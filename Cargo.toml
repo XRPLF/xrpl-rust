@@ -1,0 +1,13 @@
+[package]
+name = "xrpl-rust"
+version = "0.1.0"
+edition = "2018"
+authors = ["Tanveer Wahid <tan@wahid.email>"]
+description = "A Rust library to interact with the XRPL"
+readme = "../README.md"
+license = "ISC License"
+repository = "https://github.com/sephynox/xrpl-rust"
+
+[dependencies]
+chrono = "0.4.19"
+rust_decimal = "1.16.0"
