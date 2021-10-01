@@ -1,3 +1,5 @@
+//! Conversions between XRP drops and native number types.
+
 use rust_decimal::Decimal;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -35,14 +37,15 @@ impl From<rust_decimal::Error> for XRPRangeException {
 /// Convert a numeric XRP amount to drops of XRP.
 /// Return an equivalent amount in drops of XRP.
 ///
-/// [`chrono::DateTime`]: chrono::DateTime
-///
 /// # Examples
 ///
 /// Basic usage:
 ///
 /// ```
-/// let timestamp: i64 = datetime_to_ripple_time(Utc.timestamp(946684801, 0))?;
+/// use rust_decimal::Decimal;
+/// use xrpl_rust::utils::xrpl_conversion::xrp_to_drops;
+///
+/// let drops = xrp_to_drops(Decimal::new(100000000, 6));
 /// ```
 pub fn xrp_to_drops(xrp: Decimal) -> Result<String, XRPRangeException> {
     if xrp < ONE_DROP && xrp != Decimal::ZERO {
@@ -58,17 +61,17 @@ pub fn xrp_to_drops(xrp: Decimal) -> Result<String, XRPRangeException> {
     }
 }
 
-/// Convert a numeric XRP amount to drops of XRP.
-/// Return an equivalent amount in drops of XRP.
-///
-/// [`chrono::DateTime`]: chrono::DateTime
+/// Convert from drops to decimal XRP.
+/// Return an equivalent amount of XRP from drops.
 ///
 /// # Examples
 ///
 /// Basic usage:
 ///
 /// ```
-/// let timestamp: i64 = datetime_to_ripple_time(Utc.timestamp(946684801, 0))?;
+/// use xrpl_rust::utils::xrpl_conversion::drops_to_xrp;
+///
+/// let xrp = drops_to_xrp("100000000");
 /// ```
 pub fn drops_to_xrp(drops: &str) -> Result<Decimal, XRPRangeException> {
     let drops_d: Decimal = Decimal::from_str(drops)?;
