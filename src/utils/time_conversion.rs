@@ -4,8 +4,9 @@
 use chrono::DateTime;
 use chrono::TimeZone;
 use chrono::Utc;
-use std::fmt::Display;
-use std::fmt::Formatter;
+
+#[cfg(feature = "std")]
+extern crate std;
 
 /// The "Ripple Epoch" of 2000-01-01T00:00:00 UTC
 pub const RIPPLE_EPOCH: i64 = 946684800;
@@ -18,8 +19,9 @@ pub struct XRPLTimeRangeException {
     time: i64,
 }
 
-impl Display for XRPLTimeRangeException {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+#[cfg(feature = "std")]
+impl std::fmt::Display for XRPLTimeRangeException {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.time < 0 {
             write!(f, "{} is before the Ripple Epoch.", self.time)
         } else if self.time > MAX_XRPL_TIME {
@@ -150,5 +152,62 @@ mod test {
     fn test_posix_to_ripple_time() {
         let success: i64 = posix_to_ripple_time(RIPPLE_EPOCH).unwrap();
         assert_eq!(success, RIPPLE_EPOCH - RIPPLE_EPOCH);
+    }
+
+    #[test]
+    fn accept_posix_round_trip() {
+        let current_time: i64 = Utc::now().timestamp();
+        let ripple_time: i64 = posix_to_ripple_time(current_time).unwrap();
+        let round_trip_time: i64 = ripple_time_to_posix(ripple_time).unwrap();
+
+        assert_eq!(current_time, round_trip_time);
+    }
+
+    #[test]
+    fn accept_datetime_round_trip() {
+        let current_time: DateTime<Utc> = Utc.timestamp(Utc::now().timestamp(), 0);
+        let ripple_time: i64 = datetime_to_ripple_time(current_time).unwrap();
+        let round_trip_time: DateTime<Utc> = ripple_time_to_datetime(ripple_time).unwrap();
+
+        assert_eq!(current_time, round_trip_time);
+    }
+
+    #[test]
+    fn accept_ripple_epoch() {
+        assert_eq!(
+            Utc.ymd(2000, 1, 1).and_hms(0, 0, 0),
+            ripple_time_to_datetime(0).unwrap()
+        );
+    }
+
+    /// "Ripple Epoch" time starts in the year 2000
+    #[test]
+    fn accept_datetime_underflow() {
+        let datetime: DateTime<Utc> = Utc.ymd(1999, 1, 1).and_hms(0, 0, 0);
+        assert!(datetime_to_ripple_time(datetime).is_err())
+    }
+
+    /// "Ripple Epoch" time starts in the year 2000
+    #[test]
+    fn accept_posix_underflow() {
+        let datetime: DateTime<Utc> = Utc.ymd(1999, 1, 1).and_hms(0, 0, 0);
+        assert!(posix_to_ripple_time(datetime.timestamp()).is_err())
+    }
+
+    /// "Ripple Epoch" time's equivalent to the
+    /// "Year 2038 problem" is not until 2136
+    /// because it uses an *unsigned* 32-bit int
+    /// starting 30 years after UNIX time's signed
+    /// 32-bit int.
+    #[test]
+    fn accept_datetime_overflow() {
+        let datetime: DateTime<Utc> = Utc.ymd(2137, 1, 1).and_hms(0, 0, 0);
+        assert!(datetime_to_ripple_time(datetime).is_err())
+    }
+
+    #[test]
+    fn accept_posix_overflow() {
+        let datetime: DateTime<Utc> = Utc.ymd(2137, 1, 1).and_hms(0, 0, 0);
+        assert!(posix_to_ripple_time(datetime.timestamp()).is_err())
     }
 }
