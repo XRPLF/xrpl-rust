@@ -1,18 +1,16 @@
 //! Conversions between XRP drops and native number types.
 
+use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::str::FromStr;
 
 /// Indivisible unit of XRP
 pub const ONE_DROP: Decimal = Decimal::from_parts(1, 0, 0, false, 6);
 /// 100 billion decimal XRP
-pub const MAX_XRP: i64 = i64::pow(10, 11);
+pub const MAX_XRP: u64 = u64::pow(10, 11);
 /// Maximum possible drops of XRP
-pub const MAX_DROPS: i64 = i64::pow(10, 17);
+pub const MAX_DROPS: u64 = u64::pow(10, 17);
 /// Drops in one XRP
-pub const XRP_DROPS: i64 = 1000000;
+pub const XRP_DROPS: u64 = 1000000;
 
 #[derive(Debug)]
 /// Exception for invalid XRP Ledger time data.
@@ -20,8 +18,9 @@ pub struct XRPRangeException {
     message: String,
 }
 
-impl Display for XRPRangeException {
-    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+#[cfg(feature = "std")]
+impl std::fmt::Display for XRPRangeException {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.message)
     }
 }
@@ -52,7 +51,7 @@ pub fn xrp_to_drops(xrp: Decimal) -> Result<String, XRPRangeException> {
         Err(XRPRangeException {
             message: format!("XRP amount {} is too small.", xrp),
         })
-    } else if xrp.gt(&Decimal::new(MAX_XRP, 0)) {
+    } else if xrp.gt(&Decimal::new(MAX_XRP as i64, 0)) {
         Err(XRPRangeException {
             message: format!("XRP amount {} is too large.", xrp),
         })
@@ -77,7 +76,7 @@ pub fn drops_to_xrp(drops: &str) -> Result<Decimal, XRPRangeException> {
     let drops_d: Decimal = Decimal::from_str(drops)?;
     let xrp = drops_d * ONE_DROP;
 
-    if xrp.gt(&Decimal::new(MAX_XRP, 0)) {
+    if xrp.gt(&Decimal::new(MAX_XRP as i64, 0)) {
         Err(XRPRangeException {
             message: format!("Drops amount {} is too large.", drops),
         })
@@ -111,5 +110,71 @@ mod test {
         let xrp: Decimal = Decimal::new(100000001, 6);
 
         assert_eq!(xrp, drops);
+    }
+
+    #[test]
+    fn accept_one_xrp() {
+        let xrp = Decimal::new(1, 0);
+        assert_eq!("1000000".to_string(), xrp_to_drops(xrp).unwrap());
+    }
+
+    #[test]
+    fn accept_zero_xrp() {
+        let xrp = Decimal::new(0, 0);
+        assert_eq!("0".to_string(), xrp_to_drops(xrp).unwrap());
+    }
+
+    #[test]
+    fn accept_min_xrp() {
+        let xrp = Decimal::from_str("0.000001").unwrap();
+        assert_eq!("1".to_string(), xrp_to_drops(xrp).unwrap());
+    }
+
+    #[test]
+    fn accept_max_xrp() {
+        let xrp = Decimal::new(i64::pow(10, 11), 0);
+        assert_eq!("100000000000000000".to_string(), xrp_to_drops(xrp).unwrap());
+    }
+
+    #[test]
+    fn accept_too_small_xrp() {
+        let xrp = Decimal::from_str("0.0000001").unwrap();
+        assert!(xrp_to_drops(xrp).is_err());
+    }
+
+    #[test]
+    fn accept_too_big_xrp() {
+        let xrp = Decimal::new(i64::pow(10, 11) + 1, 0);
+        assert!(xrp_to_drops(xrp).is_err());
+    }
+
+    #[test]
+    fn accept_one_drop() {
+        let xrp = Decimal::from_str("0.000001").unwrap();
+        assert_eq!(xrp, drops_to_xrp("1").unwrap());
+    }
+
+    #[test]
+    fn accept_zero_drops() {
+        let xrp = Decimal::from_str("0").unwrap();
+        assert_eq!(xrp, drops_to_xrp("0").unwrap());
+    }
+
+    #[test]
+    fn accept_1mil_drops() {
+        let xrp = Decimal::new(1, 0);
+        assert_eq!(xrp, drops_to_xrp("1000000").unwrap());
+    }
+
+    #[test]
+    fn accept_max_drops() {
+        let xrp = Decimal::new(i64::pow(10, 11), 0);
+        assert_eq!(xrp, drops_to_xrp(&u64::pow(10, 17).to_string()).unwrap());
+    }
+
+    #[test]
+    fn accept_too_big_drops() {
+        let drop = Decimal::new(i64::pow(10, 11) + 1, 0);
+        assert!(xrp_to_drops(drop).is_err());
     }
 }
