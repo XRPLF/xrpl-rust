@@ -1,7 +1,7 @@
 # xrpl-rust
 A Rust library to interact with the XRPL.
 
-A pure Rust implementation for interacting with the XRP Ledger, the xrpl-rust package simplifies the hardest parts of XRP Ledger interaction, like serialization and transaction signing, by providing native Python methods and models for XRP Ledger transactions and core server API (rippled) objects.
+A pure Rust implementation for interacting with the XRP Ledger, the xrpl-rust package simplifies the hardest parts of XRP Ledger interaction, like serialization and transaction signing, by providing iomatic Rust functionality for XRP Ledger transactions and core server API (rippled) objects.
 
 > WIP
 

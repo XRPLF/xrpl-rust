@@ -9,7 +9,7 @@ license = "ISC License"
 repository = "https://github.com/sephynox/xrpl-rust"
 
 [lib]
-name = "xrpl_rust"
+name = "xrpl"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
@@ -17,9 +17,11 @@ hex = { version = "0.4.3", default-features = false }
 chrono = { version = "0.4.19" }
 rust_decimal = { version = "1.16.0", default-features = false }
 bs58 = { version = "0.4.0", default-features = false }
+serde = { version = "1.0.130", default-features = false }
+serde_json = { version = "1.0.68", default-features = false, features = ["alloc"] }
 strum = { version = "0.21.0" }
 strum_macros = { version = "0.21.1" }
 
 [features]
-default = ["std", "bs58/check"]
-std = ["hex/std", "rust_decimal/std", "bs58/std"]
+default = ["std", "bs58/check", "serde/derive"]
+std = ["hex/std", "rust_decimal/std", "bs58/std", "serde/std"]

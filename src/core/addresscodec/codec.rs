@@ -92,7 +92,7 @@ pub fn encode_seed(
 ) -> Result<String, XRPLAddressCodecException> {
     let prefix = algorithm_to_prefix(&encoding_type);
 
-    if entropy.len() != SEED_LENGTH.into() {
+    if entropy.len() != SEED_LENGTH as usize {
         Err(XRPLAddressCodecException::new(&format!(
             "Entropy must have length {}",
             SEED_LENGTH
