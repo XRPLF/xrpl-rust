@@ -1,64 +1,67 @@
 //! Maps and helpers providing serialization-related
 //! information about fields.
 
-use crate::core::binarycodec::definitions::exceptions::XRPDefinitionException;
 use crate::core::binarycodec::definitions::field_info::FieldInfo;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+type FieldInfoMap = IndexMap<String, FieldInfo>;
+type FieldHeaderMap = IndexMap<String, String>;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct Types {
-    pub validation: u16,
+    pub validation: i16,
     pub done: i16,
-    pub hash_128: u16,
-    pub blob: u16,
+    pub hash_128: i16,
+    pub blob: i16,
     #[serde(rename = "AccountID")]
-    pub account_id: u16,
-    pub amount: u16,
-    pub hash_256: u16,
-    pub u_int_8: u16,
-    pub vector_256: u16,
-    pub serialized_dict: u16,
+    pub account_id: i16,
+    pub amount: i16,
+    pub hash_256: i16,
+    pub u_int_8: i16,
+    pub vector_256: i16,
+    pub serialized_dict: i16,
     pub unknown: i16,
-    pub transaction: u16,
-    pub hash_160: u16,
-    pub path_set: u16,
-    pub ledger_entry: u16,
-    pub u_int_16: u16,
-    pub not_present: u16,
-    pub u_int_64: u16,
-    pub u_int_32: u16,
-    pub serialized_list: u16,
+    pub transaction: i16,
+    pub hash_160: i16,
+    pub path_set: i16,
+    pub ledger_entry: i16,
+    pub u_int_16: i16,
+    pub not_present: i16,
+    pub u_int_64: i16,
+    pub u_int_32: i16,
+    pub serialized_list: i16,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct LedgerEntryTypes {
     pub any: i16,
     pub child: i16,
     pub invalid: i16,
-    pub account_root: u16,
-    pub directory_node: u16,
-    pub ripple_state: u16,
-    pub ticket: u16,
-    pub signer_list: u16,
-    pub offer: u16,
-    pub ledger_hashes: u16,
-    pub amendments: u16,
-    pub fee_settings: u16,
-    pub escrow: u16,
-    pub pay_channel: u16,
-    pub deposit_preauth: u16,
-    pub check: u16,
-    pub nickname: u16,
-    pub contract: u16,
-    pub generator_map: u16,
+    pub account_root: i16,
+    pub directory_node: i16,
+    pub ripple_state: i16,
+    pub ticket: i16,
+    pub signer_list: i16,
+    pub offer: i16,
+    pub ledger_hashes: i16,
+    pub amendments: i16,
+    pub fee_settings: i16,
+    pub escrow: i16,
+    pub pay_channel: i16,
+    pub deposit_preauth: i16,
+    pub check: i16,
+    pub nickname: i16,
+    pub contract: i16,
+    pub generator_map: i16,
     #[serde(rename = "NegativeUNL")]
-    pub negative_unl: u16,
+    pub negative_unl: i16,
 }
 
 /// =(
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TransactionResults {
     #[serde(rename = "telLOCAL_ERROR")]
     pub tel_local_error: i16,
@@ -221,132 +224,217 @@ pub struct TransactionResults {
     pub ter_queued: i16,
 
     #[serde(rename = "tesSUCCESS")]
-    pub tes_success: u16,
+    pub tes_success: i16,
 
     #[serde(rename = "tecCLAIM")]
-    pub tec_claim: u16,
+    pub tec_claim: i16,
     #[serde(rename = "tecPATH_PARTIAL")]
-    pub tec_path_partial: u16,
+    pub tec_path_partial: i16,
     #[serde(rename = "tecUNFUNDED_ADD")]
-    pub tec_unfunded_add: u16,
+    pub tec_unfunded_add: i16,
     #[serde(rename = "tecUNFUNDED_OFFER")]
-    pub tec_unfunded_offer: u16,
+    pub tec_unfunded_offer: i16,
     #[serde(rename = "tecUNFUNDED_PAYMENT")]
-    pub tec_unfunded_payment: u16,
+    pub tec_unfunded_payment: i16,
     #[serde(rename = "tecFAILED_PROCESSING")]
-    pub tec_failed_processing: u16,
+    pub tec_failed_processing: i16,
     #[serde(rename = "tecDIR_FULL")]
-    pub tec_dir_full: u16,
+    pub tec_dir_full: i16,
     #[serde(rename = "tecINSUF_RESERVE_LINE")]
-    pub tec_insuf_reserve_line: u16,
+    pub tec_insuf_reserve_line: i16,
     #[serde(rename = "tecINSUF_RESERVE_OFFER")]
-    pub tec_insuf_reserve_offer: u16,
+    pub tec_insuf_reserve_offer: i16,
     #[serde(rename = "tecNO_DST")]
-    pub tec_no_dst: u16,
+    pub tec_no_dst: i16,
     #[serde(rename = "tecNO_DST_INSUF_XRP")]
-    pub tec_no_dst_insuf_xrp: u16,
+    pub tec_no_dst_insuf_xrp: i16,
     #[serde(rename = "tecNO_LINE_INSUF_RESERVE")]
-    pub tec_no_line_insuf_reserve: u16,
+    pub tec_no_line_insuf_reserve: i16,
     #[serde(rename = "tecNO_LINE_REDUNDANT")]
-    pub tec_no_line_redundant: u16,
+    pub tec_no_line_redundant: i16,
     #[serde(rename = "tecPATH_DRY")]
-    pub tec_path_dry: u16,
+    pub tec_path_dry: i16,
     #[serde(rename = "tecUNFUNDED")]
-    pub tec_unfunded: u16,
+    pub tec_unfunded: i16,
     #[serde(rename = "tecNO_ALTERNATIVE_KEY")]
-    pub tec_no_alternative_key: u16,
+    pub tec_no_alternative_key: i16,
     #[serde(rename = "tecNO_REGULAR_KEY")]
-    pub tec_no_regular_key: u16,
+    pub tec_no_regular_key: i16,
     #[serde(rename = "tecOWNERS")]
-    pub tec_owners: u16,
+    pub tec_owners: i16,
     #[serde(rename = "tecNO_ISSUER")]
-    pub tec_no_issuer: u16,
+    pub tec_no_issuer: i16,
     #[serde(rename = "tecNO_AUTH")]
-    pub tec_no_auth: u16,
+    pub tec_no_auth: i16,
     #[serde(rename = "tecNO_LINE")]
-    pub tec_no_line: u16,
+    pub tec_no_line: i16,
     #[serde(rename = "tecINSUFF_FEE")]
-    pub tec_insuff_fee: u16,
+    pub tec_insuff_fee: i16,
     #[serde(rename = "tecFROZEN")]
-    pub tec_frozen: u16,
+    pub tec_frozen: i16,
     #[serde(rename = "tecNO_TARGET")]
-    pub tec_no_target: u16,
+    pub tec_no_target: i16,
     #[serde(rename = "tecNO_PERMISSION")]
-    pub tec_no_permission: u16,
+    pub tec_no_permission: i16,
     #[serde(rename = "tecNO_ENTRY")]
-    pub tec_no_entry: u16,
+    pub tec_no_entry: i16,
     #[serde(rename = "tecINSUFFICIENT_RESERVE")]
-    pub tec_insufficient_reserve: u16,
+    pub tec_insufficient_reserve: i16,
     #[serde(rename = "tecNEED_MASTER_KEY")]
-    pub tec_need_master_key: u16,
+    pub tec_need_master_key: i16,
     #[serde(rename = "tecDST_TAG_NEEDED")]
-    pub tec_dst_tag_needed: u16,
+    pub tec_dst_tag_needed: i16,
     #[serde(rename = "tecINTERNAL")]
-    pub tec_internal: u16,
+    pub tec_internal: i16,
     #[serde(rename = "tecOVERSIZE")]
-    pub tec_oversize: u16,
+    pub tec_oversize: i16,
     #[serde(rename = "tecCRYPTOCONDITION_ERROR")]
-    pub tec_cryptocondition_error: u16,
+    pub tec_cryptocondition_error: i16,
     #[serde(rename = "tecINVARIANT_FAILED")]
-    pub tec_invariant_failed: u16,
+    pub tec_invariant_failed: i16,
     #[serde(rename = "tecEXPIRED")]
-    pub tec_expired: u16,
+    pub tec_expired: i16,
     #[serde(rename = "tecDUPLICATE")]
-    pub tec_duplicate: u16,
+    pub tec_duplicate: i16,
     #[serde(rename = "tecKILLED")]
-    pub tec_killed: u16,
+    pub tec_killed: i16,
     #[serde(rename = "tecHAS_OBLIGATIONS")]
-    pub tec_has_obligations: u16,
+    pub tec_has_obligations: i16,
     #[serde(rename = "tecTOO_SOON")]
-    pub tec_too_soon: u16,
+    pub tec_too_soon: i16,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct TransactionTypes {
     pub invalid: i16,
 
-    pub payment: u16,
-    pub escrow_create: u16,
-    pub escrow_finish: u16,
-    pub account_set: u16,
-    pub escrow_cancel: u16,
-    pub set_regular_key: u16,
-    pub nick_name_set: u16,
-    pub offer_create: u16,
-    pub offer_cancel: u16,
-    pub contract: u16,
-    pub ticket_create: u16,
-    pub ticket_cancel: u16,
-    pub signer_list_set: u16,
-    pub payment_channel_create: u16,
-    pub payment_channel_fund: u16,
-    pub payment_channel_claim: u16,
-    pub check_create: u16,
-    pub check_cash: u16,
-    pub check_cancel: u16,
-    pub deposit_preauth: u16,
-    pub trust_set: u16,
-    pub account_delete: u16,
+    pub payment: i16,
+    pub escrow_create: i16,
+    pub escrow_finish: i16,
+    pub account_set: i16,
+    pub escrow_cancel: i16,
+    pub set_regular_key: i16,
+    pub nick_name_set: i16,
+    pub offer_create: i16,
+    pub offer_cancel: i16,
+    pub contract: i16,
+    pub ticket_create: i16,
+    pub ticket_cancel: i16,
+    pub signer_list_set: i16,
+    pub payment_channel_create: i16,
+    pub payment_channel_fund: i16,
+    pub payment_channel_claim: i16,
+    pub check_create: i16,
+    pub check_cash: i16,
+    pub check_cancel: i16,
+    pub deposit_preauth: i16,
+    pub trust_set: i16,
+    pub account_delete: i16,
 
-    pub enable_amendment: u16,
-    pub set_fee: u16,
+    pub enable_amendment: i16,
+    pub set_fee: i16,
     #[serde(rename = "UNLModify")]
-    pub unl_modify: u16,
+    pub unl_modify: i16,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Field(pub String, pub FieldInfo);
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "UPPERCASE")]
 pub struct Definitions {
     pub types: Types,
     pub ledger_entry_types: LedgerEntryTypes,
-    //pub fields: Vec<Vec<FieldInfo>>,
+    pub fields: Vec<Field>,
     pub transaction_results: TransactionResults,
     pub transaction_types: TransactionTypes,
 }
 
-fn load_definitions() -> Result<Definitions, XRPDefinitionException> {
-    Ok(serde_json::from_str(&include_str!("definitions.json"))?)
+unsafe fn _load_definitions<'a>() -> &'a Option<Definitions> {
+    static JSON: &str = include_str!("definitions.json");
+    static mut DEFINITIONS: Option<Definitions> = None;
+
+    if DEFINITIONS.is_none() {
+        DEFINITIONS = Some(serde_json::from_str(JSON).unwrap());
+    };
+
+    &DEFINITIONS
+}
+
+unsafe fn _field_info_map<'a>() -> &'a Option<FieldInfoMap> {
+    static mut FIELD_INFO_MAP: Option<FieldInfoMap> = None;
+
+    if FIELD_INFO_MAP.is_none() {
+        let definitions: &Definitions = _load_definitions().as_ref().unwrap();
+        let mut map = FieldInfoMap::default();
+
+        for field in &definitions.fields {
+            map.insert((field.0).to_owned(), (field.1).to_owned());
+        }
+
+        FIELD_INFO_MAP = Some(map);
+    }
+
+    &FIELD_INFO_MAP
+}
+
+fn _field_entry_val(param: &str) -> Option<i16> {
+    let definitions: &Definitions = unsafe { _load_definitions().as_ref().unwrap() };
+
+    match param {
+        "Validation" => Some(definitions.types.validation),
+        "Hash128" => Some(definitions.types.hash_128),
+        "Hash256" => Some(definitions.types.hash_256),
+        "Blob" => Some(definitions.types.blob),
+        "AccountID" => Some(definitions.types.account_id),
+        "Amount" => Some(definitions.types.amount),
+        "UInt8" => Some(definitions.types.u_int_8),
+        "Vector256" => Some(definitions.types.vector_256),
+        "SerializedDict" => Some(definitions.types.serialized_dict),
+        "Unknown" => Some(definitions.types.unknown),
+        "Transaction" => Some(definitions.types.transaction),
+        "Hash160" => Some(definitions.types.hash_160),
+        "PathSet" => Some(definitions.types.path_set),
+        "LedgerEntry" => Some(definitions.types.ledger_entry),
+        "UInt16" => Some(definitions.types.u_int_16),
+        "UInt64" => Some(definitions.types.u_int_64),
+        "UInt32" => Some(definitions.types.u_int_32),
+        "SerializedList" => Some(definitions.types.serialized_list),
+        _ => None,
+    }
+}
+
+/// Returns the serialization data type for the
+/// given field name.
+///
+/// Serialization Type List:
+/// https://xrpl.org/serialization.html#type-list
+pub fn get_field_type_name(field_name: &str) -> Option<String> {
+    let field_info_map: &FieldInfoMap = unsafe { _field_info_map().as_ref().unwrap() };
+    let result = field_info_map.get(field_name);
+
+    if result.is_none() {
+        None
+    } else {
+        Some(result.unwrap().r#type.to_owned())
+    }
+}
+
+/// Returns the type code associated with the
+/// given field.
+///
+/// Serialization Type Codes:
+/// https://xrpl.org/serialization.html#type-codes
+pub fn get_field_type_code(field_name: &str) -> Option<i16> {
+    let field_type_name = get_field_type_name(field_name);
+
+    if field_type_name.is_none() {
+        None
+    } else {
+        let field_type_code = _field_entry_val(&field_type_name.unwrap());
+        field_type_code
+    }
 }
 
 #[cfg(test)]
@@ -355,7 +443,29 @@ mod test {
 
     #[test]
     fn test_load_definitions() {
-        let definitions = load_definitions();
-        println!("{:?}", definitions);
+        unsafe {
+            assert!(!_load_definitions().is_none());
+        }
+    }
+
+    #[test]
+    fn test_field_entry_val() {
+        assert_eq!(10003, _field_entry_val("Validation").unwrap());
+        assert_eq!(-2, _field_entry_val("Unknown").unwrap());
+        assert!(_field_entry_val("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_field_type_name() {
+        let field_type_name: Option<String> = get_field_type_name("HighLimit");
+
+        assert!(!field_type_name.is_none());
+        assert_eq!("Amount", field_type_name.unwrap());
+    }
+
+    #[test]
+    fn test_get_field_type_code() {
+        assert_eq!(6, get_field_type_code("HighLimit").unwrap());
+        assert_eq!(-2, get_field_type_code("Generic").unwrap());
     }
 }

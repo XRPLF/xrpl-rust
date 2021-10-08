@@ -1,7 +1,7 @@
 #[cfg(all(feature = "alloc", not(feature = "std")))]
-extern crate alloc;
+extern crate alloc as std;
 #[cfg(feature = "std")]
-extern crate std as alloc;
+extern crate std;
 
 pub mod constants;
 pub mod core;

@@ -18,7 +18,6 @@ pub struct XRPRangeException {
     message: String,
 }
 
-#[cfg(feature = "std")]
 impl std::fmt::Display for XRPRangeException {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.message)

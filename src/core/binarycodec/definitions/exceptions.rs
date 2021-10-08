@@ -4,7 +4,14 @@ pub struct XRPDefinitionException {
     message: String,
 }
 
-#[cfg(feature = "std")]
+impl XRPDefinitionException {
+    pub fn new(err: &str) -> XRPDefinitionException {
+        XRPDefinitionException {
+            message: err.to_string(),
+        }
+    }
+}
+
 impl std::convert::From<serde_json::Error> for XRPDefinitionException {
     fn from(err: serde_json::Error) -> Self {
         XRPDefinitionException {

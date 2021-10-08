@@ -77,7 +77,7 @@ impl Serializer for BinarySerializer {
     }
 
     fn write_field_and_value(&mut self, field: FieldInstance, value: &[u8]) -> &Self {
-        //let bytes = field.header.to_bytes();
+        self.extend_from_slice(&field.header.to_bytes());
 
         if field.is_vl_encoded {
             self.write_length_encoded(value);

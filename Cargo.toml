@@ -8,9 +8,11 @@ readme = "../README.md"
 license = "ISC License"
 repository = "https://github.com/sephynox/xrpl-rust"
 
+[package.metadata.release]
+tag-name = "{{version}}"
+
 [lib]
 name = "xrpl"
-crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
 hex = { version = "0.4.3", default-features = false }
@@ -21,7 +23,15 @@ serde = { version = "1.0.130", default-features = false }
 serde_json = { version = "1.0.68", default-features = false, features = ["alloc"] }
 strum = { version = "0.21.0" }
 strum_macros = { version = "0.21.1" }
+indexmap = { version = "1.7.0", features = ["serde"] }
+
+[dev-dependencies]
+criterion = "0.3.5"
+
+[[bench]]
+name = "benchmarks"
+harness = false
 
 [features]
 default = ["std", "bs58/check", "serde/derive"]
-std = ["hex/std", "rust_decimal/std", "bs58/std", "serde/std"]
+std = ["hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std"]

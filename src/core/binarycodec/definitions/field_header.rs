@@ -9,19 +9,34 @@ pub struct FieldHeader {
 }
 
 impl ToBytes for FieldHeader {
-    fn to_be_bytes(&self) -> &[u8] {
-        todo!()
-    }
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut header_bytes = vec![];
 
-    fn to_le_bytes(&self) -> &[u8] {
-        todo!()
-    }
+        if self.type_code < 16 {
+            if self.field_code < 16 {
+                let shift = self.type_code << 4 | self.field_code;
+                header_bytes.extend_from_slice(&shift.to_be_bytes());
 
-    fn to_bytes(&self) -> &[u8] {
-        if cfg!(target_endian = "big") {
-            self.to_be_bytes()
+                header_bytes
+            } else {
+                let shift = self.type_code << 4;
+
+                header_bytes.extend_from_slice(&shift.to_be_bytes());
+                header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+
+                header_bytes
+            }
+        } else if self.field_code < 16 {
+            header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+            header_bytes.extend_from_slice(&self.type_code.to_be_bytes());
+
+            header_bytes
         } else {
-            self.to_le_bytes()
+            header_bytes.extend_from_slice(&[0]);
+            header_bytes.extend_from_slice(&self.type_code.to_be_bytes());
+            header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+
+            header_bytes
         }
     }
 }

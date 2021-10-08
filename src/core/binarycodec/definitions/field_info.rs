@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 ///Model object for field info metadata from the
 /// "fields" section of definitions.json.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FieldInfo {
     /// The field code -- sort order position for
@@ -13,6 +13,7 @@ pub struct FieldInfo {
     pub nth: i16,
     /// Whether the serialized length of this
     /// field varies.
+    #[serde(rename = "isVLEncoded")]
     pub is_vl_encoded: bool,
     /// If the field is presented in binary
     /// serialized representation.

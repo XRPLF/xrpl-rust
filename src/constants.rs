@@ -9,7 +9,6 @@ pub enum CryptoAlgorithm {
     SECP256K1,
 }
 
-#[cfg(feature = "std")]
 impl std::string::ToString for CryptoAlgorithm {
     fn to_string(&self) -> std::string::String {
         match *self {

@@ -5,9 +5,6 @@ use chrono::DateTime;
 use chrono::TimeZone;
 use chrono::Utc;
 
-#[cfg(feature = "std")]
-extern crate std;
-
 /// The "Ripple Epoch" of 2000-01-01T00:00:00 UTC
 pub const RIPPLE_EPOCH: i64 = 946684800;
 /// The maximum time that can be expressed on the XRPL
@@ -19,7 +16,6 @@ pub struct XRPLTimeRangeException {
     time: i64,
 }
 
-#[cfg(feature = "std")]
 impl std::fmt::Display for XRPLTimeRangeException {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.time < 0 {
