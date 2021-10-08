@@ -41,7 +41,7 @@ impl From<rust_decimal::Error> for XRPRangeException {
 ///
 /// ```
 /// use rust_decimal::Decimal;
-/// use xrpl_rust::utils::xrpl_conversion::xrp_to_drops;
+/// use xrpl::utils::xrpl_conversion::xrp_to_drops;
 ///
 /// let drops = xrp_to_drops(Decimal::new(100000000, 6));
 /// ```
@@ -67,7 +67,7 @@ pub fn xrp_to_drops(xrp: Decimal) -> Result<String, XRPRangeException> {
 /// Basic usage:
 ///
 /// ```
-/// use xrpl_rust::utils::xrpl_conversion::drops_to_xrp;
+/// use xrpl::utils::xrpl_conversion::drops_to_xrp;
 ///
 /// let xrp = drops_to_xrp("100000000");
 /// ```

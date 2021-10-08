@@ -13,6 +13,7 @@ tag-name = "{{version}}"
 
 [lib]
 name = "xrpl"
+crate-type = ["lib"]
 
 [dependencies]
 hex = { version = "0.4.3", default-features = false }

@@ -43,7 +43,7 @@ impl std::fmt::Display for XRPLTimeRangeException {
 ///
 /// ```
 /// use chrono::DateTime;
-/// use xrpl_rust::utils::time_conversion::ripple_time_to_datetime;
+/// use xrpl::utils::time_conversion::ripple_time_to_datetime;
 ///
 /// let date_time = ripple_time_to_datetime(946684801);
 /// ```
@@ -66,7 +66,7 @@ pub fn ripple_time_to_datetime(ripple_time: i64) -> Result<DateTime<Utc>, XRPLTi
 ///
 /// ```
 /// use chrono::{Utc, TimeZone};
-/// use xrpl_rust::utils::time_conversion::datetime_to_ripple_time;
+/// use xrpl::utils::time_conversion::datetime_to_ripple_time;
 ///
 /// let timestamp = datetime_to_ripple_time(Utc.timestamp(946684801, 0));
 /// ```
@@ -88,7 +88,7 @@ pub fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTimeRangeEx
 /// Basic usage:
 ///
 /// ```
-/// use xrpl_rust::utils::time_conversion::ripple_time_to_posix;
+/// use xrpl::utils::time_conversion::ripple_time_to_posix;
 ///
 /// let timestamp = ripple_time_to_posix(946684801);
 /// ```
@@ -108,7 +108,7 @@ pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeExcept
 /// Basic usage:
 ///
 /// ```
-/// use xrpl_rust::utils::time_conversion::posix_to_ripple_time;
+/// use xrpl::utils::time_conversion::posix_to_ripple_time;
 ///
 /// let timestamp = posix_to_ripple_time(946684801);
 /// ```

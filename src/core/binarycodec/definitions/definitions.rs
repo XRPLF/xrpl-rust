@@ -351,7 +351,7 @@ pub struct Definitions {
     pub transaction_types: TransactionTypes,
 }
 
-unsafe fn _load_definitions<'a>() -> &'a Option<Definitions> {
+unsafe fn _load_definitions() -> &'static Option<Definitions> {
     static JSON: &str = include_str!("definitions.json");
     static mut DEFINITIONS: Option<Definitions> = None;
 
@@ -432,8 +432,7 @@ pub fn get_field_type_code(field_name: &str) -> Option<i16> {
     if field_type_name.is_none() {
         None
     } else {
-        let field_type_code = _field_entry_val(&field_type_name.unwrap());
-        field_type_code
+        _field_entry_val(&field_type_name.unwrap())
     }
 }
 
