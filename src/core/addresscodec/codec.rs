@@ -36,8 +36,6 @@ fn algorithm_to_prefix<'a>(algo: &'a CryptoAlgorithm) -> Option<&'a [u8]> {
 /// given data prefix (which indicates type) and while
 /// ensuring the bytestring is the expected length.
 ///
-/// TODO Broken
-///
 /// See [`bs58::encode`]
 ///
 /// [`bs58::encode`]: bs58::encode

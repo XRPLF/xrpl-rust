@@ -10,9 +10,6 @@ use crate::core::addresscodec::codec::encode_classic_address;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::XRPL_ALPHABET;
 
-#[cfg(not(feature = "std"))]
-extern crate hex;
-
 const MAX_32_BIT_UNSIGNED_INT: u32 = u32::max_value();
 
 const _PREFIX_BYTES_MAIN: [u8; 2] = [0x05, 0x44];
