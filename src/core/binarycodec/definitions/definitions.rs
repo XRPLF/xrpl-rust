@@ -1,12 +1,23 @@
 //! Maps and helpers providing serialization-related
 //! information about fields.
 
+use crate::core::binarycodec::definitions::field_header::FieldHeader;
 use crate::core::binarycodec::definitions::field_info::FieldInfo;
+use crate::core::binarycodec::definitions::field_instance::FieldInstance;
 use indexmap::IndexMap;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 
 type FieldInfoMap = IndexMap<String, FieldInfo>;
-type FieldHeaderMap = IndexMap<String, String>;
+type TypeValueMap = IndexMap<String, i16>;
+type TypeNameMap = IndexMap<i16, String>;
+type FieldHeaderNameMap = IndexMap<String, String>;
+type TransactionTypeValueMap = IndexMap<String, i16>;
+type TransactionTypeNameMap = IndexMap<i16, String>;
+type TransactionResultValueMap = IndexMap<String, i16>;
+type TransactionResultNameMap = IndexMap<i16, String>;
+type LedgerEntryTypeValueMap = IndexMap<String, i16>;
+type LedgerEntryTypeNameMap = IndexMap<i16, String>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
@@ -351,58 +362,310 @@ pub struct Definitions {
     pub transaction_types: TransactionTypes,
 }
 
-unsafe fn _load_definitions() -> &'static Option<Definitions> {
-    static JSON: &str = include_str!("definitions.json");
-    static mut DEFINITIONS: Option<Definitions> = None;
+/// Loads JSON from the definitions file and converts
+/// it to a preferred format. The definitions file contains
+/// information required for the XRP Ledger's canonical
+/// binary serialization format.
+///
+/// Serialization: https://xrpl.org/serialization.html
+#[derive(Debug, Clone)]
+pub struct DefinitionMap {
+    field_info_map: FieldInfoMap,
+    type_value_map: TypeValueMap,
+    type_name_map: TypeNameMap,
+    field_header_name_map: FieldHeaderNameMap,
+    transaction_type_value_map: TransactionTypeValueMap,
+    transaction_type_name_map: TransactionTypeNameMap,
+    transaction_result_value_map: TransactionResultValueMap,
+    transaction_result_name_map: TransactionResultNameMap,
+    ledger_entry_type_value_map: LedgerEntryTypeValueMap,
+    ledger_entry_type_name_map: LedgerEntryTypeNameMap,
+}
 
-    if DEFINITIONS.is_none() {
-        DEFINITIONS = Some(serde_json::from_str(JSON).unwrap());
-    };
+pub trait DefinitionHandler {
+    /// Create a new instance of a definition handler using
+    /// a Definitions object.
+    fn new(definitions: &Definitions) -> Self;
+    /// Get a FieldInfo object from a field name.
+    fn get_field_info(&self, key: &str) -> Option<&FieldInfo>;
+    /// Returns the serialization data type for the given
+    /// field name.
+    ///
+    /// Serialization Type List:
+    /// https://xrpl.org/serialization.html#type-list
+    fn get_field_type_name(&self, field_name: &str) -> Option<&String>;
+    /// Returns the type code associated with the given field.
+    ///
+    /// Serialization Type Codes:
+    /// https://xrpl.org/serialization.html#type-codes
+    fn get_field_type_code(&self, field_name: &str) -> Option<i16>;
+    /// Returns the field code associated with the given
+    /// field.
+    ///
+    /// Serialization Field Codes:
+    /// https://xrpl.org/serialization.html#field-codes
+    fn get_field_code(&self, field_name: &str) -> Option<i16>;
+    /// Returns a FieldHeader object for a field of the given
+    /// field name.
+    fn get_field_header_from_name(&self, field_name: &str) -> Option<FieldHeader>;
+    /// Returns the field name described by the given
+    /// FieldHeader object.
+    fn get_field_name_from_header(&self, field_header: &FieldHeader) -> Option<&String>;
+    /// Return a FieldInstance object for the given field name.
+    fn get_field_instance(&self, field_name: &str) -> Option<FieldInstance>;
+    /// Return an integer representing the given
+    /// transaction type string in an enum.
+    fn get_transaction_type_code(&self, transaction_type: &str) -> Option<&i16>;
+    /// Return string representing the given transaction
+    /// type from the enum.
+    fn get_transaction_type_name(&self, transaction_type: &i16) -> Option<&String>;
+    /// Return an integer representing the given transaction
+    /// result string in an enum.
+    fn get_transaction_result_code(&self, transaction_result: &str) -> Option<&i16>;
+    /// Return string representing the given transaction result
+    /// type from the enum.
+    fn get_transaction_result_name(&self, transaction_result: &i16) -> Option<&String>;
+    /// Return an integer representing the given ledger entry
+    /// type string in an enum.
+    fn get_ledger_entry_type_code(&self, ledger_entry_type: &str) -> Option<&i16>;
+    /// Return string representing the given ledger entry type
+    /// from the enum.
+    fn get_ledger_entry_type_name(&self, ledger_entry_type: &i16) -> Option<&String>;
+}
+
+trait DefinitionMaker {
+    fn _make_type_maps(types: &Types) -> (TypeValueMap, TypeNameMap);
+    fn _make_field_info_map(
+        fields: &[Field],
+        types: &TypeValueMap,
+    ) -> (FieldInfoMap, FieldHeaderNameMap);
+    fn _make_transaction_type_maps(
+        transaction_types: &TransactionTypes,
+    ) -> (TransactionTypeValueMap, TransactionTypeNameMap);
+    fn _make_transaction_result_maps(
+        transaction_types: &TransactionResults,
+    ) -> (TransactionResultValueMap, TransactionResultNameMap);
+    fn _make_ledger_entry_type_maps(
+        types: &LedgerEntryTypes,
+    ) -> (LedgerEntryTypeValueMap, LedgerEntryTypeNameMap);
+}
+
+impl DefinitionMaker for DefinitionMap {
+    fn _make_type_maps(types: &Types) -> (TypeValueMap, TypeNameMap) {
+        let json = serde_json::to_string(&types).unwrap();
+        let v_map: TypeValueMap = serde_json::from_str(&json).unwrap();
+        let mut n_map: TypeNameMap = TypeNameMap::default();
+
+        for (key, value) in &v_map {
+            n_map.insert(*value, key.to_owned());
+        }
+
+        (v_map, n_map)
+    }
+
+    fn _make_field_info_map(
+        fields: &[Field],
+        types: &TypeValueMap,
+    ) -> (FieldInfoMap, FieldHeaderNameMap) {
+        let mut field_info_map = FieldInfoMap::default();
+        let mut field_header_name_map = FieldHeaderNameMap::default();
+
+        for field in fields {
+            let field_name: String = (field.0).to_owned();
+            let field_info: FieldInfo = (field.1).to_owned();
+            let field_header = FieldHeader {
+                type_code: *types.get(&field_info.r#type).unwrap(),
+                field_code: field_info.nth,
+            };
+
+            field_info_map.insert(field_name.to_owned(), field_info);
+            field_header_name_map.insert(field_header.to_string(), field_name);
+        }
+
+        (field_info_map, field_header_name_map)
+    }
+
+    fn _make_transaction_type_maps(
+        transaction_types: &TransactionTypes,
+    ) -> (TransactionTypeValueMap, TransactionTypeNameMap) {
+        let json = serde_json::to_string(&transaction_types).unwrap();
+        let v_map: TransactionTypeValueMap = serde_json::from_str(&json).unwrap();
+        let mut n_map: TransactionTypeNameMap = TypeNameMap::default();
+
+        for (key, value) in &v_map {
+            n_map.insert(*value, key.to_owned());
+        }
+
+        (v_map, n_map)
+    }
+
+    fn _make_transaction_result_maps(
+        transaction_types: &TransactionResults,
+    ) -> (TransactionResultValueMap, TransactionResultNameMap) {
+        let json = serde_json::to_string(&transaction_types).unwrap();
+        let v_map: TransactionResultValueMap = serde_json::from_str(&json).unwrap();
+        let mut n_map: TransactionResultNameMap = TypeNameMap::default();
+
+        for (key, value) in &v_map {
+            n_map.insert(*value, key.to_owned());
+        }
+
+        (v_map, n_map)
+    }
+
+    fn _make_ledger_entry_type_maps(
+        types: &LedgerEntryTypes,
+    ) -> (LedgerEntryTypeValueMap, LedgerEntryTypeNameMap) {
+        let json = serde_json::to_string(&types).unwrap();
+        let v_map: TypeValueMap = serde_json::from_str(&json).unwrap();
+        let mut n_map: TypeNameMap = TypeNameMap::default();
+
+        for (key, value) in &v_map {
+            n_map.insert(*value, key.to_owned());
+        }
+
+        (v_map, n_map)
+    }
+}
+
+impl DefinitionHandler for DefinitionMap {
+    fn new(definitions: &Definitions) -> Self {
+        let (typev_map, typen_map) = DefinitionMap::_make_type_maps(&definitions.types);
+        let (field_info_map, field_header_name_map) =
+            DefinitionMap::_make_field_info_map(&definitions.fields, &typev_map);
+        let (transtv_map, transn_map) =
+            DefinitionMap::_make_transaction_type_maps(&definitions.transaction_types);
+        let (transrv_map, transrn_map) =
+            DefinitionMap::_make_transaction_result_maps(&definitions.transaction_results);
+        let (ledgerv_map, ledgern_map) =
+            DefinitionMap::_make_ledger_entry_type_maps(&definitions.ledger_entry_types);
+
+        DefinitionMap {
+            field_info_map: field_info_map,
+            type_value_map: typev_map,
+            type_name_map: typen_map,
+            field_header_name_map: field_header_name_map,
+            transaction_type_value_map: transtv_map,
+            transaction_type_name_map: transn_map,
+            transaction_result_value_map: transrv_map,
+            transaction_result_name_map: transrn_map,
+            ledger_entry_type_value_map: ledgerv_map,
+            ledger_entry_type_name_map: ledgern_map,
+        }
+    }
+
+    fn get_field_info(&self, key: &str) -> Option<&FieldInfo> {
+        self.field_info_map.get(key)
+    }
+
+    fn get_field_type_name(&self, field_name: &str) -> Option<&String> {
+        let result = self.field_info_map.get(field_name);
+
+        if result.is_none() {
+            None
+        } else {
+            Some(&result.unwrap().r#type)
+        }
+    }
+
+    fn get_field_type_code(&self, field_name: &str) -> Option<i16> {
+        let field_type_name = self.get_field_type_name(field_name);
+
+        if field_type_name.is_none() {
+            None
+        } else {
+            let result = self.type_value_map.get(field_type_name.unwrap());
+            Some(*result.unwrap())
+        }
+    }
+
+    fn get_field_code(&self, field_name: &str) -> Option<i16> {
+        let result = self.get_field_info(field_name);
+
+        if result.is_none() {
+            None
+        } else {
+            Some(result.unwrap().nth)
+        }
+    }
+
+    fn get_field_header_from_name(&self, field_name: &str) -> Option<FieldHeader> {
+        let type_code: Option<i16> = self.get_field_type_code(field_name);
+        let field_code: Option<i16> = self.get_field_code(field_name);
+
+        if type_code.is_none() || field_code.is_none() {
+            None
+        } else {
+            Some(FieldHeader {
+                type_code: type_code.unwrap(),
+                field_code: field_code.unwrap(),
+            })
+        }
+    }
+
+    fn get_field_name_from_header(&self, field_header: &FieldHeader) -> Option<&String> {
+        self.field_header_name_map.get(&field_header.to_string())
+    }
+
+    fn get_field_instance<'a>(&self, field_name: &str) -> Option<FieldInstance> {
+        let field_info = self.field_info_map.get(field_name);
+        let field_header = self.get_field_header_from_name(field_name);
+
+        if field_info.is_none() || field_header.is_none() {
+            None
+        } else {
+            Some(FieldInstance::new(
+                field_info.unwrap(),
+                field_name,
+                field_header.unwrap(),
+            ))
+        }
+    }
+
+    fn get_transaction_type_code(&self, transaction_type: &str) -> Option<&i16> {
+        self.transaction_type_value_map.get(transaction_type)
+    }
+
+    fn get_transaction_type_name(&self, transaction_type: &i16) -> Option<&String> {
+        self.transaction_type_name_map.get(transaction_type)
+    }
+
+    fn get_transaction_result_code(&self, transaction_result: &str) -> Option<&i16> {
+        self.transaction_result_value_map.get(transaction_result)
+    }
+
+    fn get_transaction_result_name(&self, transaction_result: &i16) -> Option<&String> {
+        self.transaction_result_name_map.get(transaction_result)
+    }
+
+    fn get_ledger_entry_type_code(&self, ledger_entry_type: &str) -> Option<&i16> {
+        self.ledger_entry_type_value_map.get(ledger_entry_type)
+    }
+
+    fn get_ledger_entry_type_name(&self, ledger_entry_type: &i16) -> Option<&String> {
+        self.ledger_entry_type_name_map.get(ledger_entry_type)
+    }
+}
+
+fn _load_definitions() -> &'static Option<(Definitions, DefinitionMap)> {
+    static JSON: &str = include_str!("definitions.json");
+
+    lazy_static! {
+        static ref DEFINITIONS: Option<(Definitions, DefinitionMap)> = {
+            let definitions: Definitions = serde_json::from_str(JSON).unwrap();
+            let definition_map: DefinitionMap = DefinitionMap::new(&definitions);
+
+            Some((definitions, definition_map))
+        };
+    }
 
     &DEFINITIONS
 }
 
-unsafe fn _field_info_map<'a>() -> &'a Option<FieldInfoMap> {
-    static mut FIELD_INFO_MAP: Option<FieldInfoMap> = None;
-
-    if FIELD_INFO_MAP.is_none() {
-        let definitions: &Definitions = _load_definitions().as_ref().unwrap();
-        let mut map = FieldInfoMap::default();
-
-        for field in &definitions.fields {
-            map.insert((field.0).to_owned(), (field.1).to_owned());
-        }
-
-        FIELD_INFO_MAP = Some(map);
-    }
-
-    &FIELD_INFO_MAP
-}
-
-fn _field_entry_val(param: &str) -> Option<i16> {
-    let definitions: &Definitions = unsafe { _load_definitions().as_ref().unwrap() };
-
-    match param {
-        "Validation" => Some(definitions.types.validation),
-        "Hash128" => Some(definitions.types.hash_128),
-        "Hash256" => Some(definitions.types.hash_256),
-        "Blob" => Some(definitions.types.blob),
-        "AccountID" => Some(definitions.types.account_id),
-        "Amount" => Some(definitions.types.amount),
-        "UInt8" => Some(definitions.types.u_int_8),
-        "Vector256" => Some(definitions.types.vector_256),
-        "SerializedDict" => Some(definitions.types.serialized_dict),
-        "Unknown" => Some(definitions.types.unknown),
-        "Transaction" => Some(definitions.types.transaction),
-        "Hash160" => Some(definitions.types.hash_160),
-        "PathSet" => Some(definitions.types.path_set),
-        "LedgerEntry" => Some(definitions.types.ledger_entry),
-        "UInt16" => Some(definitions.types.u_int_16),
-        "UInt64" => Some(definitions.types.u_int_64),
-        "UInt32" => Some(definitions.types.u_int_32),
-        "SerializedList" => Some(definitions.types.serialized_list),
-        _ => None,
-    }
+/// Retrieve the definition map.
+pub fn load_definition_map() -> &'static DefinitionMap {
+    let (_, map) = _load_definitions().as_ref().unwrap();
+    map
 }
 
 /// Returns the serialization data type for the
@@ -410,15 +673,9 @@ fn _field_entry_val(param: &str) -> Option<i16> {
 ///
 /// Serialization Type List:
 /// https://xrpl.org/serialization.html#type-list
-pub fn get_field_type_name(field_name: &str) -> Option<String> {
-    let field_info_map: &FieldInfoMap = unsafe { _field_info_map().as_ref().unwrap() };
-    let result = field_info_map.get(field_name);
-
-    if result.is_none() {
-        None
-    } else {
-        Some(result.unwrap().r#type.to_owned())
-    }
+pub fn get_field_type_name(field_name: &str) -> Option<&String> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_field_type_name(field_name)
 }
 
 /// Returns the type code associated with the
@@ -427,13 +684,83 @@ pub fn get_field_type_name(field_name: &str) -> Option<String> {
 /// Serialization Type Codes:
 /// https://xrpl.org/serialization.html#type-codes
 pub fn get_field_type_code(field_name: &str) -> Option<i16> {
-    let field_type_name = get_field_type_name(field_name);
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_field_type_code(field_name)
+}
 
-    if field_type_name.is_none() {
-        None
-    } else {
-        _field_entry_val(&field_type_name.unwrap())
-    }
+/// Returns the field code associated with the
+/// given field.
+///
+/// Serialization Field Codes:
+/// https://xrpl.org/serialization.html#field-codes
+pub fn get_field_code(field_name: &str) -> Option<i16> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_field_code(field_name)
+}
+
+/// Returns a FieldHeader object for a field of
+/// the given field name.
+pub fn get_field_header_from_name(field_name: &str) -> Option<FieldHeader> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_field_header_from_name(field_name)
+}
+
+/// Returns the field name described by the
+/// given FieldHeader object.
+pub fn get_field_name_from_header(field_header: &FieldHeader) -> Option<&String> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_field_name_from_header(field_header)
+}
+
+/// Return a FieldInstance object for the given
+/// field name.
+pub fn get_field_instance(field_name: &str) -> Option<FieldInstance> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    let field_instance = definition_map.get_field_instance(field_name);
+
+    field_instance
+}
+
+/// Return an integer representing the given
+/// transaction type string in an enum.
+pub fn get_transaction_type_code(transaction_type: &str) -> Option<&i16> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_transaction_type_code(transaction_type)
+}
+
+/// Return an integer representing the given
+/// transaction type string in an enum.
+pub fn get_transaction_type_name(transaction_type: &i16) -> Option<&String> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_transaction_type_name(transaction_type)
+}
+
+/// Return an integer representing the given
+/// transaction result string in an enum.
+pub fn get_transaction_result_code(transaction_result_type: &str) -> Option<&i16> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_transaction_result_code(transaction_result_type)
+}
+
+/// Return string representing the given transaction
+/// result type from the enum.
+pub fn get_transaction_result_name(transaction_result_type: &i16) -> Option<&String> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_transaction_result_name(transaction_result_type)
+}
+
+/// Return an integer representing the given ledger
+/// entry type string in an enum.
+pub fn get_ledger_entry_type_code(ledger_entry_type: &str) -> Option<&i16> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_ledger_entry_type_code(ledger_entry_type)
+}
+
+/// Return an integer representing the given ledger
+/// entry type string in an enum.
+pub fn get_ledger_entry_type_name(ledger_entry_type: &i16) -> Option<&String> {
+    let definition_map: &DefinitionMap = load_definition_map();
+    definition_map.get_ledger_entry_type_name(ledger_entry_type)
 }
 
 #[cfg(test)]
@@ -442,21 +769,12 @@ mod test {
 
     #[test]
     fn test_load_definitions() {
-        unsafe {
-            assert!(!_load_definitions().is_none());
-        }
-    }
-
-    #[test]
-    fn test_field_entry_val() {
-        assert_eq!(10003, _field_entry_val("Validation").unwrap());
-        assert_eq!(-2, _field_entry_val("Unknown").unwrap());
-        assert!(_field_entry_val("Nonexistent").is_none());
+        assert!(!_load_definitions().is_none());
     }
 
     #[test]
     fn test_get_field_type_name() {
-        let field_type_name: Option<String> = get_field_type_name("HighLimit");
+        let field_type_name = get_field_type_name("HighLimit");
 
         assert!(!field_type_name.is_none());
         assert_eq!("Amount", field_type_name.unwrap());
@@ -466,5 +784,116 @@ mod test {
     fn test_get_field_type_code() {
         assert_eq!(6, get_field_type_code("HighLimit").unwrap());
         assert_eq!(-2, get_field_type_code("Generic").unwrap());
+    }
+
+    #[test]
+    fn test_get_field_code() {
+        assert_eq!(7, get_field_code("HighLimit").unwrap());
+        assert_eq!(0, get_field_code("Generic").unwrap());
+        assert_eq!(-1, get_field_code("Invalid").unwrap());
+        assert!(get_field_code("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_field_header_from_name() {
+        let field_header = get_field_header_from_name("Generic").unwrap();
+
+        assert_eq!(-2, field_header.type_code);
+        assert_eq!(0, field_header.field_code);
+    }
+
+    #[test]
+    fn test_get_field_name_from_header() {
+        let field_header = FieldHeader {
+            type_code: -2,
+            field_code: 0,
+        };
+
+        assert_eq!(
+            "Generic",
+            get_field_name_from_header(&field_header).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_get_field_instance() {
+        let field_header = FieldHeader {
+            type_code: -2,
+            field_code: 0,
+        };
+
+        let field_info = FieldInfo {
+            nth: 0,
+            is_vl_encoded: false,
+            is_serialized: false,
+            is_signing_field: false,
+            r#type: "Unknown".to_string(),
+        };
+
+        let field_instance = FieldInstance::new(&field_info, "Generic", field_header);
+        let test_field_instance = get_field_instance("Generic");
+
+        assert!(!test_field_instance.is_none());
+
+        let test_field_instance = test_field_instance.unwrap();
+
+        assert_eq!(
+            field_instance.header.type_code,
+            test_field_instance.header.type_code
+        );
+    }
+
+    #[test]
+    fn test_get_transaction_type_code() {
+        assert_eq!(&-1, get_transaction_type_code("Invalid").unwrap());
+        assert_eq!(&8, get_transaction_type_code("OfferCancel").unwrap());
+        assert!(get_transaction_type_code("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_transaction_type_name() {
+        assert_eq!("Invalid", get_transaction_type_name(&-1).unwrap());
+        assert_eq!("Payment", get_transaction_type_name(&0).unwrap());
+        assert!(get_transaction_type_name(&9000).is_none());
+    }
+
+    #[test]
+    fn test_get_transaction_result_code() {
+        assert_eq!(
+            &-399,
+            get_transaction_result_code("telLOCAL_ERROR").unwrap()
+        );
+        assert_eq!(
+            &-267,
+            get_transaction_result_code("temCANNOT_PREAUTH_SELF").unwrap()
+        );
+        assert!(get_transaction_result_code("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_transaction_result_name() {
+        assert_eq!(
+            "telLOCAL_ERROR",
+            get_transaction_result_name(&-399).unwrap()
+        );
+        assert_eq!(
+            "temCANNOT_PREAUTH_SELF",
+            get_transaction_result_name(&-267).unwrap()
+        );
+        assert!(get_transaction_result_name(&9000).is_none());
+    }
+
+    #[test]
+    fn test_get_ledger_entry_type_code() {
+        assert_eq!(&-3, get_ledger_entry_type_code("Any").unwrap());
+        assert_eq!(&112, get_ledger_entry_type_code("DepositPreauth").unwrap());
+        assert!(get_ledger_entry_type_code("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_get_ledger_entry_type_name() {
+        assert_eq!("Any", get_ledger_entry_type_name(&-3).unwrap());
+        assert_eq!("DepositPreauth", get_ledger_entry_type_name(&112).unwrap());
+        assert!(get_ledger_entry_type_name(&9000).is_none());
     }
 }

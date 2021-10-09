@@ -3,9 +3,16 @@
 
 use crate::utils::byte_conversions::ToBytes;
 
+#[derive(Debug, Clone)]
 pub struct FieldHeader {
     pub type_code: i16,
     pub field_code: i16,
+}
+
+impl ToString for FieldHeader {
+    fn to_string(&self) -> String {
+        format!("{}_{}", self.type_code, self.field_code)
+    }
 }
 
 impl ToBytes for FieldHeader {

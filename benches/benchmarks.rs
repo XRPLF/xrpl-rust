@@ -16,7 +16,5 @@ pub fn bench_get_field_type_name(c: &mut Criterion) {
     );
 }
 
-criterion_group!(benches, bench_xrp_to_drops);
-criterion_group!(benches, bench_get_field_type_name);
-
+criterion_group!(benches, bench_xrp_to_drops, bench_get_field_type_name);
 criterion_main!(benches);
