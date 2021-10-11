@@ -4,6 +4,10 @@ use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::XRPL_ALPHABET;
 use crate::skip_err;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
 use strum::IntoEnumIterator;
 
 /// base58 encodings: https://xrpl.org/base58-encodings.html
@@ -18,14 +22,14 @@ const _NODE_PUBLIC_KEY_PREFIX: [u8; 1] = [0x1C];
 /// [1, 225, 75]
 const _ED25519_SEED_PREFIX: [u8; 3] = [0x01, 0xE1, 0x4B];
 
-pub const SEED_LENGTH: u8 = 16;
+pub const SEED_LENGTH: usize = 16;
 
 const _CLASSIC_ADDRESS_LENGTH: u8 = 20;
 const _NODE_PUBLIC_KEY_LENGTH: u8 = 33;
 const _ACCOUNT_PUBLIC_KEY_LENGTH: u8 = 33;
 
 /// Map the algorithm to the prefix.
-fn algorithm_to_prefix<'a>(algo: &'a CryptoAlgorithm) -> Option<&'a [u8]> {
+fn algorithm_to_prefix<'a>(algo: &CryptoAlgorithm) -> Option<&'a [u8]> {
     match algo {
         CryptoAlgorithm::ED25519 => Some(&_ED25519_SEED_PREFIX),
         CryptoAlgorithm::SECP256K1 => Some(&_FAMILY_SEED_PREFIX),
@@ -52,8 +56,8 @@ fn _encode(
     } else {
         let mut payload = vec![];
 
-        payload.extend_from_slice(&prefix);
-        payload.extend_from_slice(&bytestring);
+        payload.extend_from_slice(prefix);
+        payload.extend_from_slice(bytestring);
 
         Ok(bs58::encode(payload)
             .with_alphabet(&XRPL_ALPHABET)
@@ -90,7 +94,7 @@ pub fn encode_seed(
 ) -> Result<String, XRPLAddressCodecException> {
     let prefix = algorithm_to_prefix(&encoding_type);
 
-    if entropy.len() != SEED_LENGTH as usize {
+    if entropy.len() != SEED_LENGTH {
         Err(XRPLAddressCodecException::new(&format!(
             "Entropy must have length {}",
             SEED_LENGTH
@@ -100,17 +104,16 @@ pub fn encode_seed(
             "Encoding type must be valid",
         ))
     } else {
-        _encode(entropy, prefix.unwrap(), Some(SEED_LENGTH.into()))
+        _encode(entropy, prefix.unwrap(), Some(SEED_LENGTH))
     }
 }
 
 /// Returns an encoded seed.
 pub fn decode_seed(seed: &str) -> Result<(Vec<u8>, CryptoAlgorithm), XRPLAddressCodecException> {
-    let algos: Vec<CryptoAlgorithm> = CryptoAlgorithm::iter().collect::<Vec<_>>();
     let mut result: Option<Result<Vec<u8>, XRPLAddressCodecException>> = None;
     let mut algo: Option<CryptoAlgorithm> = None;
 
-    for a in algos.into_iter() {
+    for a in CryptoAlgorithm::iter() {
         let decode = _decode(seed, algorithm_to_prefix(&a).unwrap());
         result = Some(skip_err!(decode));
         algo = Some(a);

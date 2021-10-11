@@ -1,6 +1,8 @@
 //! Conversions between the XRP Ledger's 'Ripple Epoch' time and native time
 //! data types.
 
+use alloc::fmt::Display;
+use alloc::fmt::Formatter;
 use chrono::DateTime;
 use chrono::TimeZone;
 use chrono::Utc;
@@ -16,8 +18,8 @@ pub struct XRPLTimeRangeException {
     time: i64,
 }
 
-impl std::fmt::Display for XRPLTimeRangeException {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for XRPLTimeRangeException {
+    fn fmt(&self, f: &mut Formatter) -> alloc::fmt::Result {
         if self.time < 0 {
             write!(f, "{} is before the Ripple Epoch.", self.time)
         } else if self.time > MAX_XRPL_TIME {
@@ -29,6 +31,14 @@ impl std::fmt::Display for XRPLTimeRangeException {
         } else {
             write!(f, "Unknown error for {}", self.time)
         }
+    }
+}
+
+fn _ripple_check_max<T>(time: i64, ok: T) -> Result<T, XRPLTimeRangeException> {
+    if !(0..=MAX_XRPL_TIME).contains(&time) {
+        Err(XRPLTimeRangeException { time })
+    } else {
+        Ok(ok)
     }
 }
 
@@ -48,11 +58,7 @@ impl std::fmt::Display for XRPLTimeRangeException {
 /// let date_time = ripple_time_to_datetime(946684801);
 /// ```
 pub fn ripple_time_to_datetime(ripple_time: i64) -> Result<DateTime<Utc>, XRPLTimeRangeException> {
-    if ripple_time < 0 || ripple_time > MAX_XRPL_TIME {
-        Err(XRPLTimeRangeException { time: ripple_time })
-    } else {
-        Ok(Utc.timestamp(ripple_time + RIPPLE_EPOCH, 0))
-    }
+    _ripple_check_max(ripple_time, Utc.timestamp(ripple_time + RIPPLE_EPOCH, 0))
 }
 
 /// Convert from a [`chrono::DateTime`] object to an XRP Ledger
@@ -72,12 +78,7 @@ pub fn ripple_time_to_datetime(ripple_time: i64) -> Result<DateTime<Utc>, XRPLTi
 /// ```
 pub fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTimeRangeException> {
     let ripple_time = dt.timestamp() - RIPPLE_EPOCH;
-
-    if ripple_time < 0 || ripple_time > MAX_XRPL_TIME {
-        Err(XRPLTimeRangeException { time: ripple_time })
-    } else {
-        Ok(ripple_time)
-    }
+    _ripple_check_max(ripple_time, ripple_time)
 }
 
 /// Convert from XRP Ledger 'Ripple Epoch' time to a POSIX-like
@@ -93,11 +94,7 @@ pub fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTimeRangeEx
 /// let timestamp = ripple_time_to_posix(946684801);
 /// ```
 pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeException> {
-    if ripple_time < 0 || ripple_time > MAX_XRPL_TIME {
-        Err(XRPLTimeRangeException { time: ripple_time })
-    } else {
-        Ok(ripple_time + RIPPLE_EPOCH)
-    }
+    _ripple_check_max(ripple_time, ripple_time + RIPPLE_EPOCH)
 }
 
 /// Convert from a POSIX-like timestamp to an XRP Ledger
@@ -114,12 +111,7 @@ pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeExcept
 /// ```
 pub fn posix_to_ripple_time(timestamp: i64) -> Result<i64, XRPLTimeRangeException> {
     let ripple_time = timestamp - RIPPLE_EPOCH;
-
-    if ripple_time < 0 || ripple_time > MAX_XRPL_TIME {
-        Err(XRPLTimeRangeException { time: timestamp })
-    } else {
-        Ok(ripple_time)
-    }
+    _ripple_check_max(ripple_time, ripple_time)
 }
 
 #[cfg(test)]

@@ -1,3 +1,7 @@
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::string::ToString;
+
 /// General XRPL Address Codec Exception.
 
 #[derive(Debug)]
@@ -26,5 +30,11 @@ impl From<hex::FromHexError> for XRPLAddressCodecException {
         XRPLAddressCodecException {
             message: err.to_string(),
         }
+    }
+}
+
+impl ToString for XRPLAddressCodecException {
+    fn to_string(&self) -> String {
+        self.message.to_owned()
     }
 }

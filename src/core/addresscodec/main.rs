@@ -9,6 +9,7 @@ use crate::core::addresscodec::codec::decode_classic_address;
 use crate::core::addresscodec::codec::encode_classic_address;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::XRPL_ALPHABET;
+use alloc::string::String;
 
 const MAX_32_BIT_UNSIGNED_INT: u32 = u32::max_value();
 
@@ -38,18 +39,17 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecEx
     } else if flag == &1 {
         // Little-endian to big-endian
         Ok(Some(
-            (buffer[1] as u64
+            buffer[1] as u64
                 + buffer[2] as u64 * 0x100
                 + buffer[3] as u64 * 0x10000
-                + buffer[4] as u64 * 0x1000000)
-                .into(),
+                + buffer[4] as u64 * 0x1000000,
         ))
         // inverse of what happens in encode
     } else if flag != &0 {
         Err(XRPLAddressCodecException::new(
             "Flag must be zero to indicate no tag",
         ))
-    } else if hex::decode("0000000000000000")? != &buffer[1..9] {
+    } else if hex::decode("0000000000000000")? != buffer[1..9] {
         Err(XRPLAddressCodecException::new(
             "Remaining bytes must be zero",
         ))

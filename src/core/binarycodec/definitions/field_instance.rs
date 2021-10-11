@@ -3,6 +3,8 @@
 
 use crate::core::binarycodec::definitions::field_header::FieldHeader;
 use crate::core::binarycodec::definitions::field_info::FieldInfo;
+use alloc::string::String;
+use alloc::string::ToString;
 
 /// A collection of serialization information about
 /// a specific field type.

@@ -2,4 +2,4 @@
 //! serialization and deserialization.
 pub mod binary_parser;
 pub mod binary_serializer;
-pub mod utils;
+pub(crate) mod utils;

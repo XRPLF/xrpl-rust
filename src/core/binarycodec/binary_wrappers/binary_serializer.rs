@@ -7,8 +7,10 @@ use crate::core::binarycodec::binary_wrappers::utils::MAX_SECOND_BYTE_VALUE;
 use crate::core::binarycodec::binary_wrappers::utils::MAX_SINGLE_BYTE_LENGTH;
 use crate::core::binarycodec::definitions::field_instance::FieldInstance;
 use crate::core::binarycodec::exceptions::VariableLengthException;
-use crate::to_bytes;
 use crate::utils::byte_conversions::ToBytes;
+use alloc::format;
+use alloc::vec;
+use alloc::vec::Vec;
 
 /// Serializes JSON to XRPL binary format.
 pub type BinarySerializer = Vec<u8>;
@@ -26,15 +28,15 @@ pub type BinarySerializer = Vec<u8>;
 /// See Length Prefixing: https://xrpl.org/serialization.html#length-prefixing
 fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, VariableLengthException> {
     if length <= &MAX_SINGLE_BYTE_LENGTH {
-        Ok(to_bytes!(length).to_vec())
+        Ok(length.to_be_bytes().to_vec())
     } else if length < &MAX_DOUBLE_BYTE_LENGTH {
         let mut bytes = vec![];
         let b_length = *length - MAX_SINGLE_BYTE_LENGTH + 1;
         let val_a = (b_length >> 8) + (MAX_SINGLE_BYTE_LENGTH + 1);
         let val_b = b_length & 0xFF;
 
-        bytes.extend_from_slice(&to_bytes!(val_a));
-        bytes.extend_from_slice(&to_bytes!(val_b));
+        bytes.extend_from_slice(&val_a.to_be_bytes());
+        bytes.extend_from_slice(&val_b.to_be_bytes());
 
         Ok(bytes)
     } else if length <= &MAX_LENGTH_VALUE {
@@ -44,9 +46,9 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, VariableLen
         let val_b = (b_length >> 8) & 0xFF;
         let val_c = b_length & 0xFF;
 
-        bytes.extend_from_slice(&to_bytes!(val_a));
-        bytes.extend_from_slice(&to_bytes!(val_b));
-        bytes.extend_from_slice(&to_bytes!(val_c));
+        bytes.extend_from_slice(&val_a.to_be_bytes());
+        bytes.extend_from_slice(&val_b.to_be_bytes());
+        bytes.extend_from_slice(&val_c.to_be_bytes());
 
         Ok(bytes)
     } else {
@@ -71,7 +73,7 @@ impl Serializer for BinarySerializer {
         let length_prefix = _encode_variable_length_prefix(&value.len());
 
         self.extend_from_slice(&length_prefix.unwrap());
-        self.extend_from_slice(&value);
+        self.extend_from_slice(value);
 
         self
     }
@@ -98,9 +100,9 @@ mod test {
         let length_a = 192;
         let length_b = 12480;
         let length_c = 918744;
-        println!("{:?}", _encode_variable_length_prefix(&length_a));
-        println!("{:?}", _encode_variable_length_prefix(&length_b));
-        println!("{:?}", _encode_variable_length_prefix(&length_c));
+        // alloc::println!("{:?}", _encode_variable_length_prefix(&length_a));
+        // alloc::println!("{:?}", _encode_variable_length_prefix(&length_b));
+        // alloc::println!("{:?}", _encode_variable_length_prefix(&length_c));
         //assert_eq!(vec![], _encode_variable_length_prefix(&length_a).unwrap());
     }
 }

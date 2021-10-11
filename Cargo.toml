@@ -26,6 +26,11 @@ strum = { version = "0.21.0" }
 strum_macros = { version = "0.21.1" }
 indexmap = { version = "1.7.0", features = ["serde"] }
 lazy_static = "1.4.0"
+sha2 = "0.9.8"
+rand = { version = "0.8.4", default-features = false }
+ripemd160 = "0.9.1"
+ed25519-dalek = "1.0.1"
+curve25519-dalek = { version = "3.2.0", default-features = false, features = ["alloc", "u64_backend"] }
 
 [dev-dependencies]
 criterion = "0.3.5"
@@ -36,4 +41,4 @@ harness = false
 
 [features]
 default = ["std"]
-std = ["hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std"]
+std = ["rand/std", "rand/std_rng", "hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std", "curve25519-dalek/std"]

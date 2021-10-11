@@ -1,5 +1,10 @@
 //! Conversions between XRP drops and native number types.
 
+use alloc::fmt::Display;
+use alloc::fmt::Formatter;
+use alloc::format;
+use alloc::string::String;
+use alloc::string::ToString;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 
@@ -18,8 +23,8 @@ pub struct XRPRangeException {
     message: String,
 }
 
-impl std::fmt::Display for XRPRangeException {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl Display for XRPRangeException {
+    fn fmt(&self, f: &mut Formatter) -> alloc::fmt::Result {
         write!(f, "{}", self.message)
     }
 }
@@ -87,7 +92,6 @@ pub fn drops_to_xrp(drops: &str) -> Result<Decimal, XRPRangeException> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::str::FromStr;
 
     #[test]
     fn test_one_drop_decimal() {

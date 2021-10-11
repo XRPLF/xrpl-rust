@@ -1,3 +1,6 @@
+use alloc::string::String;
+use alloc::string::ToString;
+
 /// General XRPL Binary Codec Exceptions.
 
 #[derive(Debug, Clone)]

@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rust_decimal::Decimal;
-use xrpl::core::binarycodec::definitions::definitions::get_field_type_name;
+use xrpl::core::binarycodec::definitions::definition_types::get_field_type_name;
 use xrpl::utils::xrpl_conversion::xrp_to_drops;
 
 pub fn bench_xrp_to_drops(c: &mut Criterion) {

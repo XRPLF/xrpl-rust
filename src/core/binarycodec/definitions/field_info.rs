@@ -1,6 +1,7 @@
 //! Model object for field info from the "fields"
 //! section of definitions.json.
 
+use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
 ///Model object for field info metadata from the

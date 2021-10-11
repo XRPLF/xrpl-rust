@@ -3,7 +3,7 @@
 
 use crate::core::binarycodec::binary_wrappers::binary_serializer::BinarySerializer;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::to_bytes;
+use alloc::format;
 
 pub trait BinaryParser {
     fn bp_peek(&self) -> Option<[u8; 1]>;
@@ -12,8 +12,8 @@ pub trait BinaryParser {
 /// Peek the first byte of the BinaryParser.
 impl BinaryParser for BinarySerializer {
     fn bp_peek(&self) -> Option<[u8; 1]> {
-        if self.len() > 0 {
-            Some(to_bytes!(self[0]))
+        if !self.is_empty() {
+            Some(self[0].to_be_bytes())
         } else {
             None
         }

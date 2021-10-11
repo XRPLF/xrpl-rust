@@ -4,6 +4,10 @@
 use crate::core::binarycodec::definitions::field_header::FieldHeader;
 use crate::core::binarycodec::definitions::field_info::FieldInfo;
 use crate::core::binarycodec::definitions::field_instance::FieldInstance;
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -398,7 +402,7 @@ pub trait DefinitionHandler {
     ///
     /// Serialization Type Codes:
     /// https://xrpl.org/serialization.html#type-codes
-    fn get_field_type_code(&self, field_name: &str) -> Option<i16>;
+    fn get_field_type_code(&self, field_name: &str) -> Option<&i16>;
     /// Returns the field code associated with the given
     /// field.
     ///
@@ -530,27 +534,27 @@ impl DefinitionMaker for DefinitionMap {
 
 impl DefinitionHandler for DefinitionMap {
     fn new(definitions: &Definitions) -> Self {
-        let (typev_map, typen_map) = DefinitionMap::_make_type_maps(&definitions.types);
+        let (type_value_map, type_name_map) = DefinitionMap::_make_type_maps(&definitions.types);
         let (field_info_map, field_header_name_map) =
-            DefinitionMap::_make_field_info_map(&definitions.fields, &typev_map);
-        let (transtv_map, transn_map) =
+            DefinitionMap::_make_field_info_map(&definitions.fields, &type_value_map);
+        let (transaction_type_value_map, transaction_type_name_map) =
             DefinitionMap::_make_transaction_type_maps(&definitions.transaction_types);
-        let (transrv_map, transrn_map) =
+        let (transaction_result_value_map, transaction_result_name_map) =
             DefinitionMap::_make_transaction_result_maps(&definitions.transaction_results);
-        let (ledgerv_map, ledgern_map) =
+        let (ledger_entry_type_value_map, ledger_entry_type_name_map) =
             DefinitionMap::_make_ledger_entry_type_maps(&definitions.ledger_entry_types);
 
         DefinitionMap {
-            field_info_map: field_info_map,
-            type_value_map: typev_map,
-            type_name_map: typen_map,
-            field_header_name_map: field_header_name_map,
-            transaction_type_value_map: transtv_map,
-            transaction_type_name_map: transn_map,
-            transaction_result_value_map: transrv_map,
-            transaction_result_name_map: transrn_map,
-            ledger_entry_type_value_map: ledgerv_map,
-            ledger_entry_type_name_map: ledgern_map,
+            field_info_map,
+            field_header_name_map,
+            type_value_map,
+            type_name_map,
+            transaction_type_value_map,
+            transaction_type_name_map,
+            transaction_result_value_map,
+            transaction_result_name_map,
+            ledger_entry_type_value_map,
+            ledger_entry_type_name_map,
         }
     }
 
@@ -561,45 +565,38 @@ impl DefinitionHandler for DefinitionMap {
     fn get_field_type_name(&self, field_name: &str) -> Option<&String> {
         let result = self.field_info_map.get(field_name);
 
-        if result.is_none() {
-            None
+        if let Some(value) = result {
+            Some(&value.r#type)
         } else {
-            Some(&result.unwrap().r#type)
+            None
         }
     }
 
-    fn get_field_type_code(&self, field_name: &str) -> Option<i16> {
-        let field_type_name = self.get_field_type_name(field_name);
+    fn get_field_type_code(&self, field_name: &str) -> Option<&i16> {
+        let result = self.get_field_type_name(field_name);
 
-        if field_type_name.is_none() {
-            None
+        if let Some(value) = result {
+            self.type_value_map.get(value)
         } else {
-            let result = self.type_value_map.get(field_type_name.unwrap());
-            Some(*result.unwrap())
+            None
         }
     }
 
     fn get_field_code(&self, field_name: &str) -> Option<i16> {
         let result = self.get_field_info(field_name);
-
-        if result.is_none() {
-            None
-        } else {
-            Some(result.unwrap().nth)
-        }
+        result.map(|value| value.nth)
     }
 
     fn get_field_header_from_name(&self, field_name: &str) -> Option<FieldHeader> {
-        let type_code: Option<i16> = self.get_field_type_code(field_name);
-        let field_code: Option<i16> = self.get_field_code(field_name);
+        let type_code_wrap: Option<&i16> = self.get_field_type_code(field_name);
+        let field_code_wrap: Option<i16> = self.get_field_code(field_name);
 
-        if type_code.is_none() || field_code.is_none() {
-            None
-        } else {
-            Some(FieldHeader {
-                type_code: type_code.unwrap(),
-                field_code: field_code.unwrap(),
-            })
+        match (type_code_wrap, field_code_wrap) {
+            (Some(type_code), Some(field_code)) => Some(FieldHeader {
+                type_code: *type_code,
+                field_code,
+            }),
+            _ => None,
         }
     }
 
@@ -608,17 +605,14 @@ impl DefinitionHandler for DefinitionMap {
     }
 
     fn get_field_instance<'a>(&self, field_name: &str) -> Option<FieldInstance> {
-        let field_info = self.field_info_map.get(field_name);
-        let field_header = self.get_field_header_from_name(field_name);
+        let field_info_wrap = self.field_info_map.get(field_name);
+        let field_header_wrap = self.get_field_header_from_name(field_name);
 
-        if field_info.is_none() || field_header.is_none() {
-            None
-        } else {
-            Some(FieldInstance::new(
-                field_info.unwrap(),
-                field_name,
-                field_header.unwrap(),
-            ))
+        match (field_info_wrap, field_header_wrap) {
+            (Some(field_info), Some(field_header)) => {
+                Some(FieldInstance::new(field_info, field_name, field_header))
+            }
+            _ => None,
         }
     }
 
@@ -683,7 +677,7 @@ pub fn get_field_type_name(field_name: &str) -> Option<&String> {
 ///
 /// Serialization Type Codes:
 /// https://xrpl.org/serialization.html#type-codes
-pub fn get_field_type_code(field_name: &str) -> Option<i16> {
+pub fn get_field_type_code(field_name: &str) -> Option<&i16> {
     let definition_map: &DefinitionMap = load_definition_map();
     definition_map.get_field_type_code(field_name)
 }
@@ -716,9 +710,8 @@ pub fn get_field_name_from_header(field_header: &FieldHeader) -> Option<&String>
 /// field name.
 pub fn get_field_instance(field_name: &str) -> Option<FieldInstance> {
     let definition_map: &DefinitionMap = load_definition_map();
-    let field_instance = definition_map.get_field_instance(field_name);
 
-    field_instance
+    definition_map.get_field_instance(field_name)
 }
 
 /// Return an integer representing the given
@@ -782,8 +775,8 @@ mod test {
 
     #[test]
     fn test_get_field_type_code() {
-        assert_eq!(6, get_field_type_code("HighLimit").unwrap());
-        assert_eq!(-2, get_field_type_code("Generic").unwrap());
+        assert_eq!(&6, get_field_type_code("HighLimit").unwrap());
+        assert_eq!(&-2, get_field_type_code("Generic").unwrap());
     }
 
     #[test]
