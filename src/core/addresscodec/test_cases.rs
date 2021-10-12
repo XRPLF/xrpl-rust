@@ -5,7 +5,7 @@ pub struct TestCase<'a> {
     pub test_xaddress: &'a str,
 }
 
-pub const TEST_CASES: [TestCase; 22] = [
+pub const ADDRESS_TEST_CASES: [TestCase; 22] = [
     TestCase {
         address: "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59",
         tag: None,

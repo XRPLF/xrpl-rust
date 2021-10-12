@@ -3,5 +3,5 @@ pub mod codec;
 pub mod exceptions;
 pub mod main;
 #[cfg(test)]
-pub(crate) mod main_test_cases;
+pub(crate) mod test_cases;
 pub(crate) mod utils;

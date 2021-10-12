@@ -90,19 +90,3 @@ impl Serializer for BinarySerializer {
         self
     }
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_encode_variable_length_prefix() {
-        let length_a = 192;
-        let length_b = 12480;
-        let length_c = 918744;
-        // alloc::println!("{:?}", _encode_variable_length_prefix(&length_a));
-        // alloc::println!("{:?}", _encode_variable_length_prefix(&length_b));
-        // alloc::println!("{:?}", _encode_variable_length_prefix(&length_c));
-        //assert_eq!(vec![], _encode_variable_length_prefix(&length_a).unwrap());
-    }
-}

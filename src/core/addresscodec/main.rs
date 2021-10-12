@@ -139,18 +139,18 @@ pub fn xaddress_to_classic_address(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::core::addresscodec::main_test_cases::TEST_CASES;
+    use crate::core::addresscodec::test_cases::ADDRESS_TEST_CASES;
 
     #[test]
     fn test_is_valid_xaddress() {
-        for case in TEST_CASES {
+        for case in ADDRESS_TEST_CASES {
             assert!(is_valid_xaddress(case.test_xaddress))
         }
     }
 
     #[test]
     fn test_classic_address_to_xaddress() {
-        for case in TEST_CASES {
+        for case in ADDRESS_TEST_CASES {
             let xtest = classic_address_to_xaddress(case.address, case.tag, true);
             assert_eq!(*case.test_xaddress, xtest.unwrap());
 
@@ -161,7 +161,7 @@ mod test {
 
     #[test]
     fn test_xaddress_to_classic_address() {
-        for case in TEST_CASES {
+        for case in ADDRESS_TEST_CASES {
             let (classic_address, tag, is_test) =
                 xaddress_to_classic_address(case.test_xaddress).unwrap();
 
