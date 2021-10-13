@@ -1,30 +1,22 @@
-use alloc::string::String;
+use alloc::borrow::Cow;
 use alloc::string::ToString;
 
 /// General XRPL Binary Codec Exceptions.
 
 #[derive(Debug, Clone)]
-pub struct XRPLBinaryCodecException {
-    message: String,
-}
+pub struct XRPLBinaryCodecException(Cow<'static, str>);
 
 #[derive(Debug, Clone)]
-pub struct VariableLengthException {
-    message: String,
-}
+pub struct VariableLengthException(Cow<'static, str>);
 
 impl VariableLengthException {
     pub fn new(err: &str) -> VariableLengthException {
-        VariableLengthException {
-            message: err.to_string(),
-        }
+        VariableLengthException(err.to_string().into())
     }
 }
 
 impl XRPLBinaryCodecException {
     pub fn new(err: &str) -> XRPLBinaryCodecException {
-        XRPLBinaryCodecException {
-            message: err.to_string(),
-        }
+        XRPLBinaryCodecException(err.to_string().into())
     }
 }

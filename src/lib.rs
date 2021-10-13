@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(dead_code)] // Remove eventually
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 extern crate alloc;
@@ -9,3 +10,4 @@ pub mod constants;
 pub mod core;
 pub mod macros;
 pub mod utils;
+pub mod wallet;

@@ -84,7 +84,7 @@ pub fn derive_keypair(
 /// Derive the XRP Ledger classic address for a given
 /// public key. For more information, see
 /// Address Derivation:
-/// https://xrpl.org/cryptographic-keys.html#account-id-and-address
+/// `<https://xrpl.org/cryptographic-keys.html#account-id-and-address>`
 pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCodecException> {
     let account_id = get_account_id(&hex::decode(public_key)?);
     encode_classic_address(&account_id)

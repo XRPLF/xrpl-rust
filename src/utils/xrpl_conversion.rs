@@ -1,10 +1,8 @@
 //! Conversions between XRP drops and native number types.
 
-use alloc::fmt::Display;
-use alloc::fmt::Formatter;
+use crate::utils::exceptions::XRPRangeException;
 use alloc::format;
 use alloc::string::String;
-use alloc::string::ToString;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 
@@ -16,26 +14,6 @@ pub const MAX_XRP: u64 = u64::pow(10, 11);
 pub const MAX_DROPS: u64 = u64::pow(10, 17);
 /// Drops in one XRP
 pub const XRP_DROPS: u64 = 1000000;
-
-#[derive(Debug)]
-/// Exception for invalid XRP Ledger time data.
-pub struct XRPRangeException {
-    message: String,
-}
-
-impl Display for XRPRangeException {
-    fn fmt(&self, f: &mut Formatter) -> alloc::fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl From<rust_decimal::Error> for XRPRangeException {
-    fn from(err: rust_decimal::Error) -> Self {
-        XRPRangeException {
-            message: err.to_string(),
-        }
-    }
-}
 
 /// Convert a numeric XRP amount to drops of XRP.
 /// Return an equivalent amount in drops of XRP.
@@ -52,13 +30,15 @@ impl From<rust_decimal::Error> for XRPRangeException {
 /// ```
 pub fn xrp_to_drops(xrp: Decimal) -> Result<String, XRPRangeException> {
     if xrp < ONE_DROP && xrp != Decimal::ZERO {
-        Err(XRPRangeException {
-            message: format!("XRP amount {} is too small.", xrp),
-        })
+        Err(XRPRangeException::new(&format!(
+            "XRP amount {} is too small.",
+            xrp
+        )))
     } else if xrp.gt(&Decimal::new(MAX_XRP as i64, 0)) {
-        Err(XRPRangeException {
-            message: format!("XRP amount {} is too large.", xrp),
-        })
+        Err(XRPRangeException::new(&format!(
+            "XRP amount {} is too large.",
+            xrp
+        )))
     } else {
         Ok(format!("{}", (xrp / ONE_DROP).trunc()))
     }
@@ -81,9 +61,10 @@ pub fn drops_to_xrp(drops: &str) -> Result<Decimal, XRPRangeException> {
     let xrp = drops_d * ONE_DROP;
 
     if xrp.gt(&Decimal::new(MAX_XRP as i64, 0)) {
-        Err(XRPRangeException {
-            message: format!("Drops amount {} is too large.", drops),
-        })
+        Err(XRPRangeException::new(&format!(
+            "Drops amount {} is too large.",
+            drops
+        )))
     } else {
         Ok(xrp)
     }
@@ -92,6 +73,7 @@ pub fn drops_to_xrp(drops: &str) -> Result<Decimal, XRPRangeException> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::alloc::string::ToString;
 
     #[test]
     fn test_one_drop_decimal() {
@@ -101,8 +83,8 @@ mod test {
 
     #[test]
     fn test_xrp_to_drops() {
-        let xrp: String = xrp_to_drops(Decimal::new(100000001, 6)).unwrap();
-        let drops: String = (100 * XRP_DROPS + 1).to_string();
+        let xrp = xrp_to_drops(Decimal::new(100000001, 6)).unwrap();
+        let drops = (100 * XRP_DROPS + 1).to_string();
 
         assert_eq!(xrp, drops);
     }

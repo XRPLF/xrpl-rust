@@ -1,6 +1,6 @@
 //! This module handles everything related to X-Addresses.
 //! To better understand the cryptographic details, visit
-//! https://github.com/xrp-community/standards-drafts/issues/6
+//! `<https://github.com/xrp-community/standards-drafts/issues/6>`
 //!
 //! General format of an X-Address:
 //! [← 2 byte prefix →|← 160 bits of account ID →|← 8 bits of flags →|← 64 bits of tag →]

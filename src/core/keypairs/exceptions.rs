@@ -2,25 +2,23 @@
 
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::mutate_from_error;
-use alloc::string::String;
+use alloc::borrow::Cow;
 use alloc::string::ToString;
 
-fn typed_alert<T>(message: &str) -> String {
+fn typed_alert<T>(message: &str) -> Cow<'static, str> {
     let typed = alloc::any::type_name::<T>();
-    alloc::format!("{}: {}", typed, message)
+    alloc::format!("{}: {}", typed, message).into()
 }
 
 /// General XRPL Keypair Codec Exception.
 #[derive(Debug)]
-pub struct XRPLKeypairsException {
-    pub message: String,
-}
+pub struct XRPLKeypairsException(Cow<'static, str>);
 
 impl XRPLKeypairsException {
     pub fn new(err: &str) -> XRPLKeypairsException {
-        XRPLKeypairsException {
-            message: typed_alert::<ed25519_dalek::ed25519::Error>(&err.to_string()),
-        }
+        XRPLKeypairsException(typed_alert::<ed25519_dalek::ed25519::Error>(
+            &err.to_string(),
+        ))
     }
 }
 

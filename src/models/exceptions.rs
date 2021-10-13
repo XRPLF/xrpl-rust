@@ -1,6 +1,4 @@
 /// General XRPL Model Exception.
 
 #[derive(Debug)]
-pub struct XRPLModelException {
-    message: String,
-}
+pub struct XRPLModelException(Cow<'static, str>);

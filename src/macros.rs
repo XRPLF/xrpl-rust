@@ -14,9 +14,7 @@ macro_rules! mutate_from_error {
         impl From<$name> for $except {
             fn from(err: $name) -> Self {
                 let typed = alloc::any::type_name::<$name>();
-                $except {
-                    message: alloc::format!("{}: {}", typed, &err.to_string()),
-                }
+                $except(alloc::format!("{}: {}", typed, &err.to_string()).into())
             }
         }
     };

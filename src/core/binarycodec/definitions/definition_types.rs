@@ -371,7 +371,8 @@ pub struct Definitions {
 /// information required for the XRP Ledger's canonical
 /// binary serialization format.
 ///
-/// Serialization: https://xrpl.org/serialization.html
+/// Serialization:
+/// `<https://xrpl.org/serialization.html>`
 #[derive(Debug, Clone)]
 pub struct DefinitionMap {
     field_info_map: FieldInfoMap,
@@ -396,18 +397,18 @@ pub trait DefinitionHandler {
     /// field name.
     ///
     /// Serialization Type List:
-    /// https://xrpl.org/serialization.html#type-list
+    /// `<https://xrpl.org/serialization.html#type-list>`
     fn get_field_type_name(&self, field_name: &str) -> Option<&String>;
     /// Returns the type code associated with the given field.
     ///
     /// Serialization Type Codes:
-    /// https://xrpl.org/serialization.html#type-codes
+    /// `<https://xrpl.org/serialization.html#type-codes>`
     fn get_field_type_code(&self, field_name: &str) -> Option<&i16>;
     /// Returns the field code associated with the given
     /// field.
     ///
     /// Serialization Field Codes:
-    /// https://xrpl.org/serialization.html#field-codes
+    /// `<https://xrpl.org/serialization.html#field-codes>`
     fn get_field_code(&self, field_name: &str) -> Option<i16>;
     /// Returns a FieldHeader object for a field of the given
     /// field name.
@@ -475,7 +476,7 @@ impl DefinitionMaker for DefinitionMap {
         let mut field_header_name_map = FieldHeaderNameMap::default();
 
         for field in fields {
-            let field_name: String = (field.0).to_owned();
+            let field_name: &str = &(field.0);
             let field_info: FieldInfo = (field.1).to_owned();
             let field_header = FieldHeader {
                 type_code: *types.get(&field_info.r#type).unwrap(),
@@ -483,7 +484,7 @@ impl DefinitionMaker for DefinitionMap {
             };
 
             field_info_map.insert(field_name.to_owned(), field_info);
-            field_header_name_map.insert(field_header.to_string(), field_name);
+            field_header_name_map.insert(field_header.to_string(), field_name.to_owned());
         }
 
         (field_info_map, field_header_name_map)
@@ -666,7 +667,7 @@ pub fn load_definition_map() -> &'static DefinitionMap {
 /// given field name.
 ///
 /// Serialization Type List:
-/// https://xrpl.org/serialization.html#type-list
+/// `<https://xrpl.org/serialization.html#type-list>`
 pub fn get_field_type_name(field_name: &str) -> Option<&String> {
     let definition_map: &DefinitionMap = load_definition_map();
     definition_map.get_field_type_name(field_name)
@@ -676,7 +677,7 @@ pub fn get_field_type_name(field_name: &str) -> Option<&String> {
 /// given field.
 ///
 /// Serialization Type Codes:
-/// https://xrpl.org/serialization.html#type-codes
+/// `<https://xrpl.org/serialization.html#type-codes>`
 pub fn get_field_type_code(field_name: &str) -> Option<&i16> {
     let definition_map: &DefinitionMap = load_definition_map();
     definition_map.get_field_type_code(field_name)
@@ -686,7 +687,7 @@ pub fn get_field_type_code(field_name: &str) -> Option<&i16> {
 /// given field.
 ///
 /// Serialization Field Codes:
-/// https://xrpl.org/serialization.html#field-codes
+/// `<https://xrpl.org/serialization.html#field-codes>`
 pub fn get_field_code(field_name: &str) -> Option<i16> {
     let definition_map: &DefinitionMap = load_definition_map();
     definition_map.get_field_code(field_name)
@@ -823,7 +824,7 @@ mod test {
             r#type: "Unknown".to_string(),
         };
 
-        let field_instance = FieldInstance::new(&field_info, "Generic", field_header);
+        let field_instance = FieldInstance::new(&field_info, "Generic".into(), field_header);
         let test_field_instance = get_field_instance("Generic");
 
         assert!(!test_field_instance.is_none());
