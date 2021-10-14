@@ -3,4 +3,4 @@
 pub mod binary_wrappers;
 pub mod definitions;
 pub mod exceptions;
-pub mod types;
+//pub mod types;

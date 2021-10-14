@@ -16,16 +16,23 @@ pub const ED_PREFIX: &str = "ED";
 pub struct Ed25519;
 
 impl Ed25519 {
-    fn _public_key_to_str(&self, key: PublicKey) -> String {
+    fn _public_key_to_str(key: PublicKey) -> String {
         hex::encode(key.as_ref())
     }
 
-    fn _private_key_to_str(&self, key: SecretKey) -> String {
+    fn _private_key_to_str(key: SecretKey) -> String {
         hex::encode(key)
     }
 
-    fn _format_key(&self, keystr: &str) -> String {
+    fn _format_key(keystr: &str) -> String {
         format!("{}{}", ED_PREFIX, keystr.to_uppercase())
+    }
+
+    fn _format_keys(public: PublicKey, private: SecretKey) -> (String, String) {
+        (
+            Ed25519::_format_key(&Ed25519::_public_key_to_str(public)),
+            Ed25519::_format_key(&Ed25519::_private_key_to_str(private)),
+        )
     }
 }
 
@@ -44,10 +51,7 @@ impl CryptoImplementation for Ed25519 {
             let private = SecretKey::from_bytes(&raw_private)?;
             let public = PublicKey::from(&private);
 
-            Ok((
-                self._format_key(&self._public_key_to_str(public)),
-                self._format_key(&self._private_key_to_str(private)),
-            ))
+            Ok(Ed25519::_format_keys(public, private))
         }
     }
 

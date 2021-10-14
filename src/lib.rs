@@ -1,7 +1,7 @@
 #![no_std]
 #![allow(dead_code)] // Remove eventually
 
-#[cfg(all(feature = "alloc", not(feature = "std")))]
+#[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std as alloc;

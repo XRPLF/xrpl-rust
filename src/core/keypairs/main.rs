@@ -15,6 +15,7 @@ use crate::core::keypairs::utils::get_account_id;
 use alloc::string::String;
 use ed25519_dalek::SIGNATURE_LENGTH;
 use rand::Rng;
+use rand::SeedableRng;
 
 /// Test message for signature verification.
 const _VERIFICATION_MESSAGE: &[u8] = b"This test message should verify.";
@@ -43,7 +44,7 @@ pub fn generate_seed(
     entropy: Option<[u8; SEED_LENGTH]>,
     algorithm: Option<CryptoAlgorithm>,
 ) -> Result<String, XRPLAddressCodecException> {
-    let random_bytes: [u8; SEED_LENGTH];
+    let mut random_bytes: [u8; SEED_LENGTH] = [0u8; SEED_LENGTH];
     let algo: CryptoAlgorithm;
 
     if let Some(value) = algorithm {
@@ -55,7 +56,8 @@ pub fn generate_seed(
     if let Some(value) = entropy {
         random_bytes = value;
     } else {
-        random_bytes = rand::thread_rng().gen::<[u8; SEED_LENGTH]>();
+        let mut rng = rand_hc::Hc128Rng::from_entropy();
+        rng.fill(&mut random_bytes);
     }
 
     encode_seed(&random_bytes, algo)

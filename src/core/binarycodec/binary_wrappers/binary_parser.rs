@@ -289,7 +289,8 @@ mod test {
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
         let result = binary_parser.read_length_prefix();
 
-        alloc::println!("{:?}", result);
+        assert!(result.is_ok());
+        assert_eq!(0, result.unwrap());
     }
 
     #[test]

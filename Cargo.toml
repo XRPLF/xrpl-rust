@@ -16,6 +16,7 @@ name = "xrpl"
 crate-type = ["lib"]
 
 [dependencies]
+num-bigint = { version = "0.4.2", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4.19" }
 rust_decimal = { version = "1.16.0", default-features = false }
@@ -27,9 +28,11 @@ strum_macros = { version = "0.22.0" }
 indexmap = { version = "1.7.0", features = ["serde"] }
 lazy_static = "1.4.0"
 sha2 = "0.9.8"
-rand = { version = "0.8.4", default-features = false }
+rand_hc = "0.3.1"
+rand = { version = "0.8.4", default-features = false, features = ["getrandom"] }
 ripemd160 = "0.9.1"
 ed25519-dalek = "1.0.1"
+secp256k1 = { version = "0.20.3", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
 criterion = "0.3.5"
@@ -40,4 +43,4 @@ harness = false
 
 [features]
 default = ["std"]
-std = ["rand/std", "rand/std_rng", "hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std"]
+std = ["rand/std", "num-bigint/std", "rand/std_rng", "hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std", "secp256k1/std"]
