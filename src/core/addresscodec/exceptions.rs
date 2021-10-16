@@ -31,4 +31,11 @@ impl From<hex::FromHexError> for XRPLAddressCodecException {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for XRPLAddressCodecException {}
+impl alloc::error::Error for XRPLAddressCodecException {}
+
+#[cfg(feature = "std")]
+impl alloc::fmt::Display for XRPLAddressCodecException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+        write!(f, "XRPLAddressCodecException: {:?}", self)
+    }
+}

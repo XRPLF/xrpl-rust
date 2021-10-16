@@ -40,3 +40,10 @@ impl From<hex::FromHexError> for XRPLKeypairsException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLKeypairsException {}
+
+#[cfg(feature = "std")]
+impl alloc::fmt::Display for XRPLKeypairsException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+        write!(f, "XRPLKeypairsException: {:?}", self)
+    }
+}

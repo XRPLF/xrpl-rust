@@ -33,7 +33,21 @@ impl From<hex::FromHexError> for ISOCodeException {
 }
 
 #[cfg(feature = "std")]
-impl std::error::Error for XRPRangeException {}
+impl alloc::error::Error for XRPRangeException {}
 
 #[cfg(feature = "std")]
-impl std::error::Error for ISOCodeException {}
+impl alloc::error::Error for ISOCodeException {}
+
+#[cfg(feature = "std")]
+impl alloc::fmt::Display for XRPRangeException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+        write!(f, "XRPRangeException: {:?}", self)
+    }
+}
+
+#[cfg(feature = "std")]
+impl alloc::fmt::Display for ISOCodeException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+        write!(f, "ISOCodeException: {:?}", self)
+    }
+}

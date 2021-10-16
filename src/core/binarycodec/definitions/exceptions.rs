@@ -19,3 +19,10 @@ impl From<serde_json::Error> for XRPDefinitionException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPDefinitionException {}
+
+#[cfg(feature = "std")]
+impl alloc::fmt::Display for XRPDefinitionException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+        write!(f, "XRPDefinitionException: {:?}", self)
+    }
+}
