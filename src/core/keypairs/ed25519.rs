@@ -1,5 +1,6 @@
 //! Ed25519 elliptic curve cryptography interface.
 
+use crate::constants::CryptoAlgorithm;
 use crate::core::keypairs::crypto_implementation::CryptoImplementation;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::utils::sha512_first_half;
@@ -43,9 +44,9 @@ impl CryptoImplementation for Ed25519 {
         is_validator: bool,
     ) -> Result<(String, String), XRPLKeypairsException> {
         if is_validator {
-            Err(XRPLKeypairsException::new(
-                "Validator key pairs cannot use ED25519",
-            ))
+            Err(XRPLKeypairsException::UnsupportedValidatorAlgorithm {
+                expected: CryptoAlgorithm::ED25519,
+            })
         } else {
             let raw_private = sha512_first_half(decoded_seed);
             let private = SecretKey::from_bytes(&raw_private)?;

@@ -16,6 +16,7 @@ name = "xrpl"
 crate-type = ["lib"]
 
 [dependencies]
+regex = { version = "1.5.4", default-features = false }
 num-bigint = { version = "0.4.2", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4.19" }
@@ -42,5 +43,16 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = ["std"]
-std = ["rand/std", "num-bigint/std", "rand/std_rng", "hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std", "secp256k1/std"]
+default = []
+std = [
+    "rand/std", 
+    "regex/std", 
+    "num-bigint/std", 
+    "rand/std_rng", 
+    "hex/std", 
+    "rust_decimal/std", 
+    "bs58/std", 
+    "serde/std", 
+    "indexmap/std", 
+    "secp256k1/std"
+]

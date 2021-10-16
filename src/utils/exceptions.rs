@@ -1,26 +1,39 @@
-use alloc::borrow::Cow;
-use alloc::fmt::Display;
-use alloc::fmt::Formatter;
-use alloc::string::ToString;
+//! Exception for invalid XRP Ledger amount data.
 
-/// Exception for invalid XRP Ledger time data.
+use alloc::string::String;
+
 #[derive(Debug)]
-pub struct XRPRangeException(Cow<'static, str>);
-
-impl XRPRangeException {
-    pub fn new(err: &str) -> XRPRangeException {
-        XRPRangeException(err.to_string().into())
-    }
+#[non_exhaustive]
+pub enum XRPRangeException {
+    InvalidXRPAmountTooSmall { min: String, found: String },
+    InvalidXRPAmountTooLarge { max: u64, found: u64 },
+    InvalidDropsAmountTooLarge { max: String, found: String },
+    DecimalError(rust_decimal::Error),
 }
 
-impl Display for XRPRangeException {
-    fn fmt(&self, f: &mut Formatter) -> alloc::fmt::Result {
-        write!(f, "{}", self)
-    }
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ISOCodeException {
+    InvalidISOCode,
+    InvalidISOLength,
+    InvalidXRPBytes,
+    HexError(hex::FromHexError),
 }
 
 impl From<rust_decimal::Error> for XRPRangeException {
     fn from(err: rust_decimal::Error) -> Self {
-        XRPRangeException(err.to_string().into())
+        XRPRangeException::DecimalError(err)
     }
 }
+
+impl From<hex::FromHexError> for ISOCodeException {
+    fn from(err: hex::FromHexError) -> Self {
+        ISOCodeException::HexError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for XRPRangeException {}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ISOCodeException {}

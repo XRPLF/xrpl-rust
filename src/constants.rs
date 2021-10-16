@@ -4,6 +4,9 @@ use alloc::string::String;
 use alloc::string::ToString;
 use strum_macros::EnumIter;
 
+pub const ISO_CURRENCY_REGEX: &str = r"^[A-Z0-9]{3}$";
+pub const HEX_CURRENCY_REGEX: &str = r"^[A-F0-9]{40}$";
+
 /// Represents the supported cryptography algorithms.
 #[derive(Debug, PartialEq, Clone, EnumIter)]
 pub enum CryptoAlgorithm {

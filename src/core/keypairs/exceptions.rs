@@ -1,21 +1,42 @@
 //! XRPL keypair codec exceptions.
 
+use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
-use crate::mutate_from_error;
-use alloc::borrow::Cow;
-use alloc::string::ToString;
 
-/// General XRPL Keypair Codec Exception.
 #[derive(Debug)]
-pub struct XRPLKeypairsException(Cow<'static, str>);
+#[non_exhaustive]
+pub enum XRPLKeypairsException {
+    InvalidSignature,
+    UnsupportedValidatorAlgorithm { expected: CryptoAlgorithm },
+    AddressCodecException(XRPLAddressCodecException),
+    ED25519Error(ed25519_dalek::ed25519::Error),
+    SECP256K1Error(secp256k1::Error),
+    HexError(hex::FromHexError),
+}
 
-impl XRPLKeypairsException {
-    pub fn new(err: &str) -> XRPLKeypairsException {
-        XRPLKeypairsException(err.to_string().into())
+impl From<XRPLAddressCodecException> for XRPLKeypairsException {
+    fn from(err: XRPLAddressCodecException) -> Self {
+        XRPLKeypairsException::AddressCodecException(err)
     }
 }
 
-mutate_from_error!(ed25519_dalek::ed25519::Error, XRPLKeypairsException);
-mutate_from_error!(XRPLAddressCodecException, XRPLKeypairsException);
-mutate_from_error!(hex::FromHexError, XRPLKeypairsException);
-mutate_from_error!(secp256k1::Error, XRPLKeypairsException);
+impl From<ed25519_dalek::ed25519::Error> for XRPLKeypairsException {
+    fn from(err: ed25519_dalek::ed25519::Error) -> Self {
+        XRPLKeypairsException::ED25519Error(err)
+    }
+}
+
+impl From<secp256k1::Error> for XRPLKeypairsException {
+    fn from(err: secp256k1::Error) -> Self {
+        XRPLKeypairsException::SECP256K1Error(err)
+    }
+}
+
+impl From<hex::FromHexError> for XRPLKeypairsException {
+    fn from(err: hex::FromHexError) -> Self {
+        XRPLKeypairsException::HexError(err)
+    }
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLKeypairsException {}

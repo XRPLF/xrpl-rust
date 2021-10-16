@@ -16,3 +16,6 @@ impl From<serde_json::Error> for XRPDefinitionException {
         XRPDefinitionException(err.to_string().into())
     }
 }
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPDefinitionException {}

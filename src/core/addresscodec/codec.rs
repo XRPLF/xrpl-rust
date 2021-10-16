@@ -4,7 +4,6 @@ use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::XRPL_ALPHABET;
 use crate::skip_err;
-use alloc::format;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -49,10 +48,10 @@ fn _encode(
     expected_length: Option<usize>,
 ) -> Result<String, XRPLAddressCodecException> {
     if expected_length != Some(bytestring.len()) {
-        Err(XRPLAddressCodecException::new(
-            "unexpected_payload_length: len(bytestring) does not match 
-            expected_length. Ensure that the bytes are a bytestring.",
-        ))
+        Err(XRPLAddressCodecException::UnexpectedPayloadLength {
+            expected: expected_length.unwrap(),
+            found: bytestring.len(),
+        })
     } else {
         let mut payload = vec![];
 
@@ -79,9 +78,7 @@ fn _decode(b58_string: &str, prefix: &[u8]) -> Result<Vec<u8>, XRPLAddressCodecE
         .into_vec()?;
 
     if &decoded[..prefix_len] != prefix {
-        Err(XRPLAddressCodecException::new(
-            "Provided prefix is incorrect",
-        ))
+        Err(XRPLAddressCodecException::InvalidEncodingPrefixLength)
     } else {
         Ok(decoded[prefix_len..].to_vec())
     }
@@ -95,14 +92,11 @@ pub fn encode_seed(
     let prefix = algorithm_to_prefix(&encoding_type);
 
     if entropy.len() != SEED_LENGTH {
-        Err(XRPLAddressCodecException::new(&format!(
-            "Entropy must have length {}",
-            SEED_LENGTH
-        )))
+        Err(XRPLAddressCodecException::InvalidSeedEntropyLength {
+            length: SEED_LENGTH,
+        })
     } else if prefix == None {
-        Err(XRPLAddressCodecException::new(
-            "Encoding type must be valid",
-        ))
+        Err(XRPLAddressCodecException::InvalidSeedPrefixEncodingType)
     } else {
         _encode(entropy, prefix.unwrap(), Some(SEED_LENGTH))
     }
@@ -121,9 +115,7 @@ pub fn decode_seed(seed: &str) -> Result<(Vec<u8>, CryptoAlgorithm), XRPLAddress
 
     match result {
         Some(Ok(val)) => Ok((val, algo.unwrap())),
-        Some(Err(_)) | None => Err(XRPLAddressCodecException::new(
-            "Invalid seed; could not determine encoding algorithm.",
-        )),
+        Some(Err(_)) | None => Err(XRPLAddressCodecException::UnknownSeedEncoding),
     }
 }
 

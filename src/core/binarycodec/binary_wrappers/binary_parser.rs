@@ -11,8 +11,8 @@ use crate::core::binarycodec::definitions::definition_types::get_field_name_from
 use crate::core::binarycodec::definitions::field_header::FieldHeader;
 use crate::core::binarycodec::definitions::field_instance::FieldInstance;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
+use crate::core::binarycodec::types::serialized_type::Serializable;
 use alloc::borrow::ToOwned;
-use alloc::format;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 
@@ -66,7 +66,20 @@ pub trait Parser {
     /// containedin the following bytes.
     fn read_field(&mut self) -> Result<FieldInstance, XRPLBinaryCodecException>;
 
-    // TODO Implement type methods
+    /// Read next bytes from BinaryParser as the given type.
+    fn read_type<T: Serializable>(&mut self) -> Result<T, XRPLBinaryCodecException>;
+
+    /// Read value of the type specified by field from
+    /// the BinaryParser.
+    fn read_field_value<T: Serializable>(
+        &mut self,
+        field: &FieldInstance,
+    ) -> Result<T, XRPLBinaryCodecException>;
+
+    /// Get the next field and value from the BinaryParser.
+    fn read_field_and_value<T: Serializable>(
+        &mut self,
+    ) -> Result<(FieldInstance, T), XRPLBinaryCodecException>;
 }
 
 /// Peek the first byte of the BinaryParser.
@@ -81,11 +94,10 @@ impl Parser for BinaryParser {
 
     fn skip(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException> {
         if n > self.0.len() {
-            Err(XRPLBinaryCodecException::new(&format!(
-                "BinaryParser can't skip {} bytes, only contains {}.",
-                n,
-                self.0.len()
-            )))
+            Err(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+                max: self.0.len(),
+                found: n,
+            })
         } else {
             self.0 = self.0[n..].to_vec();
             Ok(self)
@@ -101,17 +113,23 @@ impl Parser for BinaryParser {
 
     fn read_uint8(&mut self) -> Result<u8, XRPLBinaryCodecException> {
         let result = self.read(1)?;
-        Ok(u8::from_be_bytes(result.try_into().expect("Invalid read")))
+        Ok(u8::from_be_bytes(result.try_into().or(Err(
+            XRPLBinaryCodecException::InvalidReadFromBytesValue,
+        ))?))
     }
 
     fn read_uint16(&mut self) -> Result<u16, XRPLBinaryCodecException> {
         let result = self.read(2)?;
-        Ok(u16::from_be_bytes(result.try_into().expect("Invalid read")))
+        Ok(u16::from_be_bytes(result.try_into().or(Err(
+            XRPLBinaryCodecException::InvalidReadFromBytesValue,
+        ))?))
     }
 
     fn read_uint32(&mut self) -> Result<u32, XRPLBinaryCodecException> {
         let result = self.read(4)?;
-        Ok(u32::from_be_bytes(result.try_into().expect("Invalid read")))
+        Ok(u32::from_be_bytes(result.try_into().or(Err(
+            XRPLBinaryCodecException::InvalidReadFromBytesValue,
+        ))?))
     }
 
     fn is_end(&self, custom_end: Option<usize>) -> bool {
@@ -152,9 +170,7 @@ impl Parser for BinaryParser {
                     + (byte2 * MAX_BYTE_VALUE)
                     + byte3)
             }
-            _ => Err(XRPLBinaryCodecException::new(
-                "Length prefix must contain between 1 and 3 bytes.",
-            )),
+            _ => Err(XRPLBinaryCodecException::UnexpectedLengthPrefixRange { min: 1, max: 3 }),
         }
     }
 
@@ -168,9 +184,7 @@ impl Parser for BinaryParser {
             type_code = self.read_uint8()? as i16;
 
             if type_code == 0 || type_code < 16 {
-                return Err(XRPLBinaryCodecException::new(
-                    "Cannot read field ID, type_code out of range.",
-                ));
+                return Err(XRPLBinaryCodecException::UnexpectedTypeCodeRange { min: 1, max: 16 });
             };
         };
 
@@ -178,9 +192,7 @@ impl Parser for BinaryParser {
             field_code = self.read_uint8()? as i16;
 
             if field_code == 0 || field_code < 16 {
-                return Err(XRPLBinaryCodecException::new(
-                    "Cannot read field ID, field_code out of range.",
-                ));
+                return Err(XRPLBinaryCodecException::UnexpectedFieldCodeRange { min: 1, max: 16 });
             };
         };
 
@@ -200,7 +212,32 @@ impl Parser for BinaryParser {
             };
         };
 
-        Err(XRPLBinaryCodecException::new("No such field name"))
+        Err(XRPLBinaryCodecException::UnknownFieldName)
+    }
+
+    fn read_type<T: Serializable>(&mut self) -> Result<T, XRPLBinaryCodecException> {
+        T::from_parser(self, None)
+    }
+
+    fn read_field_value<T: Serializable>(
+        &mut self,
+        field: &FieldInstance,
+    ) -> Result<T, XRPLBinaryCodecException> {
+        if field.is_vl_encoded {
+            let length = self.read_length_prefix()?;
+            T::from_parser(self, Some(length))
+        } else {
+            T::from_parser(self, None)
+        }
+    }
+
+    fn read_field_and_value<T: Serializable>(
+        &mut self,
+    ) -> Result<(FieldInstance, T), XRPLBinaryCodecException> {
+        let field = self.read_field()?;
+        let field_value = self.read_field_value(&field)?;
+
+        Ok((field, field_value))
     }
 }
 
@@ -292,6 +329,15 @@ mod test {
         assert!(result.is_ok());
         assert_eq!(0, result.unwrap());
     }
+
+    #[test]
+    fn test_read_field_header() {}
+
+    #[test]
+    fn test_read_field_value() {}
+
+    #[test]
+    fn test_read_field_and_value() {}
 
     #[test]
     fn accept_peek_skip_read() {

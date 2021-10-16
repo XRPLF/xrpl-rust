@@ -1,33 +1,34 @@
-use alloc::borrow::Cow;
-use alloc::borrow::ToOwned;
-use alloc::string::String;
-use alloc::string::ToString;
-
-/// General XRPL Address Codec Exception.
+//! General XRPL Address Codec Exception.
 
 #[derive(Debug)]
-pub struct XRPLAddressCodecException(Cow<'static, str>);
-
-impl XRPLAddressCodecException {
-    pub fn new(err: &str) -> XRPLAddressCodecException {
-        XRPLAddressCodecException(err.to_string().into())
-    }
+#[non_exhaustive]
+pub enum XRPLAddressCodecException {
+    InvalidXAddressPrefix,
+    UnsupportedXAddress,
+    InvalidXAddressZeroNoTag,
+    InvalidXAddressZeroRemain,
+    InvalidCAddressIdLength { length: usize },
+    InvalidCAddressTag,
+    UnknownSeedEncoding,
+    InvalidSeedEntropyLength { length: usize },
+    InvalidSeedPrefixEncodingType,
+    InvalidEncodingPrefixLength,
+    UnexpectedPayloadLength { expected: usize, found: usize },
+    Base58DecodeError(bs58::decode::Error),
+    HexError(hex::FromHexError),
 }
 
 impl From<bs58::decode::Error> for XRPLAddressCodecException {
     fn from(err: bs58::decode::Error) -> Self {
-        XRPLAddressCodecException(err.to_string().into())
+        XRPLAddressCodecException::Base58DecodeError(err)
     }
 }
 
 impl From<hex::FromHexError> for XRPLAddressCodecException {
     fn from(err: hex::FromHexError) -> Self {
-        XRPLAddressCodecException(err.to_string().into())
+        XRPLAddressCodecException::HexError(err)
     }
 }
 
-impl ToString for XRPLAddressCodecException {
-    fn to_string(&self) -> String {
-        self.to_owned().to_string()
-    }
-}
+#[cfg(feature = "std")]
+impl std::error::Error for XRPLAddressCodecException {}

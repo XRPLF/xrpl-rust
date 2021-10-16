@@ -6,9 +6,8 @@ use crate::core::binarycodec::binary_wrappers::utils::MAX_LENGTH_VALUE;
 use crate::core::binarycodec::binary_wrappers::utils::MAX_SECOND_BYTE_VALUE;
 use crate::core::binarycodec::binary_wrappers::utils::MAX_SINGLE_BYTE_LENGTH;
 use crate::core::binarycodec::definitions::field_instance::FieldInstance;
-use crate::core::binarycodec::exceptions::VariableLengthException;
+use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::utils::byte_conversions::ToBytes;
-use alloc::format;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryInto;
@@ -27,7 +26,7 @@ pub type BinarySerializer = Vec<u8>;
 /// 12480 bytes < Content length <= 918744 bytes: prefix is 3 bytes
 ///
 /// See Length Prefixing: `<https://xrpl.org/serialization.html#length-prefixing>`
-fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, VariableLengthException> {
+fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryCodecException> {
     if length <= &MAX_SINGLE_BYTE_LENGTH {
         Ok([*length as u8].to_vec())
     } else if length < &MAX_DOUBLE_BYTE_LENGTH {
@@ -57,10 +56,9 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, VariableLen
 
         Ok(bytes)
     } else {
-        Err(VariableLengthException::new(&format!(
-            "VariableLength field must be <= {} bytes long",
-            MAX_LENGTH_VALUE
-        )))
+        Err(XRPLBinaryCodecException::InvalidVariableLengthTooLarge {
+            max: MAX_LENGTH_VALUE,
+        })
     }
 }
 

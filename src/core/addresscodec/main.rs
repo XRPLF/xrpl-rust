@@ -13,6 +13,8 @@ use alloc::string::String;
 
 const MAX_32_BIT_UNSIGNED_INT: u32 = u32::max_value();
 
+const _CLASSIC_ADDRESS_ID_LENGTH: usize = 20;
+
 const _PREFIX_BYTES_MAIN: [u8; 2] = [0x05, 0x44];
 const _PREFIX_BYTES_TEST: [u8; 2] = [0x04, 0x93];
 
@@ -23,9 +25,7 @@ fn _is_test_address(prefix: &[u8]) -> Result<bool, XRPLAddressCodecException> {
     } else if _PREFIX_BYTES_TEST == prefix {
         Ok(true)
     } else {
-        Err(XRPLAddressCodecException::new(
-            "Invalid X-Address: bad prefix",
-        ))
+        Err(XRPLAddressCodecException::InvalidXAddressPrefix)
     }
 }
 
@@ -35,7 +35,7 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecEx
     let flag = &buffer[0];
 
     if flag >= &2 {
-        Err(XRPLAddressCodecException::new("Unsupported X-Address"))
+        Err(XRPLAddressCodecException::UnsupportedXAddress)
     } else if flag == &1 {
         // Little-endian to big-endian
         Ok(Some(
@@ -46,13 +46,9 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecEx
         ))
         // inverse of what happens in encode
     } else if flag != &0 {
-        Err(XRPLAddressCodecException::new(
-            "Flag must be zero to indicate no tag",
-        ))
+        Err(XRPLAddressCodecException::InvalidXAddressZeroNoTag)
     } else if hex::decode("0000000000000000")? != buffer[1..9] {
-        Err(XRPLAddressCodecException::new(
-            "Remaining bytes must be zero",
-        ))
+        Err(XRPLAddressCodecException::InvalidXAddressZeroRemain)
     } else {
         Ok(None)
     }
@@ -73,12 +69,12 @@ pub fn classic_address_to_xaddress(
     let flag: bool = tag != None;
     let tag_val: u64;
 
-    if classic_address_bytes.len() != 20 {
-        Err(XRPLAddressCodecException::new(
-            "Account ID must be 20 bytes",
-        ))
+    if classic_address_bytes.len() != _CLASSIC_ADDRESS_ID_LENGTH {
+        Err(XRPLAddressCodecException::InvalidCAddressIdLength {
+            length: _CLASSIC_ADDRESS_ID_LENGTH,
+        })
     } else if tag != None && tag > Some(MAX_32_BIT_UNSIGNED_INT.into()) {
-        Err(XRPLAddressCodecException::new("Invalid tag"))
+        Err(XRPLAddressCodecException::InvalidCAddressTag)
     } else {
         if tag != None {
             tag_val = tag.unwrap();

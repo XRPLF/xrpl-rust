@@ -77,9 +77,7 @@ pub fn derive_keypair(
     if module.is_valid_message(_VERIFICATION_MESSAGE, signature, &public) {
         Ok((public, private))
     } else {
-        Err(XRPLKeypairsException::new(
-            "Derived keypair did not generate verifiable signature",
-        ))
+        Err(XRPLKeypairsException::InvalidSignature)
     }
 }
 
