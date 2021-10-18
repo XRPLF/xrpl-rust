@@ -1,8 +1,9 @@
 //! Exception for invalid XRP Ledger amount data.
 
+use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use alloc::string::String;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum XRPRangeException {
     InvalidXRPAmountTooSmall { min: String, found: String },
@@ -11,18 +12,26 @@ pub enum XRPRangeException {
     DecimalError(rust_decimal::Error),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum ISOCodeException {
     InvalidISOCode,
     InvalidISOLength,
     InvalidXRPBytes,
+    UnsupportedCurrencyRepresentation,
     HexError(hex::FromHexError),
+    XRPLBinaryCodecError(XRPLBinaryCodecException),
 }
 
 impl From<rust_decimal::Error> for XRPRangeException {
     fn from(err: rust_decimal::Error) -> Self {
         XRPRangeException::DecimalError(err)
+    }
+}
+
+impl From<XRPLBinaryCodecException> for ISOCodeException {
+    fn from(err: XRPLBinaryCodecException) -> Self {
+        ISOCodeException::XRPLBinaryCodecError(err)
     }
 }
 

@@ -26,7 +26,7 @@ pub trait Parser {
     fn peek(&self) -> Option<[u8; 1]>;
 
     /// Consume the first n bytes of the BinaryParser.
-    fn skip(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException>;
+    fn skip_bytes(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException>;
 
     /// Consume and return the first n bytes of the
     /// BinaryParser.
@@ -92,7 +92,7 @@ impl Parser for BinaryParser {
         }
     }
 
-    fn skip(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException> {
+    fn skip_bytes(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException> {
         if n > self.0.len() {
             Err(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
                 max: self.0.len(),
@@ -107,7 +107,7 @@ impl Parser for BinaryParser {
     fn read(&mut self, n: usize) -> Result<Vec<u8>, XRPLBinaryCodecException> {
         let first_n_bytes = self.0[..n].to_owned();
 
-        self.skip(n)?;
+        self.skip_bytes(n)?;
         Ok(first_n_bytes)
     }
 
@@ -247,9 +247,33 @@ impl From<&[u8]> for BinaryParser {
     }
 }
 
+impl From<Vec<u8>> for BinaryParser {
+    fn from(hex_bytes: Vec<u8>) -> Self {
+        BinaryParser(hex_bytes)
+    }
+}
+
 impl PartialEq<[u8]> for BinaryParser {
     fn eq(&self, bytes: &[u8]) -> bool {
         self.0 == bytes
+    }
+}
+
+impl ExactSizeIterator for BinaryParser {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl Iterator for BinaryParser {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.is_end(None) {
+            Some(self.read_uint8().unwrap())
+        } else {
+            None
+        }
     }
 }
 
@@ -273,7 +297,7 @@ mod test {
         let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
 
-        assert!(binary_parser.skip(4).is_ok());
+        assert!(binary_parser.skip_bytes(4).is_ok());
         assert_eq!(binary_parser, test_bytes[4..]);
     }
 
@@ -346,7 +370,7 @@ mod test {
         let first_byte = binary_parser.peek().unwrap();
 
         assert_eq!([test_bytes[0]; 1], first_byte);
-        assert!(binary_parser.skip(3).is_ok());
+        assert!(binary_parser.skip_bytes(3).is_ok());
         assert_eq!(binary_parser, test_bytes[3..]);
 
         let result = binary_parser.read(2);

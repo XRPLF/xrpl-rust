@@ -3,4 +3,6 @@
 pub mod binary_wrappers;
 pub mod definitions;
 pub mod exceptions;
+pub mod field_id_codec;
+pub(crate) mod test_case;
 pub mod types;

@@ -6,9 +6,19 @@ pub enum XRPLBinaryCodecException {
     UnexpectedLengthPrefixRange { min: usize, max: usize },
     UnexpectedTypeCodeRange { min: usize, max: usize },
     UnexpectedFieldCodeRange { min: usize, max: usize },
+    UnexpectedFieldIdByteRange { min: usize, max: usize },
+    UnsupportedCurrencyRepresentation,
     UnknownFieldName,
     InvalidReadFromBytesValue,
     InvalidVariableLengthTooLarge { max: usize },
+    InvalidHashLength { expected: usize, found: usize },
+    HexError(hex::FromHexError),
+}
+
+impl From<hex::FromHexError> for XRPLBinaryCodecException {
+    fn from(err: hex::FromHexError) -> Self {
+        XRPLBinaryCodecException::HexError(err)
+    }
 }
 
 #[cfg(feature = "std")]

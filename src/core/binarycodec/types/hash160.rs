@@ -1,5 +1,5 @@
 //! Codec for serializing and deserializing a hash
-//! field with a width of 128 bits (16 bytes).
+//! field with a width of 160 bits (20 bytes).
 //!
 //! See Hash Fields:
 //! `<https://xrpl.org/serialization.html#hash-fields>`
@@ -16,51 +16,51 @@ use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
 
 /// Codec for serializing and deserializing a hash field
-/// with a width of 128 bits (16 bytes).
+/// with a width of 160 bits (20 bytes).
 ///
 /// See Hash Fields:
 /// `<https://xrpl.org/serialization.html#hash-fields>`
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Hash128(Vec<u8>);
+pub struct Hash160(Vec<u8>);
 
-const _HASH128_LENGTH: usize = 16;
+const _HASH160_LENGTH: usize = 20;
 
-impl Hash for Hash128 {
+impl Hash for Hash160 {
     fn get_length() -> usize {
-        _HASH128_LENGTH
+        _HASH160_LENGTH
     }
 }
 
-impl TryFrom<&str> for Hash128 {
+impl TryFrom<&str> for Hash160 {
     type Error = XRPLBinaryCodecException;
 
     /// Construct a Hash object from a hex string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Hash128::new(Some(&hex::decode(value)?))?)
+        Ok(Hash160::new(Some(&hex::decode(value)?))?)
     }
 }
 
-impl Serializable for Hash128 {
+impl Serializable for Hash160 {
     fn new(bytes: Option<&[u8]>) -> Result<Self, XRPLBinaryCodecException> {
-        Ok(Hash128(<dyn Hash>::make::<Hash128>(bytes)?))
+        Ok(Hash160(<dyn Hash>::make::<Hash160>(bytes)?))
     }
 
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Hash128, XRPLBinaryCodecException> {
-        Ok(Hash128(<dyn Hash>::parse::<Hash128>(parser, length)?))
+    ) -> Result<Hash160, XRPLBinaryCodecException> {
+        Ok(Hash160(<dyn Hash>::parse::<Hash160>(parser, length)?))
     }
 }
 
-impl Buffered for Hash128 {
+impl Buffered for Hash160 {
     fn get_buffer(&self) -> &[u8] {
         &self.0
     }
 }
 
 // TODO ToString on Bufferred does not work.
-impl ToString for Hash128 {
+impl ToString for Hash160 {
     fn to_string(&self) -> String {
         hex::encode(self.get_buffer())
     }
@@ -70,18 +70,18 @@ impl ToString for Hash128 {
 mod test {
     use super::*;
 
-    const TEST_HEX: &str = "10000000002000000000300000000012";
+    const TEST_HEX: &str = "1000000000200000000030000000004000000000";
 
     #[test]
     fn test_new() {
         let bytes = hex::decode(TEST_HEX).unwrap();
-        assert_eq!(TEST_HEX, Hash128(bytes).to_string());
+        assert_eq!(TEST_HEX, Hash160(bytes).to_string());
     }
 
     #[test]
     fn test_from_parser() {
         let mut parser = BinaryParser::from(hex::decode(TEST_HEX).unwrap());
-        let result = Hash128::from_parser(&mut parser, None);
+        let result = Hash160::from_parser(&mut parser, None);
 
         assert!(result.is_ok());
         assert_eq!(TEST_HEX, result.unwrap().to_string());
@@ -89,7 +89,7 @@ mod test {
 
     #[test]
     fn test_try_from() {
-        let result = Hash128::try_from(TEST_HEX);
+        let result = Hash160::try_from(TEST_HEX);
 
         assert!(result.is_ok());
         assert_eq!(TEST_HEX, result.unwrap().to_string());
@@ -97,7 +97,7 @@ mod test {
 
     #[test]
     fn accept_invalid_length_errors() {
-        let result = Hash128::try_from("1000000000200000000030000000001234");
+        let result = Hash160::try_from("100000000020000000003000000000400000000012");
         assert!(result.is_err());
     }
 }

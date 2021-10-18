@@ -8,6 +8,9 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 
+pub const CODE_MIN_VALUE: i16 = 1;
+pub const CODE_MAX_VALUE: i16 = u8::MAX as i16;
+
 #[derive(Debug, Clone)]
 pub struct FieldHeader {
     pub type_code: i16,

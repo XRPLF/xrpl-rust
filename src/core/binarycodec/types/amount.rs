@@ -10,11 +10,13 @@ use crate::core::binarycodec::types::serialized_type::Serializable;
 use alloc::vec::Vec;
 use anyhow::Result;
 use core::convert::TryFrom;
+use serde::{Deserialize, Serialize};
 
 /// Codec for serializing and deserializing Amount fields.
 ///
 /// See Amount Fields:
 /// `<https://xrpl.org/serialization.html#amount-fields>`
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Amount {
     bytes: Vec<u8>,
     pub value: String,

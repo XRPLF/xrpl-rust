@@ -1,4 +1,5 @@
 //! Base class for XRPL Hash types.
+//!
 //! See Hash Fields:
 //! `<https://xrpl.org/serialization.html#hash-fields>`
 
@@ -8,19 +9,35 @@ use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use alloc::vec::Vec;
 
 /// XRPL Hash type.
+///
 /// See Hash Fields:
 /// `<https://xrpl.org/serialization.html#hash-fields>`
-pub(crate) trait Hash {}
+pub(crate) trait Hash {
+    fn get_length() -> usize
+    where
+        Self: Sized;
+}
 
 impl dyn Hash {
-    pub(crate) fn make(bytes: Option<&[u8]>) -> Vec<u8> {
-        bytes.or(Some(&[])).unwrap().into()
+    pub fn make<T: Hash>(bytes: Option<&[u8]>) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+        let byte_value: &[u8] = bytes.or(Some(&[])).unwrap();
+        let hash_length: usize = T::get_length();
+
+        if byte_value.len() != hash_length {
+            Err(XRPLBinaryCodecException::InvalidHashLength {
+                expected: hash_length,
+                found: byte_value.len(),
+            })
+        } else {
+            Ok(bytes.unwrap().to_vec())
+        }
     }
 
-    pub(crate) fn parse(
+    pub fn parse<T: Hash>(
         parser: &mut BinaryParser,
-        length: usize,
+        length: Option<usize>,
     ) -> Result<Vec<u8>, XRPLBinaryCodecException> {
-        parser.read(length)
+        let read_length = length.or(Some(T::get_length())).unwrap();
+        parser.read(read_length)
     }
 }

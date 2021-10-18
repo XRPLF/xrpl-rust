@@ -90,7 +90,6 @@ pub fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTimeRangeEx
 ///
 /// ```
 /// use xrpl::utils::time_conversion::ripple_time_to_posix;
-///
 /// let timestamp = ripple_time_to_posix(946684801);
 /// ```
 pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeException> {
@@ -106,7 +105,6 @@ pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeExcept
 ///
 /// ```
 /// use xrpl::utils::time_conversion::posix_to_ripple_time;
-///
 /// let timestamp = posix_to_ripple_time(946684801);
 /// ```
 pub fn posix_to_ripple_time(timestamp: i64) -> Result<i64, XRPLTimeRangeException> {

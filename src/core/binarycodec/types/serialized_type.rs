@@ -7,11 +7,14 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 /// Contains a serialized buffer of a Serializer type.
+#[derive(Debug)]
 pub struct SerializedType(Vec<u8>);
 
 pub trait Serializable {
     /// Create a new instance of a type.
-    fn new(buffer: Option<&[u8]>) -> Self;
+    fn new(buffer: Option<&[u8]>) -> Result<Self, XRPLBinaryCodecException>
+    where
+        Self: Sized;
     /// Construct a type from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
@@ -35,6 +38,7 @@ where
     }
 }
 
+// TODO This doesn't seem to work.
 impl ToString for dyn Buffered {
     fn to_string(&self) -> String {
         hex::encode(self.get_buffer())
