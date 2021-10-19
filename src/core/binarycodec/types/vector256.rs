@@ -4,33 +4,43 @@
 use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::types::hash256::Hash256;
-use crate::core::binarycodec::types::serialized_type::Buffered;
-use crate::core::binarycodec::types::serialized_type::Serializable;
+use crate::core::binarycodec::types::xrpl_type::Buffered;
+use crate::core::binarycodec::types::xrpl_type::FromParser;
+use crate::core::binarycodec::types::xrpl_type::XRPLType;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
+use serde::ser::SerializeSeq;
+use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
 const _HASH_LENGTH_BYTES: usize = 32;
 
 /// Codec for serializing and deserializing
 /// vectors of Hash256.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(try_from = "Vec<&str>")]
 pub struct Vector256(Vec<u8>);
 
-impl Serializable for Vector256 {
+impl XRPLType for Vector256 {
+    type Error = XRPLBinaryCodecException;
+
     /// Construct a Vector256.
-    fn new(buffer: Option<&[u8]>) -> Result<Self, XRPLBinaryCodecException> {
+    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Vector256(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }
+}
+
+impl FromParser for Vector256 {
+    type Error = XRPLBinaryCodecException;
 
     /// Construct a Vector256 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Vector256, XRPLBinaryCodecException> {
+    ) -> Result<Vector256, Self::Error> {
         let mut bytes = vec![];
         let num_bytes: usize;
         let num_hashes: usize;
@@ -57,11 +67,34 @@ impl Buffered for Vector256 {
     }
 }
 
-impl TryFrom<&[&str]> for Vector256 {
+impl Serialize for Vector256 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if self.0.len() % _HASH_LENGTH_BYTES != 0 {
+            use serde::ser::Error;
+            Err(S::Error::custom(
+                XRPLBinaryCodecException::InvalidVector256Bytes,
+            ))
+        } else {
+            let mut sequence = serializer.serialize_seq(None)?;
+
+            for i in (0..self.0.len()).step_by(_HASH_LENGTH_BYTES) {
+                let encoded = hex::encode(&self.0[i..i + _HASH_LENGTH_BYTES]).to_uppercase();
+                sequence.serialize_element(&encoded)?;
+            }
+
+            sequence.end()
+        }
+    }
+}
+
+impl TryFrom<Vec<&str>> for Vector256 {
     type Error = XRPLBinaryCodecException;
 
     /// Construct a Vector256 from a list of strings.
-    fn try_from(value: &[&str]) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<&str>) -> Result<Self, Self::Error> {
         let mut bytes = vec![];
 
         for string in value {
@@ -82,11 +115,11 @@ impl ToString for Vector256 {
 #[cfg(test)]
 mod test {
     use super::*;
+    use alloc::format;
 
     const SERIALIZED: &str = "42426C4D4F1009EE67080A9B7965B44656D7714D104A72F9B4369F97ABF044EE4C97EBA926031A7CF7D7B36FDE3ED66DDA5421192D63DE53FFB46E43B9DC8373";
     const HASH1: &str = "42426C4D4F1009EE67080A9B7965B44656D7714D104A72F9B4369F97ABF044EE";
     const HASH2: &str = "4C97EBA926031A7CF7D7B36FDE3ED66DDA5421192D63DE53FFB46E43B9DC8373";
-    const HASH_LIST: &[&str] = &[HASH1, HASH2];
 
     #[test]
     fn test_new() {
@@ -105,9 +138,19 @@ mod test {
 
     #[test]
     fn test_try_from() {
-        let result = Vector256::try_from(HASH_LIST);
+        let result = Vector256::try_from(vec![HASH1, HASH2]);
 
         assert!(result.is_ok());
         assert_eq!(SERIALIZED, result.unwrap().to_string());
+    }
+
+    #[test]
+    fn accept_serde_encode_decode() {
+        let vector = Vector256::try_from(vec![HASH1, HASH2]).unwrap();
+        let serialize = serde_json::to_string(&vector).unwrap();
+        let deserialize: Vector256 = serde_json::from_str(&serialize).unwrap();
+
+        assert_eq!(format!("[\"{}\",\"{}\"]", HASH1, HASH2), serialize);
+        assert_eq!(SERIALIZED, deserialize.to_string());
     }
 }

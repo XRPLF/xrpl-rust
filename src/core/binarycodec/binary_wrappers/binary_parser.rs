@@ -11,7 +11,7 @@ use crate::core::binarycodec::definitions::definition_types::get_field_name_from
 use crate::core::binarycodec::definitions::field_header::FieldHeader;
 use crate::core::binarycodec::definitions::field_instance::FieldInstance;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::serialized_type::Serializable;
+use crate::core::binarycodec::types::xrpl_type::FromParser;
 use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
 use core::convert::TryInto;
@@ -67,19 +67,13 @@ pub trait Parser {
     fn read_field(&mut self) -> Result<FieldInstance, XRPLBinaryCodecException>;
 
     /// Read next bytes from BinaryParser as the given type.
-    fn read_type<T: Serializable>(&mut self) -> Result<T, XRPLBinaryCodecException>;
+    fn read_type<T: FromParser>(&mut self) -> Result<T, T::Error>;
 
     /// Read value of the type specified by field from
     /// the BinaryParser.
-    fn read_field_value<T: Serializable>(
-        &mut self,
-        field: &FieldInstance,
-    ) -> Result<T, XRPLBinaryCodecException>;
-
-    /// Get the next field and value from the BinaryParser.
-    fn read_field_and_value<T: Serializable>(
-        &mut self,
-    ) -> Result<(FieldInstance, T), XRPLBinaryCodecException>;
+    fn read_field_value<T: FromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
+    where
+        T::Error: From<XRPLBinaryCodecException>;
 }
 
 /// Peek the first byte of the BinaryParser.
@@ -215,29 +209,20 @@ impl Parser for BinaryParser {
         Err(XRPLBinaryCodecException::UnknownFieldName)
     }
 
-    fn read_type<T: Serializable>(&mut self) -> Result<T, XRPLBinaryCodecException> {
+    fn read_type<T: FromParser>(&mut self) -> Result<T, T::Error> {
         T::from_parser(self, None)
     }
 
-    fn read_field_value<T: Serializable>(
-        &mut self,
-        field: &FieldInstance,
-    ) -> Result<T, XRPLBinaryCodecException> {
+    fn read_field_value<T: FromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
+    where
+        T::Error: From<XRPLBinaryCodecException>,
+    {
         if field.is_vl_encoded {
             let length = self.read_length_prefix()?;
             T::from_parser(self, Some(length))
         } else {
             T::from_parser(self, None)
         }
-    }
-
-    fn read_field_and_value<T: Serializable>(
-        &mut self,
-    ) -> Result<(FieldInstance, T), XRPLBinaryCodecException> {
-        let field = self.read_field()?;
-        let field_value = self.read_field_value(&field)?;
-
-        Ok((field, field_value))
     }
 }
 

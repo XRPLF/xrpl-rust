@@ -21,11 +21,18 @@ pub enum ISOCodeException {
     UnsupportedCurrencyRepresentation,
     HexError(hex::FromHexError),
     XRPLBinaryCodecError(XRPLBinaryCodecException),
+    Utf8Error(core::str::Utf8Error),
 }
 
 impl From<rust_decimal::Error> for XRPRangeException {
     fn from(err: rust_decimal::Error) -> Self {
         XRPRangeException::DecimalError(err)
+    }
+}
+
+impl From<core::str::Utf8Error> for ISOCodeException {
+    fn from(err: core::str::Utf8Error) -> Self {
+        ISOCodeException::Utf8Error(err)
     }
 }
 

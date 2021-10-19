@@ -3,11 +3,10 @@
 
 use crate::constants::HEX_CURRENCY_REGEX;
 use crate::constants::ISO_CURRENCY_REGEX;
-use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::types::hash160::Hash160;
-use crate::core::binarycodec::types::serialized_type::Buffered;
-use crate::core::binarycodec::types::serialized_type::Serializable;
+use crate::core::binarycodec::types::xrpl_type::Buffered;
+use crate::core::binarycodec::types::xrpl_type::XRPLType;
 use crate::utils::exceptions::ISOCodeException;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -16,6 +15,7 @@ use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::convert::TryInto;
 use regex::Regex;
+use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
 pub const CURRENCY_CODE_LENGTH: usize = 20;
@@ -24,7 +24,7 @@ pub const NATIVE_CODE: &str = "XRP";
 
 /// Codec for serializing and deserializing
 /// vectors of Hash256.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Currency(Hash160);
 
 /// Tests if value is a valid 3-char iso code.
@@ -40,12 +40,12 @@ fn _is_hex(value: &str) -> bool {
 }
 
 fn _iso_code_from_hex(value: &[u8]) -> Result<Option<String>, ISOCodeException> {
-    let candidate_iso = hex::encode(value);
+    let candidate_iso = alloc::str::from_utf8(&value[12..15])?;
 
     if candidate_iso == NATIVE_CODE {
         Err(ISOCodeException::InvalidXRPBytes)
     } else if _is_iso_code(&candidate_iso) {
-        Ok(Some(candidate_iso))
+        Ok(Some(candidate_iso.to_string()))
     } else {
         Ok(None)
     }
@@ -77,19 +77,13 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
     }
 }
 
-impl Serializable for Currency {
+impl XRPLType for Currency {
+    type Error = XRPLBinaryCodecException;
+
     /// Construct a Currency.
-    fn new(buffer: Option<&[u8]>) -> Result<Self, XRPLBinaryCodecException> {
+    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         let hash160 = Hash160::new(buffer.or(Some(&[0; CURRENCY_CODE_LENGTH])))?;
         Ok(Currency(hash160))
-    }
-
-    /// Construct a Currency from a BinaryParser.
-    fn from_parser(
-        _: &mut BinaryParser,
-        _: Option<usize>,
-    ) -> Result<Currency, XRPLBinaryCodecException> {
-        todo!()
     }
 }
 
@@ -135,9 +129,25 @@ impl ToString for Currency {
     }
 }
 
+impl AsRef<[u8]> for Currency {
+    fn as_ref(&self) -> &[u8] {
+        self.get_buffer()
+    }
+}
+
+impl Serialize for Currency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode(self.get_buffer()))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use alloc::format;
 
     const ILLEGAL_NATIVE_HEX_CODE: &str = "0000000000000000000000005852500000000000";
     const USD_HEX_CODE: &str = "0000000000000000000000005553440000000000";
@@ -185,19 +195,34 @@ mod test {
         assert!(_iso_to_bytes(invalid_iso).is_err());
     }
 
-    // TODO
-    // #[test]
-    // fn test_currency_try_from() {
-    //     let from_hex_xrp = Currency::try_from(NATIVE_HEX_CODE).unwrap();
-    //     let from_hex_ic = Currency::try_from(USD_HEX_CODE).unwrap();
-    //     let from_iso_xrp = Currency::try_from(NATIVE_CODE).unwrap();
-    //     let from_iso_ic = Currency::try_from(USD_ISO).unwrap();
-    //     let from_ns = Currency::try_from(NONSTANDARD_HEX_CODE).unwrap();
+    #[test]
+    fn test_currency_new() {
+        let currency = Currency::new(Some(&hex::decode(USD_HEX_CODE).unwrap()));
+        assert_eq!(USD_HEX_CODE, hex::encode(currency.unwrap()).to_uppercase())
+    }
 
-    //     assert_eq!(NATIVE_CODE, from_hex_xrp.to_string());
-    //     assert_eq!(USD_ISO, from_hex_ic.to_string());
-    //     assert_eq!(NATIVE_HEX_CODE, from_iso_xrp.to_string());
-    //     assert_eq!(USD_HEX_CODE, from_iso_ic.to_string());
-    //     assert_eq!(NONSTANDARD_HEX_CODE, from_ns.to_string());
-    // }
+    #[test]
+    fn test_currency_try_from() {
+        let from_hex_xrp = Currency::try_from(NATIVE_HEX_CODE).unwrap();
+        let from_hex_ic = Currency::try_from(USD_HEX_CODE).unwrap();
+        let from_iso_xrp = Currency::try_from(NATIVE_CODE).unwrap();
+        let from_iso_ic = Currency::try_from(USD_ISO).unwrap();
+        let from_ns = Currency::try_from(NONSTANDARD_HEX_CODE).unwrap();
+
+        assert_eq!(NATIVE_CODE, from_hex_xrp.to_string());
+        assert_eq!(USD_ISO, from_hex_ic.to_string());
+        assert_eq!(NATIVE_HEX_CODE, hex::encode(from_iso_xrp).to_uppercase());
+        assert_eq!(USD_HEX_CODE, hex::encode(from_iso_ic).to_uppercase());
+        assert_eq!(NONSTANDARD_HEX_CODE, hex::encode(from_ns).to_uppercase());
+    }
+
+    #[test]
+    fn accept_serde_encode_decode() {
+        let currency = Currency::try_from(USD_HEX_CODE).unwrap();
+        let serialize = serde_json::to_string(&currency).unwrap();
+        let deserialize: Currency = serde_json::from_str(&serialize).unwrap();
+
+        assert_eq!(format!("\"{}\"", USD_HEX_CODE), serialize);
+        assert_eq!(currency.to_string(), deserialize.to_string());
+    }
 }

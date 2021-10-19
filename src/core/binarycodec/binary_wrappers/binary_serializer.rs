@@ -62,7 +62,7 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryC
     }
 }
 
-pub trait Serializer {
+pub trait Serialization {
     /// Write given bytes to this BinarySerializer.
     fn append(&mut self, bytes: &[u8]) -> &Self;
 
@@ -74,7 +74,7 @@ pub trait Serializer {
     fn write_field_and_value(&mut self, field: FieldInstance, value: &[u8]) -> &Self;
 }
 
-impl Serializer for BinarySerializer {
+impl Serialization for BinarySerializer {
     fn append(&mut self, bytes: &[u8]) -> &Self {
         self.extend_from_slice(bytes);
         self

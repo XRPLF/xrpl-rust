@@ -9,6 +9,7 @@ pub enum XRPLBinaryCodecException {
     UnexpectedFieldIdByteRange { min: usize, max: usize },
     UnsupportedCurrencyRepresentation,
     UnknownFieldName,
+    InvalidVector256Bytes,
     InvalidReadFromBytesValue,
     InvalidVariableLengthTooLarge { max: usize },
     InvalidHashLength { expected: usize, found: usize },
@@ -21,12 +22,11 @@ impl From<hex::FromHexError> for XRPLBinaryCodecException {
     }
 }
 
-#[cfg(feature = "std")]
-impl alloc::error::Error for XRPLBinaryCodecException {}
-
-#[cfg(feature = "std")]
 impl alloc::fmt::Display for XRPLBinaryCodecException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
         write!(f, "XRPLBinaryCodecException: {:?}", self)
     }
 }
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLBinaryCodecException {}

@@ -7,20 +7,22 @@
 use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::types::hash::Hash;
-use crate::core::binarycodec::types::serialized_type::Buffered;
-use crate::core::binarycodec::types::serialized_type::Serializable;
+use crate::core::binarycodec::types::xrpl_type::Buffered;
+use crate::core::binarycodec::types::xrpl_type::FromParser;
+use crate::core::binarycodec::types::xrpl_type::XRPLType;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// Codec for serializing and deserializing a hash field
 /// with a width of 256 bits (32 bytes).
 ///
 /// See Hash Fields:
 /// `<https://xrpl.org/serialization.html#hash-fields>`
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
+#[serde(try_from = "&str")]
 pub struct Hash256(Vec<u8>);
 
 const _HASH256_LENGTH: usize = 32;
@@ -40,15 +42,21 @@ impl TryFrom<&str> for Hash256 {
     }
 }
 
-impl Serializable for Hash256 {
-    fn new(bytes: Option<&[u8]>) -> Result<Self, XRPLBinaryCodecException> {
+impl XRPLType for Hash256 {
+    type Error = XRPLBinaryCodecException;
+
+    fn new(bytes: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Hash256(<dyn Hash>::make::<Hash256>(bytes)?))
     }
+}
+
+impl FromParser for Hash256 {
+    type Error = XRPLBinaryCodecException;
 
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Hash256, XRPLBinaryCodecException> {
+    ) -> Result<Hash256, Self::Error> {
         Ok(Hash256(<dyn Hash>::parse::<Hash256>(parser, length)?))
     }
 }

@@ -5,8 +5,8 @@
 
 use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::types::hash::Hash;
-use crate::core::binarycodec::types::serialized_type::Buffered;
-use crate::core::binarycodec::types::serialized_type::Serializable;
+use crate::core::binarycodec::types::xrpl_type::Buffered;
+use crate::core::binarycodec::types::xrpl_type::XRPLType;
 use alloc::vec::Vec;
 use anyhow::Result;
 use core::convert::TryFrom;
@@ -33,7 +33,7 @@ impl TryFrom<&str> for Amount {
     }
 }
 
-impl Serializable for Amount {
+impl XRPLType for Amount {
     fn new(bytes: &[u8]) -> Self {
         Amount(bytes.to_vec())
     }

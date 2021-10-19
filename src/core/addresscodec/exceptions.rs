@@ -1,21 +1,31 @@
 //! General XRPL Address Codec Exception.
 
-#[derive(Debug)]
+use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum XRPLAddressCodecException {
     InvalidXAddressPrefix,
-    UnsupportedXAddress,
     InvalidXAddressZeroNoTag,
     InvalidXAddressZeroRemain,
     InvalidCAddressIdLength { length: usize },
     InvalidCAddressTag,
-    UnknownSeedEncoding,
     InvalidSeedEntropyLength { length: usize },
     InvalidSeedPrefixEncodingType,
     InvalidEncodingPrefixLength,
+    InvalidClassicAddressValue,
+    UnsupportedXAddress,
+    UnknownSeedEncoding,
     UnexpectedPayloadLength { expected: usize, found: usize },
     Base58DecodeError(bs58::decode::Error),
     HexError(hex::FromHexError),
+    XRPLBinaryCodecError(XRPLBinaryCodecException),
+}
+
+impl From<XRPLBinaryCodecException> for XRPLAddressCodecException {
+    fn from(err: XRPLBinaryCodecException) -> Self {
+        XRPLAddressCodecException::XRPLBinaryCodecError(err)
+    }
 }
 
 impl From<bs58::decode::Error> for XRPLAddressCodecException {
@@ -30,12 +40,11 @@ impl From<hex::FromHexError> for XRPLAddressCodecException {
     }
 }
 
-#[cfg(feature = "std")]
-impl alloc::error::Error for XRPLAddressCodecException {}
-
-#[cfg(feature = "std")]
 impl alloc::fmt::Display for XRPLAddressCodecException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
         write!(f, "XRPLAddressCodecException: {:?}", self)
     }
 }
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLAddressCodecException {}

@@ -1,4 +1,7 @@
 /// General XRPL Model Exception.
 
 #[derive(Debug)]
-pub struct XRPLModelException(Cow<'static, str>);
+pub enum XRPLModelException {}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLModelException {}
