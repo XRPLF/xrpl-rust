@@ -6,6 +6,7 @@ use alloc::string::String;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum XRPRangeException {
+    InvalidXRPAmount,
     InvalidXRPAmountTooSmall { min: String, found: String },
     InvalidXRPAmountTooLarge { max: u64, found: u64 },
     InvalidDropsAmountTooLarge { max: String, found: String },

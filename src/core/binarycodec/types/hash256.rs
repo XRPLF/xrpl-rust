@@ -33,15 +33,6 @@ impl Hash for Hash256 {
     }
 }
 
-impl TryFrom<&str> for Hash256 {
-    type Error = XRPLBinaryCodecException;
-
-    /// Construct a Hash object from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Hash256::new(Some(&hex::decode(value)?))?)
-    }
-}
-
 impl XRPLType for Hash256 {
     type Error = XRPLBinaryCodecException;
 
@@ -64,6 +55,15 @@ impl FromParser for Hash256 {
 impl Buffered for Hash256 {
     fn get_buffer(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl TryFrom<&str> for Hash256 {
+    type Error = XRPLBinaryCodecException;
+
+    /// Construct a Hash object from a hex string.
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(Hash256::new(Some(&hex::decode(value)?))?)
     }
 }
 

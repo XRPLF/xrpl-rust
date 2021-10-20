@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2018"
 authors = ["Tanveer Wahid <tan@wahid.email>"]
 description = "A Rust library to interact with the XRPL"
-readme = "../README.md"
+readme = "README.md"
 license = "ISC License"
 repository = "https://github.com/sephynox/xrpl-rust"
 
