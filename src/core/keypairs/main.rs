@@ -95,7 +95,7 @@ pub fn sign(message: &[u8], private_key: &str) -> Result<String, XRPLKeypairsExc
     let module = _get_algorithm_engine_from_key(private_key);
     let result = module.sign(message, private_key)?;
 
-    Ok(hex::encode(result).to_uppercase())
+    Ok(hex::encode_upper(result))
 }
 
 /// Verifies the signature on a given message.
@@ -144,7 +144,7 @@ mod test {
     #[test]
     fn test_sign() {
         assert_eq!(
-            hex::encode(SIGNATURE_ED25519).to_uppercase(),
+            hex::encode_upper(SIGNATURE_ED25519),
             sign(TEST_MESSAGE.as_bytes(), PRIVATE_ED25519).unwrap()
         );
     }

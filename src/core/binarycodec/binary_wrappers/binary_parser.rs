@@ -18,7 +18,7 @@ use core::convert::TryInto;
 
 /// Deserializes from hex-encoded XRPL binary format to
 /// serde JSON fields and values.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BinaryParser(Vec<u8>);
 
 pub trait Parser {

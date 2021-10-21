@@ -156,13 +156,13 @@ pub fn decode(field_id: &str) -> Result<&str, XRPLBinaryCodecException> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::core::binarycodec::test_case::load_field_tests;
+    use crate::core::binarycodec::test_cases::load_field_tests;
 
     #[test]
     fn test_encode() {
         for test in load_field_tests() {
-            let result = hex::encode(encode(&test.name).unwrap());
-            assert_eq!(test.expected_hex, result.to_uppercase())
+            let result = hex::encode_upper(encode(&test.name).unwrap());
+            assert_eq!(test.expected_hex, result)
         }
     }
 

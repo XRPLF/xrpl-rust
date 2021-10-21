@@ -7,10 +7,15 @@ use alloc::string::String;
 #[non_exhaustive]
 pub enum XRPRangeException {
     InvalidXRPAmount,
+    InvalidICAmount,
     InvalidXRPAmountTooSmall { min: String, found: String },
     InvalidXRPAmountTooLarge { max: u64, found: u64 },
+    InvalidICPrecisionTooSmall { min: i32, found: i32 },
+    InvalidICPrecisionTooLarge { max: i32, found: i32 },
     InvalidDropsAmountTooLarge { max: String, found: String },
+    UnexpectedICAmountOverflow { max: usize, found: usize },
     DecimalError(rust_decimal::Error),
+    HexError(hex::FromHexError),
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +33,12 @@ pub enum ISOCodeException {
 impl From<rust_decimal::Error> for XRPRangeException {
     fn from(err: rust_decimal::Error) -> Self {
         XRPRangeException::DecimalError(err)
+    }
+}
+
+impl From<hex::FromHexError> for XRPRangeException {
+    fn from(err: hex::FromHexError) -> Self {
+        XRPRangeException::HexError(err)
     }
 }
 
@@ -49,22 +60,20 @@ impl From<hex::FromHexError> for ISOCodeException {
     }
 }
 
-#[cfg(feature = "std")]
-impl alloc::error::Error for XRPRangeException {}
-
-#[cfg(feature = "std")]
-impl alloc::error::Error for ISOCodeException {}
-
-#[cfg(feature = "std")]
 impl alloc::fmt::Display for XRPRangeException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         write!(f, "XRPRangeException: {:?}", self)
     }
 }
 
-#[cfg(feature = "std")]
 impl alloc::fmt::Display for ISOCodeException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         write!(f, "ISOCodeException: {:?}", self)
     }
 }
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPRangeException {}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for ISOCodeException {}

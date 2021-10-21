@@ -1,8 +1,6 @@
 //! Conversions between the XRP Ledger's 'Ripple Epoch' time and native time
 //! data types.
 
-use alloc::fmt::Display;
-use alloc::fmt::Formatter;
 use chrono::DateTime;
 use chrono::TimeZone;
 use chrono::Utc;
@@ -16,22 +14,6 @@ pub const MAX_XRPL_TIME: i64 = i64::pow(2, 32);
 /// Exception for invalid XRP Ledger time data.
 pub struct XRPLTimeRangeException {
     time: i64,
-}
-
-impl Display for XRPLTimeRangeException {
-    fn fmt(&self, f: &mut Formatter) -> alloc::fmt::Result {
-        if self.time < 0 {
-            write!(f, "{} is before the Ripple Epoch.", self.time)
-        } else if self.time > MAX_XRPL_TIME {
-            write!(
-                f,
-                "{} is larger than any time that can be expressed on the XRP Ledger.",
-                self.time
-            )
-        } else {
-            write!(f, "Unknown error for {}", self.time)
-        }
-    }
 }
 
 fn _ripple_check_max<T>(time: i64, ok: T) -> Result<T, XRPLTimeRangeException> {
@@ -110,6 +92,22 @@ pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeExcept
 pub fn posix_to_ripple_time(timestamp: i64) -> Result<i64, XRPLTimeRangeException> {
     let ripple_time = timestamp - RIPPLE_EPOCH;
     _ripple_check_max(ripple_time, ripple_time)
+}
+
+impl alloc::fmt::Display for XRPLTimeRangeException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
+        if self.time < 0 {
+            write!(f, "{} is before the Ripple Epoch.", self.time)
+        } else if self.time > MAX_XRPL_TIME {
+            write!(
+                f,
+                "{} is larger than any time that can be expressed on the XRP Ledger.",
+                self.time
+            )
+        } else {
+            write!(f, "Unknown error for {}", self.time)
+        }
+    }
 }
 
 #[cfg(test)]

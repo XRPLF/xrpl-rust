@@ -38,7 +38,7 @@ impl TryFrom<&str> for Hash128 {
 
     /// Construct a Hash object from a hex string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Hash128::new(Some(&hex::decode(value)?))?)
+        Hash128::new(Some(&hex::decode(value)?))
     }
 }
 

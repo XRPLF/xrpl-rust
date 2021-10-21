@@ -63,7 +63,7 @@ impl TryFrom<&str> for Hash256 {
 
     /// Construct a Hash object from a hex string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Ok(Hash256::new(Some(&hex::decode(value)?))?)
+        Hash256::new(Some(&hex::decode(value)?))
     }
 }
 

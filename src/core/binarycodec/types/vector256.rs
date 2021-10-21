@@ -81,7 +81,7 @@ impl Serialize for Vector256 {
             let mut sequence = serializer.serialize_seq(None)?;
 
             for i in (0..self.0.len()).step_by(_HASH_LENGTH_BYTES) {
-                let encoded = hex::encode(&self.0[i..i + _HASH_LENGTH_BYTES]).to_uppercase();
+                let encoded = hex::encode_upper(&self.0[i..i + _HASH_LENGTH_BYTES]);
                 sequence.serialize_element(&encoded)?;
             }
 
@@ -98,7 +98,7 @@ impl TryFrom<Vec<&str>> for Vector256 {
         let mut bytes = vec![];
 
         for string in value {
-            bytes.extend_from_slice(Hash256::try_from(string.as_ref())?.get_buffer())
+            bytes.extend_from_slice(Hash256::try_from(string)?.get_buffer())
         }
 
         Ok(Vector256(bytes))
@@ -108,7 +108,7 @@ impl TryFrom<Vec<&str>> for Vector256 {
 // TODO ToString on Bufferred does not work.
 impl ToString for Vector256 {
     fn to_string(&self) -> String {
-        hex::encode(self.get_buffer()).to_uppercase()
+        hex::encode_upper(self.get_buffer())
     }
 }
 

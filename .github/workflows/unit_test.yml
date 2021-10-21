@@ -2,12 +2,11 @@ on:
   push:
     branches:
       - main
-      - develop
   pull_request:
     branches:
-      - main
+      - develop
 
-name: CI
+name: Unit
 
 jobs:
   build_and_test:

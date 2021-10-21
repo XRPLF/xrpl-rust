@@ -1,13 +1,12 @@
 //! Miscellaneous helper functions.
 
+use crate::core::binarycodec::types::utils::ACCOUNT_ID_LENGTH;
 use core::convert::TryInto;
 use ripemd160::Ripemd160;
 use sha2::{Digest, Sha256, Sha512};
 
 /// Length of half a sha512 hash.
 pub const HASH_LENGTH: usize = 32;
-/// Length of an account id.
-pub const ACCOUNT_ID_LENGTH: usize = 20;
 
 /// Returns the first 32 bytes of SHA-512
 /// hash of message.

@@ -37,7 +37,7 @@ impl dyn Hash {
         parser: &mut BinaryParser,
         length: Option<usize>,
     ) -> Result<Vec<u8>, XRPLBinaryCodecException> {
-        let read_length = length.or(Some(T::get_length())).unwrap();
+        let read_length = length.or_else(|| Some(T::get_length())).unwrap();
         parser.read(read_length)
     }
 }

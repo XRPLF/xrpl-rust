@@ -3,9 +3,12 @@
 
 use crate::constants::HEX_CURRENCY_REGEX;
 use crate::constants::ISO_CURRENCY_REGEX;
+use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::types::hash160::Hash160;
+use crate::core::binarycodec::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::binarycodec::types::xrpl_type::Buffered;
+use crate::core::binarycodec::types::xrpl_type::FromParser;
 use crate::core::binarycodec::types::xrpl_type::XRPLType;
 use crate::utils::exceptions::ISOCodeException;
 use alloc::string::String;
@@ -18,7 +21,6 @@ use regex::Regex;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
-pub const CURRENCY_CODE_LENGTH: usize = 20;
 pub const NATIVE_HEX_CODE: &str = "0000000000000000000000000000000000000000";
 pub const NATIVE_CODE: &str = "XRP";
 
@@ -44,7 +46,7 @@ fn _iso_code_from_hex(value: &[u8]) -> Result<Option<String>, ISOCodeException> 
 
     if candidate_iso == NATIVE_CODE {
         Err(ISOCodeException::InvalidXRPBytes)
-    } else if _is_iso_code(&candidate_iso) {
+    } else if _is_iso_code(candidate_iso) {
         Ok(Some(candidate_iso.to_string()))
     } else {
         Ok(None)
@@ -68,7 +70,7 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
         let mut result: Vec<u8> = vec![];
 
         result.extend_from_slice(&pad_left);
-        result.extend_from_slice(&iso_bytes);
+        result.extend_from_slice(iso_bytes);
         result.extend_from_slice(&pad_right);
 
         Ok(result
@@ -89,7 +91,18 @@ impl XRPLType for Currency {
 
 impl Buffered for Currency {
     fn get_buffer(&self) -> &[u8] {
-        &self.0.get_buffer()
+        self.0.get_buffer()
+    }
+}
+
+impl FromParser for Currency {
+    type Error = XRPLBinaryCodecException;
+
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> Result<Currency, Self::Error> {
+        Ok(Currency(Hash160::from_parser(parser, length)?))
     }
 }
 
@@ -136,6 +149,7 @@ impl AsRef<[u8]> for Currency {
 }
 
 impl Serialize for Currency {
+    /// Returns the JSON representation of a currency.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -198,7 +212,7 @@ mod test {
     #[test]
     fn test_currency_new() {
         let currency = Currency::new(Some(&hex::decode(USD_HEX_CODE).unwrap()));
-        assert_eq!(USD_HEX_CODE, hex::encode(currency.unwrap()).to_uppercase())
+        assert_eq!(USD_HEX_CODE, hex::encode_upper(currency.unwrap()))
     }
 
     #[test]
@@ -211,9 +225,9 @@ mod test {
 
         assert_eq!(NATIVE_CODE, from_hex_xrp.to_string());
         assert_eq!(USD_ISO, from_hex_ic.to_string());
-        assert_eq!(NATIVE_HEX_CODE, hex::encode(from_iso_xrp).to_uppercase());
-        assert_eq!(USD_HEX_CODE, hex::encode(from_iso_ic).to_uppercase());
-        assert_eq!(NONSTANDARD_HEX_CODE, hex::encode(from_ns).to_uppercase());
+        assert_eq!(NATIVE_HEX_CODE, hex::encode_upper(from_iso_xrp));
+        assert_eq!(USD_HEX_CODE, hex::encode_upper(from_iso_ic));
+        assert_eq!(NONSTANDARD_HEX_CODE, hex::encode_upper(from_ns));
     }
 
     #[test]

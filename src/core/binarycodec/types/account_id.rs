@@ -8,8 +8,12 @@ use crate::core::addresscodec::codec::is_valid_classic_address;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::main::is_valid_xaddress;
 use crate::core::addresscodec::main::xaddress_to_classic_address;
+use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
+use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::types::hash160::Hash160;
+use crate::core::binarycodec::types::utils::ACCOUNT_ID_LENGTH;
 use crate::core::binarycodec::types::xrpl_type::Buffered;
+use crate::core::binarycodec::types::xrpl_type::FromParser;
 use crate::core::binarycodec::types::xrpl_type::XRPLType;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -17,8 +21,6 @@ use core::convert::TryFrom;
 use regex::Regex;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
-
-pub const ACCOUNT_ID_LENGTH: usize = 20;
 
 /// Codec for serializing and deserializing AccountID fields.
 ///
@@ -46,11 +48,24 @@ impl XRPLType for AccountId {
 
 impl Buffered for AccountId {
     fn get_buffer(&self) -> &[u8] {
-        &self.0.get_buffer()
+        self.0.get_buffer()
+    }
+}
+
+impl FromParser for AccountId {
+    type Error = XRPLBinaryCodecException;
+
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> Result<AccountId, Self::Error> {
+        Ok(AccountId(Hash160::from_parser(parser, length)?))
     }
 }
 
 impl Serialize for AccountId {
+    /// Return the value of this AccountID encoded as a
+    /// base58 string.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -69,7 +84,7 @@ impl Serialize for AccountId {
 impl TryFrom<&str> for AccountId {
     type Error = XRPLAddressCodecException;
 
-    /// Construct an AccountID from a hex string or
+    /// Construct an AccountId from a hex string or
     /// a base58 r-Address.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if is_hex_address(value) {
@@ -109,13 +124,13 @@ mod test {
     #[test]
     fn test_account_id_new() {
         let account = AccountId::new(Some(&hex::decode(HEX_ENCODING).unwrap()));
-        assert_eq!(HEX_ENCODING, hex::encode(account.unwrap()).to_uppercase())
+        assert_eq!(HEX_ENCODING, hex::encode_upper(account.unwrap()))
     }
 
     #[test]
     fn test_currency_try_from() {
         let account = AccountId::try_from(BASE58_ENCODING).unwrap();
-        assert_eq!(HEX_ENCODING, hex::encode(account).to_uppercase())
+        assert_eq!(HEX_ENCODING, hex::encode_upper(account))
     }
 
     #[test]

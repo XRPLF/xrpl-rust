@@ -68,7 +68,7 @@ impl CryptoImplementation for Secp256k1 {
         _is_validator: bool,
     ) -> Result<(String, String), XRPLKeypairsException> {
         let secp = secp256k1::Secp256k1::new();
-        let secret_key = SecretKey::from_slice(&decoded_seed)?;
+        let secret_key = SecretKey::from_slice(decoded_seed)?;
         let public_key = PublicKey::from_secret_key(&secp, &secret_key);
 
         Ok(Secp256k1::_format_keys(public_key, secret_key))
@@ -80,7 +80,7 @@ impl CryptoImplementation for Secp256k1 {
         private_key: &str,
     ) -> Result<[u8; 64], XRPLKeypairsException> {
         let secp = secp256k1::Secp256k1::<SignOnly>::signing_only();
-        let message = Message::from_slice(&message_bytes)?;
+        let message = Message::from_slice(message_bytes)?;
         let private = SecretKey::from_str(private_key)?;
         let signature = secp.sign(&message, &private);
 
@@ -94,16 +94,15 @@ impl CryptoImplementation for Secp256k1 {
         public_key: &str,
     ) -> bool {
         let secp = secp256k1::Secp256k1::<VerifyOnly>::verification_only();
-        let message = Message::from_slice(&message_bytes);
-        let signature = Signature::from_compact(&signature_compact);
+        let msg = Message::from_slice(message_bytes);
+        let sig = Signature::from_compact(&signature_compact);
         let public = PublicKey::from_str(public_key);
 
-        if message.is_err() || signature.is_err() || public.is_err() {
-            return false;
-        };
-
-        secp.verify(&message.unwrap(), &signature.unwrap(), &public.unwrap())
-            .is_ok()
+        if let (&Ok(m), &Ok(s), &Ok(p)) = (&msg.as_ref(), &sig.as_ref(), &public.as_ref()) {
+            secp.verify(m, s, p).is_ok()
+        } else {
+            false
+        }
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::core::addresscodec::codec::SEED_LENGTH;
-use crate::core::keypairs::utils::ACCOUNT_ID_LENGTH;
+use crate::core::binarycodec::types::utils::ACCOUNT_ID_LENGTH;
 use crate::core::keypairs::utils::HASH_LENGTH;
 use ed25519_dalek::SIGNATURE_LENGTH;
 

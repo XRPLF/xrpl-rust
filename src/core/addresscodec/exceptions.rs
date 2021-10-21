@@ -1,6 +1,7 @@
 //! General XRPL Address Codec Exception.
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
+use crate::utils::exceptions::ISOCodeException;
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -20,6 +21,13 @@ pub enum XRPLAddressCodecException {
     Base58DecodeError(bs58::decode::Error),
     HexError(hex::FromHexError),
     XRPLBinaryCodecError(XRPLBinaryCodecException),
+    ISOError(ISOCodeException),
+}
+
+impl From<ISOCodeException> for XRPLAddressCodecException {
+    fn from(err: ISOCodeException) -> Self {
+        XRPLAddressCodecException::ISOError(err)
+    }
 }
 
 impl From<XRPLBinaryCodecException> for XRPLAddressCodecException {
