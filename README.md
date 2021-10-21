@@ -10,7 +10,7 @@
 [deps_status]: https://deps.rs/repo/github/589labs/xrpl-rust/status.svg
 [deps]: https://deps.rs/repo/github/589labs/xrpl-rust
 
-[audit_status]: ttps://github.com/589labs/xrpl-rust/actions/workflows/audit_test.yml/badge.svg
+[audit_status]: https://github.com/589labs/xrpl-rust/actions/workflows/audit_test.yml/badge.svg
 [audit]: https://github.com/589labs/xrpl-rust/actions/workflows/audit_test.yml
 
 [rustc]: https://img.shields.io/badge/rust-1.51.0%2B-orange.svg
