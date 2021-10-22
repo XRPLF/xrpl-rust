@@ -83,7 +83,7 @@ not supported in the alloc crate. TODO: Support both.
 
 This library aims to be `#![no_std]` compliant.
 
-# ☮ Contributing [![contributors_status]][contributors]
+# 🕊 Contributing [![contributors_status]][contributors]
 
 If you want to contribute to this project, see [CONTRIBUTING.md].
 

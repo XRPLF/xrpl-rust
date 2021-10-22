@@ -7,8 +7,8 @@ how to set up your developer environment.
 
 ### Setup the Rust/Cargo Environment
 
-To make it easy to manage your Python environment with `xrpl-rust`, including 
-switching between versions, install `rust` and `cargo` follow these steps:
+Getting started with Rust and `xrpl-rust` is easy. To install `rust` and 
+`cargo` follow these steps:
 
 * Install [`rust`](https://doc.rust-lang.org/cargo/getting-started/installation.html):
 
