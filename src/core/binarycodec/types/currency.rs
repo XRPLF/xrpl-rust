@@ -27,6 +27,7 @@ pub const NATIVE_CODE: &str = "XRP";
 /// Codec for serializing and deserializing
 /// vectors of Hash256.
 #[derive(Debug, Deserialize, Clone)]
+#[serde(try_from = "&str")]
 pub struct Currency(Hash160);
 
 /// Tests if value is a valid 3-char iso code.
@@ -106,6 +107,16 @@ impl FromParser for Currency {
     }
 }
 
+impl Serialize for Currency {
+    /// Returns the JSON representation of a currency.
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
 impl TryFrom<&str> for Currency {
     type Error = ISOCodeException;
 
@@ -145,16 +156,6 @@ impl ToString for Currency {
 impl AsRef<[u8]> for Currency {
     fn as_ref(&self) -> &[u8] {
         self.get_buffer()
-    }
-}
-
-impl Serialize for Currency {
-    /// Returns the JSON representation of a currency.
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&hex::encode(self.get_buffer()))
     }
 }
 
@@ -236,7 +237,7 @@ mod test {
         let serialize = serde_json::to_string(&currency).unwrap();
         let deserialize: Currency = serde_json::from_str(&serialize).unwrap();
 
-        assert_eq!(format!("\"{}\"", USD_HEX_CODE), serialize);
+        assert_eq!(format!("\"{}\"", USD_ISO), serialize);
         assert_eq!(currency.to_string(), deserialize.to_string());
     }
 }

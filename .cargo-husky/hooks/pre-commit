@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+echo 'Running all pre-commit checks:'
+cargo fmt
+cargo test --no-default-features --features core
+cargo test --all-features
+cargo clippy --fix --allow-staged
+#cargo audit

@@ -57,7 +57,7 @@ fn _contains_decimal(string: &str) -> bool {
 /// Serializes the value field of an issued currency amount
 /// to its bytes representation.
 fn _serialize_issed_currency_value(value: &str) -> Result<[u8; 16], XRPRangeException> {
-    //verify_valid_ic_value(value)?;
+    verify_valid_ic_value(value)?;
 
     let decimal = Decimal::from_str(value)?;
     let mut mantissa = decimal.mantissa();
@@ -204,4 +204,12 @@ impl TryFrom<IssuedCurrency> for Amount {
         let serialized = _serialize_issued_currency_amount(value)?;
         Ok(Amount::new(Some(&serialized))?)
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_contains_decimal() {}
 }

@@ -13,12 +13,20 @@ pub enum XRPLBinaryCodecException {
     InvalidReadFromBytesValue,
     InvalidVariableLengthTooLarge { max: usize },
     InvalidHashLength { expected: usize, found: usize },
+    InvalidPathSetFromValue,
     HexError(hex::FromHexError),
+    SerdeJsonError(serde_json::error::Category),
 }
 
 impl From<hex::FromHexError> for XRPLBinaryCodecException {
     fn from(err: hex::FromHexError) -> Self {
         XRPLBinaryCodecException::HexError(err)
+    }
+}
+
+impl From<serde_json::Error> for XRPLBinaryCodecException {
+    fn from(err: serde_json::Error) -> Self {
+        XRPLBinaryCodecException::SerdeJsonError(err.classify())
     }
 }
 

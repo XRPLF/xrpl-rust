@@ -824,7 +824,7 @@ mod test {
             r#type: "Unknown".to_string(),
         };
 
-        let field_instance = FieldInstance::new(&field_info, "Generic".into(), field_header);
+        let field_instance = FieldInstance::new(&field_info, "Generic", field_header);
         let test_field_instance = get_field_instance("Generic");
 
         assert!(!test_field_instance.is_none());

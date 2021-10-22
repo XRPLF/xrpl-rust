@@ -36,8 +36,8 @@ impl Hash for Hash256 {
 impl XRPLType for Hash256 {
     type Error = XRPLBinaryCodecException;
 
-    fn new(bytes: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(Hash256(<dyn Hash>::make::<Hash256>(bytes)?))
+    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+        Ok(Hash256(<dyn Hash>::make::<Hash256>(buffer)?))
     }
 }
 

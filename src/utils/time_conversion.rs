@@ -123,7 +123,7 @@ mod test {
     #[test]
     fn test_datetime_to_ripple_time() {
         let success: i64 = datetime_to_ripple_time(Utc.timestamp(RIPPLE_EPOCH, 0)).unwrap();
-        assert_eq!(success, RIPPLE_EPOCH - RIPPLE_EPOCH);
+        assert_eq!(success, 0);
     }
 
     #[test]
@@ -135,7 +135,7 @@ mod test {
     #[test]
     fn test_posix_to_ripple_time() {
         let success: i64 = posix_to_ripple_time(RIPPLE_EPOCH).unwrap();
-        assert_eq!(success, RIPPLE_EPOCH - RIPPLE_EPOCH);
+        assert_eq!(success, 0);
     }
 
     #[test]

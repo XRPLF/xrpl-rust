@@ -1,5 +1,5 @@
-# xrpl-rust
-[![latest]][crates.io] [![docs_status]][docs] [![deps_status]][deps] [![audit_status]][audit] [![rustc]][rust] [![unit_status]][unit]
+# xrpl-rust ![Downloads](https://img.shields.io/crates/d/xrpl)
+[![latest]][crates.io] [![deps_status]][deps] [![audit_status]][audit] [![unit_status]][unit]
 
 [latest]: https://img.shields.io/crates/v/xrpl.svg
 [crates.io]: https://crates.io/crates/xrpl
@@ -19,11 +19,17 @@
 [unit_status]: https://github.com/589labs/xrpl-rust/actions/workflows/unit_test.yml/badge.svg
 [unit]: https://github.com/589labs/xrpl-rust/actions/workflows/unit_test.yml
 
+[contributors]: https://github.com/589labs/xrpl-rust/graphs/contributors
+[contributors_status]: https://img.shields.io/github/contributors/589labs/xrpl-rust.svg
+
+[license]: https://opensource.org/licenses/ISC
+[license_status]: https://img.shields.io/badge/License-ISC-blue.svg
+
 A Rust library to interact with the XRPL.
 
-A pure Rust implementation for interacting with the XRP Ledger, the xrpl-rust 
-package simplifies the hardest parts of XRP Ledger interaction, like 
-serialization and transaction signing, by providing idiomatic Rust 
+A pure Rust implementation for interacting with the XRP Ledger. The xrpl-rust 
+crate simplifies the hardest parts of XRP Ledger interaction including
+serialization and transaction signing while providing idiomatic Rust 
 functionality for XRP Ledger transactions and core server API (rippled) 
 objects.
 
@@ -35,11 +41,7 @@ this library can be used on devices without the ability to use a
 
 > WIP - Help Welcome
 
-# 🕮 Documentation
-
-Documentation is available [here](https://docs.rs/xrpl). TODO
-
-# 🛠 Installation
+# 🛠 Installation [![rustc]][rust]
 
 To install, add the following to your project's `Cargo.toml`:
 
@@ -47,15 +49,25 @@ To install, add the following to your project's `Cargo.toml`:
 [dependencies.xrpl]
 version = "0.1.0"
 ```
+
+# 🕮 Documentation [![docs_status]][docs]
+
+Documentation is available [here](https://docs.rs/xrpl). 
+
+## ⛮ Quickstart
+TODO
+
 # ⚐ Flags
 
-By default, no features are available. 
-To use [std](hhttps://doc.rust-lang.org/std) simply enable the flag:
+By default, the `std` and `core` features are enabled. 
+To operate in a `#![no_std]` environment simply disable the defaults
+and enable features manually:
 
 ```toml
 [dependencies.xrpl]
 version = "0.1.0"
-features = ["std"]
+default-features = false
+features = ["core", "models"]
 ```
 
 ## ‼ Serde
@@ -65,8 +77,17 @@ This project uses  [serde](https://serde.rs) for JSON handling.
 ## ‼ Indexmap
 
 This project uses [indexmap](https://docs.rs/crate/indexmap) as HashMap is 
-not supported in the std crate. TODO: Support both.
+not supported in the alloc crate. TODO: Support both.
 
 ## ⚙ #![no_std]
 
 This library aims to be `#![no_std]` compliant.
+
+# 🖋 Contributing [![contributors_status]][contributors]
+
+If you want to contribute to this project, see [CONTRIBUTING.md].
+
+# 🗎 License [![license_status]][license]
+
+The `xrpl-rust` library is licensed under the ISC License. 
+See [LICENSE] for more information.

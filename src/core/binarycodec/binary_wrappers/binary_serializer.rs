@@ -114,7 +114,7 @@ mod test {
     /// BinarySerializer.write_length_encoded.
     #[test]
     fn test_encode_variable_length_prefix() {
-        for case in [100 as usize, 1000, 20_000] {
+        for case in [100_usize, 1000, 20_000] {
             let blob = (0..case).map(|_| "A2").collect::<String>();
             let mut binary_serializer: BinarySerializer = BinarySerializer::new();
 

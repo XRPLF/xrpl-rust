@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate std as alloc;
 
 pub mod constants;
+#[cfg(feature = "core")]
 pub mod core;
 pub mod macros;
 pub mod utils;

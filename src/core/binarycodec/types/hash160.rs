@@ -33,20 +33,11 @@ impl Hash for Hash160 {
     }
 }
 
-impl TryFrom<&str> for Hash160 {
-    type Error = XRPLBinaryCodecException;
-
-    /// Construct a Hash object from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Hash160::new(Some(&hex::decode(value)?))
-    }
-}
-
 impl XRPLType for Hash160 {
     type Error = XRPLBinaryCodecException;
 
-    fn new(bytes: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(Hash160(<dyn Hash>::make::<Hash160>(bytes)?))
+    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+        Ok(Hash160(<dyn Hash>::make::<Hash160>(buffer)?))
     }
 }
 
@@ -64,6 +55,15 @@ impl FromParser for Hash160 {
 impl Buffered for Hash160 {
     fn get_buffer(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl TryFrom<&str> for Hash160 {
+    type Error = XRPLBinaryCodecException;
+
+    /// Construct a Hash object from a hex string.
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Hash160::new(Some(&hex::decode(value)?))
     }
 }
 

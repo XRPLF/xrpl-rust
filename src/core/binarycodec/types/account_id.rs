@@ -19,6 +19,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use core::convert::TryFrom;
 use regex::Regex;
+use serde::ser::Error;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
@@ -75,7 +76,6 @@ impl Serialize for AccountId {
         if let Ok(data) = result {
             serializer.serialize_str(data)
         } else {
-            use serde::ser::Error;
             Err(S::Error::custom(result.as_ref().unwrap_err()))
         }
     }

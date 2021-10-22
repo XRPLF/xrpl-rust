@@ -9,7 +9,7 @@ license = "ISC License"
 repository = "https://github.com/sephynox/xrpl-rust"
 
 keywords = ["xrpl", "no_std"]
-categories = ["api", "no-std"]
+categories = ["dlt", "api", "no-std"]
 
 [package.metadata.release]
 no-dev-version = true
@@ -41,13 +41,16 @@ secp256k1 = { version = "0.20.3", default-features = false, features = ["alloc"]
 
 [dev-dependencies]
 criterion = "0.3.5"
+cargo-husky = { version = "1.5.0", default-features = false, features = ["user-hooks"] }
 
 [[bench]]
 name = "benchmarks"
 harness = false
 
 [features]
-default = ["std"]
+default = ["std", "core", "models"]
+core = []
+models = ["core"]
 std = [
     "rand/std", 
     "regex/std",
