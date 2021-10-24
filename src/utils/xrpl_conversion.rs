@@ -25,21 +25,48 @@ pub const MAX_IOU_EXPONENT: u8 = 80;
 // Maximum IC precision
 pub const MAX_IOU_PRECISION: u8 = 16;
 
-/// TODO Fix
+/// TODO Make less bootleg
 /// Get the precision of a number.
 fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
-    let decimal = Decimal::from_str(value)?;
-    let string = decimal.normalize().to_string();
-    let regex = Regex::new("[^0-9]").unwrap();
+    let decimal = Decimal::from_str(value)?.normalize();
+    let regex = Regex::new("[^1-9]").unwrap();
 
-    if let Some(value) = decimal.checked_rem(Decimal::ONE) {
-        let quantized = value.to_string();
-        let stripped = regex.replace(&quantized, "").replace(".", "");
-
+    if decimal.checked_rem(Decimal::ONE).is_some() {
+        let stripped = regex
+            .replace(&decimal.to_string(), "")
+            .replace('.', "")
+            .replace('0', "");
         Ok(stripped.len())
     } else {
-        let stripped = regex.replace(&string, "").replace(".", "");
+        let quantized = decimal.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
+        let stripped = regex
+            .replace(&quantized.to_string(), "")
+            .replace('.', "")
+            .replace('0', "");
         Ok(stripped.len())
+    }
+}
+
+/// Ensure that the value after being multiplied by the
+/// exponent does not contain a decimal.
+fn _verify_no_decimal(decimal: Decimal) -> Result<(), XRPRangeException> {
+    let value: String;
+    let decimal = Decimal::from_u32(decimal.scale()).expect("");
+
+    if decimal == Decimal::ZERO {
+        value = decimal.mantissa().to_string();
+    } else {
+        value = decimal
+            .checked_mul(decimal)
+            .or(Some(Decimal::ZERO))
+            .unwrap()
+            .to_string();
+    }
+
+    if value.contains('.') {
+        Err(XRPRangeException::InvalidValueContainsDecimal)
+    } else {
+        Ok(())
     }
 }
 
@@ -150,30 +177,23 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> 
 pub fn verify_valid_ic_value(ic_value: &str) -> Result<(), XRPRangeException> {
     let decimal = Decimal::from_str(ic_value)?.normalize();
     let scale = -(decimal.scale() as i32);
+    let prec = _calculate_precision(ic_value)?;
 
-    extern crate std;
-    std::println!(
-        "{:?} {:?} {:?}",
-        ic_value,
-        scale,
-        _calculate_precision(ic_value).unwrap()
-    );
     match decimal {
         ic if ic.is_zero() => Ok(()),
-        _ if scale > MAX_IOU_EXPONENT as i32 => {
+        _ if prec > MAX_IOU_PRECISION as usize || scale > MAX_IOU_EXPONENT as i32 => {
             Err(XRPRangeException::InvalidICPrecisionTooLarge {
                 max: MAX_IOU_EXPONENT as i32,
                 found: scale,
             })
         }
-        _ if scale < MIN_IOU_EXPONENT as i32 => {
+        _ if prec > MAX_IOU_PRECISION as usize || scale < MIN_IOU_EXPONENT as i32 => {
             Err(XRPRangeException::InvalidICPrecisionTooSmall {
                 min: MIN_IOU_EXPONENT as i32,
                 found: scale as i32,
             })
         }
-        // Should never occur
-        _ => Err(XRPRangeException::InvalidXRPAmount),
+        _ => _verify_no_decimal(decimal),
     }
 }
 
@@ -181,6 +201,7 @@ pub fn verify_valid_ic_value(ic_value: &str) -> Result<(), XRPRangeException> {
 mod test {
     use super::*;
     use crate::alloc::string::ToString;
+    extern crate std;
 
     #[test]
     fn test_one_drop_decimal() {
@@ -212,30 +233,35 @@ mod test {
         assert!(verify_valid_xrp_value("100000000000000001").is_err());
     }
 
-    // #[test]
-    // fn test_verify_valid_ic_value() {
-    //     // { zero, pos, negative } * fractional, large, small
-    //     let valid = [
-    //         "0",
-    //         "0.0",
-    //         "1",
-    //         "1.1111",
-    //         "-1",
-    //         "-1.1",
-    //         "1111111111111111.0",
-    //         "-1111111111111111.0",
-    //         "0.00000000001",
-    //         "0.00000000001",
-    //         "-0.00000000001",
-    //         "1.111111111111111e-3",
-    //         "-1.111111111111111e-3",
-    //         "2E+2",
-    //     ];
+    #[test]
+    fn test_verify_valid_ic_value() {
+        // { zero, pos, negative } * fractional, large, small
+        let valid = [
+            "0",
+            "0.0",
+            "1",
+            "1.1111",
+            "-1",
+            "-1.1",
+            "1111111111111111.0",
+            "-1111111111111111.0",
+            "0.00000000001",
+            "0.00000000001",
+            "-0.00000000001",
+            "0.001111111111111111",
+            "-0.001111111111111111",
+        ];
 
-    //     for case in valid {
-    //         verify_valid_ic_value(case);
-    //     }
-    // }
+        let invalid = ["-0.0011111111111111111"];
+
+        for case in valid {
+            assert!(verify_valid_ic_value(case).is_ok());
+        }
+
+        for case in invalid {
+            assert!(verify_valid_ic_value(case).is_err());
+        }
+    }
 
     #[test]
     fn accept_one_xrp() {

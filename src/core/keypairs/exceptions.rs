@@ -38,7 +38,7 @@ impl From<hex::FromHexError> for XRPLKeypairsException {
     }
 }
 
-impl alloc::fmt::Display for XRPLKeypairsException {
+impl core::fmt::Display for XRPLKeypairsException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         write!(f, "XRPLKeypairsException: {:?}", self)
     }

@@ -10,5 +10,6 @@ pub mod constants;
 #[cfg(feature = "core")]
 pub mod core;
 pub mod macros;
+#[cfg(feature = "utils")]
 pub mod utils;
 pub mod wallet;

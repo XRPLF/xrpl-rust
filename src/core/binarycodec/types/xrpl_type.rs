@@ -1,8 +1,6 @@
 //! The base class for all binary codec field types.
 
 use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
-use alloc::string::String;
-use alloc::string::ToString;
 use alloc::vec::Vec;
 
 /// Contains a serialized buffer of a Serializer type.
@@ -38,12 +36,5 @@ where
 {
     fn from(instance: T) -> Self {
         SerializedType(instance.get_buffer().to_vec())
-    }
-}
-
-// TODO This doesn't seem to work.
-impl ToString for dyn Buffered {
-    fn to_string(&self) -> String {
-        hex::encode(self.get_buffer())
     }
 }

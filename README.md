@@ -70,14 +70,15 @@ default-features = false
 features = ["core", "models"]
 ```
 
-## ‼ Serde
+## ‼ Required Dependencies
+### Serde
 
-This project uses  [serde](https://serde.rs) for JSON handling.
+This project uses [serde](https://serde.rs) for handling JSON.
 
-## ‼ Indexmap
+### Indexmap
 
-This project uses [indexmap](https://docs.rs/crate/indexmap) as HashMap is 
-not supported in the alloc crate. TODO: Support both.
+This project uses [indexmap](https://docs.rs/crate/indexmap) as `HashMap` is 
+not supported in the `alloc` crate. TODO: Support both.
 
 ## ⚙ #![no_std]
 
@@ -85,9 +86,9 @@ This library aims to be `#![no_std]` compliant.
 
 # 🕊 Contributing [![contributors_status]][contributors]
 
-If you want to contribute to this project, see [CONTRIBUTING.md].
+If you want to contribute to this project, see [CONTRIBUTING](CONTRIBUTING.md).
 
 # 🗎 License [![license_status]][license]
 
 The `xrpl-rust` library is licensed under the ISC License. 
-See [LICENSE] for more information.
+See [LICENSE](LICENSE) for more information.

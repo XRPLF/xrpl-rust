@@ -100,10 +100,9 @@ impl TryFrom<&str> for AccountId {
     }
 }
 
-// TODO ToString on Bufferred does not work.
 impl ToString for AccountId {
     fn to_string(&self) -> String {
-        hex::encode(self.0.get_buffer())
+        encode_classic_address(self.get_buffer()).expect("Error")
     }
 }
 

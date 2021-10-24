@@ -105,7 +105,6 @@ impl TryFrom<Vec<&str>> for Vector256 {
     }
 }
 
-// TODO ToString on Bufferred does not work.
 impl ToString for Vector256 {
     fn to_string(&self) -> String {
         hex::encode_upper(self.get_buffer())

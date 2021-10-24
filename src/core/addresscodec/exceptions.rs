@@ -22,6 +22,7 @@ pub enum XRPLAddressCodecException {
     HexError(hex::FromHexError),
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     ISOError(ISOCodeException),
+    SerdeJsonError(serde_json::error::Category),
 }
 
 impl From<ISOCodeException> for XRPLAddressCodecException {
@@ -48,7 +49,13 @@ impl From<hex::FromHexError> for XRPLAddressCodecException {
     }
 }
 
-impl alloc::fmt::Display for XRPLAddressCodecException {
+impl From<serde_json::Error> for XRPLAddressCodecException {
+    fn from(err: serde_json::Error) -> Self {
+        XRPLAddressCodecException::SerdeJsonError(err.classify())
+    }
+}
+
+impl core::fmt::Display for XRPLAddressCodecException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
         write!(f, "XRPLAddressCodecException: {:?}", self)
     }

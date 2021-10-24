@@ -30,7 +30,7 @@ impl From<serde_json::Error> for XRPLBinaryCodecException {
     }
 }
 
-impl alloc::fmt::Display for XRPLBinaryCodecException {
+impl core::fmt::Display for XRPLBinaryCodecException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
         write!(f, "XRPLBinaryCodecException: {:?}", self)
     }

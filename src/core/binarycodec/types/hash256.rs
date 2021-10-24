@@ -67,7 +67,6 @@ impl TryFrom<&str> for Hash256 {
     }
 }
 
-// TODO ToString on Bufferred does not work.
 impl ToString for Hash256 {
     fn to_string(&self) -> String {
         hex::encode(self.get_buffer())

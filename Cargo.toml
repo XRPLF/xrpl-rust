@@ -48,9 +48,10 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "core", "models"]
-core = []
+default = ["std", "core", "models", "utils"]
 models = ["core"]
+core = ["utils"]
+utils = []
 std = [
     "rand/std", 
     "regex/std",

@@ -54,7 +54,6 @@ impl TryFrom<&str> for Blob {
     }
 }
 
-// TODO ToString on Bufferred does not work.
 impl ToString for Blob {
     fn to_string(&self) -> String {
         hex::encode(self.get_buffer())

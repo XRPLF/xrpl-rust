@@ -65,6 +65,7 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
     } else if value == NATIVE_CODE {
         Ok([0; CURRENCY_CODE_LENGTH])
     } else {
+        let value = value.to_uppercase();
         let iso_bytes = value.as_bytes();
         let pad_left: [u8; 12] = [0; 12];
         let pad_right: [u8; 5] = [0; 5];
@@ -124,7 +125,8 @@ impl TryFrom<&str> for Currency {
     /// representation of a currency.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         if _is_iso_code(value) {
-            let hash160 = Hash160::new(Some(&_iso_to_bytes(value)?.to_vec()))?;
+            let iso_bytes = _iso_to_bytes(value)?;
+            let hash160 = Hash160::new(Some(&iso_bytes))?;
             Ok(Currency(hash160))
         } else if _is_hex(value) {
             Ok(Currency(Hash160::new(Some(&hex::decode(value)?))?))
@@ -134,7 +136,6 @@ impl TryFrom<&str> for Currency {
     }
 }
 
-// TODO ToString on Bufferred does not work.
 impl ToString for Currency {
     fn to_string(&self) -> String {
         let buffer = self.0.get_buffer();

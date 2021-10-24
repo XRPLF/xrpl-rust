@@ -14,15 +14,22 @@ use crate::core::binarycodec::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::binarycodec::types::xrpl_type::Buffered;
 use crate::core::binarycodec::types::xrpl_type::FromParser;
 use crate::core::binarycodec::types::xrpl_type::XRPLType;
+use alloc::borrow::ToOwned;
 use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use indexmap::IndexMap;
+use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
-use serde::ser::SerializeStruct;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
+
+// Constant Keys
+const _ACC_KEY: &str = "account";
+const _CUR_KEY: &str = "currency";
+const _ISS_KEY: &str = "issuer";
 
 // Constant for masking types of a PathStep
 const _TYPE_ACCOUNT: u8 = 0x01;
@@ -33,11 +40,10 @@ const _TYPE_ISSUER: u8 = 0x20;
 const _PATHSET_END_BYTE: u8 = 0x00;
 const _PATH_SEPARATOR_BYTE: u8 = 0xFF;
 
-/// JSON serialization error.
-const JSON_ERROR: &str = "JSON Serialization failed.";
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct PathStepData {
+    #[serde(skip_serializing)]
+    index: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
     account: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -61,7 +67,7 @@ pub struct PathSet(Vec<u8>);
 /// Helper function to determine if a dictionary represents
 /// a valid path step.
 fn _is_path_step(value: &IndexMap<String, String>) -> bool {
-    value.contains_key("issuer") || value.contains_key("account") || value.contains_key("currency")
+    value.contains_key(_ISS_KEY) || value.contains_key(_ACC_KEY) || value.contains_key(_CUR_KEY)
 }
 
 /// Helper function to determine if a list represents a
@@ -94,6 +100,18 @@ impl XRPLType for PathSet {
     /// Construct an PathSet from given bytes.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(PathSet(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+    }
+}
+
+impl PathStepData {
+    /// Constract a new instance of PathStepData.
+    pub fn new(account: Option<String>, currency: Option<String>, issuer: Option<String>) -> Self {
+        Self {
+            index: _PATHSET_END_BYTE | _TYPE_ACCOUNT,
+            account,
+            currency,
+            issuer,
+        }
     }
 }
 
@@ -160,31 +178,27 @@ impl FromParser for PathStepData {
         let data_type = parser.read_uint8()?;
 
         if data_type & _TYPE_ACCOUNT != 0 {
-            let data = AccountId::from_parser(&mut parser.clone(), None)?;
-            account = Some(serde_json::to_string(&data)?);
+            let data = AccountId::from_parser(parser, None)?;
+            account = Some(data.to_string());
         } else {
             account = None;
         }
 
         if data_type & _TYPE_CURRENCY != 0 {
-            let data = Currency::from_parser(&mut parser.clone(), None)?;
-            currency = Some(serde_json::to_string(&data)?);
+            let data = Currency::from_parser(parser, None)?;
+            currency = Some(data.to_string());
         } else {
             currency = None;
         }
 
         if data_type & _TYPE_ISSUER != 0 {
-            let data = AccountId::from_parser(&mut parser.clone(), None)?;
-            issuer = Some(serde_json::to_string(&data)?);
+            let data = AccountId::from_parser(parser, None)?;
+            issuer = Some(data.to_string());
         } else {
             issuer = None;
         }
 
-        Ok(PathStepData {
-            account,
-            currency,
-            issuer,
-        })
+        Ok(PathStepData::new(account, currency, issuer))
     }
 }
 
@@ -246,16 +260,21 @@ impl Serialize for PathStep {
         let mut parser = BinaryParser::from(self.get_buffer());
         let result = PathStepData::from_parser(&mut parser, None);
 
-        if let Ok(path) = result {
-            let mut builder = serializer.serialize_struct("Path", 3)?;
+        if let Ok(pathdata) = result {
+            let mut builder = serializer.serialize_map(None)?;
 
-            builder.serialize_field("account", &Some(path.account))?;
-            builder.serialize_field("currency", &Some(path.currency))?;
-            builder.serialize_field("issuer", &Some(path.issuer))?;
+            for path in pathdata {
+                let (key, value) = path;
+                if let Some(data) = value {
+                    builder.serialize_entry(&key, &data)?;
+                } else {
+                    continue;
+                }
+            }
 
             builder.end()
         } else {
-            Err(serde::ser::Error::custom(JSON_ERROR))
+            Err(serde::ser::Error::custom(result.unwrap_err()))
         }
     }
 }
@@ -275,7 +294,7 @@ impl Serialize for Path {
             if let Ok(step) = pathstep {
                 sequence.serialize_element(&step)?;
             } else {
-                return Err(serde::ser::Error::custom(JSON_ERROR));
+                return Err(serde::ser::Error::custom(pathstep.unwrap_err()));
             }
         }
 
@@ -300,11 +319,11 @@ impl Serialize for PathSet {
                 sequence.serialize_element(&step)?;
                 catcher = parser.skip_bytes(1);
             } else {
-                return Err(serde::ser::Error::custom(JSON_ERROR));
+                return Err(serde::ser::Error::custom(path.unwrap_err()));
             }
 
-            if catcher.is_err() {
-                return Err(serde::ser::Error::custom(JSON_ERROR));
+            if let Err(err) = catcher {
+                return Err(serde::ser::Error::custom(err));
             }
         }
 
@@ -312,31 +331,31 @@ impl Serialize for PathSet {
     }
 }
 
-impl TryFrom<&IndexMap<String, String>> for PathStep {
+impl TryFrom<IndexMap<String, String>> for PathStep {
     type Error = XRPLAddressCodecException;
 
     /// Construct a PathStep object from a dictionary.
-    fn try_from(value: &IndexMap<String, String>) -> Result<Self, Self::Error> {
+    fn try_from(value: IndexMap<String, String>) -> Result<Self, Self::Error> {
         let mut value_bytes: Vec<u8> = vec![];
         let mut data_type = 0x00;
         let mut buffer = vec![];
 
-        if value.contains_key("account") {
-            let data = AccountId::try_from(value["account"].as_ref())?;
+        if value.contains_key(_ACC_KEY) {
+            let data = AccountId::try_from(value[_ACC_KEY].as_ref())?;
             data_type |= _TYPE_ACCOUNT;
 
             value_bytes.extend_from_slice(data.get_buffer());
         };
 
-        if value.contains_key("currency") {
-            let data = Currency::try_from(value["currency"].as_ref())?;
+        if value.contains_key(_CUR_KEY) {
+            let data = Currency::try_from(value[_CUR_KEY].as_ref())?;
             data_type |= _TYPE_CURRENCY;
 
             value_bytes.extend_from_slice(data.get_buffer());
         };
 
-        if value.contains_key("issuer") {
-            let data = AccountId::try_from(value["issuer"].as_ref())?;
+        if value.contains_key(_ISS_KEY) {
+            let data = AccountId::try_from(value[_ISS_KEY].as_ref())?;
             data_type |= _TYPE_ISSUER;
 
             value_bytes.extend_from_slice(data.get_buffer());
@@ -349,11 +368,11 @@ impl TryFrom<&IndexMap<String, String>> for PathStep {
     }
 }
 
-impl TryFrom<&Vec<IndexMap<String, String>>> for Path {
+impl TryFrom<Vec<IndexMap<String, String>>> for Path {
     type Error = XRPLAddressCodecException;
 
     /// Construct a Path object from a list.
-    fn try_from(value: &Vec<IndexMap<String, String>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<IndexMap<String, String>>) -> Result<Self, Self::Error> {
         let mut buffer: Vec<u8> = vec![];
 
         for step in value {
@@ -365,12 +384,12 @@ impl TryFrom<&Vec<IndexMap<String, String>>> for Path {
     }
 }
 
-impl TryFrom<&Vec<Vec<IndexMap<String, String>>>> for PathSet {
+impl TryFrom<Vec<Vec<IndexMap<String, String>>>> for PathSet {
     type Error = XRPLBinaryCodecException;
 
     /// Construct a PathSet object from a list.
-    fn try_from(value: &Vec<Vec<IndexMap<String, String>>>) -> Result<Self, Self::Error> {
-        if _is_path_set(value) {
+    fn try_from(value: Vec<Vec<IndexMap<String, String>>>) -> Result<Self, Self::Error> {
+        if _is_path_set(&value) {
             let mut buffer: Vec<u8> = vec![];
 
             for path_val in value {
@@ -394,24 +413,57 @@ impl TryFrom<&Vec<Vec<IndexMap<String, String>>>> for PathSet {
     }
 }
 
+impl TryFrom<&str> for Path {
+    type Error = XRPLAddressCodecException;
+
+    /// Construct a Path object from a string.
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let json: Vec<IndexMap<String, String>> = serde_json::from_str(value)?;
+        Self::try_from(json)
+    }
+}
+
 impl TryFrom<&str> for PathSet {
     type Error = XRPLBinaryCodecException;
 
     /// Construct a PathSet object from a string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let json: Vec<Vec<IndexMap<String, String>>> = serde_json::from_str(value)?;
-        Self::try_from(&json)
+        Self::try_from(json)
+    }
+}
+
+impl Iterator for PathStepData {
+    type Item = (String, Option<String>);
+
+    fn next(&mut self) -> Option<Self::Item>
+    where
+        Self: Sized,
+    {
+        if self.index & _TYPE_ACCOUNT != 0 {
+            self.index = _TYPE_CURRENCY;
+            Some((_ACC_KEY.to_string(), self.account.to_owned()))
+        } else if self.index & _TYPE_CURRENCY != 0 {
+            self.index = _TYPE_ISSUER;
+            Some((_CUR_KEY.to_string(), self.currency.to_owned()))
+        } else if self.index & _TYPE_ISSUER != 0 {
+            self.index = _PATHSET_END_BYTE;
+            Some((_ISS_KEY.to_string(), self.issuer.to_owned()))
+        } else {
+            None
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::core::binarycodec::types::test_cases::TEST_PATH_BUFFER;
     use crate::core::binarycodec::types::test_cases::TEST_PATH_SET_BUFFER;
-    extern crate std;
-    //std::println!("{:?}", json);
+    use crate::core::binarycodec::types::test_cases::TEST_PATH_STEP_BUFFER;
 
     pub const PATH_SET_TEST: &str = include_str!("../test_data/path-set-test.json");
+    pub const PATH_TEST: &str = include_str!("../test_data/path-test.json");
 
     #[test]
     fn test_is_path_step() {
@@ -431,55 +483,125 @@ mod test {
     }
 
     #[test]
-    fn test_pathstep_new() {}
+    fn test_pathstep_new() {
+        for data in TEST_PATH_STEP_BUFFER {
+            let hex: Vec<u8> = hex::decode(data).unwrap();
+            let pathstep = PathStep::new(Some(&hex)).unwrap();
+
+            assert_eq!(hex, pathstep.get_buffer());
+        }
+    }
 
     #[test]
-    fn test_path_new() {}
+    fn test_path_new() {
+        let hex: Vec<u8> = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let path = Path::new(Some(&hex)).unwrap();
+
+        assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(path.get_buffer()));
+    }
 
     #[test]
     fn test_pathset_new() {
         let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
-        let pathstep = PathSet::new(Some(&hex)).unwrap();
+        let pathset = PathSet::new(Some(&hex)).unwrap();
 
         assert_eq!(
             TEST_PATH_SET_BUFFER,
-            hex::encode_upper(pathstep.get_buffer())
+            hex::encode_upper(pathset.get_buffer())
         );
     }
 
     #[test]
-    fn test_pathstep_from_parser() {}
+    fn test_pathstep_from_parser() {
+        for data in TEST_PATH_STEP_BUFFER {
+            let hex = hex::decode(data).unwrap();
+            let mut parser = BinaryParser::from(hex.clone());
+            let pathset = PathStep::from_parser(&mut parser, None).unwrap();
 
-    #[test]
-    fn test_path_from_parser() {}
-
-    #[test]
-    fn test_pathset_from_parser() {
-        // let compact: serde_json::Value = serde_json::from_str(PATH_SET_TEST).unwrap();
-        // let mut parser = BinaryParser::from(hex::decode(TEST_PATH_SET_BUFFER).unwrap());
-        // let pathset = PathSet::from_parser(&mut parser, None).unwrap();
-
-        // assert_eq!(
-        //     serde_json::to_string(&compact).unwrap(),
-        //     serde_json::to_string(&pathset).unwrap()
-        // );
+            assert_eq!(hex, pathset.get_buffer());
+        }
     }
 
     #[test]
-    fn test_pathstep_try_from() {}
+    fn test_path_from_parser() {
+        let hex = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let mut parser = BinaryParser::from(hex.clone());
+        let pathset = Path::from_parser(&mut parser, None).unwrap();
+
+        assert_eq!(hex, pathset.get_buffer());
+    }
 
     #[test]
-    fn test_path_try_from() {}
+    fn test_pathset_from_parser() {
+        let hex = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let mut parser = BinaryParser::from(hex.clone());
+        let pathset = PathSet::from_parser(&mut parser, None).unwrap();
+
+        assert_eq!(hex, pathset.get_buffer());
+    }
 
     #[test]
-    fn test_pathset_try_from() {}
+    fn test_pathstep_try_from() {
+        let json: Vec<IndexMap<String, String>> = serde_json::from_str(PATH_TEST).unwrap();
+        let mut pathsteps: Vec<u8> = vec![];
+
+        for map in json {
+            pathsteps.extend_from_slice(PathStep::try_from(map.clone()).unwrap().get_buffer());
+        }
+
+        assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(pathsteps));
+    }
 
     #[test]
-    fn test_pathstep_to_json() {}
+    fn test_path_try_from() {
+        let hex = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let path = Path::try_from(PATH_TEST).unwrap();
+
+        assert_eq!(hex, path.get_buffer())
+    }
 
     #[test]
-    fn test_path_to_json() {}
+    fn test_pathset_try_from() {
+        let hex = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let pathset = PathSet::try_from(PATH_SET_TEST).unwrap();
+
+        assert_eq!(hex, pathset.get_buffer())
+    }
 
     #[test]
-    fn test_pathset_to_json() {}
+    fn test_pathstep_to_json() {
+        let json: Vec<IndexMap<String, String>> = serde_json::from_str(PATH_TEST).unwrap();
+
+        for map in json {
+            let pathstep = PathStep::try_from(map.clone()).unwrap();
+            assert_eq!(
+                serde_json::to_string(&map).unwrap(),
+                serde_json::to_string(&pathstep).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn test_path_to_json() {
+        let hex: Vec<u8> = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let path = Path::new(Some(&hex)).unwrap();
+        let compact: serde_json::Value = serde_json::from_str(PATH_TEST).unwrap();
+
+        assert_eq!(
+            serde_json::to_string(&compact).unwrap(),
+            serde_json::to_string(&path).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_pathset_to_json() {
+        let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let pathset = PathSet::new(Some(&hex)).unwrap();
+        let compact: serde_json::Value = serde_json::from_str(PATH_SET_TEST).unwrap();
+
+        assert_eq!(
+            serde_json::to_string(&compact).unwrap(),
+            serde_json::to_string(&pathset).unwrap()
+        );
+    }
 }

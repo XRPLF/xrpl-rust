@@ -94,7 +94,7 @@ pub fn posix_to_ripple_time(timestamp: i64) -> Result<i64, XRPLTimeRangeExceptio
     _ripple_check_max(ripple_time, ripple_time)
 }
 
-impl alloc::fmt::Display for XRPLTimeRangeException {
+impl core::fmt::Display for XRPLTimeRangeException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
         if self.time < 0 {
             write!(f, "{} is before the Ripple Epoch.", self.time)

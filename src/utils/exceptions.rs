@@ -8,6 +8,7 @@ use alloc::string::String;
 pub enum XRPRangeException {
     InvalidXRPAmount,
     InvalidICAmount,
+    InvalidValueContainsDecimal,
     InvalidXRPAmountTooSmall { min: String, found: String },
     InvalidXRPAmountTooLarge { max: u64, found: u64 },
     InvalidICPrecisionTooSmall { min: i32, found: i32 },
@@ -60,13 +61,13 @@ impl From<hex::FromHexError> for ISOCodeException {
     }
 }
 
-impl alloc::fmt::Display for XRPRangeException {
+impl core::fmt::Display for XRPRangeException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         write!(f, "XRPRangeException: {:?}", self)
     }
 }
 
-impl alloc::fmt::Display for ISOCodeException {
+impl core::fmt::Display for ISOCodeException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         write!(f, "ISOCodeException: {:?}", self)
     }

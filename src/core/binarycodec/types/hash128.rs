@@ -67,7 +67,6 @@ impl TryFrom<&str> for Hash128 {
     }
 }
 
-// TODO ToString on Bufferred does not work.
 impl ToString for Hash128 {
     fn to_string(&self) -> String {
         hex::encode(self.get_buffer())
