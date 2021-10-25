@@ -11,7 +11,6 @@ pub enum XRPLAddressCodecException {
     InvalidXAddressZeroRemain,
     InvalidCAddressIdLength { length: usize },
     InvalidCAddressTag,
-    InvalidSeedEntropyLength { length: usize },
     InvalidSeedPrefixEncodingType,
     InvalidEncodingPrefixLength,
     InvalidClassicAddressValue,
@@ -23,6 +22,7 @@ pub enum XRPLAddressCodecException {
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     ISOError(ISOCodeException),
     SerdeJsonError(serde_json::error::Category),
+    VecResizeError(alloc::vec::Vec<u8>),
 }
 
 impl From<ISOCodeException> for XRPLAddressCodecException {
@@ -52,6 +52,12 @@ impl From<hex::FromHexError> for XRPLAddressCodecException {
 impl From<serde_json::Error> for XRPLAddressCodecException {
     fn from(err: serde_json::Error) -> Self {
         XRPLAddressCodecException::SerdeJsonError(err.classify())
+    }
+}
+
+impl From<alloc::vec::Vec<u8>> for XRPLAddressCodecException {
+    fn from(err: alloc::vec::Vec<u8>) -> Self {
+        XRPLAddressCodecException::VecResizeError(err)
     }
 }
 

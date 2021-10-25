@@ -1,12 +1,10 @@
 //! Codec for serializing and deserializing
 //! vectors of Hash256.
 
-use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::hash256::Hash256;
-use crate::core::binarycodec::types::xrpl_type::Buffered;
-use crate::core::binarycodec::types::xrpl_type::FromParser;
-use crate::core::binarycodec::types::xrpl_type::XRPLType;
+use crate::core::binarycodec::BinaryParser;
+use crate::core::types::hash::Hash256;
+use crate::core::types::*;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;

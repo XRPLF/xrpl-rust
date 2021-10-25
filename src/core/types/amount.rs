@@ -3,19 +3,14 @@
 //! See Amount Fields:
 //! `<https://xrpl.org/serialization.html#amount-fields>`
 
-use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
-use crate::core::binarycodec::binary_wrappers::binary_parser::Parser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::account_id::AccountId;
-use crate::core::binarycodec::types::currency::Currency;
-use crate::core::binarycodec::types::xrpl_type::Buffered;
-use crate::core::binarycodec::types::xrpl_type::FromParser;
-use crate::core::binarycodec::types::xrpl_type::XRPLType;
+use crate::core::binarycodec::BinaryParser;
+use crate::core::binarycodec::Parser;
+use crate::core::types::account_id::AccountId;
+use crate::core::types::currency::Currency;
+use crate::core::types::*;
 use crate::utils::exceptions::XRPRangeException;
-use crate::utils::xrpl_conversion::verify_valid_ic_value;
-use crate::utils::xrpl_conversion::verify_valid_xrp_value;
-use crate::utils::xrpl_conversion::MAX_IOU_EXPONENT;
-use crate::utils::xrpl_conversion::MIN_IOU_EXPONENT;
+use crate::utils::xrpl_conversion::*;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryFrom;

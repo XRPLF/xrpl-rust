@@ -3,13 +3,11 @@
 
 use crate::constants::HEX_CURRENCY_REGEX;
 use crate::constants::ISO_CURRENCY_REGEX;
-use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::hash160::Hash160;
-use crate::core::binarycodec::types::utils::CURRENCY_CODE_LENGTH;
-use crate::core::binarycodec::types::xrpl_type::Buffered;
-use crate::core::binarycodec::types::xrpl_type::FromParser;
-use crate::core::binarycodec::types::xrpl_type::XRPLType;
+use crate::core::binarycodec::BinaryParser;
+use crate::core::types::hash::Hash160;
+use crate::core::types::utils::CURRENCY_CODE_LENGTH;
+use crate::core::types::*;
 use crate::utils::exceptions::ISOCodeException;
 use alloc::string::String;
 use alloc::string::ToString;

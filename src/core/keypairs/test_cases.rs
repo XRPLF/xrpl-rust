@@ -1,11 +1,11 @@
-use crate::core::addresscodec::codec::SEED_LENGTH;
-use crate::core::binarycodec::types::utils::ACCOUNT_ID_LENGTH;
-use crate::core::keypairs::utils::HASH_LENGTH;
+use crate::core::addresscodec::utils::SEED_LENGTH;
+use crate::core::keypairs::utils::SHA512_HASH_LENGTH;
+use crate::core::types::utils::ACCOUNT_ID_LENGTH;
 use ed25519_dalek::SIGNATURE_LENGTH;
 
 pub const TEST_MESSAGE: &str = "test message";
 
-pub const TEST_MESSAGE_SHA: [u8; HASH_LENGTH] = [
+pub const TEST_MESSAGE_SHA: [u8; SHA512_HASH_LENGTH] = [
     149, 11, 42, 126, 255, 167, 143, 81, 166, 53, 21, 236, 69, 224, 62, 206, 190, 80, 239, 47, 28,
     65, 230, 150, 41, 181, 7, 120, 241, 27, 192, 128,
 ];

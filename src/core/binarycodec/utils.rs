@@ -1,15 +1,34 @@
-//! Encodes and decodes field IDs.
-//! Field IDs <https://xrpl.org/serialization.html#field-ids>
+//! Utilities for binarycodec crate.
 
-use crate::core::binarycodec::definitions::definition_types::load_definition_map;
-use crate::core::binarycodec::definitions::definition_types::DefinitionHandler;
-use crate::core::binarycodec::definitions::field_header::FieldHeader;
-use crate::core::binarycodec::definitions::field_header::CODE_MAX_VALUE;
-use crate::core::binarycodec::definitions::field_header::CODE_MIN_VALUE;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
+use crate::core::definitions::types::load_definition_map;
+use crate::core::definitions::types::DefinitionHandler;
+use crate::core::definitions::FieldHeader;
+use crate::core::definitions::CODE_MAX_VALUE;
+use crate::core::definitions::CODE_MIN_VALUE;
 use alloc::vec;
 use alloc::vec::Vec;
 
+/// Max length that can be represented in a single byte
+/// per XRPL serialization encoding.
+pub const MAX_SINGLE_BYTE_LENGTH: usize = 192;
+/// Max length that can be represented in 2 bytes per
+/// XRPL serialization encoding.
+pub const MAX_DOUBLE_BYTE_LENGTH: usize = 12481;
+/// Max value that can be used in the second byte of a
+/// length field.
+pub const MAX_SECOND_BYTE_VALUE: usize = 240;
+/// Max value that can be represented in using two
+/// 8-bit bytes (2^16)
+pub const MAX_DOUBLE_BYTE_VALUE: usize = 65536;
+/// Maximum length that can be encoded in a length
+/// prefix per XRPL serialization encoding.
+pub const MAX_LENGTH_VALUE: usize = 918744;
+/// Max value that can be represented using one 8-bit
+/// byte (2^8)
+pub const MAX_BYTE_VALUE: usize = 256;
+
+/// See: `<https://xrpl.org/serialization.html#field-ids>`
 fn _encode_field_id(field_header: &FieldHeader) -> Result<Vec<u8>, XRPLBinaryCodecException> {
     let type_code = field_header.type_code;
     let field_code = field_header.field_code;
@@ -71,6 +90,7 @@ fn _encode_field_id(field_header: &FieldHeader) -> Result<Vec<u8>, XRPLBinaryCod
     }
 }
 
+/// See: `<https://xrpl.org/serialization.html#field-ids>`
 fn _decode_field_id(field_id: &str) -> Result<FieldHeader, XRPLBinaryCodecException> {
     let bytes = hex::decode(field_id)?;
 
@@ -129,7 +149,34 @@ fn _decode_field_id(field_id: &str) -> Result<FieldHeader, XRPLBinaryCodecExcept
 /// This field ID consists of the type code and field
 /// code, in 1 to 3 bytes depending on whether those
 /// values are "common" (<16) or "uncommon" (>=16)
-pub fn encode(field_name: &str) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+///
+/// See Field Ids:
+/// `<https://xrpl.org/serialization.html#field-ids>`
+///
+/// # Examples
+///
+/// ## Basic usage
+///
+/// ```
+/// use xrpl::core::binarycodec::utils::encode_field_name;
+/// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// extern crate alloc;
+/// use alloc::vec;
+///
+/// let field_name: &str = "LedgerSequence";
+/// let bytes: Vec<u8> = vec![38];
+///
+/// let encoding: Option<Vec<u8>> = match encode_field_name(field_name) {
+///     Ok(bytes) => Some(bytes),
+///     Err(e) => match e {
+///         XRPLBinaryCodecException::UnknownFieldName => None,
+///         _ => None,
+///     }
+/// };
+///
+/// assert_eq!(Some(bytes), encoding);
+/// ```
+pub fn encode_field_name(field_name: &str) -> Result<Vec<u8>, XRPLBinaryCodecException> {
     let definitions = load_definition_map();
     let field_header = definitions.get_field_header_from_name(field_name);
 
@@ -141,7 +188,35 @@ pub fn encode(field_name: &str) -> Result<Vec<u8>, XRPLBinaryCodecException> {
 }
 
 /// Returns the field name represented by the given field ID.
-pub fn decode(field_id: &str) -> Result<&str, XRPLBinaryCodecException> {
+///
+/// See Field Ids:
+/// `<https://xrpl.org/serialization.html#field-ids>`
+///
+/// # Examples
+///
+/// ## Basic usage
+///
+/// ```
+/// use xrpl::core::binarycodec::utils::decode_field_name;
+/// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+///
+/// let field_id: &str = "26";
+/// let field_name: &str = "LedgerSequence";
+///
+/// let decoding: Option<&str> = match decode_field_name(field_id) {
+///     Ok(field_name) => Some(field_name),
+///     Err(e) => match e {
+///         XRPLBinaryCodecException::UnexpectedFieldIdByteRange {
+///             min: _,
+///             max: _
+///         } => None,
+///         _ => None,
+///     }
+/// };
+///
+/// assert_eq!(Some(field_name), decoding);
+/// ```
+pub fn decode_field_name(field_id: &str) -> Result<&str, XRPLBinaryCodecException> {
     let definitions = load_definition_map();
     let field_header = _decode_field_id(field_id)?;
     let field_name = definitions.get_field_name_from_header(&field_header);
@@ -159,17 +234,17 @@ mod test {
     use crate::core::binarycodec::test_cases::load_field_tests;
 
     #[test]
-    fn test_encode() {
+    fn test_encode_field_name() {
         for test in load_field_tests() {
-            let result = hex::encode_upper(encode(&test.name).unwrap());
+            let result = hex::encode_upper(encode_field_name(&test.name).unwrap());
             assert_eq!(test.expected_hex, result)
         }
     }
 
     #[test]
-    fn test_decode() {
+    fn test_decode_field_name() {
         for test in load_field_tests() {
-            let result = decode(&test.expected_hex).unwrap();
+            let result = decode_field_name(&test.expected_hex).unwrap();
             assert_eq!(test.name, result)
         }
     }

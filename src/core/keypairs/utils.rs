@@ -1,16 +1,28 @@
 //! Miscellaneous helper functions.
 
-use crate::core::binarycodec::types::utils::ACCOUNT_ID_LENGTH;
+use crate::core::types::utils::ACCOUNT_ID_LENGTH;
 use core::convert::TryInto;
 use ripemd160::Ripemd160;
 use sha2::{Digest, Sha256, Sha512};
 
+/// Intermediate private keys are always padded with
+/// 4 bytes of zeros.
+pub(crate) const SECP256K1_INTERMEDIATE_KEYPAIR_PADDING: [u8; 4] = [0, 0, 0, 0];
+/// String keys must be _KEY_LENGTH long
+pub(crate) const SECP256K1_KEY_LENGTH: usize = 66;
+
+/// Test message for signature verification.
+pub(crate) const SIGNATURE_VERIFICATION_MESSAGE: &[u8] = b"This test message should verify.";
+
 /// Length of half a sha512 hash.
-pub const HASH_LENGTH: usize = 32;
+pub const SHA512_HASH_LENGTH: usize = 32;
+
+/// ED25519 prefix
+pub const ED25519_PREFIX: &str = "ED";
 
 /// Returns the first 32 bytes of SHA-512
 /// hash of message.
-pub fn sha512_first_half(message: &[u8]) -> [u8; HASH_LENGTH] {
+pub fn sha512_first_half(message: &[u8]) -> [u8; SHA512_HASH_LENGTH] {
     let mut sha512 = Sha512::new();
     sha512.update(message);
     sha512.finalize()[..32]

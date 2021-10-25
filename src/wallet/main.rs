@@ -1,12 +1,12 @@
 //! The information needed to control an XRPL account.
 
 use crate::constants::CryptoAlgorithm;
+use crate::core::addresscodec::classic_address_to_xaddress;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
-use crate::core::addresscodec::main::classic_address_to_xaddress;
+use crate::core::keypairs::derive_classic_address;
+use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
-use crate::core::keypairs::main::derive_classic_address;
-use crate::core::keypairs::main::derive_keypair;
-use crate::core::keypairs::main::generate_seed;
+use crate::core::keypairs::generate_seed;
 use alloc::borrow::Cow;
 use alloc::format;
 use alloc::string::String;

@@ -71,6 +71,7 @@ features = ["core", "models"]
 ```
 
 ## ‼ Required Dependencies
+
 ### Serde
 
 This project uses [serde](https://serde.rs) for handling JSON.

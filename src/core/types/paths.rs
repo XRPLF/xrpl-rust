@@ -4,16 +4,14 @@
 //! `<https://xrpl.org/serialization.html#pathset-fields>`
 
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
-use crate::core::binarycodec::binary_wrappers::binary_parser::BinaryParser;
-use crate::core::binarycodec::binary_wrappers::binary_parser::Parser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::account_id::AccountId;
-use crate::core::binarycodec::types::currency::Currency;
-use crate::core::binarycodec::types::utils::ACCOUNT_ID_LENGTH;
-use crate::core::binarycodec::types::utils::CURRENCY_CODE_LENGTH;
-use crate::core::binarycodec::types::xrpl_type::Buffered;
-use crate::core::binarycodec::types::xrpl_type::FromParser;
-use crate::core::binarycodec::types::xrpl_type::XRPLType;
+use crate::core::binarycodec::BinaryParser;
+use crate::core::binarycodec::Parser;
+use crate::core::types::account_id::AccountId;
+use crate::core::types::currency::Currency;
+use crate::core::types::utils::ACCOUNT_ID_LENGTH;
+use crate::core::types::utils::CURRENCY_CODE_LENGTH;
+use crate::core::types::*;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -458,9 +456,9 @@ impl Iterator for PathStepData {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::core::binarycodec::types::test_cases::TEST_PATH_BUFFER;
-    use crate::core::binarycodec::types::test_cases::TEST_PATH_SET_BUFFER;
-    use crate::core::binarycodec::types::test_cases::TEST_PATH_STEP_BUFFER;
+    use crate::core::types::test_cases::TEST_PATH_BUFFER;
+    use crate::core::types::test_cases::TEST_PATH_SET_BUFFER;
+    use crate::core::types::test_cases::TEST_PATH_STEP_BUFFER;
 
     pub const PATH_SET_TEST: &str = include_str!("../test_data/path-set-test.json");
     pub const PATH_TEST: &str = include_str!("../test_data/path-test.json");

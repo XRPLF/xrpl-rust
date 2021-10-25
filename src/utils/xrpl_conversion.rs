@@ -51,7 +51,7 @@ fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
 /// exponent does not contain a decimal.
 fn _verify_no_decimal(decimal: Decimal) -> Result<(), XRPRangeException> {
     let value: String;
-    let decimal = Decimal::from_u32(decimal.scale()).expect("");
+    let decimal = Decimal::from_u32(decimal.scale()).expect("_verify_no_decimal");
 
     if decimal == Decimal::ZERO {
         value = decimal.mantissa().to_string();
@@ -75,11 +75,25 @@ fn _verify_no_decimal(decimal: Decimal) -> Result<(), XRPRangeException> {
 ///
 /// # Examples
 ///
-/// Basic usage:
+/// ## Basic usage
 ///
 /// ```
 /// use xrpl::utils::xrpl_conversion::xrp_to_drops;
-/// let drops = xrp_to_drops("100.000001");
+/// use xrpl::utils::exceptions::XRPRangeException;
+///
+/// let xrp: &str = "100.000001";
+/// let drops: String = "100000001".to_string();
+///
+/// let conversion: Option<String> = match xrp_to_drops(xrp) {
+///     Ok(xrp) => Some(xrp),
+///     Err(e) => match e {
+///         XRPRangeException::InvalidXRPAmountTooLarge { max: _, found: _ } => None,
+///         XRPRangeException::InvalidXRPAmountTooSmall { min: _, found: _ } => None,
+///         _ => None,
+///     },
+/// };
+///
+/// assert_eq!(Some(drops), conversion);
 /// ```
 pub fn xrp_to_drops(xrp: &str) -> Result<String, XRPRangeException> {
     let xrp_d = Decimal::from_str(xrp)?;
@@ -90,9 +104,9 @@ pub fn xrp_to_drops(xrp: &str) -> Result<String, XRPRangeException> {
             found: xrp.to_string(),
         })
     } else if xrp_d.gt(&Decimal::new(MAX_XRP as i64, 0)) {
-        Err(XRPRangeException::InvalidDropsAmountTooLarge {
-            max: MAX_XRP.to_string(),
-            found: xrp.to_string(),
+        Err(XRPRangeException::InvalidXRPAmountTooLarge {
+            max: MAX_XRP,
+            found: xrp.into(),
         })
     } else {
         Ok(format!("{}", (xrp_d / _ONE_DROP).trunc()))
@@ -104,11 +118,24 @@ pub fn xrp_to_drops(xrp: &str) -> Result<String, XRPRangeException> {
 ///
 /// # Examples
 ///
-/// Basic usage:
+/// ## Basic usage
 ///
 /// ```
 /// use xrpl::utils::xrpl_conversion::drops_to_xrp;
-/// let xrp = drops_to_xrp("100000000");
+/// use xrpl::utils::exceptions::XRPRangeException;
+///
+/// let drops: &str = "100000000";
+/// let xrp: String = "100".to_string();
+///
+/// let conversion: Option<String> = match drops_to_xrp(drops) {
+///     Ok(xrp) => Some(xrp),
+///     Err(e) => match e {
+///         XRPRangeException::InvalidDropsAmountTooLarge { max: _, found: _ } => None,
+///         _ => None,
+///     },
+/// };
+///
+/// assert_eq!(Some(xrp), conversion);
 /// ```
 pub fn drops_to_xrp(drops: &str) -> Result<String, XRPRangeException> {
     let drops_d = Decimal::from_str(drops)?;
@@ -128,21 +155,22 @@ pub fn drops_to_xrp(drops: &str) -> Result<String, XRPRangeException> {
 ///
 /// # Examples
 ///
-/// Basic usage:
+/// ## Basic usage
 ///
 /// ```
 /// use xrpl::utils::xrpl_conversion::verify_valid_xrp_value;
 /// use xrpl::utils::exceptions::XRPRangeException;
 ///
-/// let valid: bool = match verify_valid_xrp_value("0.00000001") {
+/// let valid: bool = match verify_valid_xrp_value("0.000001") {
 ///     Ok(()) => true,
 ///     Err(e) => match e {
-///         // Handle each case your own way
 ///         XRPRangeException::InvalidXRPAmountTooSmall { min: _, found: _ } => false,
 ///         XRPRangeException::InvalidXRPAmountTooLarge { max: _, found: _ } => false,
 ///         _ => false,
 ///     },
 /// };
+///
+/// assert!(valid);
 /// ```
 pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> {
     let decimal = Decimal::from_str(xrp_value)?;
@@ -168,11 +196,22 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> 
 ///
 /// # Examples
 ///
-/// Basic usage:
+/// ## Basic usage
 ///
 /// ```
 /// use xrpl::utils::xrpl_conversion::verify_valid_ic_value;
 /// use xrpl::utils::exceptions::XRPRangeException;
+///
+/// let valid: bool = match verify_valid_ic_value("1111111111111111.0") {
+///     Ok(()) => true,
+///     Err(e) => match e {
+///         XRPRangeException::InvalidICPrecisionTooSmall { min: _, found: _ } => false,
+///         XRPRangeException::InvalidICPrecisionTooLarge { max: _, found: _ } => false,
+///         _ => false,
+///     },
+/// };
+///
+/// assert!(valid);
 /// ```
 pub fn verify_valid_ic_value(ic_value: &str) -> Result<(), XRPRangeException> {
     let decimal = Decimal::from_str(ic_value)?.normalize();

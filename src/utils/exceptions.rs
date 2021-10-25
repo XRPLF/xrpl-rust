@@ -4,13 +4,19 @@ use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use alloc::string::String;
 
 #[derive(Debug, Clone)]
+pub enum XRPLTimeRangeException {
+    InvalidTimeBeforeEpoch { min: i64, found: i64 },
+    UnexpectedTimeOverflow { max: i64, found: i64 },
+}
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum XRPRangeException {
     InvalidXRPAmount,
     InvalidICAmount,
     InvalidValueContainsDecimal,
     InvalidXRPAmountTooSmall { min: String, found: String },
-    InvalidXRPAmountTooLarge { max: u64, found: u64 },
+    InvalidXRPAmountTooLarge { max: u64, found: String },
     InvalidICPrecisionTooSmall { min: i32, found: i32 },
     InvalidICPrecisionTooLarge { max: i32, found: i32 },
     InvalidDropsAmountTooLarge { max: String, found: String },
@@ -70,6 +76,12 @@ impl core::fmt::Display for XRPRangeException {
 impl core::fmt::Display for ISOCodeException {
     fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
         write!(f, "ISOCodeException: {:?}", self)
+    }
+}
+
+impl core::fmt::Display for XRPLTimeRangeException {
+    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
+        write!(f, "XRPLTimeRangeException: {:?}", self)
     }
 }
 

@@ -1,9 +1,9 @@
 //! Maps and helpers providing serialization-related
 //! information about fields.
 
-use crate::core::binarycodec::definitions::field_header::FieldHeader;
-use crate::core::binarycodec::definitions::field_info::FieldInfo;
-use crate::core::binarycodec::definitions::field_instance::FieldInstance;
+use crate::core::definitions::FieldHeader;
+use crate::core::definitions::FieldInfo;
+use crate::core::definitions::FieldInstance;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::string::ToString;

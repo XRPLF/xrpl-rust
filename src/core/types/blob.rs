@@ -4,8 +4,7 @@
 //! `<https://xrpl.org/serialization.html#blob-fields>`
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::xrpl_type::Buffered;
-use crate::core::binarycodec::types::xrpl_type::XRPLType;
+use crate::core::types::*;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
