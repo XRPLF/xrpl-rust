@@ -280,8 +280,6 @@ impl TryFrom<IssuedCurrency> for Amount {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-
     #[test]
     fn test_contains_decimal() {}
 }
