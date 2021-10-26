@@ -46,7 +46,6 @@ pub struct Hash256(Vec<u8>);
 /// See Hash Fields:
 /// `<https://xrpl.org/serialization.html#hash-fields>`
 ///
-///
 /// # Examples
 ///
 /// ## Basic usage
@@ -66,6 +65,7 @@ pub struct Hash256(Vec<u8>);
 /// }
 /// ```
 pub trait Hash {
+    /// Get the length of the hash.
     fn get_length() -> usize
     where
         Self: Sized;

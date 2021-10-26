@@ -23,7 +23,6 @@ pub struct Blob(Vec<u8>);
 impl XRPLType for Blob {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct a Blob.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Blob(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }

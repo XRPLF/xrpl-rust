@@ -11,12 +11,18 @@ use crate::core::types::currency::Currency;
 use crate::core::types::*;
 use crate::utils::exceptions::XRPRangeException;
 use crate::utils::xrpl_conversion::*;
+use alloc::format;
 use alloc::string::String;
+use alloc::string::ToString;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
+use core::convert::TryInto;
 use core::str::FromStr;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
+use serde::ser::Error;
+use serde::ser::SerializeMap;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
@@ -29,10 +35,11 @@ const _ZERO_CURRENCY_AMOUNT_HEX: u64 = 0x8000000000000000;
 const _NATIVE_AMOUNT_BYTE_LENGTH: u8 = 8;
 const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
 
-pub struct IssuedCurrency {
-    value: String,
-    currency: Currency,
-    issuer: AccountId,
+/// An Issued Currency object.
+struct IssuedCurrency {
+    pub value: Decimal,
+    pub currency: Currency,
+    pub issuer: AccountId,
 }
 
 /// Codec for serializing and deserializing Amount fields.
@@ -46,15 +53,14 @@ pub struct Amount(Vec<u8>);
 /// Returns True if the given string contains a
 /// decimal point character.
 fn _contains_decimal(string: &str) -> bool {
-    string.contains(".")
+    string.contains('.')
 }
 
 /// Serializes the value field of an issued currency amount
 /// to its bytes representation.
-fn _serialize_issed_currency_value(value: &str) -> Result<[u8; 16], XRPRangeException> {
-    verify_valid_ic_value(value)?;
+fn _serialize_issued_currency_value(decimal: Decimal) -> Result<[u8; 16], XRPRangeException> {
+    verify_valid_ic_value(&decimal.to_string())?;
 
-    let decimal = Decimal::from_str(value)?;
     let mut mantissa = decimal.mantissa();
     let mut exp: u64 = decimal.scale() as u64;
 
@@ -101,7 +107,7 @@ fn _serialize_issed_currency_value(value: &str) -> Result<[u8; 16], XRPRangeExce
         // last 54 bits are mantissa
         serial |= mantissa;
 
-        return Ok(serial.to_be_bytes());
+        Ok(serial.to_be_bytes())
     }
 }
 
@@ -121,11 +127,32 @@ fn _serialize_xrp_amount(value: &str) -> Result<[u8; 8], XRPRangeException> {
 }
 
 /// Serializes an issued currency amount.
-fn _serialize_issued_currency_amount(ic: IssuedCurrency) -> Result<[u8; 8], XRPRangeException> {
-    todo!()
+fn _serialize_issued_currency_amount(
+    issused_currency: IssuedCurrency,
+) -> Result<[u8; 8], XRPRangeException> {
+    let mut bytes = vec![];
+    let amount_bytes = _serialize_issued_currency_value(issused_currency.value)?;
+    let currency_bytes: &[u8] = issused_currency.currency.as_ref();
+    let issuer_bytes: &[u8] = issused_currency.issuer.as_ref();
+
+    bytes.extend_from_slice(&amount_bytes);
+    bytes.extend_from_slice(currency_bytes);
+    bytes.extend_from_slice(issuer_bytes);
+
+    Ok(bytes.try_into().expect("_serialize_issued_currency_amount"))
 }
 
 impl Amount {
+    /// Format native asset value for serialization.
+    fn _format_native_serialization(&self) -> String {
+        let sign: &str = if self.is_positive() { "" } else { "-" };
+        let mut sized: [u8; 8] = Default::default();
+        sized.copy_from_slice(&self.get_buffer()[..8]);
+        let number = u64::from_be_bytes(sized);
+
+        format!("{}{}", sign, number)
+    }
+
     /// Returns True if this amount is a native XRP amount.
     pub fn is_native(&self) -> bool {
         self.0[0] == 0
@@ -135,6 +162,26 @@ impl Amount {
     /// (positive amount).
     pub fn is_positive(&self) -> bool {
         self.0[1] > 0
+    }
+}
+
+impl IssuedCurrency {
+    /// Format issued currency value for serialization.
+    fn _format_ic_serialization(
+        parser: &mut BinaryParser,
+    ) -> Result<Decimal, XRPLBinaryCodecException> {
+        let ic = IssuedCurrency::from_parser(parser, None)?;
+        let exp = ic.value.scale();
+        let mantissa = ic.value.mantissa();
+        let decimal = Decimal::from_str(&format!("{}", mantissa))?;
+        let multiplier = Decimal::from_str(&format!("1e{}", exp))?;
+        let value = decimal
+            .checked_mul(multiplier)
+            .ok_or(rust_decimal::Error::ExceedsMaximumPossibleValue)?
+            .normalize();
+
+        verify_valid_ic_value(&value.to_string())?;
+        Ok(value)
     }
 }
 
@@ -169,6 +216,21 @@ impl FromParser for Amount {
     }
 }
 
+impl FromParser for IssuedCurrency {
+    type Error = XRPLBinaryCodecException;
+
+    fn from_parser(
+        parser: &mut BinaryParser,
+        _length: Option<usize>,
+    ) -> Result<IssuedCurrency, Self::Error> {
+        Ok(IssuedCurrency {
+            value: IssuedCurrency::_format_ic_serialization(parser)?,
+            currency: Currency::from_parser(parser, None)?,
+            issuer: AccountId::from_parser(parser, None)?,
+        })
+    }
+}
+
 impl Serialize for Amount {
     /// Construct a JSON object representing this Amount.
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -176,7 +238,22 @@ impl Serialize for Amount {
         S: Serializer,
     {
         if self.is_native() {
+            serializer.serialize_str(&self._format_native_serialization())
         } else {
+            let mut parser = BinaryParser::from(self.get_buffer());
+
+            if let Ok(ic) = IssuedCurrency::from_parser(&mut parser, None) {
+                let mut builder = serializer.serialize_map(Some(3))?;
+
+                builder.serialize_entry("value", &ic.value)?;
+                builder.serialize_entry("currency", &ic.currency)?;
+                builder.serialize_entry("issuer", &ic.issuer)?;
+                builder.end()
+            } else {
+                Err(S::Error::custom(
+                    XRPLBinaryCodecException::InvalidReadFromBytesValue,
+                ))
+            }
         }
     }
 }

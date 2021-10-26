@@ -1,7 +1,7 @@
 //! This module contains commonly-used constants.
 pub mod exceptions;
 #[cfg(test)]
-pub(crate) mod test_cases;
+pub mod test_cases;
 pub mod utils;
 
 use crate::constants::CryptoAlgorithm;
@@ -67,8 +67,12 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecEx
 /// use xrpl::core::addresscodec::encode_seed;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
 /// use xrpl::constants::CryptoAlgorithm;
+/// use xrpl::core::addresscodec::utils::SEED_LENGTH;
 ///
-/// let entropy: [u8; 16] = [207, 45, 227, 120, 251, 221, 126, 46, 232, 125, 72, 109, 251, 90, 123, 255];
+/// let entropy: [u8; SEED_LENGTH] = [
+///     207, 45, 227, 120, 251, 221, 126, 46, 232,
+///     125, 72, 109, 251, 90, 123, 255
+/// ];
 /// let encoding_type: CryptoAlgorithm = CryptoAlgorithm::SECP256K1;
 /// let seed: String = "sn259rEFXrQrWyx3Q7XneWcwV6dfL".into();
 ///
@@ -303,10 +307,10 @@ pub fn xaddress_to_classic_address(
 ///     94, 123, 17, 37, 35, 246, 141, 47, 94, 135, 157, 180,
 ///     234, 197, 28, 102, 152, 166, 147, 4
 /// ];
-/// let key: String = "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59".into();
+/// let address: String = "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59".into();
 ///
 /// let encoding: Option<String> = match encode_classic_address(bytes) {
-///     Ok(key) => Some(key),
+///     Ok(address) => Some(address),
 ///     Err(e) => match e {
 ///         XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
@@ -316,7 +320,7 @@ pub fn xaddress_to_classic_address(
 ///     }
 /// };
 ///
-/// assert_eq!(Some(key), encoding);
+/// assert_eq!(Some(address), encoding);
 /// ```
 pub fn encode_classic_address(bytestring: &[u8]) -> Result<String, XRPLAddressCodecException> {
     encode_base58(
@@ -668,7 +672,7 @@ mod test {
     #[test]
     fn accept_seed_encode_decode_secp256k1_low() {
         let encoded_string = "sp6JS7f14BuwFY8Mw6bTtLKWauoUs";
-        let bytes: [u8; 16] = [0; SEED_LENGTH];
+        let bytes: [u8; 16] = Default::default();
         let encode_result = encode_seed(bytes, CryptoAlgorithm::SECP256K1);
 
         assert_eq!(encoded_string, encode_result.unwrap());
@@ -698,7 +702,7 @@ mod test {
     #[test]
     fn accept_seed_encode_decode_ed25519_low() {
         let encoded_string = "sEdSJHS4oiAdz7w2X2ni1gFiqtbJHqE";
-        let bytes: [u8; 16] = [0; SEED_LENGTH];
+        let bytes: [u8; 16] = Default::default();
         let encode_result = encode_seed(bytes, CryptoAlgorithm::ED25519);
 
         assert_eq!(encoded_string, encode_result.unwrap());

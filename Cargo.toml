@@ -6,7 +6,7 @@ authors = ["Tanveer Wahid <tan@wahid.email>"]
 description = "A 100% Rust library to interact with the XRPL"
 readme = "README.md"
 license = "ISC License"
-repository = "https://github.com/sephynox/xrpl-rust"
+repository = "https://github.com/589labs/xrpl-rust"
 
 keywords = ["xrpl", "no_std"]
 categories = ["dlt", "api", "no-std"]
@@ -30,7 +30,7 @@ strum = { version = "0.22.0", default-features = false }
 strum_macros = { version = "0.22.0", default-features = false }
 regex = { version = "1.5.4", default-features = false }
 num-bigint = { version = "0.4.2", default-features = false }
-rust_decimal = { version = "1.16.0", default-features = false }
+rust_decimal = { version = "1.16.0", default-features = false, features = ["serde"] }
 chrono = { version = "0.4.19", default-features = false, features = ["alloc", "clock"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 bs58 = { version = "0.4.0", default-features = false, features = ["check", "alloc"] }

@@ -46,7 +46,7 @@ pub const SEED_LENGTH: usize = 16;
 ///
 /// See [`bs58::encode`]
 ///
-/// [`bs58::encode`]: bs58::encode
+/// [`bs58::encode`]: mod@bs58::encode()
 ///
 /// # Examples
 ///
@@ -101,7 +101,7 @@ pub fn decode_base58(
 ///
 /// See [`bs58::encode`]
 ///
-/// [`bs58::encode`]: bs58::encode
+/// [`bs58::encode`]: mod@bs58::encode()
 ///
 /// # Examples
 ///

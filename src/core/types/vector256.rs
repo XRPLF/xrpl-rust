@@ -10,6 +10,7 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
+use serde::ser::Error;
 use serde::ser::SerializeSeq;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
@@ -25,7 +26,6 @@ pub struct Vector256(Vec<u8>);
 impl XRPLType for Vector256 {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct a Vector256.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Vector256(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }
@@ -71,7 +71,6 @@ impl Serialize for Vector256 {
         S: Serializer,
     {
         if self.0.len() % _HASH_LENGTH_BYTES != 0 {
-            use serde::ser::Error;
             Err(S::Error::custom(
                 XRPLBinaryCodecException::InvalidVector256Bytes,
             ))

@@ -84,13 +84,47 @@ To test dependencies for known security advisories, run:
 cargo audit
 ```
 
+### Submitting Bugs
+
+Bug reports are welcome. Please create an issue using the default issue
+template. Fill in *all* information including a minimal reproducible 
+code example. Every function in the library comes with such an example
+and can adapted to look like the following for an issue report:
+
+```rust
+// Required Dependencies
+use xrpl::core::keypairs::derive_keypair;
+use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
+
+// Provided Variables
+let seed: &str = "sn259rEFXrQrWyx3Q7XneWcwV6dfL";
+let validator: bool = false;
+
+// Expected Result
+let tuple: (String, String) = (
+    "ED60292139838CB86E719134F848F055057CA5BDA61F5A529729F1697502D53E1C".into(),
+    "ED009F66528611A0D400946A01FA01F8AF4FF4C1D0C744AE3F193317DCA77598F1".into(),
+);
+
+// Operation
+match derive_keypair(seed, validator) {
+    Ok(seed) => assert_eq!(tuple, seed),
+    Err(e) => match e {
+        XRPLKeypairsException::InvalidSignature => panic!("Fails unexpectedly"),
+        _ => (),
+    },
+};
+```
+> This format makes it easy for maintainers to replicate and test against.
+
 ## Release Process
 
 ### Editing the Code
 
 * Your changes should have unit and/or integration tests.
+* New functionality should include a minimal reproducible sample.
 * Your changes should pass the linter.
-* Your code should pass all the actions on Github.
+* Your code should pass all the actions on GitHub.
 * Open a PR against `main` and ensure that all CI passes.
 * Get a full code review from one of the maintainers.
 * Merge your changes.

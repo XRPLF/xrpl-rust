@@ -1,18 +1,17 @@
 //! Codec for currency property inside an XRPL
 //! issued currency amount json.
 
-use crate::constants::HEX_CURRENCY_REGEX;
+use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::*;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
 use crate::core::types::hash::Hash160;
-use crate::core::types::utils::ACCOUNT_ID_LENGTH;
 use crate::core::types::*;
+use crate::utils::is_hex_address;
 use alloc::string::String;
 use alloc::string::ToString;
 use core::convert::TryFrom;
-use regex::Regex;
 use serde::ser::Error;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
@@ -21,14 +20,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// See AccountID Fields:
 /// `<https://xrpl.org/serialization.html#accountid-fields>`
+///
+///
 #[derive(Debug, Deserialize, Clone)]
 #[serde(try_from = "&str")]
 pub struct AccountId(Hash160);
-
-pub fn is_hex_address(value: &str) -> bool {
-    let regex = Regex::new(HEX_CURRENCY_REGEX).unwrap();
-    regex.is_match(value)
-}
 
 impl XRPLType for AccountId {
     type Error = XRPLAddressCodecException;
@@ -96,7 +92,7 @@ impl TryFrom<&str> for AccountId {
 
 impl ToString for AccountId {
     fn to_string(&self) -> String {
-        encode_classic_address(self.get_buffer()).expect("Error")
+        encode_classic_address(self.get_buffer()).expect("to_string")
     }
 }
 

@@ -27,7 +27,7 @@ fn _ripple_check_max<T>(time: i64, ok: T) -> Result<T, XRPLTimeRangeException> {
 /// Used internally.
 /// See [`chrono::DateTime`]
 ///
-/// [`chrono::DateTime`]: chrono::DateTime
+/// [`chrono::DateTime`]: mod@chrono::DateTime
 /// ```
 pub(crate) fn ripple_time_to_datetime(
     ripple_time: i64,
@@ -39,7 +39,7 @@ pub(crate) fn ripple_time_to_datetime(
 /// 'Ripple Epoch' time.
 /// Used internally.
 ///
-/// [`chrono::DateTime`]: chrono::DateTime
+/// [`chrono::DateTime`]: mod@chrono::DateTime
 /// ```
 pub(crate) fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTimeRangeException> {
     let ripple_time = dt.timestamp() - RIPPLE_EPOCH;

@@ -1,6 +1,6 @@
+use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::utils::SEED_LENGTH;
 use crate::core::keypairs::utils::SHA512_HASH_LENGTH;
-use crate::core::types::utils::ACCOUNT_ID_LENGTH;
 use ed25519_dalek::SIGNATURE_LENGTH;
 
 pub const TEST_MESSAGE: &str = "test message";

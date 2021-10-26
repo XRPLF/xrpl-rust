@@ -61,12 +61,12 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
     if !_is_iso_code(value) {
         Err(ISOCodeException::InvalidISOCode)
     } else if value == NATIVE_CODE {
-        Ok([0; CURRENCY_CODE_LENGTH])
+        Ok(Default::default())
     } else {
         let value = value.to_uppercase();
         let iso_bytes = value.as_bytes();
-        let pad_left: [u8; 12] = [0; 12];
-        let pad_right: [u8; 5] = [0; 5];
+        let pad_left: [u8; 12] = Default::default();
+        let pad_right: [u8; 5] = Default::default();
         let mut result: Vec<u8> = vec![];
 
         result.extend_from_slice(&pad_left);
@@ -82,7 +82,6 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
 impl XRPLType for Currency {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct a Currency.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         let hash160 = Hash160::new(buffer.or(Some(&[0; CURRENCY_CODE_LENGTH])))?;
         Ok(Currency(hash160))

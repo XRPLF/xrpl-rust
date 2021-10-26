@@ -3,7 +3,7 @@
 
 pub mod types;
 
-use crate::utils::byte_conversions::ToBytes;
+use crate::utils::ToBytes;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;

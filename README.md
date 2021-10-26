@@ -26,6 +26,7 @@
 [license_status]: https://img.shields.io/badge/License-ISC-blue.svg
 
 A Rust library to interact with the XRPL.
+Based off of the [xrpl-py](https://github.com/XRPLF/xrpl-py) library.
 
 A pure Rust implementation for interacting with the XRP Ledger. The xrpl-rust 
 crate simplifies the hardest parts of XRP Ledger interaction including
@@ -70,15 +71,15 @@ default-features = false
 features = ["core", "models"]
 ```
 
-## ‼ Required Dependencies
+## ‼ Exposed Dependencies
 
 ### Serde
 
-This project uses [serde](https://serde.rs) for handling JSON.
+This project exposes [serde](https://serde.rs) for handling JSON.
 
 ### Indexmap
 
-This project uses [indexmap](https://docs.rs/crate/indexmap) as `HashMap` is 
+This project exposes [indexmap](https://docs.rs/crate/indexmap) as `HashMap` is 
 not supported in the `alloc` crate. TODO: Support both.
 
 ## ⚙ #![no_std]

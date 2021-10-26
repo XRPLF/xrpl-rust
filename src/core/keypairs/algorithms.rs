@@ -13,9 +13,9 @@ use crate::core::keypairs::utils::*;
 use crate::core::keypairs::CryptoImplementation;
 use alloc::format;
 use alloc::string::String;
+use core::convert::TryInto;
 use core::str::FromStr;
 use ed25519_dalek::Verifier;
-use ed25519_dalek::SIGNATURE_LENGTH;
 use num_bigint::BigUint;
 use rust_decimal::prelude::One;
 use secp256k1::constants::CURVE_ORDER;
@@ -29,6 +29,7 @@ pub struct Secp256k1;
 /// Methods for using the ED25519 cryptographic system.
 pub struct Ed25519;
 
+/// TODO Not working
 impl Secp256k1 {
     fn _private_key_to_str(key: secp256k1::SecretKey) -> String {
         hex::encode(key.as_ref())
@@ -102,28 +103,29 @@ impl CryptoImplementation for Secp256k1 {
         &self,
         message_bytes: &[u8],
         private_key: &str,
-    ) -> Result<[u8; 64], XRPLKeypairsException> {
+    ) -> Result<String, XRPLKeypairsException> {
         let secp = secp256k1::Secp256k1::<SignOnly>::signing_only();
         let message = secp256k1::Message::from_slice(message_bytes)?;
         let private = secp256k1::SecretKey::from_str(private_key)?;
         let signature = secp.sign(&message, &private);
 
-        Ok(signature.serialize_compact())
+        Ok(hex::encode_upper(signature.serialize_compact()))
     }
 
-    fn is_valid_message(
-        &self,
-        message_bytes: &[u8],
-        signature_compact: [u8; 64],
-        public_key: &str,
-    ) -> bool {
+    fn is_valid_message(&self, message_bytes: &[u8], signature: &str, public_key: &str) -> bool {
         let secp = secp256k1::Secp256k1::<VerifyOnly>::verification_only();
         let msg = secp256k1::Message::from_slice(message_bytes);
-        let sig = secp256k1::Signature::from_compact(&signature_compact);
-        let public = secp256k1::PublicKey::from_str(public_key);
+        let signature_compact = hex::decode(signature);
 
-        if let (&Ok(m), &Ok(s), &Ok(p)) = (&msg.as_ref(), &sig.as_ref(), &public.as_ref()) {
-            secp.verify(m, s, p).is_ok()
+        if let Ok(compact) = signature_compact {
+            let sig = secp256k1::Signature::from_compact(&compact);
+            let public = secp256k1::PublicKey::from_str(public_key);
+
+            if let (&Ok(m), &Ok(s), &Ok(p)) = (&msg.as_ref(), &sig.as_ref(), &public.as_ref()) {
+                secp.verify(m, s, p).is_ok()
+            } else {
+                false
+            }
         } else {
             false
         }
@@ -149,38 +151,36 @@ impl CryptoImplementation for Ed25519 {
         }
     }
 
-    fn sign(
-        &self,
-        message: &[u8],
-        private_key: &str,
-    ) -> Result<[u8; SIGNATURE_LENGTH], XRPLKeypairsException> {
+    fn sign(&self, message: &[u8], private_key: &str) -> Result<String, XRPLKeypairsException> {
         let raw_private = hex::decode(&private_key[ED25519_PREFIX.len()..])?;
         let private = ed25519_dalek::SecretKey::from_bytes(&raw_private)?;
         let expanded_private = ed25519_dalek::ExpandedSecretKey::from(&private);
         let public = ed25519_dalek::PublicKey::from(&private);
         let signature: ed25519_dalek::Signature = expanded_private.sign(message, &public);
 
-        Ok(signature.to_bytes())
+        Ok(hex::encode_upper(signature.to_bytes()))
     }
 
-    fn is_valid_message(
-        &self,
-        message: &[u8],
-        signature: [u8; SIGNATURE_LENGTH],
-        public_key: &str,
-    ) -> bool {
+    fn is_valid_message(&self, message: &[u8], signature: &str, public_key: &str) -> bool {
         let raw_public = hex::decode(&public_key[ED25519_PREFIX.len()..]);
+        let decoded_sig = hex::decode(signature);
 
-        if raw_public.is_err() {
+        if raw_public.is_err() || decoded_sig.is_err() {
             return false;
         };
 
+        let bytes = decoded_sig.unwrap();
         let public = ed25519_dalek::PublicKey::from_bytes(&raw_public.unwrap());
 
+        if bytes.len() != ED25519_SIGNATURE_LENGTH {
+            return false;
+        };
+
         if let Ok(value) = public {
-            value
-                .verify(message, &ed25519_dalek::Signature::from(signature))
-                .is_ok()
+            let sig: [u8; ED25519_SIGNATURE_LENGTH] = bytes.try_into().expect("is_valid_message");
+            let converted = &ed25519_dalek::Signature::from(sig);
+
+            value.verify(message, converted).is_ok()
         } else {
             false
         }
@@ -253,10 +253,9 @@ mod test {
 
     #[test]
     fn test_ed25519_is_valid_message() {
-        assert!(Ed25519.is_valid_message(
-            TEST_MESSAGE.as_bytes(),
-            SIGNATURE_ED25519,
-            PUBLIC_ED25519
-        ))
+        let signature: &str = &hex::encode_upper(SIGNATURE_ED25519);
+        let message: &[u8] = TEST_MESSAGE.as_bytes();
+
+        assert!(Ed25519.is_valid_message(message, signature, PUBLIC_ED25519));
     }
 }

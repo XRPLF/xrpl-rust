@@ -9,7 +9,7 @@ use crate::core::binarycodec::utils::*;
 use crate::core::definitions::types::*;
 use crate::core::definitions::*;
 use crate::core::types::FromParser;
-use crate::utils::byte_conversions::ToBytes;
+use crate::utils::ToBytes;
 use alloc::borrow::ToOwned;
 use alloc::vec;
 use alloc::vec::Vec;

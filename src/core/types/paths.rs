@@ -3,13 +3,13 @@
 //! See PathSet Fields:
 //! `<https://xrpl.org/serialization.html#pathset-fields>`
 
+use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
 use crate::core::binarycodec::Parser;
 use crate::core::types::account_id::AccountId;
 use crate::core::types::currency::Currency;
-use crate::core::types::utils::ACCOUNT_ID_LENGTH;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::types::*;
 use alloc::borrow::ToOwned;
@@ -77,7 +77,6 @@ fn _is_path_set(value: &[Vec<IndexMap<String, String>>]) -> bool {
 impl XRPLType for PathStep {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct an PathStep from given bytes.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(PathStep(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }
@@ -86,7 +85,6 @@ impl XRPLType for PathStep {
 impl XRPLType for Path {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct an Path from given bytes.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Path(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }
@@ -95,7 +93,6 @@ impl XRPLType for Path {
 impl XRPLType for PathSet {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct an PathSet from given bytes.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(PathSet(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }
@@ -134,7 +131,6 @@ impl Buffered for PathSet {
 impl FromParser for PathStep {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct a PathStep object from an existing BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
@@ -165,7 +161,6 @@ impl FromParser for PathStep {
 impl FromParser for PathStepData {
     type Error = XRPLBinaryCodecException;
 
-    /// ConstructStepData a Path object from an existing BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
@@ -203,7 +198,6 @@ impl FromParser for PathStepData {
 impl FromParser for Path {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct a Path object from an existing BinaryParser.
     fn from_parser(parser: &mut BinaryParser, _length: Option<usize>) -> Result<Path, Self::Error> {
         let mut buffer: Vec<u8> = vec![];
 
@@ -225,7 +219,6 @@ impl FromParser for Path {
 impl FromParser for PathSet {
     type Error = XRPLBinaryCodecException;
 
-    /// Construct a PathSet object from an existing BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
@@ -306,7 +299,6 @@ impl Serialize for PathSet {
     where
         S: Serializer,
     {
-        let mut catcher: Result<&BinaryParser, XRPLBinaryCodecException>;
         let mut sequence = serializer.serialize_seq(None)?;
         let mut parser = BinaryParser::from(self.get_buffer());
 
@@ -315,13 +307,12 @@ impl Serialize for PathSet {
 
             if let Ok(step) = path {
                 sequence.serialize_element(&step)?;
-                catcher = parser.skip_bytes(1);
+
+                if let Err(err) = parser.skip_bytes(1) {
+                    return Err(serde::ser::Error::custom(err));
+                };
             } else {
                 return Err(serde::ser::Error::custom(path.unwrap_err()));
-            }
-
-            if let Err(err) = catcher {
-                return Err(serde::ser::Error::custom(err));
             }
         }
 

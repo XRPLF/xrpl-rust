@@ -11,6 +11,7 @@ use rust_decimal::Decimal;
 /// Indivisible unit of XRP
 pub(crate) const _ONE_DROP: Decimal = Decimal::from_parts(1, 0, 0, false, 6);
 
+/// One drop in decimal form.
 pub const ONE_DROP: &str = "0.000001";
 /// 100 billion decimal XRP
 pub const MAX_XRP: u64 = u64::pow(10, 11);
@@ -18,11 +19,11 @@ pub const MAX_XRP: u64 = u64::pow(10, 11);
 pub const MAX_DROPS: u64 = u64::pow(10, 17);
 /// Drops in one XRP
 pub const XRP_DROPS: u64 = 1000000;
-// Minimum IC exponent
+/// Minimum IC exponent
 pub const MIN_IOU_EXPONENT: i8 = -96;
-// Maximum IC exponent
+/// Maximum IC exponent
 pub const MAX_IOU_EXPONENT: u8 = 80;
-// Maximum IC precision
+/// Maximum IC precision
 pub const MAX_IOU_PRECISION: u8 = 16;
 
 /// TODO Make less bootleg
