@@ -8,7 +8,7 @@ use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::utils::*;
 use crate::core::definitions::types::*;
 use crate::core::definitions::*;
-use crate::core::types::FromParser;
+use crate::core::types::TryFromParser;
 use crate::utils::ToBytes;
 use alloc::borrow::ToOwned;
 use alloc::vec;
@@ -323,11 +323,11 @@ pub trait Parser {
     fn read_field(&mut self) -> Result<FieldInstance, XRPLBinaryCodecException>;
 
     /// Read next bytes from BinaryParser as the given type.
-    fn read_type<T: FromParser>(&mut self) -> Result<T, T::Error>;
+    fn read_type<T: TryFromParser>(&mut self) -> Result<T, T::Error>;
 
     /// Read value of the type specified by field from
     /// the BinaryParser.
-    fn read_field_value<T: FromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
+    fn read_field_value<T: TryFromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
     where
         T::Error: From<XRPLBinaryCodecException>;
 }
@@ -570,11 +570,11 @@ impl Parser for BinaryParser {
         Err(XRPLBinaryCodecException::UnknownFieldName)
     }
 
-    fn read_type<T: FromParser>(&mut self) -> Result<T, T::Error> {
+    fn read_type<T: TryFromParser>(&mut self) -> Result<T, T::Error> {
         T::from_parser(self, None)
     }
 
-    fn read_field_value<T: FromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
+    fn read_field_value<T: TryFromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
     where
         T::Error: From<XRPLBinaryCodecException>,
     {

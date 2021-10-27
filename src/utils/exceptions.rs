@@ -1,6 +1,5 @@
 //! Exception for invalid XRP Ledger amount data.
 
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use alloc::string::String;
 
 #[derive(Debug, Clone)]
@@ -20,6 +19,7 @@ pub enum XRPRangeException {
     InvalidICPrecisionTooSmall { min: i32, found: i32 },
     InvalidICPrecisionTooLarge { max: i32, found: i32 },
     InvalidDropsAmountTooLarge { max: String, found: String },
+    InvalidICSerializationLength { expected: usize, found: usize },
     UnexpectedICAmountOverflow { max: usize, found: usize },
     DecimalError(rust_decimal::Error),
     HexError(hex::FromHexError),
@@ -31,10 +31,26 @@ pub enum ISOCodeException {
     InvalidISOCode,
     InvalidISOLength,
     InvalidXRPBytes,
+    InvalidSerdeValue {
+        expected: String,
+        found: serde_json::Value,
+    },
     UnsupportedCurrencyRepresentation,
+    DecimalError(rust_decimal::Error),
     HexError(hex::FromHexError),
-    XRPLBinaryCodecError(XRPLBinaryCodecException),
     Utf8Error(core::str::Utf8Error),
+}
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum JSONParseException {
+    ISOCodeError(ISOCodeException),
+    DecimalError(rust_decimal::Error),
+    XRPRangeError(XRPRangeException),
+    InvalidSerdeValue {
+        expected: String,
+        found: serde_json::Value,
+    },
 }
 
 impl From<rust_decimal::Error> for XRPRangeException {
@@ -49,21 +65,39 @@ impl From<hex::FromHexError> for XRPRangeException {
     }
 }
 
+impl From<rust_decimal::Error> for ISOCodeException {
+    fn from(err: rust_decimal::Error) -> Self {
+        ISOCodeException::DecimalError(err)
+    }
+}
+
 impl From<core::str::Utf8Error> for ISOCodeException {
     fn from(err: core::str::Utf8Error) -> Self {
         ISOCodeException::Utf8Error(err)
     }
 }
 
-impl From<XRPLBinaryCodecException> for ISOCodeException {
-    fn from(err: XRPLBinaryCodecException) -> Self {
-        ISOCodeException::XRPLBinaryCodecError(err)
-    }
-}
-
 impl From<hex::FromHexError> for ISOCodeException {
     fn from(err: hex::FromHexError) -> Self {
         ISOCodeException::HexError(err)
+    }
+}
+
+impl From<XRPRangeException> for JSONParseException {
+    fn from(err: XRPRangeException) -> Self {
+        JSONParseException::XRPRangeError(err)
+    }
+}
+
+impl From<ISOCodeException> for JSONParseException {
+    fn from(err: ISOCodeException) -> Self {
+        JSONParseException::ISOCodeError(err)
+    }
+}
+
+impl From<rust_decimal::Error> for JSONParseException {
+    fn from(err: rust_decimal::Error) -> Self {
+        JSONParseException::DecimalError(err)
     }
 }
 

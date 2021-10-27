@@ -20,9 +20,9 @@ pub const MAX_DROPS: u64 = u64::pow(10, 17);
 /// Drops in one XRP
 pub const XRP_DROPS: u64 = 1000000;
 /// Minimum IC exponent
-pub const MIN_IOU_EXPONENT: i8 = -96;
+pub const MIN_IOU_EXPONENT: i32 = -96;
 /// Maximum IC exponent
-pub const MAX_IOU_EXPONENT: u8 = 80;
+pub const MAX_IOU_EXPONENT: i32 = 80;
 /// Maximum IC precision
 pub const MAX_IOU_PRECISION: u8 = 16;
 

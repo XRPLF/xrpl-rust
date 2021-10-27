@@ -35,6 +35,7 @@ pub struct ValueTest {
     pub mantissa: Option<String>,
     pub significant_digits: Option<usize>,
     pub exponent: Option<i16>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -62,4 +63,21 @@ fn _load_tests() -> &'static Option<TestDefinitions> {
 pub fn load_field_tests() -> &'static Vec<FieldTest> {
     let defintions = _load_tests().as_ref().unwrap();
     &defintions.fields_tests
+}
+
+/// Retrieve the field tests.
+pub fn load_data_tests(test_type: Option<&str>) -> Vec<ValueTest> {
+    let defintions = _load_tests().as_ref().unwrap();
+
+    if let Some(test) = test_type {
+        defintions
+            .values_tests
+            .clone()
+            .into_iter()
+            .filter(|vt| vt.r#type == test)
+            .collect::<Vec<ValueTest>>()
+            .to_vec()
+    } else {
+        defintions.values_tests.clone()
+    }
 }

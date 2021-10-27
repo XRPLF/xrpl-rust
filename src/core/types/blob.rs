@@ -28,18 +28,12 @@ impl XRPLType for Blob {
     }
 }
 
-impl Buffered for Blob {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
 impl Serialize for Blob {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(&hex::encode(self.get_buffer()))
+        serializer.serialize_str(&hex::encode_upper(self.as_ref()))
     }
 }
 
@@ -53,14 +47,16 @@ impl TryFrom<&str> for Blob {
 }
 
 impl ToString for Blob {
+    /// Get the hex representation of the Blob bytes.
     fn to_string(&self) -> String {
-        hex::encode(self.get_buffer())
+        hex::encode_upper(self.as_ref())
     }
 }
 
 impl AsRef<[u8]> for Blob {
+    /// Get a reference of the byte representation.
     fn as_ref(&self) -> &[u8] {
-        self.get_buffer()
+        &self.0
     }
 }
 
@@ -76,7 +72,7 @@ mod test {
         let blob = Blob::new(Some(&bytes));
 
         assert!(blob.is_ok());
-        assert_eq!(bytes, blob.unwrap().get_buffer());
+        assert_eq!(bytes, blob.unwrap().as_ref());
     }
 
     #[test]
@@ -85,6 +81,6 @@ mod test {
         let blob = Blob::try_from(TEST_HEX);
 
         assert!(blob.is_ok());
-        assert_eq!(bytes, blob.unwrap().get_buffer());
+        assert_eq!(bytes, blob.unwrap().as_ref());
     }
 }

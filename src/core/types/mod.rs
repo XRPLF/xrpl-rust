@@ -4,6 +4,7 @@ pub mod account_id;
 pub mod amount;
 pub mod blob;
 pub mod currency;
+pub mod exceptions;
 pub mod hash;
 pub mod paths;
 pub(crate) mod test_cases;
@@ -61,50 +62,6 @@ pub trait XRPLType {
         Self: Sized;
 }
 
-/// Useful for types with a buffer.
-///
-/// # Examples
-///
-/// ## Basic usage
-///
-/// ```
-/// use xrpl::core::types::Buffered;
-///
-/// pub struct Example(Vec<u8>);
-///
-/// impl Buffered for Example {
-///     fn get_buffer(&self) -> &[u8] {
-///         &self.0
-///     }
-/// }
-/// ```
-///
-/// ## Advanced usage
-///
-/// You can further use this with `AsRef<[u8]>`.
-///
-/// ```
-/// use xrpl::core::types::Buffered;
-///
-/// pub struct Example(Vec<u8>);
-///
-/// impl Buffered for Example {
-///     fn get_buffer(&self) -> &[u8] {
-///         &self.0
-///     }
-/// }
-///
-/// impl AsRef<[u8]> for Example {
-///     fn as_ref(&self) -> &[u8] {
-///         self.get_buffer()
-///     }
-/// }
-/// ```
-pub trait Buffered {
-    /// Return the byte value.
-    fn get_buffer(&self) -> &[u8];
-}
-
 /// Converter for transforming a BinaryParser into a type.
 ///
 /// # Examples
@@ -112,14 +69,14 @@ pub trait Buffered {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::types::FromParser;
+/// use xrpl::core::types::TryFromParser;
 /// use xrpl::core::binarycodec::BinaryParser;
 /// use xrpl::core::binarycodec::Parser;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
 ///
 /// pub struct Example(Vec<u8>);
 ///
-/// impl FromParser for Example {
+/// impl TryFromParser for Example {
 ///     type Error = XRPLBinaryCodecException;
 ///
 ///     fn from_parser(
@@ -130,7 +87,7 @@ pub trait Buffered {
 ///     }
 /// }
 /// ```
-pub trait FromParser {
+pub trait TryFromParser {
     /// Error type for implementing type.
     type Error;
 
@@ -142,9 +99,10 @@ pub trait FromParser {
 
 impl<'value, T> From<T> for SerializedType
 where
-    T: Buffered,
+    T: XRPLType + AsRef<[u8]>,
 {
+    /// Create a serialized type from an XRPLType.
     fn from(instance: T) -> Self {
-        SerializedType(instance.get_buffer().to_vec())
+        SerializedType(instance.as_ref().to_vec())
     }
 }

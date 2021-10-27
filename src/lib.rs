@@ -32,3 +32,6 @@ pub mod macros;
 #[cfg(feature = "utils")]
 pub mod utils;
 pub mod wallet;
+
+pub extern crate indexmap;
+pub extern crate serde_json;

@@ -3,8 +3,8 @@
 
 use crate::constants::HEX_CURRENCY_REGEX;
 use crate::constants::ISO_CURRENCY_REGEX;
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
+use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::hash::Hash160;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::types::*;
@@ -80,7 +80,7 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
 }
 
 impl XRPLType for Currency {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         let hash160 = Hash160::new(buffer.or(Some(&[0; CURRENCY_CODE_LENGTH])))?;
@@ -88,15 +88,10 @@ impl XRPLType for Currency {
     }
 }
 
-impl Buffered for Currency {
-    fn get_buffer(&self) -> &[u8] {
-        self.0.get_buffer()
-    }
-}
+impl TryFromParser for Currency {
+    type Error = XRPLHashException;
 
-impl FromParser for Currency {
-    type Error = XRPLBinaryCodecException;
-
+    /// Build Currency from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
@@ -116,7 +111,7 @@ impl Serialize for Currency {
 }
 
 impl TryFrom<&str> for Currency {
-    type Error = ISOCodeException;
+    type Error = XRPLHashException;
 
     /// Construct a Currency object from a string
     /// representation of a currency.
@@ -128,32 +123,36 @@ impl TryFrom<&str> for Currency {
         } else if _is_hex(value) {
             Ok(Currency(Hash160::new(Some(&hex::decode(value)?))?))
         } else {
-            Err(ISOCodeException::UnsupportedCurrencyRepresentation)
+            Err(XRPLHashException::ISOCodeError(
+                ISOCodeException::UnsupportedCurrencyRepresentation,
+            ))
         }
     }
 }
 
 impl ToString for Currency {
+    /// Get the ISO or hex representation of the Currency bytes.
     fn to_string(&self) -> String {
-        let buffer = self.0.get_buffer();
+        let buffer = self.0.as_ref();
 
-        if hex::encode(buffer) == NATIVE_HEX_CODE {
+        if hex::encode_upper(buffer) == NATIVE_HEX_CODE {
             NATIVE_CODE.to_string()
         } else {
             let iso = _iso_code_from_hex(buffer);
 
             if let Ok(code) = iso {
-                code.or_else(|| Some(hex::encode(buffer))).unwrap()
+                code.or_else(|| Some(hex::encode_upper(buffer))).unwrap()
             } else {
-                hex::encode(buffer)
+                hex::encode_upper(buffer)
             }
         }
     }
 }
 
 impl AsRef<[u8]> for Currency {
+    /// Get a reference of the byte representation.
     fn as_ref(&self) -> &[u8] {
-        self.get_buffer()
+        self.0.as_ref()
     }
 }
 
@@ -203,8 +202,8 @@ mod test {
         // Error case
         let invalid_iso = "INVALID";
 
-        assert_eq!(USD_HEX_CODE, hex::encode(usd_iso_bytes));
-        assert_eq!(NATIVE_HEX_CODE, hex::encode(xrp_iso_bytes));
+        assert_eq!(USD_HEX_CODE, hex::encode_upper(usd_iso_bytes));
+        assert_eq!(NATIVE_HEX_CODE, hex::encode_upper(xrp_iso_bytes));
         assert!(_iso_to_bytes(invalid_iso).is_err());
     }
 
@@ -230,7 +229,7 @@ mod test {
     }
 
     #[test]
-    fn accept_serde_encode_decode() {
+    fn accept_currency_serde_encode_decode() {
         let currency = Currency::try_from(USD_HEX_CODE).unwrap();
         let serialize = serde_json::to_string(&currency).unwrap();
         let deserialize: Currency = serde_json::from_str(&serialize).unwrap();

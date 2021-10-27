@@ -1,5 +1,6 @@
 //! General XRPL Binary Codec Exceptions.
 
+use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::XRPRangeException;
 
 #[derive(Debug, Clone)]
@@ -9,9 +10,7 @@ pub enum XRPLBinaryCodecException {
     UnexpectedTypeCodeRange { min: usize, max: usize },
     UnexpectedFieldCodeRange { min: usize, max: usize },
     UnexpectedFieldIdByteRange { min: usize, max: usize },
-    UnsupportedCurrencyRepresentation,
     UnknownFieldName,
-    InvalidVector256Bytes,
     InvalidReadFromBytesValue,
     InvalidVariableLengthTooLarge { max: usize },
     InvalidHashLength { expected: usize, found: usize },
@@ -22,11 +21,19 @@ pub enum XRPLBinaryCodecException {
     Utf8Error(alloc::string::FromUtf8Error),
     FromSliceError(core::array::TryFromSliceError),
     DecimalError(rust_decimal::Error),
+    IntParseError(core::num::ParseIntError),
+    ISOCodeError(ISOCodeException),
 }
 
 impl From<XRPRangeException> for XRPLBinaryCodecException {
     fn from(err: XRPRangeException) -> Self {
         XRPLBinaryCodecException::XRPRangeError(err)
+    }
+}
+
+impl From<ISOCodeException> for XRPLBinaryCodecException {
+    fn from(err: ISOCodeException) -> Self {
+        XRPLBinaryCodecException::ISOCodeError(err)
     }
 }
 
@@ -51,6 +58,12 @@ impl From<serde_json::Error> for XRPLBinaryCodecException {
 impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {
     fn from(err: core::array::TryFromSliceError) -> Self {
         XRPLBinaryCodecException::FromSliceError(err)
+    }
+}
+
+impl From<core::num::ParseIntError> for XRPLBinaryCodecException {
+    fn from(err: core::num::ParseIntError) -> Self {
+        XRPLBinaryCodecException::IntParseError(err)
     }
 }
 

@@ -56,7 +56,16 @@ version = "0.1.0"
 Documentation is available [here](https://docs.rs/xrpl). 
 
 ## ⛮ Quickstart
-TODO
+TODO - Most core functionality is in place and working. 
+
+In Progres:
+* Models
+* Asynchronous ledger interactions
+    * JSON RPC
+    * API
+    * Websocket
+* Benchmarks
+* Integration tests
 
 # ⚐ Flags
 
@@ -71,15 +80,15 @@ default-features = false
 features = ["core", "models"]
 ```
 
-## ‼ Exposed Dependencies
+## ‼ Exported Dependencies
 
 ### Serde
 
-This project exposes [serde](https://serde.rs) for handling JSON.
+This project exports [serde](https://serde.rs) for handling JSON.
 
 ### Indexmap
 
-This project exposes [indexmap](https://docs.rs/crate/indexmap) as `HashMap` is 
+This project exports [indexmap](https://docs.rs/crate/indexmap) as `HashMap` is 
 not supported in the `alloc` crate. TODO: Support both.
 
 ## ⚙ #![no_std]

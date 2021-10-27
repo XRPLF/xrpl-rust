@@ -58,7 +58,7 @@ To run tests:
 
 ```bash
 # Test the core feature for no_std
-cargo test --no-default-features --features core
+cargo test --no-default-features --features core,models,utils
 # Test all features enabled
 cargo test --all-features
 ```

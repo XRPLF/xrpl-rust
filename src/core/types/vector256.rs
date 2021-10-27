@@ -1,8 +1,8 @@
 //! Codec for serializing and deserializing
 //! vectors of Hash256.
 
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
+use crate::core::types::exceptions::XRPLVectorException;
 use crate::core::types::hash::Hash256;
 use crate::core::types::*;
 use alloc::string::String;
@@ -24,17 +24,17 @@ const _HASH_LENGTH_BYTES: usize = 32;
 pub struct Vector256(Vec<u8>);
 
 impl XRPLType for Vector256 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLVectorException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Vector256(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
     }
 }
 
-impl FromParser for Vector256 {
-    type Error = XRPLBinaryCodecException;
+impl TryFromParser for Vector256 {
+    type Error = XRPLVectorException;
 
-    /// Construct a Vector256 from a BinaryParser.
+    /// Build Vector256 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
@@ -52,16 +52,10 @@ impl FromParser for Vector256 {
         num_hashes = num_bytes / _HASH_LENGTH_BYTES;
 
         for _ in 0..num_hashes {
-            bytes.extend_from_slice(Hash256::from_parser(parser, None)?.get_buffer());
+            bytes.extend_from_slice(Hash256::from_parser(parser, None)?.as_ref());
         }
 
         Ok(Vector256(bytes))
-    }
-}
-
-impl Buffered for Vector256 {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
     }
 }
 
@@ -71,9 +65,7 @@ impl Serialize for Vector256 {
         S: Serializer,
     {
         if self.0.len() % _HASH_LENGTH_BYTES != 0 {
-            Err(S::Error::custom(
-                XRPLBinaryCodecException::InvalidVector256Bytes,
-            ))
+            Err(S::Error::custom(XRPLVectorException::InvalidVector256Bytes))
         } else {
             let mut sequence = serializer.serialize_seq(None)?;
 
@@ -88,14 +80,14 @@ impl Serialize for Vector256 {
 }
 
 impl TryFrom<Vec<&str>> for Vector256 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLVectorException;
 
     /// Construct a Vector256 from a list of strings.
     fn try_from(value: Vec<&str>) -> Result<Self, Self::Error> {
         let mut bytes = vec![];
 
         for string in value {
-            bytes.extend_from_slice(Hash256::try_from(string)?.get_buffer())
+            bytes.extend_from_slice(Hash256::try_from(string)?.as_ref())
         }
 
         Ok(Vector256(bytes))
@@ -103,8 +95,16 @@ impl TryFrom<Vec<&str>> for Vector256 {
 }
 
 impl ToString for Vector256 {
+    /// Get the hex representation of the Vector256 bytes.
     fn to_string(&self) -> String {
-        hex::encode_upper(self.get_buffer())
+        hex::encode_upper(self.as_ref())
+    }
+}
+
+impl AsRef<[u8]> for Vector256 {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -118,13 +118,13 @@ mod test {
     const HASH2: &str = "4C97EBA926031A7CF7D7B36FDE3ED66DDA5421192D63DE53FFB46E43B9DC8373";
 
     #[test]
-    fn test_new() {
+    fn test_vector256_new() {
         let bytes = hex::decode(HASH1).unwrap();
         assert_eq!(HASH1, Vector256(bytes).to_string());
     }
 
     #[test]
-    fn test_from_parser() {
+    fn test_vector256_try_from_parser() {
         let mut parser = BinaryParser::from(hex::decode(SERIALIZED).unwrap());
         let result = Vector256::from_parser(&mut parser, None);
 
@@ -133,7 +133,7 @@ mod test {
     }
 
     #[test]
-    fn test_try_from() {
+    fn test_vector256_try_from() {
         let result = Vector256::try_from(vec![HASH1, HASH2]);
 
         assert!(result.is_ok());
@@ -141,7 +141,7 @@ mod test {
     }
 
     #[test]
-    fn accept_serde_encode_decode() {
+    fn accept_vector256_serde_encode_decode() {
         let vector = Vector256::try_from(vec![HASH1, HASH2]).unwrap();
         let serialize = serde_json::to_string(&vector).unwrap();
         let deserialize: Vector256 = serde_json::from_str(&serialize).unwrap();

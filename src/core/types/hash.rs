@@ -3,9 +3,9 @@
 //! See Hash Fields:
 //! `<https://xrpl.org/serialization.html#hash-fields>`
 
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
 use crate::core::binarycodec::Parser;
+use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::utils::*;
 use crate::core::types::*;
 use alloc::string::String;
@@ -80,7 +80,7 @@ impl dyn Hash {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::types::exceptions::XRPLHashException;
     /// use xrpl::core::types::hash::Hash;
     /// use xrpl::core::types::hash::Hash160;
     ///
@@ -88,10 +88,10 @@ impl dyn Hash {
     ///     assert!(true)
     /// }
     ///
-    /// fn handle_hash_error(error: XRPLBinaryCodecException) {
+    /// fn handle_hash_error(error: XRPLHashException) {
     ///     // Error Conditions
     ///     match error {
-    ///         XRPLBinaryCodecException::InvalidHashLength {
+    ///         XRPLHashException::InvalidHashLength {
     ///             expected,
     ///             found,
     ///         } => assert!(true),
@@ -101,7 +101,7 @@ impl dyn Hash {
     ///
     /// let buffer: &str = "1000000000200000000030000000004000000000";
     /// let data: Vec<u8> = hex::decode(buffer).unwrap();
-    /// let result: Result<Vec<u8>, XRPLBinaryCodecException> =
+    /// let result: Result<Vec<u8>, XRPLHashException> =
     ///     <dyn Hash>::make::<Hash160>(Some(&data));
     ///
     /// match result {
@@ -109,12 +109,12 @@ impl dyn Hash {
     ///     Err(e) => handle_hash_error(e),
     /// };
     /// ```
-    pub fn make<T: Hash>(bytes: Option<&[u8]>) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+    pub fn make<T: Hash>(bytes: Option<&[u8]>) -> Result<Vec<u8>, XRPLHashException> {
         let byte_value: &[u8] = bytes.or(Some(&[])).unwrap();
         let hash_length: usize = T::get_length();
 
         if byte_value.len() != hash_length {
-            Err(XRPLBinaryCodecException::InvalidHashLength {
+            Err(XRPLHashException::InvalidHashLength {
                 expected: hash_length,
                 found: byte_value.len(),
             })
@@ -130,9 +130,10 @@ impl dyn Hash {
     /// ## Basic usage
     ///
     /// ```
+    /// use xrpl::core::types::exceptions::XRPLHashException;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::types::FromParser;
+    /// use xrpl::core::types::TryFromParser;
     /// use xrpl::core::types::hash::Hash;
     /// use xrpl::core::types::hash::Hash128;
     ///
@@ -141,20 +142,24 @@ impl dyn Hash {
     ///     assert!(true);
     /// }
     ///
-    /// fn handle_parser_error(error: XRPLBinaryCodecException) {
+    /// fn handle_parser_error(error: XRPLHashException) {
     ///     // Error Conditions
     ///     match error {
-    ///         XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
-    ///             max,
-    ///             found,
-    ///         } => assert!(true),
-    ///         _ => assert!(true),
+    ///         XRPLHashException::XRPLBinaryCodecError(e) => match e {
+    ///             XRPLBinaryCodecException::UnexpectedParserSkipOverflow
+    ///             {
+    ///                 max,
+    ///                 found,
+    ///             } => assert!(false),
+    ///             _ => assert!(false),
+    ///         },
+    ///         _ => assert!(false),
     ///     }
     /// }
     ///
     /// fn handle_hash128_from_parser(data: &[u8]) {
     ///     let mut parser: BinaryParser = BinaryParser::from(data);
-    ///     let result: Result<Hash128, XRPLBinaryCodecException> =
+    ///     let result: Result<Hash128, XRPLHashException> =
     ///         Hash128::from_parser(&mut parser, None);
     ///
     ///     match result {
@@ -171,9 +176,9 @@ impl dyn Hash {
     pub fn parse<T: Hash>(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+    ) -> Result<Vec<u8>, XRPLHashException> {
         let read_length = length.or_else(|| Some(T::get_length())).unwrap();
-        parser.read(read_length)
+        Ok(parser.read(read_length)?)
     }
 }
 
@@ -196,7 +201,7 @@ impl Hash for Hash256 {
 }
 
 impl XRPLType for Hash128 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Hash128(<dyn Hash>::make::<Hash128>(buffer)?))
@@ -204,7 +209,7 @@ impl XRPLType for Hash128 {
 }
 
 impl XRPLType for Hash160 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Hash160(<dyn Hash>::make::<Hash160>(buffer)?))
@@ -212,16 +217,17 @@ impl XRPLType for Hash160 {
 }
 
 impl XRPLType for Hash256 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         Ok(Hash256(<dyn Hash>::make::<Hash256>(buffer)?))
     }
 }
 
-impl FromParser for Hash128 {
-    type Error = XRPLBinaryCodecException;
+impl TryFromParser for Hash128 {
+    type Error = XRPLHashException;
 
+    /// Build Hash128 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
@@ -230,9 +236,10 @@ impl FromParser for Hash128 {
     }
 }
 
-impl FromParser for Hash160 {
-    type Error = XRPLBinaryCodecException;
+impl TryFromParser for Hash160 {
+    type Error = XRPLHashException;
 
+    /// Build Hash160 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
@@ -241,9 +248,10 @@ impl FromParser for Hash160 {
     }
 }
 
-impl FromParser for Hash256 {
-    type Error = XRPLBinaryCodecException;
+impl TryFromParser for Hash256 {
+    type Error = XRPLHashException;
 
+    /// Build Hash256 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
@@ -252,26 +260,8 @@ impl FromParser for Hash256 {
     }
 }
 
-impl Buffered for Hash128 {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl Buffered for Hash160 {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl Buffered for Hash256 {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
 impl TryFrom<&str> for Hash128 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     /// Construct a Hash object from a hex string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -280,7 +270,7 @@ impl TryFrom<&str> for Hash128 {
 }
 
 impl TryFrom<&str> for Hash160 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     /// Construct a Hash object from a hex string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -289,7 +279,7 @@ impl TryFrom<&str> for Hash160 {
 }
 
 impl TryFrom<&str> for Hash256 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLHashException;
 
     /// Construct a Hash object from a hex string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -298,20 +288,44 @@ impl TryFrom<&str> for Hash256 {
 }
 
 impl ToString for Hash128 {
+    /// Get the hex representation of the Hash128 bytes.
     fn to_string(&self) -> String {
-        hex::encode(self.get_buffer())
+        hex::encode_upper(self.as_ref())
     }
 }
 
 impl ToString for Hash160 {
+    /// Get the hex representation of the Hash160 bytes.
     fn to_string(&self) -> String {
-        hex::encode(self.get_buffer())
+        hex::encode_upper(self.as_ref())
     }
 }
 
 impl ToString for Hash256 {
+    /// Get the hex representation of the Hash256 bytes.
     fn to_string(&self) -> String {
-        hex::encode(self.get_buffer())
+        hex::encode_upper(self.as_ref())
+    }
+}
+
+impl AsRef<[u8]> for Hash160 {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Hash128 {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Hash256 {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -325,7 +339,7 @@ mod test {
         "1000000000200000000030000000004000000000500000000060000000001234";
 
     #[test]
-    fn test_new() {
+    fn test_hash_new() {
         let hex128 = hex::decode(HASH128_HEX_TEST).unwrap();
         let hex160 = hex::decode(HASH160_HEX_TEST).unwrap();
         let hex256 = hex::decode(HASH256_HEX_TEST).unwrap();
@@ -336,7 +350,7 @@ mod test {
     }
 
     #[test]
-    fn test_from_parser() {
+    fn test_hash_try_from_parser() {
         let mut parser = BinaryParser::from(hex::decode(HASH128_HEX_TEST).unwrap());
         let result = Hash128::from_parser(&mut parser, None);
 
@@ -357,7 +371,7 @@ mod test {
     }
 
     #[test]
-    fn test_try_from() {
+    fn test_hash_try_from() {
         let result = Hash128::try_from(HASH128_HEX_TEST);
 
         assert!(result.is_ok());
@@ -375,7 +389,7 @@ mod test {
     }
 
     #[test]
-    fn accept_invalid_length_errors() {
+    fn accept_hash_invalid_length_errors() {
         let hash128 = Hash128::try_from("1000000000200000000030000000001234");
         let hash160 = Hash160::try_from("100000000020000000003000000000400000000012");
         let hash256 =

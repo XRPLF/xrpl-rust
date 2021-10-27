@@ -4,12 +4,12 @@
 //! `<https://xrpl.org/serialization.html#pathset-fields>`
 
 use crate::constants::ACCOUNT_ID_LENGTH;
-use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
 use crate::core::binarycodec::Parser;
 use crate::core::types::account_id::AccountId;
 use crate::core::types::currency::Currency;
+use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::types::*;
 use alloc::borrow::ToOwned;
@@ -110,27 +110,10 @@ impl PathStepData {
     }
 }
 
-impl Buffered for PathStep {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl Buffered for Path {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl Buffered for PathSet {
-    fn get_buffer(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl FromParser for PathStep {
+impl TryFromParser for PathStep {
     type Error = XRPLBinaryCodecException;
 
+    /// Build PathStep from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
@@ -158,9 +141,10 @@ impl FromParser for PathStep {
     }
 }
 
-impl FromParser for PathStepData {
-    type Error = XRPLBinaryCodecException;
+impl TryFromParser for PathStepData {
+    type Error = XRPLHashException;
 
+    /// Build PathStepData from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
@@ -195,15 +179,16 @@ impl FromParser for PathStepData {
     }
 }
 
-impl FromParser for Path {
+impl TryFromParser for Path {
     type Error = XRPLBinaryCodecException;
 
+    /// Build Path from a BinaryParser.
     fn from_parser(parser: &mut BinaryParser, _length: Option<usize>) -> Result<Path, Self::Error> {
         let mut buffer: Vec<u8> = vec![];
 
         while !parser.is_end(None) {
             let pathstep = PathStep::from_parser(parser, None)?;
-            buffer.extend_from_slice(pathstep.get_buffer());
+            buffer.extend_from_slice(pathstep.as_ref());
 
             if parser.peek() == Some([_PATHSET_END_BYTE; 1])
                 || parser.peek() == Some([_PATH_SEPARATOR_BYTE; 1])
@@ -216,9 +201,10 @@ impl FromParser for Path {
     }
 }
 
-impl FromParser for PathSet {
+impl TryFromParser for PathSet {
     type Error = XRPLBinaryCodecException;
 
+    /// Build PathSet from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
@@ -228,7 +214,7 @@ impl FromParser for PathSet {
         while !parser.is_end(None) {
             let path = Path::from_parser(parser, None)?;
 
-            buffer.extend_from_slice(path.get_buffer());
+            buffer.extend_from_slice(path.as_ref());
             buffer.extend_from_slice(&parser.read(1)?);
 
             let len = buffer.len();
@@ -248,7 +234,7 @@ impl Serialize for PathStep {
     where
         S: Serializer,
     {
-        let mut parser = BinaryParser::from(self.get_buffer());
+        let mut parser = BinaryParser::from(self.as_ref());
         let result = PathStepData::from_parser(&mut parser, None);
 
         if let Ok(pathdata) = result {
@@ -277,7 +263,7 @@ impl Serialize for Path {
         S: Serializer,
     {
         let mut sequence = serializer.serialize_seq(None)?;
-        let mut parser = BinaryParser::from(self.get_buffer());
+        let mut parser = BinaryParser::from(self.as_ref());
 
         while !parser.is_end(None) {
             let pathstep = PathStep::from_parser(&mut parser, None);
@@ -300,7 +286,7 @@ impl Serialize for PathSet {
         S: Serializer,
     {
         let mut sequence = serializer.serialize_seq(None)?;
-        let mut parser = BinaryParser::from(self.get_buffer());
+        let mut parser = BinaryParser::from(self.as_ref());
 
         while !parser.is_end(None) {
             let path = Path::from_parser(&mut parser, None);
@@ -321,7 +307,7 @@ impl Serialize for PathSet {
 }
 
 impl TryFrom<IndexMap<String, String>> for PathStep {
-    type Error = XRPLAddressCodecException;
+    type Error = XRPLHashException;
 
     /// Construct a PathStep object from a dictionary.
     fn try_from(value: IndexMap<String, String>) -> Result<Self, Self::Error> {
@@ -333,21 +319,21 @@ impl TryFrom<IndexMap<String, String>> for PathStep {
             let data = AccountId::try_from(value[_ACC_KEY].as_ref())?;
             data_type |= _TYPE_ACCOUNT;
 
-            value_bytes.extend_from_slice(data.get_buffer());
+            value_bytes.extend_from_slice(data.as_ref());
         };
 
         if value.contains_key(_CUR_KEY) {
             let data = Currency::try_from(value[_CUR_KEY].as_ref())?;
             data_type |= _TYPE_CURRENCY;
 
-            value_bytes.extend_from_slice(data.get_buffer());
+            value_bytes.extend_from_slice(data.as_ref());
         };
 
         if value.contains_key(_ISS_KEY) {
             let data = AccountId::try_from(value[_ISS_KEY].as_ref())?;
             data_type |= _TYPE_ISSUER;
 
-            value_bytes.extend_from_slice(data.get_buffer());
+            value_bytes.extend_from_slice(data.as_ref());
         };
 
         buffer.extend_from_slice(&[data_type]);
@@ -358,7 +344,7 @@ impl TryFrom<IndexMap<String, String>> for PathStep {
 }
 
 impl TryFrom<Vec<IndexMap<String, String>>> for Path {
-    type Error = XRPLAddressCodecException;
+    type Error = XRPLHashException;
 
     /// Construct a Path object from a list.
     fn try_from(value: Vec<IndexMap<String, String>>) -> Result<Self, Self::Error> {
@@ -366,7 +352,7 @@ impl TryFrom<Vec<IndexMap<String, String>>> for Path {
 
         for step in value {
             let pathstep = PathStep::try_from(step)?;
-            buffer.extend_from_slice(pathstep.get_buffer());
+            buffer.extend_from_slice(pathstep.as_ref());
         }
 
         Ok(Path::new(Some(&buffer))?)
@@ -385,7 +371,7 @@ impl TryFrom<Vec<Vec<IndexMap<String, String>>>> for PathSet {
                 let result = Path::try_from(path_val);
 
                 if let Ok(path) = result {
-                    buffer.extend_from_slice(path.get_buffer());
+                    buffer.extend_from_slice(path.as_ref());
                     buffer.extend_from_slice(&[_PATH_SEPARATOR_BYTE; 1]);
                 } else {
                     return Err(XRPLBinaryCodecException::InvalidPathSetFromValue);
@@ -403,7 +389,7 @@ impl TryFrom<Vec<Vec<IndexMap<String, String>>>> for PathSet {
 }
 
 impl TryFrom<&str> for Path {
-    type Error = XRPLAddressCodecException;
+    type Error = XRPLHashException;
 
     /// Construct a Path object from a string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -419,6 +405,27 @@ impl TryFrom<&str> for PathSet {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let json: Vec<Vec<IndexMap<String, String>>> = serde_json::from_str(value)?;
         Self::try_from(json)
+    }
+}
+
+impl AsRef<[u8]> for PathStep {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Path {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for PathSet {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
     }
 }
 
@@ -477,7 +484,7 @@ mod test {
             let hex: Vec<u8> = hex::decode(data).unwrap();
             let pathstep = PathStep::new(Some(&hex)).unwrap();
 
-            assert_eq!(hex, pathstep.get_buffer());
+            assert_eq!(hex, pathstep.as_ref());
         }
     }
 
@@ -486,7 +493,7 @@ mod test {
         let hex: Vec<u8> = hex::decode(TEST_PATH_BUFFER).unwrap();
         let path = Path::new(Some(&hex)).unwrap();
 
-        assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(path.get_buffer()));
+        assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(path.as_ref()));
     }
 
     #[test]
@@ -494,10 +501,7 @@ mod test {
         let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
         let pathset = PathSet::new(Some(&hex)).unwrap();
 
-        assert_eq!(
-            TEST_PATH_SET_BUFFER,
-            hex::encode_upper(pathset.get_buffer())
-        );
+        assert_eq!(TEST_PATH_SET_BUFFER, hex::encode_upper(pathset.as_ref()));
     }
 
     #[test]
@@ -507,7 +511,7 @@ mod test {
             let mut parser = BinaryParser::from(hex.clone());
             let pathset = PathStep::from_parser(&mut parser, None).unwrap();
 
-            assert_eq!(hex, pathset.get_buffer());
+            assert_eq!(hex, pathset.as_ref());
         }
     }
 
@@ -517,7 +521,7 @@ mod test {
         let mut parser = BinaryParser::from(hex.clone());
         let pathset = Path::from_parser(&mut parser, None).unwrap();
 
-        assert_eq!(hex, pathset.get_buffer());
+        assert_eq!(hex, pathset.as_ref());
     }
 
     #[test]
@@ -526,7 +530,7 @@ mod test {
         let mut parser = BinaryParser::from(hex.clone());
         let pathset = PathSet::from_parser(&mut parser, None).unwrap();
 
-        assert_eq!(hex, pathset.get_buffer());
+        assert_eq!(hex, pathset.as_ref());
     }
 
     #[test]
@@ -535,7 +539,7 @@ mod test {
         let mut pathsteps: Vec<u8> = vec![];
 
         for map in json {
-            pathsteps.extend_from_slice(PathStep::try_from(map.clone()).unwrap().get_buffer());
+            pathsteps.extend_from_slice(PathStep::try_from(map.clone()).unwrap().as_ref());
         }
 
         assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(pathsteps));
@@ -546,7 +550,7 @@ mod test {
         let hex = hex::decode(TEST_PATH_BUFFER).unwrap();
         let path = Path::try_from(PATH_TEST).unwrap();
 
-        assert_eq!(hex, path.get_buffer())
+        assert_eq!(hex, path.as_ref())
     }
 
     #[test]
@@ -554,7 +558,7 @@ mod test {
         let hex = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
         let pathset = PathSet::try_from(PATH_SET_TEST).unwrap();
 
-        assert_eq!(hex, pathset.get_buffer())
+        assert_eq!(hex, pathset.as_ref())
     }
 
     #[test]

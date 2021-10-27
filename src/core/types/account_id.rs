@@ -4,8 +4,8 @@
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::*;
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::BinaryParser;
+use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::hash::Hash160;
 use crate::core::types::*;
 use crate::utils::is_hex_address;
@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 pub struct AccountId(Hash160);
 
 impl XRPLType for AccountId {
-    type Error = XRPLAddressCodecException;
+    type Error = XRPLHashException;
 
     /// Construct an AccountID from given bytes.
     /// If buffer is not provided, default to 20 zero bytes.
@@ -37,15 +37,10 @@ impl XRPLType for AccountId {
     }
 }
 
-impl Buffered for AccountId {
-    fn get_buffer(&self) -> &[u8] {
-        self.0.get_buffer()
-    }
-}
+impl TryFromParser for AccountId {
+    type Error = XRPLHashException;
 
-impl FromParser for AccountId {
-    type Error = XRPLBinaryCodecException;
-
+    /// Build AccountId from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
@@ -61,7 +56,7 @@ impl Serialize for AccountId {
     where
         S: Serializer,
     {
-        let result = &encode_classic_address(self.get_buffer());
+        let result = &encode_classic_address(self.as_ref());
 
         if let Ok(data) = result {
             serializer.serialize_str(data)
@@ -72,7 +67,7 @@ impl Serialize for AccountId {
 }
 
 impl TryFrom<&str> for AccountId {
-    type Error = XRPLAddressCodecException;
+    type Error = XRPLHashException;
 
     /// Construct an AccountId from a hex string or
     /// a base58 r-Address.
@@ -85,20 +80,24 @@ impl TryFrom<&str> for AccountId {
             let (classic_address, _, _) = xaddress_to_classic_address(value)?;
             Self::new(Some(&decode_classic_address(&classic_address)?))
         } else {
-            Err(XRPLAddressCodecException::InvalidClassicAddressValue)
+            Err(XRPLHashException::XRPLAddressCodecError(
+                XRPLAddressCodecException::InvalidClassicAddressValue,
+            ))
         }
     }
 }
 
 impl ToString for AccountId {
+    /// Get the classic address of the AccountId bytes.
     fn to_string(&self) -> String {
-        encode_classic_address(self.get_buffer()).expect("to_string")
+        encode_classic_address(self.as_ref()).expect("to_string")
     }
 }
 
 impl AsRef<[u8]> for AccountId {
+    /// Get a reference of the byte representation.
     fn as_ref(&self) -> &[u8] {
-        self.get_buffer()
+        self.0.as_ref()
     }
 }
 
@@ -111,19 +110,19 @@ mod test {
     const BASE58_ENCODING: &str = "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59";
 
     #[test]
-    fn test_account_id_new() {
+    fn test_accountid_new() {
         let account = AccountId::new(Some(&hex::decode(HEX_ENCODING).unwrap()));
         assert_eq!(HEX_ENCODING, hex::encode_upper(account.unwrap()))
     }
 
     #[test]
-    fn test_currency_try_from() {
+    fn test_accountid_try_from() {
         let account = AccountId::try_from(BASE58_ENCODING).unwrap();
         assert_eq!(HEX_ENCODING, hex::encode_upper(account))
     }
 
     #[test]
-    fn accept_serde_encode_decode() {
+    fn accept_accountid_serde_encode_decode() {
         let account: AccountId = AccountId::try_from(BASE58_ENCODING).unwrap();
         let serialize = serde_json::to_string(&account).unwrap();
         let deserialize: AccountId = serde_json::from_str(&serialize).unwrap();
