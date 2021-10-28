@@ -5,7 +5,7 @@ edition = "2018"
 authors = ["Tanveer Wahid <tan@wahid.email>"]
 description = "A 100% Rust library to interact with the XRPL"
 readme = "README.md"
-license = "ISC License"
+license = "ISC"
 repository = "https://github.com/589labs/xrpl-rust"
 
 keywords = ["xrpl", "no_std"]
