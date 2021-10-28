@@ -430,14 +430,10 @@ mod test {
         let tests = load_data_tests(Some("Amount"));
 
         for test in tests {
-            extern crate std;
-            std::println!("{:?}", test.test_json);
-            //let data = test.test_json.clone();
             let amount = Amount::try_from(test.test_json);
 
             if test.error.is_none() {
                 assert_eq!(test.expected_hex, Some(amount.unwrap().to_string()));
-                //assert_eq!(data, serde_json::to_string(&amount).unwrap());
             } else {
                 assert!(amount.is_err());
             }
