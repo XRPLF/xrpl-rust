@@ -1,6 +1,6 @@
 /// General XRPL Model Exception.
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum XRPLModelException {}
 
 #[cfg(feature = "std")]

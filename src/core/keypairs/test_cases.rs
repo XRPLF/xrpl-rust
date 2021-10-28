@@ -1,7 +1,7 @@
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::utils::SEED_LENGTH;
 use crate::core::keypairs::utils::SHA512_HASH_LENGTH;
-use ed25519_dalek::SIGNATURE_LENGTH;
+use crate::core::keypairs::ED25519_SIGNATURE_LENGTH;
 
 pub const TEST_MESSAGE: &str = "test message";
 
@@ -35,11 +35,18 @@ pub const PUBLIC_SECP256K1: &str =
 pub const PRIVATE_SECP256K1: &str =
     "00D78B9735C3F26501C7337B8A5727FD53A6EFDBC6AA55984F098488561F985E23";
 
-pub const SIGNATURE_ED25519: [u8; SIGNATURE_LENGTH] = [
+pub const SIGNATURE_ED25519: [u8; ED25519_SIGNATURE_LENGTH] = [
     203, 25, 158, 27, 253, 78, 61, 170, 16, 94, 72, 50, 238, 223, 163, 100, 19, 225, 244, 66, 5,
     228, 239, 185, 226, 126, 130, 96, 68, 194, 30, 62, 46, 132, 139, 188, 129, 149, 232, 149, 155,
     173, 248, 135, 89, 155, 115, 16, 173, 27, 112, 71, 239, 17, 182, 130, 224, 208, 104, 247, 55,
     73, 117, 14,
+];
+
+pub const SIGNATURE_SECP256K1: [u8; 70] = [
+    48, 68, 2, 32, 88, 58, 145, 201, 94, 84, 230, 166, 81, 196, 123, 236, 34, 116, 78, 11, 16, 30,
+    44, 64, 96, 231, 176, 143, 99, 65, 101, 125, 173, 155, 195, 238, 2, 32, 125, 20, 137, 199, 57,
+    93, 176, 24, 141, 58, 86, 169, 119, 236, 186, 84, 179, 111, 169, 55, 27, 64, 49, 150, 85, 177,
+    180, 66, 158, 51, 239, 45,
 ];
 
 pub const CLASSIC_ADDRESS_ED25519: &str = "rLUEXYuLiQptky37CqLcm9USQpPiz5rkpD";

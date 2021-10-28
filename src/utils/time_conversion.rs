@@ -111,45 +111,48 @@ mod test {
 
     #[test]
     fn test_datetime_to_ripple_time() {
-        let success: i64 = datetime_to_ripple_time(Utc.timestamp(RIPPLE_EPOCH, 0)).unwrap();
-        assert_eq!(success, 0);
+        assert_eq!(
+            Ok(0_i64),
+            datetime_to_ripple_time(Utc.timestamp(RIPPLE_EPOCH, 0))
+        );
     }
 
     #[test]
     fn test_ripple_time_to_posix() {
-        let success: i64 = ripple_time_to_posix(RIPPLE_EPOCH).unwrap();
-        assert_eq!(success, RIPPLE_EPOCH + RIPPLE_EPOCH);
+        assert_eq!(
+            ripple_time_to_posix(RIPPLE_EPOCH),
+            Ok(RIPPLE_EPOCH + RIPPLE_EPOCH)
+        );
     }
 
     #[test]
     fn test_posix_to_ripple_time() {
-        let success: i64 = posix_to_ripple_time(RIPPLE_EPOCH).unwrap();
-        assert_eq!(success, 0);
+        assert_eq!(posix_to_ripple_time(RIPPLE_EPOCH), Ok(0_i64));
     }
 
     #[test]
     fn accept_posix_round_trip() {
         let current_time: i64 = Utc::now().timestamp();
         let ripple_time: i64 = posix_to_ripple_time(current_time).unwrap();
-        let round_trip_time: i64 = ripple_time_to_posix(ripple_time).unwrap();
+        let round_trip_time = ripple_time_to_posix(ripple_time);
 
-        assert_eq!(current_time, round_trip_time);
+        assert_eq!(Ok(current_time), round_trip_time);
     }
 
     #[test]
     fn accept_datetime_round_trip() {
         let current_time: DateTime<Utc> = Utc.timestamp(Utc::now().timestamp(), 0);
         let ripple_time: i64 = datetime_to_ripple_time(current_time).unwrap();
-        let round_trip_time: DateTime<Utc> = ripple_time_to_datetime(ripple_time).unwrap();
+        let round_trip_time = ripple_time_to_datetime(ripple_time);
 
-        assert_eq!(current_time, round_trip_time);
+        assert_eq!(Ok(current_time), round_trip_time);
     }
 
     #[test]
     fn accept_ripple_epoch() {
         assert_eq!(
-            Utc.ymd(2000, 1, 1).and_hms(0, 0, 0),
-            ripple_time_to_datetime(0).unwrap()
+            Ok(Utc.ymd(2000, 1, 1).and_hms(0, 0, 0)),
+            ripple_time_to_datetime(0)
         );
     }
 

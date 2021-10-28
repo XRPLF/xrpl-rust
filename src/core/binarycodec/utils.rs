@@ -236,7 +236,7 @@ mod test {
     #[test]
     fn test_encode_field_name() {
         for test in load_field_tests() {
-            let result = hex::encode_upper(encode_field_name(&test.name).unwrap());
+            let result = hex::encode_upper(encode_field_name(&test.name).expect(""));
             assert_eq!(test.expected_hex, result)
         }
     }
@@ -244,8 +244,10 @@ mod test {
     #[test]
     fn test_decode_field_name() {
         for test in load_field_tests() {
-            let result = decode_field_name(&test.expected_hex).unwrap();
-            assert_eq!(test.name, result)
+            assert_eq!(
+                decode_field_name(&test.expected_hex),
+                Ok(test.name.as_ref())
+            )
         }
     }
 }

@@ -78,7 +78,11 @@ impl XRPLType for PathStep {
     type Error = XRPLBinaryCodecException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(PathStep(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+        if let Some(data) = buffer {
+            Ok(PathStep(data.to_vec()))
+        } else {
+            Ok(PathStep(vec![]))
+        }
     }
 }
 
@@ -86,7 +90,11 @@ impl XRPLType for Path {
     type Error = XRPLBinaryCodecException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(Path(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+        if let Some(data) = buffer {
+            Ok(Path(data.to_vec()))
+        } else {
+            Ok(Path(vec![]))
+        }
     }
 }
 
@@ -94,7 +102,11 @@ impl XRPLType for PathSet {
     type Error = XRPLBinaryCodecException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(PathSet(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+        if let Some(data) = buffer {
+            Ok(PathSet(data.to_vec()))
+        } else {
+            Ok(PathSet(vec![]))
+        }
     }
 }
 
@@ -463,13 +475,15 @@ mod test {
 
     #[test]
     fn test_is_path_step() {
-        let json: Vec<Vec<IndexMap<String, String>>> = serde_json::from_str(PATH_SET_TEST).unwrap();
+        let json: Vec<Vec<IndexMap<String, String>>> =
+            serde_json::from_str(PATH_SET_TEST).expect("");
         assert!(_is_path_set(&json));
     }
 
     #[test]
     fn test_is_path_set() {
-        let json: Vec<Vec<IndexMap<String, String>>> = serde_json::from_str(PATH_SET_TEST).unwrap();
+        let json: Vec<Vec<IndexMap<String, String>>> =
+            serde_json::from_str(PATH_SET_TEST).expect("");
 
         for path in json {
             for step in path {
@@ -481,95 +495,95 @@ mod test {
     #[test]
     fn test_pathstep_new() {
         for data in TEST_PATH_STEP_BUFFER {
-            let hex: Vec<u8> = hex::decode(data).unwrap();
+            let hex: Vec<u8> = hex::decode(data).expect("");
             let pathstep = PathStep::new(Some(&hex)).unwrap();
 
-            assert_eq!(hex, pathstep.as_ref());
+            assert_eq!(pathstep.as_ref(), hex);
         }
     }
 
     #[test]
     fn test_path_new() {
-        let hex: Vec<u8> = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let hex: Vec<u8> = hex::decode(TEST_PATH_BUFFER).expect("");
         let path = Path::new(Some(&hex)).unwrap();
 
-        assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(path.as_ref()));
+        assert_eq!(hex::encode_upper(path.as_ref()), TEST_PATH_BUFFER);
     }
 
     #[test]
     fn test_pathset_new() {
-        let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).expect("");
         let pathset = PathSet::new(Some(&hex)).unwrap();
 
-        assert_eq!(TEST_PATH_SET_BUFFER, hex::encode_upper(pathset.as_ref()));
+        assert_eq!(hex::encode_upper(pathset.as_ref()), TEST_PATH_SET_BUFFER);
     }
 
     #[test]
     fn test_pathstep_from_parser() {
         for data in TEST_PATH_STEP_BUFFER {
-            let hex = hex::decode(data).unwrap();
+            let hex = hex::decode(data).expect("");
             let mut parser = BinaryParser::from(hex.clone());
             let pathset = PathStep::from_parser(&mut parser, None).unwrap();
 
-            assert_eq!(hex, pathset.as_ref());
+            assert_eq!(pathset.as_ref(), hex);
         }
     }
 
     #[test]
     fn test_path_from_parser() {
-        let hex = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let hex = hex::decode(TEST_PATH_BUFFER).expect("");
         let mut parser = BinaryParser::from(hex.clone());
         let pathset = Path::from_parser(&mut parser, None).unwrap();
 
-        assert_eq!(hex, pathset.as_ref());
+        assert_eq!(pathset.as_ref(), hex);
     }
 
     #[test]
     fn test_pathset_from_parser() {
-        let hex = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let hex = hex::decode(TEST_PATH_SET_BUFFER).expect("");
         let mut parser = BinaryParser::from(hex.clone());
         let pathset = PathSet::from_parser(&mut parser, None).unwrap();
 
-        assert_eq!(hex, pathset.as_ref());
+        assert_eq!(pathset.as_ref(), hex);
     }
 
     #[test]
     fn test_pathstep_try_from() {
-        let json: Vec<IndexMap<String, String>> = serde_json::from_str(PATH_TEST).unwrap();
+        let json: Vec<IndexMap<String, String>> = serde_json::from_str(PATH_TEST).expect("");
         let mut pathsteps: Vec<u8> = vec![];
 
         for map in json {
             pathsteps.extend_from_slice(PathStep::try_from(map.clone()).unwrap().as_ref());
         }
 
-        assert_eq!(TEST_PATH_BUFFER, hex::encode_upper(pathsteps));
+        assert_eq!(hex::encode_upper(pathsteps), TEST_PATH_BUFFER);
     }
 
     #[test]
     fn test_path_try_from() {
-        let hex = hex::decode(TEST_PATH_BUFFER).unwrap();
+        let hex = hex::decode(TEST_PATH_BUFFER).expect("");
         let path = Path::try_from(PATH_TEST).unwrap();
 
-        assert_eq!(hex, path.as_ref())
+        assert_eq!(path.as_ref(), hex)
     }
 
     #[test]
     fn test_pathset_try_from() {
-        let hex = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let hex = hex::decode(TEST_PATH_SET_BUFFER).expect("");
         let pathset = PathSet::try_from(PATH_SET_TEST).unwrap();
 
-        assert_eq!(hex, pathset.as_ref())
+        assert_eq!(pathset.as_ref(), hex)
     }
 
     #[test]
     fn test_pathstep_to_json() {
-        let json: Vec<IndexMap<String, String>> = serde_json::from_str(PATH_TEST).unwrap();
+        let json: Vec<IndexMap<String, String>> = serde_json::from_str(PATH_TEST).expect("");
 
         for map in json {
             let pathstep = PathStep::try_from(map.clone()).unwrap();
             assert_eq!(
-                serde_json::to_string(&map).unwrap(),
-                serde_json::to_string(&pathstep).unwrap()
+                serde_json::to_string(&pathstep).unwrap(),
+                serde_json::to_string(&map).expect(""),
             );
         }
     }
@@ -581,20 +595,20 @@ mod test {
         let compact: serde_json::Value = serde_json::from_str(PATH_TEST).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&compact).unwrap(),
-            serde_json::to_string(&path).unwrap()
+            serde_json::to_string(&path).unwrap(),
+            serde_json::to_string(&compact).expect(""),
         );
     }
 
     #[test]
     fn test_pathset_to_json() {
-        let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).unwrap();
+        let hex: Vec<u8> = hex::decode(TEST_PATH_SET_BUFFER).expect("");
+        let compact: serde_json::Value = serde_json::from_str(PATH_SET_TEST).expect("");
         let pathset = PathSet::new(Some(&hex)).unwrap();
-        let compact: serde_json::Value = serde_json::from_str(PATH_SET_TEST).unwrap();
 
         assert_eq!(
-            serde_json::to_string(&compact).unwrap(),
-            serde_json::to_string(&pathset).unwrap()
+            serde_json::to_string(&pathset).unwrap(),
+            serde_json::to_string(&compact).expect(""),
         );
     }
 }

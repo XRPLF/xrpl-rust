@@ -30,7 +30,7 @@ pub const MAX_IOU_PRECISION: u8 = 16;
 /// Get the precision of a number.
 fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
     let decimal = Decimal::from_str(value)?.normalize();
-    let regex = Regex::new("[^1-9]").unwrap();
+    let regex = Regex::new("[^1-9]").expect("_calculate_precision");
 
     if decimal.checked_rem(Decimal::ONE).is_some() {
         let stripped = regex
@@ -245,24 +245,23 @@ mod test {
 
     #[test]
     fn test_one_drop_decimal() {
-        let test: Decimal = Decimal::from_str("0.000001").unwrap();
-        assert_eq!(_ONE_DROP, test);
+        assert_eq!(Ok(_ONE_DROP), Decimal::from_str("0.000001"));
     }
 
     #[test]
     fn test_xrp_to_drops() {
-        let xrp = xrp_to_drops("100.000001").unwrap();
-        let drops = (100 * XRP_DROPS + 1).to_string();
-
-        assert_eq!(xrp, drops);
+        assert_eq!(
+            Ok((100 * XRP_DROPS + 1).to_string()),
+            xrp_to_drops("100.000001")
+        );
     }
 
     #[test]
     fn test_drops_to_xrp() {
-        let drops: String = drops_to_xrp("100000001").unwrap();
-        let xrp: Decimal = Decimal::new(100000001, 6);
-
-        assert_eq!(xrp.to_string(), drops);
+        assert_eq!(
+            drops_to_xrp("100000001"),
+            Ok(Decimal::new(100000001, 6).to_string())
+        );
     }
 
     #[test]
@@ -305,25 +304,24 @@ mod test {
 
     #[test]
     fn accept_one_xrp() {
-        assert_eq!("1000000".to_string(), xrp_to_drops("1").unwrap());
+        assert_eq!(xrp_to_drops("1"), Ok("1000000".to_string()));
     }
 
     #[test]
     fn accept_zero_xrp() {
-        assert_eq!("0".to_string(), xrp_to_drops("0").unwrap());
+        assert_eq!(xrp_to_drops("0"), Ok("0".to_string()));
     }
 
     #[test]
     fn accept_min_xrp() {
-        assert_eq!("1".to_string(), xrp_to_drops("0.000001").unwrap());
+        assert_eq!(xrp_to_drops("0.000001"), Ok("1".to_string()));
     }
 
     #[test]
     fn accept_max_xrp() {
-        let xrp = MAX_XRP.to_string();
         assert_eq!(
-            "100000000000000000".to_string(),
-            xrp_to_drops(&xrp).unwrap()
+            xrp_to_drops(&MAX_XRP.to_string()),
+            Ok("100000000000000000".to_string())
         );
     }
 
@@ -340,35 +338,29 @@ mod test {
 
     #[test]
     fn accept_one_drop() {
-        let xrp = Decimal::from_str(ONE_DROP).unwrap();
-        assert_eq!(xrp.to_string(), drops_to_xrp("1").unwrap());
+        assert_eq!(drops_to_xrp("1"), Ok(ONE_DROP.to_string()));
     }
 
     #[test]
     fn accept_zero_drops() {
-        let xrp = Decimal::from_str("0").unwrap();
-        assert_eq!(xrp.to_string(), drops_to_xrp("0").unwrap());
+        assert_eq!(drops_to_xrp("0"), Ok("0".to_string()));
     }
 
     #[test]
     fn accept_1mil_drops() {
-        let xrp = Decimal::new(1, 0);
-        assert_eq!(xrp.to_string(), drops_to_xrp("1000000").unwrap());
+        assert_eq!(drops_to_xrp("1000000"), Ok(Decimal::new(1, 0).to_string()));
     }
 
     #[test]
     fn accept_max_drops() {
-        let xrp = Decimal::new(MAX_XRP as i64, 0);
-
         assert_eq!(
-            xrp.to_string(),
-            drops_to_xrp(&MAX_DROPS.to_string()).unwrap()
+            drops_to_xrp(&MAX_DROPS.to_string()),
+            Ok(Decimal::new(MAX_XRP as i64, 0).to_string())
         );
     }
 
     #[test]
     fn accept_too_big_drops() {
-        let drop = (MAX_XRP + 1).to_string();
-        assert!(xrp_to_drops(&drop).is_err());
+        assert!(xrp_to_drops(&(MAX_XRP + 1).to_string()).is_err());
     }
 }

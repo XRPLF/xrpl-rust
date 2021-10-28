@@ -7,6 +7,7 @@ use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::types::*;
 use alloc::string::String;
 use alloc::string::ToString;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use serde::Serializer;
@@ -24,7 +25,11 @@ impl XRPLType for Blob {
     type Error = XRPLBinaryCodecException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(Blob(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+        if let Some(data) = buffer {
+            Ok(Blob(data.to_vec()))
+        } else {
+            Ok(Blob(vec![]))
+        }
     }
 }
 

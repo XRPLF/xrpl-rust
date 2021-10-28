@@ -3,7 +3,7 @@
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::utils::exceptions::ISOCodeException;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum XRPLAddressCodecException {
     InvalidXAddressPrefix,

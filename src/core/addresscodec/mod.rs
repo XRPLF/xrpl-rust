@@ -145,7 +145,7 @@ pub fn decode_seed(
     match result {
         Some(Ok(val)) => {
             let decoded: [u8; SEED_LENGTH] = val.try_into()?;
-            Ok((decoded, algo.unwrap()))
+            Ok((decoded, algo.expect("decode_seed")))
         }
         Some(Err(_)) | None => Err(XRPLAddressCodecException::UnknownSeedEncoding),
     }
@@ -203,8 +203,8 @@ pub fn classic_address_to_xaddress(
     } else if tag != None && tag > Some(u32::max_value().into()) {
         Err(XRPLAddressCodecException::InvalidCAddressTag)
     } else {
-        if tag != None {
-            tag_val = tag.unwrap();
+        if let Some(tval) = tag {
+            tag_val = tval;
         } else {
             tag_val = 0;
         }
@@ -545,6 +545,7 @@ pub fn is_valid_xaddress(xaddress: &str) -> bool {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::alloc::string::ToString;
     use crate::core::addresscodec::test_cases::*;
 
     #[test]
@@ -564,27 +565,31 @@ mod test {
         let bytes: [u8; 16] = [
             207, 45, 227, 120, 251, 221, 126, 46, 232, 125, 72, 109, 251, 90, 123, 255,
         ];
-        let encode_result = encode_seed(bytes, CryptoAlgorithm::SECP256K1);
 
-        assert_eq!(SECP256K1_ENCODED_SEED_TEST, encode_result.unwrap());
+        assert_eq!(
+            Ok(SECP256K1_ENCODED_SEED_TEST.to_string()),
+            encode_seed(bytes, CryptoAlgorithm::SECP256K1)
+        );
 
         let bytes: [u8; 16] = [
             76, 58, 29, 33, 63, 189, 251, 20, 199, 194, 141, 96, 148, 105, 179, 65,
         ];
-        let encode_result = encode_seed(bytes, CryptoAlgorithm::ED25519);
 
-        assert_eq!(ED25519_ENCODED_SEED_TEST, encode_result.unwrap());
+        assert_eq!(
+            Ok(ED25519_ENCODED_SEED_TEST.to_string()),
+            encode_seed(bytes, CryptoAlgorithm::ED25519)
+        );
     }
 
     #[test]
     fn test_decode_seed() {
-        let hex_bytes = hex::decode(SECP256K1_HEX_TEST).unwrap();
+        let hex_bytes = hex::decode(SECP256K1_HEX_TEST).expect("");
         let (decode_result, encoding_type) = decode_seed(SECP256K1_ENCODED_SEED_TEST).unwrap();
 
         assert_eq!(hex_bytes, decode_result);
         assert_eq!(CryptoAlgorithm::SECP256K1, encoding_type);
 
-        let hex_bytes = hex::decode(ED25519_HEX_TEST).unwrap();
+        let hex_bytes = hex::decode(ED25519_HEX_TEST).expect("");
         let (decode_result, encoding_type) = decode_seed(ED25519_ENCODED_SEED_TEST).unwrap();
 
         assert_eq!(hex_bytes, decode_result);
@@ -594,11 +599,15 @@ mod test {
     #[test]
     fn test_classic_address_to_xaddress() {
         for case in ADDRESS_TEST_CASES {
-            let xtest = classic_address_to_xaddress(case.address, case.tag, true);
-            assert_eq!(*case.test_xaddress, xtest.unwrap());
+            assert_eq!(
+                classic_address_to_xaddress(case.address, case.tag, true),
+                Ok(case.test_xaddress.to_string()),
+            );
 
-            let xmain = classic_address_to_xaddress(case.address, case.tag, false);
-            assert_eq!(*case.main_xaddress, xmain.unwrap());
+            assert_eq!(
+                classic_address_to_xaddress(case.address, case.tag, false),
+                Ok(case.main_xaddress.to_string()),
+            );
         }
     }
 
@@ -623,35 +632,34 @@ mod test {
 
     #[test]
     fn test_encode_node_public_key() {
-        let bytes = hex::decode(NODE_PUBLIC_KEY_HEX_TEST).unwrap();
+        let bytes = hex::decode(NODE_PUBLIC_KEY_HEX_TEST).expect("");
         assert_eq!(
-            NODE_PUBLIC_KEY_TEST,
-            encode_node_public_key(&bytes).unwrap()
+            encode_node_public_key(&bytes),
+            Ok(NODE_PUBLIC_KEY_TEST.to_string()),
         );
     }
 
     #[test]
     fn test_decode_node_public_key() {
         assert_eq!(
-            hex::decode(NODE_PUBLIC_KEY_HEX_TEST).unwrap(),
-            decode_node_public_key(NODE_PUBLIC_KEY_TEST).unwrap()
+            decode_node_public_key(NODE_PUBLIC_KEY_TEST),
+            Ok(hex::decode(NODE_PUBLIC_KEY_HEX_TEST).expect("")),
         );
     }
 
     #[test]
     fn test_encode_account_public_key() {
-        let bytes = hex::decode(ACCOUNT_PUBLIC_KEY_HEX_TEST).unwrap();
         assert_eq!(
-            ACCOUNT_PUBLIC_KEY_TEST,
-            encode_account_public_key(&bytes).unwrap()
+            encode_account_public_key(&hex::decode(ACCOUNT_PUBLIC_KEY_HEX_TEST).expect("")),
+            Ok(ACCOUNT_PUBLIC_KEY_TEST.to_string()),
         );
     }
 
     #[test]
     fn test_decode_account_public_key() {
         assert_eq!(
-            hex::decode(ACCOUNT_PUBLIC_KEY_HEX_TEST).unwrap(),
-            decode_account_public_key(ACCOUNT_PUBLIC_KEY_TEST).unwrap()
+            decode_account_public_key(ACCOUNT_PUBLIC_KEY_TEST),
+            Ok(hex::decode(ACCOUNT_PUBLIC_KEY_HEX_TEST).expect("")),
         );
     }
 
@@ -673,59 +681,59 @@ mod test {
     fn accept_seed_encode_decode_secp256k1_low() {
         let encoded_string = "sp6JS7f14BuwFY8Mw6bTtLKWauoUs";
         let bytes: [u8; 16] = Default::default();
-        let encode_result = encode_seed(bytes, CryptoAlgorithm::SECP256K1);
-
-        assert_eq!(encoded_string, encode_result.unwrap());
-
         let (decode_result, encoding_type) = decode_seed(encoded_string).unwrap();
 
-        assert_eq!(bytes, decode_result);
-        assert_eq!(CryptoAlgorithm::SECP256K1, encoding_type);
+        assert_eq!(
+            encode_seed(bytes, CryptoAlgorithm::SECP256K1),
+            Ok(encoded_string.to_string()),
+        );
+
+        assert_eq!(decode_result, bytes);
+        assert_eq!(encoding_type, CryptoAlgorithm::SECP256K1);
     }
 
     #[test]
     fn accept_seed_encode_decode_secp256k1_high() {
-        let bytes: [u8; 16] = [
-            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        ];
+        let bytes: [u8; 16] = [255; 16];
         let encoded_string = "saGwBRReqUNKuWNLpUAq8i8NkXEPN";
-        let encode_result = encode_seed(bytes, CryptoAlgorithm::SECP256K1);
-
-        assert_eq!(encoded_string, encode_result.unwrap());
-
         let (decode_result, encoding_type) = decode_seed(encoded_string).unwrap();
 
-        assert_eq!(bytes, decode_result);
-        assert_eq!(CryptoAlgorithm::SECP256K1, encoding_type);
+        assert_eq!(
+            encode_seed(bytes, CryptoAlgorithm::SECP256K1),
+            Ok(encoded_string.to_string()),
+        );
+
+        assert_eq!(decode_result, bytes);
+        assert_eq!(encoding_type, CryptoAlgorithm::SECP256K1);
     }
 
     #[test]
     fn accept_seed_encode_decode_ed25519_low() {
         let encoded_string = "sEdSJHS4oiAdz7w2X2ni1gFiqtbJHqE";
         let bytes: [u8; 16] = Default::default();
-        let encode_result = encode_seed(bytes, CryptoAlgorithm::ED25519);
-
-        assert_eq!(encoded_string, encode_result.unwrap());
-
         let (decode_result, encoding_type) = decode_seed(encoded_string).unwrap();
 
-        assert_eq!(bytes, decode_result);
-        assert_eq!(CryptoAlgorithm::ED25519, encoding_type);
+        assert_eq!(
+            encode_seed(bytes, CryptoAlgorithm::ED25519),
+            Ok(encoded_string.to_string()),
+        );
+
+        assert_eq!(decode_result, bytes);
+        assert_eq!(encoding_type, CryptoAlgorithm::ED25519);
     }
 
     #[test]
     fn accept_seed_encode_decode_ed25519_high() {
-        let bytes: [u8; 16] = [
-            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        ];
+        let bytes: [u8; 16] = [255; 16];
         let encoded_string = "sEdV19BLfeQeKdEXyYA4NhjPJe6XBfG";
-        let encode_result = encode_seed(bytes, CryptoAlgorithm::ED25519);
-
-        assert_eq!(encoded_string, encode_result.unwrap());
-
         let (decode_result, encoding_type) = decode_seed(encoded_string).unwrap();
 
-        assert_eq!(bytes, decode_result);
-        assert_eq!(CryptoAlgorithm::ED25519, encoding_type);
+        assert_eq!(
+            encode_seed(bytes, CryptoAlgorithm::ED25519),
+            Ok(encoded_string.to_string()),
+        );
+
+        assert_eq!(decode_result, bytes);
+        assert_eq!(encoding_type, CryptoAlgorithm::ED25519);
     }
 }

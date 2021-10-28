@@ -10,12 +10,16 @@ use sha2::{Digest, Sha256, Sha512};
 pub(crate) const SECP256K1_INTERMEDIATE_KEYPAIR_PADDING: [u8; 4] = [0, 0, 0, 0];
 /// String keys must be _KEY_LENGTH long
 pub(crate) const SECP256K1_KEY_LENGTH: usize = 66;
+/// SECP256K1 sequence size.
+pub(crate) const SECP256K1_SEQUENCE_SIZE: u32 = 4;
+/// SECP256K1 maximum sequence.
+pub(crate) const SECP256K1_SEQUENCE_MAX: u64 = u64::pow(256, SECP256K1_SEQUENCE_SIZE);
 
 /// Test message for signature verification.
 pub(crate) const SIGNATURE_VERIFICATION_MESSAGE: &[u8] = b"This test message should verify.";
 
 /// String keys must be _KEY_LENGTH long
-pub const SECP256K1_SIGNATURE_LENGTH: usize = secp256k1::constants::COMPACT_SIGNATURE_SIZE;
+pub const SECP256K1_SIGNATURE_LENGTH: usize = secp256k1::constants::MAX_SIGNATURE_SIZE;
 /// String keys must be _KEY_LENGTH long
 pub const ED25519_SIGNATURE_LENGTH: usize = ed25519_dalek::SIGNATURE_LENGTH;
 /// Length of half a sha512 hash.
@@ -23,6 +27,14 @@ pub const SHA512_HASH_LENGTH: usize = 32;
 
 /// ED25519 prefix
 pub const ED25519_PREFIX: &str = "ED";
+/// SECP256K1 prefix
+pub const SECP256K1_PREFIX: char = '0';
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum Secp256k1Phase {
+    Root,
+    Mid,
+}
 
 /// Returns the first 32 bytes of SHA-512 hash of message.
 ///

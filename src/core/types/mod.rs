@@ -48,7 +48,11 @@ pub struct SerializedMap(SerializedType);
 ///     type Error = XRPLBinaryCodecException;
 ///
 ///     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-///         Ok(Example(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+///         if let Some(data) = buffer {
+///             Ok(Example(data.to_vec()))
+///         } else {
+///             Ok(Example(vec![]))
+///         }
 ///     }
 /// }
 /// ```

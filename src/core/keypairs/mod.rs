@@ -10,10 +10,12 @@ use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::SEED_LENGTH;
 use crate::core::addresscodec::*;
-use crate::core::keypairs::algorithms::Ed25519;
+use crate::core::keypairs::algorithms::*;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::utils::*;
+use alloc::boxed::Box;
 use alloc::string::String;
+use alloc::vec::Vec;
 use rand::Rng;
 use rand::SeedableRng;
 
@@ -35,16 +37,16 @@ fn _get_algorithm_from_key(key: &str) -> CryptoAlgorithm {
 
 /// Return the trait implementation for the provided
 /// algorithm enum.
-fn _get_algorithm_engine(algo: CryptoAlgorithm) -> impl CryptoImplementation {
+fn _get_algorithm_engine(algo: CryptoAlgorithm) -> Box<dyn CryptoImplementation> {
     match algo {
-        CryptoAlgorithm::ED25519 => Ed25519,
-        CryptoAlgorithm::SECP256K1 => Ed25519,
+        CryptoAlgorithm::ED25519 => Box::new(Ed25519),
+        CryptoAlgorithm::SECP256K1 => Box::new(Secp256k1),
     }
 }
 
 /// Return the trait implementation based on the
 /// provided key.
-fn _get_algorithm_engine_from_key(key: &str) -> impl CryptoImplementation {
+fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
     match &key[..2] {
         ED25519_PREFIX => _get_algorithm_engine(CryptoAlgorithm::ED25519),
         _ => _get_algorithm_engine(CryptoAlgorithm::SECP256K1),
@@ -117,11 +119,11 @@ pub fn generate_seed(
 /// use xrpl::core::keypairs::derive_keypair;
 /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
 ///
-/// let seed: &str = "sn259rEFXrQrWyx3Q7XneWcwV6dfL";
+/// let seed: &str = "sEdSKaCy2JT7JaM7v95H9SxkhP9wS2r";
 /// let validator: bool = false;
 /// let tuple: (String, String) = (
-///     "ED60292139838CB86E719134F848F055057CA5BDA61F5A529729F1697502D53E1C".into(),
-///     "ED009F66528611A0D400946A01FA01F8AF4FF4C1D0C744AE3F193317DCA77598F1".into(),
+///     "ED01FA53FA5A7E77798F882ECE20B1ABC00BB358A9E55A202D0D0676BD0CE37A63".into(),
+///     "EDB4C4E046826BD26190D09715FC31F4E6A728204EADD112905B08B14B7F15C4F3".into(),
 /// );
 ///
 /// let generator: Option<(String, String)> = match derive_keypair(
@@ -131,8 +133,8 @@ pub fn generate_seed(
 ///     Ok(seed) => Some(seed),
 ///     Err(e) => match e {
 ///         XRPLKeypairsException::InvalidSignature => None,
-///         XRPLKeypairsException::ED25519Error(_ed25519_error) => None,
-///         XRPLKeypairsException::SECP256K1Error(_secp256k1_error) => None,
+///         XRPLKeypairsException::ED25519Error => None,
+///         XRPLKeypairsException::SECP256K1Error => None,
 ///         XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ } => None,
 ///         _ => None,
 ///     }
@@ -215,8 +217,8 @@ pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCod
 /// ) {
 ///     Ok(signature) => Some(signature),
 ///     Err(e) => match e {
-///         XRPLKeypairsException::ED25519Error(_ed25519_error) => None,
-///         XRPLKeypairsException::SECP256K1Error(_secp256k1_error) => None,
+///         XRPLKeypairsException::ED25519Error => None,
+///         XRPLKeypairsException::SECP256K1Error => None,
 ///         _ => None,
 ///     }
 /// };
@@ -225,7 +227,7 @@ pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCod
 /// ```
 pub fn sign(message: &[u8], private_key: &str) -> Result<String, XRPLKeypairsException> {
     let module = _get_algorithm_engine_from_key(private_key);
-    module.sign(message, private_key)
+    Ok(hex::encode_upper(module.sign(message, private_key)?))
 }
 
 /// Verifies the signature on a given message.
@@ -270,7 +272,7 @@ pub trait CryptoImplementation {
     /// Signs a message using a given private key.
     /// * `message` - Text about foo.
     /// * `private_key` - Text about bar.
-    fn sign(&self, message: &[u8], private_key: &str) -> Result<String, XRPLKeypairsException>;
+    fn sign(&self, message: &[u8], private_key: &str) -> Result<Vec<u8>, XRPLKeypairsException>;
 
     /// Verifies the signature on a given message.
     fn is_valid_message(&self, message: &[u8], signature: &str, public_key: &str) -> bool;
@@ -279,43 +281,63 @@ pub trait CryptoImplementation {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::alloc::string::ToString;
+    use crate::constants::CryptoAlgorithm;
     use crate::core::keypairs::test_cases::*;
 
     #[test]
     fn test_generate_seed() {
         assert!(generate_seed(None, None).is_ok());
-        assert_eq!(SEED_ED25519, generate_seed(Some(TEST_BYTES), None).unwrap());
+        assert!(generate_seed(Some(TEST_BYTES), None).is_ok());
+        assert_eq!(
+            generate_seed(Some(TEST_BYTES), Some(CryptoAlgorithm::ED25519)),
+            Ok(SEED_ED25519.to_string()),
+        );
+        assert_eq!(
+            generate_seed(Some(TEST_BYTES), Some(CryptoAlgorithm::SECP256K1)),
+            Ok(SEED_SECP256K1.to_string()),
+        );
     }
 
     #[test]
     fn test_derive_keypair() {
-        let (public, private) = derive_keypair(SEED_ED25519, false).unwrap();
+        let (public_ed25519, private_ed25519) = derive_keypair(SEED_ED25519, false).unwrap();
+        let (public_secp256k1, private_secp256k1) = derive_keypair(SEED_SECP256K1, false).unwrap();
 
-        assert_eq!(PRIVATE_ED25519, private);
-        assert_eq!(PUBLIC_ED25519, public);
+        assert_eq!(PRIVATE_ED25519, private_ed25519);
+        assert_eq!(PUBLIC_ED25519, public_ed25519);
+        assert_eq!(PRIVATE_SECP256K1, private_secp256k1);
+        assert_eq!(PUBLIC_SECP256K1, public_secp256k1);
     }
 
     #[test]
     fn test_derive_classic_address() {
         assert_eq!(
-            CLASSIC_ADDRESS_ED25519,
-            derive_classic_address(PUBLIC_ED25519).unwrap()
+            derive_classic_address(PUBLIC_ED25519),
+            Ok(CLASSIC_ADDRESS_ED25519.to_string()),
         );
     }
 
     #[test]
     fn test_sign() {
         assert_eq!(
-            hex::encode_upper(SIGNATURE_ED25519),
-            sign(TEST_MESSAGE.as_bytes(), PRIVATE_ED25519).unwrap()
+            sign(TEST_MESSAGE.as_bytes(), PRIVATE_ED25519),
+            Ok(hex::encode_upper(SIGNATURE_ED25519)),
+        );
+
+        assert_eq!(
+            sign(TEST_MESSAGE.as_bytes(), PRIVATE_SECP256K1),
+            Ok(hex::encode_upper(SIGNATURE_SECP256K1)),
         );
     }
 
     #[test]
     fn test_is_valid_message() {
-        let signature: &str = &hex::encode_upper(SIGNATURE_ED25519);
         let message: &[u8] = TEST_MESSAGE.as_bytes();
+        let sig_ed25519: &str = &hex::encode_upper(SIGNATURE_ED25519);
+        let sig_secp256k1: &str = &hex::encode_upper(SIGNATURE_SECP256K1);
 
-        assert!(is_valid_message(message, signature, PUBLIC_ED25519));
+        assert!(is_valid_message(message, sig_ed25519, PUBLIC_ED25519));
+        assert!(is_valid_message(message, sig_secp256k1, PUBLIC_SECP256K1));
     }
 }

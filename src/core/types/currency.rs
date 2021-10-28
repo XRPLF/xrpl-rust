@@ -30,13 +30,13 @@ pub struct Currency(Hash160);
 
 /// Tests if value is a valid 3-char iso code.
 fn _is_iso_code(value: &str) -> bool {
-    let regex = Regex::new(ISO_CURRENCY_REGEX).unwrap();
+    let regex = Regex::new(ISO_CURRENCY_REGEX).expect("_is_iso_code");
     regex.is_match(value)
 }
 
 /// Tests if value is a valid 40-char hex string.
 fn _is_hex(value: &str) -> bool {
-    let regex = Regex::new(HEX_CURRENCY_REGEX).unwrap();
+    let regex = Regex::new(HEX_CURRENCY_REGEX).expect("_is_hex");
     regex.is_match(value)
 }
 
@@ -209,7 +209,8 @@ mod test {
 
     #[test]
     fn test_currency_new() {
-        let currency = Currency::new(Some(&hex::decode(USD_HEX_CODE).unwrap()));
+        let hex = hex::decode(USD_HEX_CODE).expect("");
+        let currency = Currency::new(Some(&hex));
         assert_eq!(USD_HEX_CODE, hex::encode_upper(currency.unwrap()))
     }
 

@@ -57,10 +57,8 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryC
     } else if length < &MAX_DOUBLE_BYTE_LENGTH {
         let mut bytes = vec![];
         let b_length = *length - (MAX_SINGLE_BYTE_LENGTH + 1);
-        let val_a: u8 = ((b_length >> 8) + (MAX_SINGLE_BYTE_LENGTH + 1))
-            .try_into()
-            .unwrap();
-        let val_b: u8 = (b_length & 0xFF).try_into().unwrap();
+        let val_a: u8 = ((b_length >> 8) + (MAX_SINGLE_BYTE_LENGTH + 1)).try_into()?;
+        let val_b: u8 = (b_length & 0xFF).try_into()?;
 
         bytes.extend_from_slice(&[val_a]);
         bytes.extend_from_slice(&[val_b]);
@@ -69,11 +67,9 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryC
     } else if length <= &MAX_LENGTH_VALUE {
         let mut bytes = vec![];
         let b_length = *length - MAX_DOUBLE_BYTE_LENGTH;
-        let val_a: u8 = ((MAX_SECOND_BYTE_VALUE + 1) + (b_length >> 16))
-            .try_into()
-            .unwrap();
-        let val_b: u8 = ((b_length >> 8) & 0xFF).try_into().unwrap();
-        let val_c: u8 = (b_length & 0xFF).try_into().unwrap();
+        let val_a: u8 = ((MAX_SECOND_BYTE_VALUE + 1) + (b_length >> 16)).try_into()?;
+        let val_b: u8 = ((b_length >> 8) & 0xFF).try_into()?;
+        let val_c: u8 = (b_length & 0xFF).try_into()?;
 
         bytes.extend_from_slice(&[val_a]);
         bytes.extend_from_slice(&[val_b]);
@@ -613,6 +609,12 @@ impl PartialEq<[u8]> for BinaryParser {
     }
 }
 
+impl PartialEq<Vec<u8>> for BinaryParser {
+    fn eq(&self, bytes: &Vec<u8>) -> bool {
+        &self.0 == bytes
+    }
+}
+
 impl ExactSizeIterator for BinaryParser {
     fn len(&self) -> usize {
         self.0.len()
@@ -626,7 +628,7 @@ impl Iterator for BinaryParser {
         if self.is_end(None) {
             None
         } else {
-            Some(self.read_uint8().unwrap())
+            Some(self.read_uint8().expect("BinaryParser::next"))
         }
     }
 }
@@ -641,7 +643,7 @@ mod test {
 
     #[test]
     fn test_binaryparser_from() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let ref_bytes: &[u8] = test_bytes.as_ref();
         let slice_parser = BinaryParser::from(ref_bytes);
         let vec_parser = BinaryParser::from(test_bytes.to_owned());
@@ -652,7 +654,7 @@ mod test {
 
     #[test]
     fn test_binaryparser_try_from() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let string_parser = BinaryParser::try_from(TEST_HEX).unwrap();
 
         assert_eq!(string_parser, test_bytes[..]);
@@ -660,16 +662,15 @@ mod test {
 
     #[test]
     fn test_peek() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let binary_parser = BinaryParser::from(test_bytes.as_ref());
-        let first_byte = binary_parser.peek().unwrap();
 
-        assert_eq!([test_bytes[0]; 1], first_byte);
+        assert_eq!(binary_parser.peek(), Some([test_bytes[0]; 1]));
     }
 
     #[test]
     fn test_skip_bytes() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
 
         assert!(binary_parser.skip_bytes(4).is_ok());
@@ -678,55 +679,55 @@ mod test {
 
     #[test]
     fn test_read() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
         let result = binary_parser.read(5);
 
         assert!(result.is_ok());
-        assert_eq!(test_bytes[..5], result.unwrap());
+        assert_eq!(result.unwrap(), test_bytes[..5]);
     }
 
     #[test]
     fn test_read_uint8() {
         let test_hex: &str = "01000200000003";
-        let test_bytes: Vec<u8> = hex::decode(test_hex).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(test_hex).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
         let result = binary_parser.read_uint8();
 
         assert!(result.is_ok());
-        assert_eq!(1, result.unwrap());
+        assert_eq!(result, Ok(1));
     }
 
     #[test]
     fn test_read_uint16() {
         let test_hex: &str = "000200000003";
-        let test_bytes: Vec<u8> = hex::decode(test_hex).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(test_hex).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
         let result = binary_parser.read_uint16();
 
         assert!(result.is_ok());
-        assert_eq!(2, result.unwrap());
+        assert_eq!(result, Ok(2));
     }
 
     #[test]
     fn test_read_uint32() {
         let test_hex: &str = "00000003";
-        let test_bytes: Vec<u8> = hex::decode(test_hex).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(test_hex).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
         let result = binary_parser.read_uint32();
 
         assert!(result.is_ok());
-        assert_eq!(3, result.unwrap());
+        assert_eq!(result, Ok(3));
     }
 
     #[test]
     fn test_read_length_prefix() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
         let result = binary_parser.read_length_prefix();
 
         assert!(result.is_ok());
-        assert_eq!(0, result.unwrap());
+        assert_eq!(result, Ok(0));
     }
 
     // TODO Finish tests
@@ -744,11 +745,10 @@ mod test {
 
     #[test]
     fn accept_peek_skip_read() {
-        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).unwrap();
+        let test_bytes: Vec<u8> = hex::decode(TEST_HEX).expect("");
         let mut binary_parser = BinaryParser::from(test_bytes.as_ref());
-        let first_byte = binary_parser.peek().unwrap();
 
-        assert_eq!([test_bytes[0]; 1], first_byte);
+        assert_eq!(binary_parser.peek(), Some([test_bytes[0]; 1]));
         assert!(binary_parser.skip_bytes(3).is_ok());
         assert_eq!(binary_parser, test_bytes[3..]);
 
@@ -791,13 +791,13 @@ mod test {
             let blob = (0..case).map(|_| "A2").collect::<String>();
             let mut binary_serializer: BinarySerializer = BinarySerializer::new();
 
-            binary_serializer.write_length_encoded(&hex::decode(blob).unwrap());
+            binary_serializer.write_length_encoded(&hex::decode(blob).expect(""));
 
             let mut binary_parser: BinaryParser = BinaryParser::from(binary_serializer.as_ref());
             let decoded_length = binary_parser.read_length_prefix();
 
             assert!(decoded_length.is_ok());
-            assert_eq!(case, decoded_length.unwrap());
+            assert_eq!(decoded_length, Ok(case));
         }
     }
 }

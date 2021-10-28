@@ -111,14 +111,15 @@ mod test {
 
     #[test]
     fn test_accountid_new() {
-        let account = AccountId::new(Some(&hex::decode(HEX_ENCODING).unwrap()));
-        assert_eq!(HEX_ENCODING, hex::encode_upper(account.unwrap()))
+        let hex = hex::decode(HEX_ENCODING).expect("");
+        let account = AccountId::new(Some(&hex)).unwrap();
+        assert_eq!(HEX_ENCODING, hex::encode_upper(account));
     }
 
     #[test]
     fn test_accountid_try_from() {
         let account = AccountId::try_from(BASE58_ENCODING).unwrap();
-        assert_eq!(HEX_ENCODING, hex::encode_upper(account))
+        assert_eq!(HEX_ENCODING, hex::encode_upper(account));
     }
 
     #[test]

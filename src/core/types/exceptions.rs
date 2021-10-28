@@ -6,7 +6,7 @@ use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::JSONParseException;
 use crate::utils::exceptions::XRPRangeException;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum XRPLTypeException {
     InvalidNoneValue,
@@ -18,7 +18,7 @@ pub enum XRPLTypeException {
     HexError(hex::FromHexError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum XRPLHashException {
     InvalidHashLength { expected: usize, found: usize },
@@ -29,7 +29,7 @@ pub enum XRPLHashException {
     HexError(hex::FromHexError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum XRPLVectorException {
     InvalidVector256Bytes,

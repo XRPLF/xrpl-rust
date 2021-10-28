@@ -22,7 +22,7 @@ use regex::Regex;
 /// assert!(is_hex_address(value));
 /// ```
 pub fn is_hex_address(value: &str) -> bool {
-    let regex = Regex::new(HEX_CURRENCY_REGEX).unwrap();
+    let regex = Regex::new(HEX_CURRENCY_REGEX).expect("is_hex_address");
     regex.is_match(value)
 }
 

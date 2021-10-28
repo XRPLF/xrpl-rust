@@ -53,7 +53,7 @@ fn _load_tests() -> &'static Option<TestDefinitions> {
 
     lazy_static! {
         static ref TEST_CASES: Option<TestDefinitions> =
-            Some(serde_json::from_str(DATA_DRIVEN_TESTS).unwrap());
+            Some(serde_json::from_str(DATA_DRIVEN_TESTS).expect("_load_tests"));
     }
 
     &TEST_CASES
@@ -61,13 +61,13 @@ fn _load_tests() -> &'static Option<TestDefinitions> {
 
 /// Retrieve the field tests.
 pub fn load_field_tests() -> &'static Vec<FieldTest> {
-    let defintions = _load_tests().as_ref().unwrap();
+    let defintions = _load_tests().as_ref().expect("load_field_tests");
     &defintions.fields_tests
 }
 
 /// Retrieve the field tests.
 pub fn load_data_tests(test_type: Option<&str>) -> Vec<ValueTest> {
-    let defintions = _load_tests().as_ref().unwrap();
+    let defintions = _load_tests().as_ref().expect("load_data_tests");
 
     if let Some(test) = test_type {
         defintions

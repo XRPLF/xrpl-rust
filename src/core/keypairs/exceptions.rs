@@ -3,15 +3,16 @@
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum XRPLKeypairsException {
     InvalidSignature,
+    InvalidSecret,
     UnsupportedValidatorAlgorithm { expected: CryptoAlgorithm },
+    ED25519Error,
+    SECP256K1Error,
+    FromHexError,
     AddressCodecException(XRPLAddressCodecException),
-    ED25519Error(ed25519_dalek::ed25519::Error),
-    SECP256K1Error(secp256k1::Error),
-    HexError(hex::FromHexError),
 }
 
 impl From<XRPLAddressCodecException> for XRPLKeypairsException {
@@ -21,20 +22,20 @@ impl From<XRPLAddressCodecException> for XRPLKeypairsException {
 }
 
 impl From<ed25519_dalek::ed25519::Error> for XRPLKeypairsException {
-    fn from(err: ed25519_dalek::ed25519::Error) -> Self {
-        XRPLKeypairsException::ED25519Error(err)
+    fn from(_: ed25519_dalek::ed25519::Error) -> Self {
+        XRPLKeypairsException::ED25519Error
     }
 }
 
 impl From<secp256k1::Error> for XRPLKeypairsException {
-    fn from(err: secp256k1::Error) -> Self {
-        XRPLKeypairsException::SECP256K1Error(err)
+    fn from(_: secp256k1::Error) -> Self {
+        XRPLKeypairsException::SECP256K1Error
     }
 }
 
 impl From<hex::FromHexError> for XRPLKeypairsException {
-    fn from(err: hex::FromHexError) -> Self {
-        XRPLKeypairsException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        XRPLKeypairsException::FromHexError
     }
 }
 

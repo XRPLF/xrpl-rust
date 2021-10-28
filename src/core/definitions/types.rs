@@ -457,8 +457,8 @@ trait DefinitionMaker {
 
 impl DefinitionMaker for DefinitionMap {
     fn _make_type_maps(types: &Types) -> (TypeValueMap, TypeNameMap) {
-        let json = serde_json::to_string(&types).unwrap();
-        let v_map: TypeValueMap = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&types).expect("_make_type_maps_a");
+        let v_map: TypeValueMap = serde_json::from_str(&json).expect("_make_type_maps_b");
         let mut n_map: TypeNameMap = TypeNameMap::default();
 
         for (key, value) in &v_map {
@@ -479,7 +479,7 @@ impl DefinitionMaker for DefinitionMap {
             let field_name: &str = &(field.0);
             let field_info: FieldInfo = (field.1).to_owned();
             let field_header = FieldHeader {
-                type_code: *types.get(&field_info.r#type).unwrap(),
+                type_code: *types.get(&field_info.r#type).expect("_make_field_info_map"),
                 field_code: field_info.nth,
             };
 
@@ -493,8 +493,10 @@ impl DefinitionMaker for DefinitionMap {
     fn _make_transaction_type_maps(
         transaction_types: &TransactionTypes,
     ) -> (TransactionTypeValueMap, TransactionTypeNameMap) {
-        let json = serde_json::to_string(&transaction_types).unwrap();
-        let v_map: TransactionTypeValueMap = serde_json::from_str(&json).unwrap();
+        let json =
+            serde_json::to_string(&transaction_types).expect("_make_transaction_type_maps_a");
+        let v_map: TransactionTypeValueMap =
+            serde_json::from_str(&json).expect("_make_transaction_type_maps_b");
         let mut n_map: TransactionTypeNameMap = TypeNameMap::default();
 
         for (key, value) in &v_map {
@@ -507,8 +509,10 @@ impl DefinitionMaker for DefinitionMap {
     fn _make_transaction_result_maps(
         transaction_types: &TransactionResults,
     ) -> (TransactionResultValueMap, TransactionResultNameMap) {
-        let json = serde_json::to_string(&transaction_types).unwrap();
-        let v_map: TransactionResultValueMap = serde_json::from_str(&json).unwrap();
+        let json =
+            serde_json::to_string(&transaction_types).expect("_make_transaction_result_maps_a");
+        let v_map: TransactionResultValueMap =
+            serde_json::from_str(&json).expect("_make_transaction_result_maps_b");
         let mut n_map: TransactionResultNameMap = TypeNameMap::default();
 
         for (key, value) in &v_map {
@@ -521,8 +525,9 @@ impl DefinitionMaker for DefinitionMap {
     fn _make_ledger_entry_type_maps(
         types: &LedgerEntryTypes,
     ) -> (LedgerEntryTypeValueMap, LedgerEntryTypeNameMap) {
-        let json = serde_json::to_string(&types).unwrap();
-        let v_map: TypeValueMap = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&types).expect("_make_ledger_entry_type_maps_a");
+        let v_map: TypeValueMap =
+            serde_json::from_str(&json).expect("_make_ledger_entry_type_maps_b");
         let mut n_map: TypeNameMap = TypeNameMap::default();
 
         for (key, value) in &v_map {
@@ -647,7 +652,7 @@ fn _load_definitions() -> &'static Option<(Definitions, DefinitionMap)> {
 
     lazy_static! {
         static ref DEFINITIONS: Option<(Definitions, DefinitionMap)> = {
-            let definitions: Definitions = serde_json::from_str(JSON).unwrap();
+            let definitions: Definitions = serde_json::from_str(JSON).expect("_load_definitions");
             let definition_map: DefinitionMap = DefinitionMap::new(&definitions);
 
             Some((definitions, definition_map))
@@ -659,7 +664,7 @@ fn _load_definitions() -> &'static Option<(Definitions, DefinitionMap)> {
 
 /// Retrieve the definition map.
 pub fn load_definition_map() -> &'static DefinitionMap {
-    let (_, map) = _load_definitions().as_ref().unwrap();
+    let (_, map) = _load_definitions().as_ref().expect("load_definition_map");
     map
 }
 
@@ -768,23 +773,23 @@ mod test {
 
     #[test]
     fn test_get_field_type_name() {
-        let field_type_name = get_field_type_name("HighLimit");
-
-        assert!(!field_type_name.is_none());
-        assert_eq!("Amount", field_type_name.unwrap());
+        assert_eq!(
+            get_field_type_name("HighLimit"),
+            Some(&"Amount".to_string())
+        );
     }
 
     #[test]
     fn test_get_field_type_code() {
-        assert_eq!(&6, get_field_type_code("HighLimit").unwrap());
-        assert_eq!(&-2, get_field_type_code("Generic").unwrap());
+        assert_eq!(get_field_type_code("HighLimit"), Some(&6));
+        assert_eq!(get_field_type_code("Generic"), Some(&-2));
     }
 
     #[test]
     fn test_get_field_code() {
-        assert_eq!(7, get_field_code("HighLimit").unwrap());
-        assert_eq!(0, get_field_code("Generic").unwrap());
-        assert_eq!(-1, get_field_code("Invalid").unwrap());
+        assert_eq!(get_field_code("HighLimit"), Some(7));
+        assert_eq!(get_field_code("Generic"), Some(0));
+        assert_eq!(get_field_code("Invalid"), Some(-1));
         assert!(get_field_code("Nonexistent").is_none());
     }
 
@@ -804,8 +809,8 @@ mod test {
         };
 
         assert_eq!(
-            "Generic",
-            get_field_name_from_header(&field_header).unwrap()
+            get_field_name_from_header(&field_header),
+            Some(&"Generic".to_string())
         );
     }
 
@@ -839,27 +844,24 @@ mod test {
 
     #[test]
     fn test_get_transaction_type_code() {
-        assert_eq!(&-1, get_transaction_type_code("Invalid").unwrap());
-        assert_eq!(&8, get_transaction_type_code("OfferCancel").unwrap());
+        assert_eq!(get_transaction_type_code("Invalid"), Some(&-1));
+        assert_eq!(get_transaction_type_code("OfferCancel"), Some(&8));
         assert!(get_transaction_type_code("Nonexistent").is_none());
     }
 
     #[test]
     fn test_get_transaction_type_name() {
-        assert_eq!("Invalid", get_transaction_type_name(&-1).unwrap());
-        assert_eq!("Payment", get_transaction_type_name(&0).unwrap());
+        assert_eq!(get_transaction_type_name(&-1), Some(&"Invalid".to_string()));
+        assert_eq!(get_transaction_type_name(&0), Some(&"Payment".to_string()));
         assert!(get_transaction_type_name(&9000).is_none());
     }
 
     #[test]
     fn test_get_transaction_result_code() {
+        assert_eq!(get_transaction_result_code("telLOCAL_ERROR"), Some(&-399));
         assert_eq!(
-            &-399,
-            get_transaction_result_code("telLOCAL_ERROR").unwrap()
-        );
-        assert_eq!(
-            &-267,
-            get_transaction_result_code("temCANNOT_PREAUTH_SELF").unwrap()
+            get_transaction_result_code("temCANNOT_PREAUTH_SELF"),
+            Some(&-267)
         );
         assert!(get_transaction_result_code("Nonexistent").is_none());
     }
@@ -867,27 +869,30 @@ mod test {
     #[test]
     fn test_get_transaction_result_name() {
         assert_eq!(
-            "telLOCAL_ERROR",
-            get_transaction_result_name(&-399).unwrap()
+            get_transaction_result_name(&-399),
+            Some(&"telLOCAL_ERROR".to_string())
         );
         assert_eq!(
-            "temCANNOT_PREAUTH_SELF",
-            get_transaction_result_name(&-267).unwrap()
+            get_transaction_result_name(&-267),
+            Some(&"temCANNOT_PREAUTH_SELF".to_string()),
         );
         assert!(get_transaction_result_name(&9000).is_none());
     }
 
     #[test]
     fn test_get_ledger_entry_type_code() {
-        assert_eq!(&-3, get_ledger_entry_type_code("Any").unwrap());
-        assert_eq!(&112, get_ledger_entry_type_code("DepositPreauth").unwrap());
+        assert_eq!(get_ledger_entry_type_code("Any"), Some(&-3));
+        assert_eq!(get_ledger_entry_type_code("DepositPreauth"), Some(&112));
         assert!(get_ledger_entry_type_code("Nonexistent").is_none());
     }
 
     #[test]
     fn test_get_ledger_entry_type_name() {
-        assert_eq!("Any", get_ledger_entry_type_name(&-3).unwrap());
-        assert_eq!("DepositPreauth", get_ledger_entry_type_name(&112).unwrap());
+        assert_eq!(get_ledger_entry_type_name(&-3), Some(&"Any".to_string()));
+        assert_eq!(
+            get_ledger_entry_type_name(&112),
+            Some(&"DepositPreauth".to_string())
+        );
         assert!(get_ledger_entry_type_name(&9000).is_none());
     }
 }

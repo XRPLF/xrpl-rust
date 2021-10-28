@@ -3,7 +3,7 @@
 use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::XRPRangeException;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum XRPLBinaryCodecException {
     UnexpectedParserSkipOverflow { max: usize, found: usize },
     UnexpectedLengthPrefixRange { min: usize, max: usize },
@@ -15,13 +15,14 @@ pub enum XRPLBinaryCodecException {
     InvalidVariableLengthTooLarge { max: usize },
     InvalidHashLength { expected: usize, found: usize },
     InvalidPathSetFromValue,
+    TryFromSliceError,
+    TryFromIntError,
+    FromUtf8Error,
+    ParseIntError,
+    FromHexError,
     XRPRangeError(XRPRangeException),
-    HexError(hex::FromHexError),
     SerdeJsonError(serde_json::error::Category),
-    Utf8Error(alloc::string::FromUtf8Error),
-    FromSliceError(core::array::TryFromSliceError),
     DecimalError(rust_decimal::Error),
-    IntParseError(core::num::ParseIntError),
     ISOCodeError(ISOCodeException),
 }
 
@@ -44,8 +45,8 @@ impl From<rust_decimal::Error> for XRPLBinaryCodecException {
 }
 
 impl From<hex::FromHexError> for XRPLBinaryCodecException {
-    fn from(err: hex::FromHexError) -> Self {
-        XRPLBinaryCodecException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        XRPLBinaryCodecException::FromHexError
     }
 }
 
@@ -55,21 +56,27 @@ impl From<serde_json::Error> for XRPLBinaryCodecException {
     }
 }
 
+impl From<core::num::TryFromIntError> for XRPLBinaryCodecException {
+    fn from(_: core::num::TryFromIntError) -> Self {
+        XRPLBinaryCodecException::TryFromIntError
+    }
+}
+
 impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {
-    fn from(err: core::array::TryFromSliceError) -> Self {
-        XRPLBinaryCodecException::FromSliceError(err)
+    fn from(_: core::array::TryFromSliceError) -> Self {
+        XRPLBinaryCodecException::TryFromSliceError
     }
 }
 
 impl From<core::num::ParseIntError> for XRPLBinaryCodecException {
-    fn from(err: core::num::ParseIntError) -> Self {
-        XRPLBinaryCodecException::IntParseError(err)
+    fn from(_: core::num::ParseIntError) -> Self {
+        XRPLBinaryCodecException::ParseIntError
     }
 }
 
 impl From<alloc::string::FromUtf8Error> for XRPLBinaryCodecException {
-    fn from(err: alloc::string::FromUtf8Error) -> Self {
-        XRPLBinaryCodecException::Utf8Error(err)
+    fn from(_: alloc::string::FromUtf8Error) -> Self {
+        XRPLBinaryCodecException::FromUtf8Error
     }
 }
 

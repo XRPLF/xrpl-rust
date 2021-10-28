@@ -2,13 +2,13 @@
 
 use alloc::string::String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum XRPLTimeRangeException {
     InvalidTimeBeforeEpoch { min: i64, found: i64 },
     UnexpectedTimeOverflow { max: i64, found: i64 },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum XRPRangeException {
     InvalidXRPAmount,
@@ -21,11 +21,11 @@ pub enum XRPRangeException {
     InvalidDropsAmountTooLarge { max: String, found: String },
     InvalidICSerializationLength { expected: usize, found: usize },
     UnexpectedICAmountOverflow { max: usize, found: usize },
+    FromHexError,
     DecimalError(rust_decimal::Error),
-    HexError(hex::FromHexError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum ISOCodeException {
     InvalidISOCode,
@@ -36,12 +36,12 @@ pub enum ISOCodeException {
         found: serde_json::Value,
     },
     UnsupportedCurrencyRepresentation,
+    FromHexError,
+    Utf8Error,
     DecimalError(rust_decimal::Error),
-    HexError(hex::FromHexError),
-    Utf8Error(core::str::Utf8Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum JSONParseException {
     ISOCodeError(ISOCodeException),
@@ -60,8 +60,8 @@ impl From<rust_decimal::Error> for XRPRangeException {
 }
 
 impl From<hex::FromHexError> for XRPRangeException {
-    fn from(err: hex::FromHexError) -> Self {
-        XRPRangeException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        XRPRangeException::FromHexError
     }
 }
 
@@ -72,14 +72,14 @@ impl From<rust_decimal::Error> for ISOCodeException {
 }
 
 impl From<core::str::Utf8Error> for ISOCodeException {
-    fn from(err: core::str::Utf8Error) -> Self {
-        ISOCodeException::Utf8Error(err)
+    fn from(_: core::str::Utf8Error) -> Self {
+        ISOCodeException::Utf8Error
     }
 }
 
 impl From<hex::FromHexError> for ISOCodeException {
-    fn from(err: hex::FromHexError) -> Self {
-        ISOCodeException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        ISOCodeException::FromHexError
     }
 }
 

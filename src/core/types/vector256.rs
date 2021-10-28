@@ -27,7 +27,11 @@ impl XRPLType for Vector256 {
     type Error = XRPLVectorException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(Vector256(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+        if let Some(data) = buffer {
+            Ok(Vector256(data.to_vec()))
+        } else {
+            Ok(Vector256(vec![]))
+        }
     }
 }
 
@@ -125,7 +129,8 @@ mod test {
 
     #[test]
     fn test_vector256_try_from_parser() {
-        let mut parser = BinaryParser::from(hex::decode(SERIALIZED).unwrap());
+        let hex = hex::decode(SERIALIZED).expect("");
+        let mut parser = BinaryParser::from(hex);
         let result = Vector256::from_parser(&mut parser, None);
 
         assert!(result.is_ok());

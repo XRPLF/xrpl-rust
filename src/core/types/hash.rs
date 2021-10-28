@@ -100,7 +100,7 @@ impl dyn Hash {
     /// }
     ///
     /// let buffer: &str = "1000000000200000000030000000004000000000";
-    /// let data: Vec<u8> = hex::decode(buffer).unwrap();
+    /// let data: Vec<u8> = hex::decode(buffer).expect("");
     /// let result: Result<Vec<u8>, XRPLHashException> =
     ///     <dyn Hash>::make::<Hash160>(Some(&data));
     ///
@@ -119,7 +119,7 @@ impl dyn Hash {
                 found: byte_value.len(),
             })
         } else {
-            Ok(bytes.unwrap().to_vec())
+            Ok(byte_value.to_vec())
         }
     }
 
@@ -145,14 +145,7 @@ impl dyn Hash {
     /// fn handle_parser_error(error: XRPLHashException) {
     ///     // Error Conditions
     ///     match error {
-    ///         XRPLHashException::XRPLBinaryCodecError(e) => match e {
-    ///             XRPLBinaryCodecException::UnexpectedParserSkipOverflow
-    ///             {
-    ///                 max,
-    ///                 found,
-    ///             } => assert!(false),
-    ///             _ => assert!(false),
-    ///         },
+    ///         XRPLHashException::XRPLBinaryCodecError(_e) => assert!(false),
     ///         _ => assert!(false),
     ///     }
     /// }
@@ -169,7 +162,7 @@ impl dyn Hash {
     /// }
     ///
     /// let buffer: &str = "10000000002000000000300000000012";
-    /// let data: Vec<u8> = hex::decode(buffer).unwrap();
+    /// let data: Vec<u8> = hex::decode(buffer).expect("");
     ///
     /// handle_hash128_from_parser(&data);
     /// ```
@@ -351,19 +344,22 @@ mod test {
 
     #[test]
     fn test_hash_try_from_parser() {
-        let mut parser = BinaryParser::from(hex::decode(HASH128_HEX_TEST).unwrap());
+        let hex = hex::decode(HASH128_HEX_TEST).expect("");
+        let mut parser = BinaryParser::from(hex);
         let result = Hash128::from_parser(&mut parser, None);
 
         assert!(result.is_ok());
         assert_eq!(HASH128_HEX_TEST, result.unwrap().to_string());
 
-        let mut parser = BinaryParser::from(hex::decode(HASH160_HEX_TEST).unwrap());
+        let hex = hex::decode(HASH160_HEX_TEST).expect("");
+        let mut parser = BinaryParser::from(hex);
         let result = Hash160::from_parser(&mut parser, None);
 
         assert!(result.is_ok());
         assert_eq!(HASH160_HEX_TEST, result.unwrap().to_string());
 
-        let mut parser = BinaryParser::from(hex::decode(HASH256_HEX_TEST).unwrap());
+        let hex = hex::decode(HASH256_HEX_TEST).expect("");
+        let mut parser = BinaryParser::from(hex);
         let result = Hash256::from_parser(&mut parser, None);
 
         assert!(result.is_ok());

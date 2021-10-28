@@ -207,7 +207,11 @@ impl XRPLType for Amount {
 
     /// Construct an Amount from given bytes.
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
-        Ok(Amount(buffer.or_else(|| Some(&[])).unwrap().to_vec()))
+        if let Some(data) = buffer {
+            Ok(Amount(data.to_vec()))
+        } else {
+            Ok(Amount(vec![]))
+        }
     }
 }
 
@@ -373,10 +377,10 @@ mod test {
 
     #[test]
     fn test_amount_new() {
-        let json: Vec<IOUCase> = serde_json::from_str(IOU_TEST).unwrap();
+        let json: Vec<IOUCase> = serde_json::from_str(IOU_TEST).expect("");
 
         for case in json {
-            let bytes = hex::decode(case.1).unwrap();
+            let bytes = hex::decode(case.1).expect("");
             let amount: Amount = Amount::new(Some(&bytes)).unwrap();
 
             assert_eq!(hex::encode_upper(bytes), amount.to_string())
@@ -385,7 +389,7 @@ mod test {
 
     #[test]
     fn test_amount_try_from_issuedcurrency() {
-        let json: Vec<IOUCase> = serde_json::from_str(IOU_TEST).unwrap();
+        let json: Vec<IOUCase> = serde_json::from_str(IOU_TEST).expect("");
 
         for case in json {
             let amount = Amount::try_from(case.0).unwrap();
@@ -403,11 +407,11 @@ mod test {
 
     #[test]
     fn accept_amount_serde_encode_decode() {
-        let json: Vec<IOUCase> = serde_json::from_str(IOU_TEST).unwrap();
+        let json: Vec<IOUCase> = serde_json::from_str(IOU_TEST).expect("");
 
         for case in json {
-            let expect = serde_json::to_string(&case.0).unwrap();
-            let bytes = hex::decode(case.1).unwrap();
+            let expect = serde_json::to_string(&case.0).expect("");
+            let bytes = hex::decode(case.1).expect("");
             let amount: Amount = Amount::new(Some(&bytes)).unwrap();
             let serialize = serde_json::to_string(&amount).unwrap();
 
@@ -415,7 +419,7 @@ mod test {
         }
 
         for (xrp, result) in TEST_XRP_CASES {
-            let bytes = hex::decode(result).unwrap();
+            let bytes = hex::decode(result).expect("");
             let amount: Amount = Amount::new(Some(&bytes)).unwrap();
             let serialize = serde_json::to_string(&amount).unwrap();
 

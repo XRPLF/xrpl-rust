@@ -143,7 +143,7 @@ pub fn encode_base58(
 ) -> Result<String, XRPLAddressCodecException> {
     if expected_length != Some(bytestring.len()) {
         Err(XRPLAddressCodecException::UnexpectedPayloadLength {
-            expected: expected_length.unwrap(),
+            expected: expected_length.expect(""),
             found: bytestring.len(),
         })
     } else {
@@ -162,6 +162,7 @@ pub fn encode_base58(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::alloc::string::ToString;
 
     const ENCODED: &str = "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59";
     const DECODED: &[u8] = &[
@@ -170,17 +171,14 @@ mod test {
 
     #[test]
     fn test_decode_base58() {
-        let result = decode_base58(ENCODED, &[0x0]);
-
-        assert!(result.is_ok());
-        assert_eq!(DECODED, result.unwrap());
+        assert_eq!(decode_base58(ENCODED, &[0x0]), Ok(DECODED.to_vec()));
     }
 
     #[test]
     fn test_encode_base58() {
-        let result = encode_base58(DECODED, &[0x0], Some(20));
-
-        assert!(result.is_ok());
-        assert_eq!(ENCODED, result.unwrap());
+        assert_eq!(
+            encode_base58(DECODED, &[0x0], Some(20)),
+            Ok(ENCODED.to_string())
+        );
     }
 }
