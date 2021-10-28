@@ -53,7 +53,7 @@ version = "0.1.1"
 
 # 🕮 Documentation [![docs_status]][docs]
 
-Documentation is available [here](https://docs.rs/xrpl). 
+Documentation is available [here](https://docs.rs/xrpl-rust). 
 
 ## ⛮ Quickstart
 TODO - Most core functionality is in place and working. 
