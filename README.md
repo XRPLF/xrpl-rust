@@ -48,7 +48,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.xrpl]
-version = "0.1.0"
+version = "0.1.1"
 ```
 
 # 🕮 Documentation [![docs_status]][docs]
@@ -75,7 +75,7 @@ and enable features manually:
 
 ```toml
 [dependencies.xrpl]
-version = "0.1.0"
+version = "0.1.1"
 default-features = false
 features = ["core", "models"]
 ```
