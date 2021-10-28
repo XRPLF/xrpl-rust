@@ -170,7 +170,7 @@ impl CryptoImplementation for Secp256k1 {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::keypairs::algorithms::Secp256k1;
+    /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
     ///
@@ -226,7 +226,7 @@ impl CryptoImplementation for Secp256k1 {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::keypairs::algorithms::Secp256k1;
+    /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
     ///
@@ -276,7 +276,7 @@ impl CryptoImplementation for Secp256k1 {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::keypairs::algorithms::Secp256k1;
+    /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
     ///
@@ -323,7 +323,7 @@ impl CryptoImplementation for Ed25519 {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::keypairs::algorithms::Ed25519;
+    /// use xrpl::core::keypairs::Ed25519;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
     ///
@@ -379,7 +379,7 @@ impl CryptoImplementation for Ed25519 {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::keypairs::algorithms::Ed25519;
+    /// use xrpl::core::keypairs::Ed25519;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
     ///
@@ -424,7 +424,7 @@ impl CryptoImplementation for Ed25519 {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::keypairs::algorithms::Ed25519;
+    /// use xrpl::core::keypairs::Ed25519;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
     ///

@@ -6,11 +6,13 @@ pub mod exceptions;
 pub(crate) mod test_cases;
 pub mod utils;
 
+pub use self::algorithms::Ed25519;
+pub use self::algorithms::Secp256k1;
+
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::SEED_LENGTH;
 use crate::core::addresscodec::*;
-use crate::core::keypairs::algorithms::*;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::utils::*;
 use alloc::boxed::Box;
@@ -315,6 +317,11 @@ mod test {
         assert_eq!(
             derive_classic_address(PUBLIC_ED25519),
             Ok(CLASSIC_ADDRESS_ED25519.to_string()),
+        );
+
+        assert_eq!(
+            derive_classic_address(PUBLIC_SECP256K1),
+            Ok(CLASSIC_ADDRESS_SECP256K1.to_string()),
         );
     }
 

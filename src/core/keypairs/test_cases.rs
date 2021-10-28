@@ -50,3 +50,4 @@ pub const SIGNATURE_SECP256K1: [u8; 70] = [
 ];
 
 pub const CLASSIC_ADDRESS_ED25519: &str = "rLUEXYuLiQptky37CqLcm9USQpPiz5rkpD";
+pub const CLASSIC_ADDRESS_SECP256K1: &str = "rU6K7V3Po4snVhBBaU29sesqs2qTQJWDw1";

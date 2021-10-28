@@ -3,11 +3,11 @@
 //! See Hash Fields:
 //! `<https://xrpl.org/serialization.html#hash-fields>`
 
-use crate::core::binarycodec::BinaryParser;
-use crate::core::binarycodec::Parser;
 use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::utils::*;
 use crate::core::types::*;
+use crate::core::BinaryParser;
+use crate::core::Parser;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;

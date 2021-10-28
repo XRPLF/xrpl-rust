@@ -3,6 +3,8 @@
 
 pub mod types;
 
+pub use self::types::*;
+
 use crate::utils::ToBytes;
 use alloc::format;
 use alloc::string::String;

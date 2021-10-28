@@ -3,11 +3,10 @@
 
 use crate::constants::HEX_CURRENCY_REGEX;
 use crate::constants::ISO_CURRENCY_REGEX;
-use crate::core::binarycodec::BinaryParser;
 use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::hash::Hash160;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::types::*;
+use crate::core::BinaryParser;
 use crate::utils::exceptions::ISOCodeException;
 use alloc::string::String;
 use alloc::string::ToString;

@@ -6,5 +6,5 @@ cargo fmt
 cargo test --no-default-features --features core,models,utils
 cargo test --all-features
 cargo clippy --fix --allow-staged
-cargo doc
+cargo doc --no-deps
 #cargo audit

@@ -1,8 +1,8 @@
 //! Utilities for binarycodec crate.
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::definitions::types::load_definition_map;
-use crate::core::definitions::types::DefinitionHandler;
+use crate::core::definitions::load_definition_map;
+use crate::core::definitions::DefinitionHandler;
 use crate::core::definitions::FieldHeader;
 use crate::core::definitions::CODE_MAX_VALUE;
 use crate::core::definitions::CODE_MIN_VALUE;

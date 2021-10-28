@@ -4,10 +4,9 @@
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::*;
-use crate::core::binarycodec::BinaryParser;
 use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::hash::Hash160;
 use crate::core::types::*;
+use crate::core::BinaryParser;
 use crate::utils::is_hex_address;
 use alloc::string::String;
 use alloc::string::ToString;

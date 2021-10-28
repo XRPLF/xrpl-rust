@@ -5,13 +5,13 @@
 
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::BinaryParser;
-use crate::core::binarycodec::Parser;
-use crate::core::types::account_id::AccountId;
-use crate::core::types::currency::Currency;
 use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
+use crate::core::types::AccountId;
+use crate::core::types::Currency;
 use crate::core::types::*;
+use crate::core::BinaryParser;
+use crate::core::Parser;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::string::ToString;

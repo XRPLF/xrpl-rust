@@ -11,7 +11,20 @@ pub(crate) mod test_cases;
 pub mod utils;
 pub mod vector256;
 
-use crate::core::binarycodec::BinaryParser;
+pub use self::account_id::AccountId;
+pub use self::amount::Amount;
+pub use self::blob::Blob;
+pub use self::currency::Currency;
+pub use self::hash::Hash;
+pub use self::hash::Hash128;
+pub use self::hash::Hash160;
+pub use self::hash::Hash256;
+pub use self::paths::Path;
+pub use self::paths::PathSet;
+pub use self::paths::PathStep;
+pub use self::vector256::Vector256;
+
+use crate::core::BinaryParser;
 use alloc::vec::Vec;
 
 /// Contains a serialized buffer of a Serializer type.
@@ -75,7 +88,7 @@ pub trait XRPLType {
 /// ```
 /// use xrpl::core::types::TryFromParser;
 /// use xrpl::core::binarycodec::BinaryParser;
-/// use xrpl::core::binarycodec::Parser;
+/// use xrpl::core::Parser;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
 ///
 /// pub struct Example(Vec<u8>);

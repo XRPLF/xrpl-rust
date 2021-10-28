@@ -79,7 +79,7 @@ fn _verify_no_decimal(decimal: Decimal) -> Result<(), XRPRangeException> {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::utils::xrpl_conversion::xrp_to_drops;
+/// use xrpl::utils::xrp_to_drops;
 /// use xrpl::utils::exceptions::XRPRangeException;
 ///
 /// let xrp: &str = "100.000001";
@@ -122,7 +122,7 @@ pub fn xrp_to_drops(xrp: &str) -> Result<String, XRPRangeException> {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::utils::xrpl_conversion::drops_to_xrp;
+/// use xrpl::utils::drops_to_xrp;
 /// use xrpl::utils::exceptions::XRPRangeException;
 ///
 /// let drops: &str = "100000000";
@@ -159,7 +159,7 @@ pub fn drops_to_xrp(drops: &str) -> Result<String, XRPRangeException> {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::utils::xrpl_conversion::verify_valid_xrp_value;
+/// use xrpl::utils::verify_valid_xrp_value;
 /// use xrpl::utils::exceptions::XRPRangeException;
 ///
 /// let valid: bool = match verify_valid_xrp_value("0.000001") {
@@ -200,7 +200,7 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> 
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::utils::xrpl_conversion::verify_valid_ic_value;
+/// use xrpl::utils::verify_valid_ic_value;
 /// use xrpl::utils::exceptions::XRPRangeException;
 ///
 /// let valid: bool = match verify_valid_ic_value("1111111111111111.0") {

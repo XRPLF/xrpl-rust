@@ -4,15 +4,13 @@
 //! `<https://xrpl.org/serialization.html#amount-fields>`
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::BinaryParser;
-use crate::core::binarycodec::Parser;
-use crate::core::types::account_id::AccountId;
-use crate::core::types::currency::Currency;
 use crate::core::types::exceptions::XRPLTypeException;
 use crate::core::types::*;
+use crate::core::BinaryParser;
+use crate::core::Parser;
 use crate::utils::exceptions::JSONParseException;
 use crate::utils::exceptions::XRPRangeException;
-use crate::utils::xrpl_conversion::*;
+use crate::utils::*;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
@@ -362,7 +360,7 @@ impl AsRef<[u8]> for Amount {
 #[cfg(test)]
 mod test {
     use super::*;
-    //use crate::core::binarycodec::test_cases::load_data_tests;
+    use crate::core::binarycodec::test_cases::load_data_tests;
     use crate::core::types::test_cases::IOUCase;
     use crate::core::types::test_cases::TEST_XRP_CASES;
     use alloc::format;
@@ -415,7 +413,7 @@ mod test {
             let amount: Amount = Amount::new(Some(&bytes)).unwrap();
             let serialize = serde_json::to_string(&amount).unwrap();
 
-            assert_eq!(expect, serialize);
+            assert_eq!(serialize, expect);
         }
 
         for (xrp, result) in TEST_XRP_CASES {
@@ -423,26 +421,26 @@ mod test {
             let amount: Amount = Amount::new(Some(&bytes)).unwrap();
             let serialize = serde_json::to_string(&amount).unwrap();
 
-            assert_eq!(format!("\"{}\"", xrp), serialize);
+            assert_eq!(serialize, format!("\"{}\"", xrp));
         }
     }
 
-    // #[test]
-    // fn accept_amount_value_tests() {
-    //     let tests = load_data_tests(Some("Amount"));
+    #[test]
+    fn accept_amount_value_tests() {
+        let tests = load_data_tests(Some("Amount"));
 
-    //     for test in tests {
-    //         extern crate std;
-    //         std::println!("{:?}", test.test_json);
-    //         //let data = test.test_json.clone();
-    //         let amount = Amount::try_from(test.test_json);
+        for test in tests {
+            extern crate std;
+            std::println!("{:?}", test.test_json);
+            //let data = test.test_json.clone();
+            let amount = Amount::try_from(test.test_json);
 
-    //         if test.error.is_none() {
-    //             assert_eq!(test.expected_hex, Some(amount.unwrap().to_string()));
-    //             //assert_eq!(data, serde_json::to_string(&amount).unwrap());
-    //         } else {
-    //             assert!(amount.is_err());
-    //         }
-    //     }
-    // }
+            if test.error.is_none() {
+                assert_eq!(test.expected_hex, Some(amount.unwrap().to_string()));
+                //assert_eq!(data, serde_json::to_string(&amount).unwrap());
+            } else {
+                assert!(amount.is_err());
+            }
+        }
+    }
 }

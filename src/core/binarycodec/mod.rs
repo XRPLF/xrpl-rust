@@ -6,7 +6,6 @@ pub mod utils;
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::utils::*;
-use crate::core::definitions::types::*;
 use crate::core::definitions::*;
 use crate::core::types::TryFromParser;
 use crate::utils::ToBytes;
@@ -28,7 +27,7 @@ pub type BinarySerializer = Vec<u8>;
 ///
 /// ```
 /// use xrpl::core::binarycodec::BinaryParser;
-/// use xrpl::core::binarycodec::Parser;
+/// use xrpl::core::Parser;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
 ///
 /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -92,7 +91,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -111,7 +110,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -138,7 +137,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -165,7 +164,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -192,7 +191,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -219,7 +218,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
@@ -248,7 +247,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     /// extern crate alloc;
     /// use alloc::vec;
@@ -291,7 +290,7 @@ pub trait Parser {
     ///
     /// ```
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::binarycodec::Parser;
+    /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     ///
     /// let test_bytes: &[u8] = &[6, 17, 34, 51, 68, 85, 102];
