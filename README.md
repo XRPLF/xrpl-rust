@@ -1,11 +1,11 @@
-# xrpl-rust ![Downloads](https://img.shields.io/crates/d/xrpl)
+# xrpl-rust ![Downloads](https://img.shields.io/crates/d/xrpl-rust)
 [![latest]][crates.io] [![deps_status]][deps] [![audit_status]][audit] [![unit_status]][unit]
 
-[latest]: https://img.shields.io/crates/v/xrpl.svg
-[crates.io]: https://crates.io/crates/xrpl
+[latest]: https://img.shields.io/crates/v/xrpl-rust.svg
+[crates.io]: https://crates.io/crates/xrpl-rust
 
-[docs_status]: https://docs.rs/xrpl/badge.svg
-[docs]: https://docs.rs/xrpl
+[docs_status]: https://docs.rs/xrpl-rust/badge.svg
+[docs]: https://docs.rs/xrpl-rust
 
 [deps_status]: https://deps.rs/repo/github/589labs/xrpl-rust/status.svg
 [deps]: https://deps.rs/repo/github/589labs/xrpl-rust

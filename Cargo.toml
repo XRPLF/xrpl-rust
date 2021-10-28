@@ -9,7 +9,7 @@ license = "ISC"
 repository = "https://github.com/589labs/xrpl-rust"
 
 keywords = ["xrpl", "no_std"]
-categories = ["dlt", "api", "no-std"]
+categories = ["no-std"]
 
 [package.metadata.release]
 no-dev-version = true
