@@ -67,7 +67,7 @@ fn _serialize_issued_currency_value(decimal: Decimal) -> Result<[u8; 8], XRPRang
 
     let is_positive: bool = decimal.is_sign_positive();
     let mut exp: i32 = -(decimal.normalize().scale() as i32);
-    let mut mantissa: u128 = decimal.normalize().mantissa().abs() as u128;
+    let mut mantissa: u128 = decimal.normalize().mantissa().unsigned_abs();
 
     while mantissa < _MIN_MANTISSA && exp > MIN_IOU_EXPONENT {
         mantissa *= 10;
@@ -186,7 +186,7 @@ impl IssuedCurrency {
         } else {
             let hex_mantissa = hex::encode([&[bytes[1] & 0x3F], &bytes[2..]].concat());
             let int_mantissa = i128::from_str_radix(&hex_mantissa, 16)?;
-            value = Decimal::from_i128_with_scale(int_mantissa, exp.abs() as u32);
+            value = Decimal::from_i128_with_scale(int_mantissa, exp.unsigned_abs());
 
             if bytes[0] & 0x40 > 0 {
                 value.set_sign_positive(true);
@@ -421,7 +421,7 @@ mod test {
             let amount: Amount = Amount::new(Some(&bytes)).unwrap();
             let serialize = serde_json::to_string(&amount).unwrap();
 
-            assert_eq!(serialize, format!("\"{}\"", xrp));
+            assert_eq!(serialize, format!("\"{xrp}\""));
         }
     }
 

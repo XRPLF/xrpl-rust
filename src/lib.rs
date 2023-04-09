@@ -29,9 +29,14 @@ pub mod constants;
 #[cfg(feature = "core")]
 pub mod core;
 pub mod macros;
+#[cfg(feature = "models")]
+pub mod models;
 #[cfg(feature = "utils")]
 pub mod utils;
 pub mod wallet;
 
 pub extern crate indexmap;
 pub extern crate serde_json;
+
+mod _anyhow;
+mod _serde;

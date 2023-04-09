@@ -93,13 +93,12 @@ pub fn generate_seed(
     algorithm: Option<CryptoAlgorithm>,
 ) -> Result<String, XRPLAddressCodecException> {
     let mut random_bytes: [u8; SEED_LENGTH] = [0u8; SEED_LENGTH];
-    let algo: CryptoAlgorithm;
 
-    if let Some(value) = algorithm {
-        algo = value;
+    let algo: CryptoAlgorithm = if let Some(value) = algorithm {
+        value
     } else {
-        algo = CryptoAlgorithm::ED25519;
-    }
+        CryptoAlgorithm::ED25519
+    };
 
     if let Some(value) = entropy {
         random_bytes = value;

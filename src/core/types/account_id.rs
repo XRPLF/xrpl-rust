@@ -127,7 +127,7 @@ mod test {
         let serialize = serde_json::to_string(&account).unwrap();
         let deserialize: AccountId = serde_json::from_str(&serialize).unwrap();
 
-        assert_eq!(format!("\"{}\"", BASE58_ENCODING), serialize);
+        assert_eq!(format!("\"{BASE58_ENCODING}\""), serialize);
         assert_eq!(account.to_string(), deserialize.to_string());
     }
 }

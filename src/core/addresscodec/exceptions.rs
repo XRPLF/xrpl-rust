@@ -2,8 +2,9 @@
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::utils::exceptions::ISOCodeException;
+use strum_macros::Display;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPLAddressCodecException {
     InvalidXAddressPrefix,
@@ -17,8 +18,8 @@ pub enum XRPLAddressCodecException {
     UnsupportedXAddress,
     UnknownSeedEncoding,
     UnexpectedPayloadLength { expected: usize, found: usize },
+    FromHexError,
     Base58DecodeError(bs58::decode::Error),
-    HexError(hex::FromHexError),
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     ISOError(ISOCodeException),
     SerdeJsonError(serde_json::error::Category),
@@ -44,8 +45,8 @@ impl From<bs58::decode::Error> for XRPLAddressCodecException {
 }
 
 impl From<hex::FromHexError> for XRPLAddressCodecException {
-    fn from(err: hex::FromHexError) -> Self {
-        XRPLAddressCodecException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        XRPLAddressCodecException::FromHexError
     }
 }
 
@@ -58,12 +59,6 @@ impl From<serde_json::Error> for XRPLAddressCodecException {
 impl From<alloc::vec::Vec<u8>> for XRPLAddressCodecException {
     fn from(err: alloc::vec::Vec<u8>) -> Self {
         XRPLAddressCodecException::VecResizeError(err)
-    }
-}
-
-impl core::fmt::Display for XRPLAddressCodecException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        write!(f, "XRPLAddressCodecException: {:?}", self)
     }
 }
 

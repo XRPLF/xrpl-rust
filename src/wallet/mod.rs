@@ -7,11 +7,11 @@ use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::generate_seed;
-use alloc::borrow::Cow;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
+use zeroize::Zeroize;
 
 /// The cryptographic keys needed to control an
 /// XRP Ledger account.
@@ -21,24 +21,35 @@ use alloc::vec;
 struct Wallet {
     /// The seed from which the public and private keys
     /// are derived.
-    seed: String,
+    pub seed: String,
     /// The public key that is used to identify this wallet's
     /// signatures, as a hexadecimal string.
-    public_key: Cow<'static, str>,
+    pub public_key: String,
     /// The private key that is used to create signatures, as
     /// a hexadecimal string. MUST be kept secret!
     ///
     /// TODO Use seckey
-    private_key: Cow<'static, str>,
+    pub private_key: String,
     /// The address that publicly identifies this wallet, as
     /// a base58 string.
-    classic_address: Cow<'static, str>,
+    pub classic_address: String,
     /// The next available sequence number to use for
     /// transactions from this wallet. Must be updated by the
     /// user. Increments on the ledger with every successful
     /// transaction submission, and stays the same with every
     /// failed transaction submission.
-    sequence: u64,
+    pub sequence: u64,
+}
+
+// Zeroize the memory where sensitive data is stored.
+impl Drop for Wallet {
+    fn drop(&mut self) {
+        self.seed.zeroize();
+        self.public_key.zeroize();
+        self.private_key.zeroize();
+        self.classic_address.zeroize();
+        self.sequence.zeroize();
+    }
 }
 
 impl Wallet {
@@ -49,9 +60,9 @@ impl Wallet {
 
         Ok(Wallet {
             seed: seed.into(),
-            public_key: public_key.into(),
-            private_key: private_key.into(),
-            classic_address: classic_address.into(),
+            public_key,
+            private_key,
+            classic_address,
             sequence,
         })
     }

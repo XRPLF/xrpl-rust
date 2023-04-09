@@ -7,8 +7,6 @@ use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
-use crate::core::types::AccountId;
-use crate::core::types::Currency;
 use crate::core::types::*;
 use crate::core::BinaryParser;
 use crate::core::Parser;
@@ -19,10 +17,9 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use indexmap::IndexMap;
-use serde::ser::SerializeMap;
-use serde::ser::SerializeSeq;
-use serde::Serializer;
-use serde::{Deserialize, Serialize};
+use serde::ser::{SerializeMap, SerializeSeq};
+use serde::{Deserialize, Serialize, Serializer};
+use serde_with::skip_serializing_none;
 
 // Constant Keys
 const _ACC_KEY: &str = "account";
@@ -38,28 +35,29 @@ const _TYPE_ISSUER: u8 = 0x20;
 const _PATHSET_END_BYTE: u8 = 0x00;
 const _PATH_SEPARATOR_BYTE: u8 = 0xFF;
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct PathStepData {
     #[serde(skip_serializing)]
     index: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
     account: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     currency: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     issuer: Option<String>,
 }
 
 /// Serialize and deserialize a single step in a Path.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(try_from = "&str")]
 pub struct PathStep(Vec<u8>);
 
 /// Class for serializing/deserializing Paths.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(try_from = "&str")]
 pub struct Path(Vec<u8>);
 
 /// Class for serializing/deserializing Paths.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(try_from = "&str")]
 pub struct PathSet(Vec<u8>);
 
 /// Helper function to determine if a dictionary represents
@@ -161,31 +159,28 @@ impl TryFromParser for PathStepData {
         parser: &mut BinaryParser,
         _length: Option<usize>,
     ) -> Result<PathStepData, Self::Error> {
-        let account: Option<String>;
-        let currency: Option<String>;
-        let issuer: Option<String>;
         let data_type = parser.read_uint8()?;
 
-        if data_type & _TYPE_ACCOUNT != 0 {
+        let account: Option<String> = if data_type & _TYPE_ACCOUNT != 0 {
             let data = AccountId::from_parser(parser, None)?;
-            account = Some(data.to_string());
+            Some(data.to_string())
         } else {
-            account = None;
-        }
+            None
+        };
 
-        if data_type & _TYPE_CURRENCY != 0 {
+        let currency: Option<String> = if data_type & _TYPE_CURRENCY != 0 {
             let data = Currency::from_parser(parser, None)?;
-            currency = Some(data.to_string());
+            Some(data.to_string())
         } else {
-            currency = None;
-        }
+            None
+        };
 
-        if data_type & _TYPE_ISSUER != 0 {
+        let issuer: Option<String> = if data_type & _TYPE_ISSUER != 0 {
             let data = AccountId::from_parser(parser, None)?;
-            issuer = Some(data.to_string());
+            Some(data.to_string())
         } else {
-            issuer = None;
-        }
+            None
+        };
 
         Ok(PathStepData::new(account, currency, issuer))
     }
@@ -406,6 +401,16 @@ impl TryFrom<&str> for Path {
     /// Construct a Path object from a string.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let json: Vec<IndexMap<String, String>> = serde_json::from_str(value)?;
+        Self::try_from(json)
+    }
+}
+
+impl TryFrom<&str> for PathStep {
+    type Error = XRPLHashException;
+
+    /// Construct a PathSet object from a string.
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let json: IndexMap<String, String> = serde_json::from_str(value)?;
         Self::try_from(json)
     }
 }

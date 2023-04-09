@@ -44,16 +44,14 @@ impl TryFromParser for Vector256 {
         length: Option<usize>,
     ) -> Result<Vector256, Self::Error> {
         let mut bytes = vec![];
-        let num_bytes: usize;
-        let num_hashes: usize;
 
-        if let Some(value) = length {
-            num_bytes = value;
+        let num_bytes: usize = if let Some(value) = length {
+            value
         } else {
-            num_bytes = parser.len();
-        }
+            parser.len()
+        };
 
-        num_hashes = num_bytes / _HASH_LENGTH_BYTES;
+        let num_hashes: usize = num_bytes / _HASH_LENGTH_BYTES;
 
         for _ in 0..num_hashes {
             bytes.extend_from_slice(Hash256::from_parser(parser, None)?.as_ref());
@@ -151,7 +149,7 @@ mod test {
         let serialize = serde_json::to_string(&vector).unwrap();
         let deserialize: Vector256 = serde_json::from_str(&serialize).unwrap();
 
-        assert_eq!(format!("[\"{}\",\"{}\"]", HASH1, HASH2), serialize);
+        assert_eq!(format!("[\"{HASH1}\",\"{HASH2}\"]"), serialize);
         assert_eq!(SERIALIZED, deserialize.to_string());
     }
 }

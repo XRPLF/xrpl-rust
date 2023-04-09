@@ -114,7 +114,7 @@ pub trait TryFromParser {
         Self: Sized;
 }
 
-impl<'value, T> From<T> for SerializedType
+impl<T> From<T> for SerializedType
 where
     T: XRPLType + AsRef<[u8]>,
 {
