@@ -2,9 +2,9 @@
 //! data types.
 
 use crate::utils::exceptions::XRPLTimeRangeException;
-use chrono::DateTime;
 use chrono::TimeZone;
 use chrono::Utc;
+use chrono::{DateTime, LocalResult};
 
 /// The "Ripple Epoch" of 2000-01-01T00:00:00 UTC
 pub const RIPPLE_EPOCH: i64 = 946684800;
@@ -32,7 +32,11 @@ fn _ripple_check_max<T>(time: i64, ok: T) -> Result<T, XRPLTimeRangeException> {
 pub(crate) fn ripple_time_to_datetime(
     ripple_time: i64,
 ) -> Result<DateTime<Utc>, XRPLTimeRangeException> {
-    _ripple_check_max(ripple_time, Utc.timestamp(ripple_time + RIPPLE_EPOCH, 0))
+    let datetime = Utc.timestamp_opt(ripple_time + RIPPLE_EPOCH, 0);
+    match datetime {
+        LocalResult::Single(dt) => _ripple_check_max(ripple_time, dt),
+        _ => Err(XRPLTimeRangeException::InvalidLocalTime),
+    }
 }
 
 /// Convert from a [`chrono::DateTime`] object to an XRP Ledger

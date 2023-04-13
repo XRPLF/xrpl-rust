@@ -16,9 +16,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 use core::str::FromStr;
+use crypto_bigint::Encoding;
+use crypto_bigint::U256;
 use ed25519_dalek::Verifier;
-use num_bigint::BigUint;
-use rust_decimal::prelude::One;
+use secp256k1::ecdsa;
+use secp256k1::Scalar;
 
 /// Methods for using the ECDSA cryptographic system with
 /// the SECP256K1 elliptic curve.
@@ -40,10 +42,11 @@ impl Secp256k1 {
 
     /// Format a provided key.
     fn _format_key(keystr: &str) -> String {
-        format!("{:0>pad$}", keystr, pad = SECP256K1_KEY_LENGTH)
+        format!("{keystr:0>SECP256K1_KEY_LENGTH$}")
     }
 
     /// Format the public and private keys.
+    /// TODO Make function constant time
     fn _format_keys(
         public: secp256k1::PublicKey,
         private: secp256k1::SecretKey,
@@ -60,10 +63,11 @@ impl Secp256k1 {
     }
 
     /// Determing if the provided secret key is valid.
-    fn _is_secret_valid(key: &[u8]) -> bool {
-        let key_bytes = BigUint::from_bytes_be(key);
-        key_bytes >= BigUint::one()
-            && key_bytes <= BigUint::from_bytes_be(&secp256k1::constants::CURVE_ORDER)
+    /// TODO Make function constant time
+    fn _is_secret_valid(key: [u8; u32::BITS as usize]) -> bool {
+        let key_bytes = U256::from_be_bytes(key);
+        key_bytes >= U256::ONE
+            && key_bytes <= U256::from_be_bytes(secp256k1::constants::CURVE_ORDER)
     }
 
     /// Concat candidate key.
@@ -101,10 +105,9 @@ impl Secp256k1 {
         mid_public: secp256k1::PublicKey,
         mid_private: secp256k1::SecretKey,
     ) -> Result<(secp256k1::PublicKey, secp256k1::SecretKey), XRPLKeypairsException> {
-        let mut wrapped_private = root_private;
+        let wrapped_private = root_private.add_tweak(&Scalar::from(mid_private))?;
         let wrapped_public = root_public.combine(&mid_public)?;
 
-        wrapped_private.add_assign(mid_private.as_ref())?;
         Ok((wrapped_public, wrapped_private))
     }
 
@@ -122,7 +125,7 @@ impl Secp256k1 {
             let root = (raw_root as u32).to_be_bytes();
             let candidate = sha512_first_half(&Self::_candidate_merger(input, &root, phase));
 
-            if Self::_is_secret_valid(&candidate) {
+            if Self::_is_secret_valid(candidate) {
                 return Ok(candidate);
             } else {
                 continue;
@@ -145,6 +148,7 @@ impl Ed25519 {
     }
 
     /// Format a provided key.
+    /// TODO Determine security implications
     fn _format_key(keystr: &str) -> String {
         format!("{}{}", ED25519_PREFIX, keystr.to_uppercase())
     }
@@ -264,7 +268,7 @@ impl CryptoImplementation for Secp256k1 {
         let message = Self::_get_message(message_bytes)?;
         let trimmed_key = private_key.trim_start_matches(SECP256K1_PREFIX);
         let private = secp256k1::SecretKey::from_str(trimmed_key)?;
-        let signature = secp.sign(&message, &private);
+        let signature = secp.sign_ecdsa(&message, &private);
 
         Ok(signature.serialize_der().to_vec())
     }
@@ -300,11 +304,11 @@ impl CryptoImplementation for Secp256k1 {
         let msg = Self::_get_message(message_bytes);
 
         if let Ok(value) = hex::decode(signature) {
-            let sig = secp256k1::Signature::from_der(&value);
+            let sig = ecdsa::Signature::from_der(&value);
             let public = secp256k1::PublicKey::from_str(public_key);
 
             if let (&Ok(m), &Ok(s), &Ok(p)) = (&msg.as_ref(), &sig.as_ref(), &public.as_ref()) {
-                secp.verify(m, s, p).is_ok()
+                secp.verify_ecdsa(m, s, p).is_ok()
             } else {
                 false
             }

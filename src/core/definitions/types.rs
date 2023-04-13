@@ -832,7 +832,7 @@ mod test {
         let field_instance = FieldInstance::new(&field_info, "Generic", field_header);
         let test_field_instance = get_field_instance("Generic");
 
-        assert!(!test_field_instance.is_none());
+        assert!(test_field_instance.is_some());
 
         let test_field_instance = test_field_instance.unwrap();
 

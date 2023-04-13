@@ -110,7 +110,7 @@ impl dyn Hash {
     /// };
     /// ```
     pub fn make<T: Hash>(bytes: Option<&[u8]>) -> Result<Vec<u8>, XRPLHashException> {
-        let byte_value: &[u8] = bytes.or(Some(&[])).unwrap();
+        let byte_value: &[u8] = bytes.unwrap_or(&[]);
         let hash_length: usize = T::get_length();
 
         if byte_value.len() != hash_length {

@@ -2,8 +2,9 @@
 
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
+use strum_macros::Display;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPLKeypairsException {
     InvalidSignature,
@@ -36,12 +37,6 @@ impl From<secp256k1::Error> for XRPLKeypairsException {
 impl From<hex::FromHexError> for XRPLKeypairsException {
     fn from(_: hex::FromHexError) -> Self {
         XRPLKeypairsException::FromHexError
-    }
-}
-
-impl core::fmt::Display for XRPLKeypairsException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
-        write!(f, "XRPLKeypairsException: {:?}", self)
     }
 }
 

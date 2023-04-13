@@ -1,14 +1,16 @@
 //! Exception for invalid XRP Ledger amount data.
 
 use alloc::string::String;
+use strum_macros::Display;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 pub enum XRPLTimeRangeException {
     InvalidTimeBeforeEpoch { min: i64, found: i64 },
     UnexpectedTimeOverflow { max: i64, found: i64 },
+    InvalidLocalTime,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPRangeException {
     InvalidXRPAmount,
@@ -25,7 +27,7 @@ pub enum XRPRangeException {
     DecimalError(rust_decimal::Error),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum ISOCodeException {
     InvalidISOCode,
@@ -41,7 +43,7 @@ pub enum ISOCodeException {
     DecimalError(rust_decimal::Error),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum JSONParseException {
     ISOCodeError(ISOCodeException),
@@ -101,23 +103,8 @@ impl From<rust_decimal::Error> for JSONParseException {
     }
 }
 
-impl core::fmt::Display for XRPRangeException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
-        write!(f, "XRPRangeException: {:?}", self)
-    }
-}
-
-impl core::fmt::Display for ISOCodeException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
-        write!(f, "ISOCodeException: {:?}", self)
-    }
-}
-
-impl core::fmt::Display for XRPLTimeRangeException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter<'_>) -> alloc::fmt::Result {
-        write!(f, "XRPLTimeRangeException: {:?}", self)
-    }
-}
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLTimeRangeException {}
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPRangeException {}

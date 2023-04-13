@@ -98,6 +98,7 @@ pub fn decode_base58(
 /// Returns the base58 encoding of the bytestring, with the
 /// given data prefix (which indicates type) and while
 /// ensuring the bytestring is the expected length.
+/// TODO Analyze Security implication for time-based side channels
 ///
 /// See [`bs58::encode`]
 ///

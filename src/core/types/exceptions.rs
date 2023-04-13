@@ -5,37 +5,37 @@ use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::JSONParseException;
 use crate::utils::exceptions::XRPRangeException;
+use strum_macros::Display;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPLTypeException {
     InvalidNoneValue,
+    FromHexError,
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     XRPLHashError(XRPLHashException),
     XRPLRangeError(XRPRangeException),
     DecimalError(rust_decimal::Error),
     JSONParseError(JSONParseException),
-    HexError(hex::FromHexError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPLHashException {
     InvalidHashLength { expected: usize, found: usize },
+    FromHexError,
     ISOCodeError(ISOCodeException),
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     XRPLAddressCodecError(XRPLAddressCodecException),
     SerdeJsonError(serde_json::error::Category),
-    HexError(hex::FromHexError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPLVectorException {
     InvalidVector256Bytes,
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     XRPLHashError(XRPLHashException),
-    HexError(hex::FromHexError),
 }
 
 impl From<XRPLHashException> for XRPLTypeException {
@@ -69,8 +69,8 @@ impl From<rust_decimal::Error> for XRPLTypeException {
 }
 
 impl From<hex::FromHexError> for XRPLTypeException {
-    fn from(err: hex::FromHexError) -> Self {
-        XRPLTypeException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        XRPLTypeException::FromHexError
     }
 }
 
@@ -99,8 +99,8 @@ impl From<serde_json::Error> for XRPLHashException {
 }
 
 impl From<hex::FromHexError> for XRPLHashException {
-    fn from(err: hex::FromHexError) -> Self {
-        XRPLHashException::HexError(err)
+    fn from(_: hex::FromHexError) -> Self {
+        XRPLHashException::FromHexError
     }
 }
 
@@ -110,20 +110,11 @@ impl From<XRPLHashException> for XRPLVectorException {
     }
 }
 
-impl core::fmt::Display for XRPLTypeException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        write!(f, "XRPLTypeException: {:?}", self)
-    }
-}
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLTypeException {}
 
-impl core::fmt::Display for XRPLHashException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        write!(f, "XRPLHashException: {:?}", self)
-    }
-}
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLHashException {}
 
-impl core::fmt::Display for XRPLVectorException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        write!(f, "XRPLVectorException: {:?}", self)
-    }
-}
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLVectorException {}

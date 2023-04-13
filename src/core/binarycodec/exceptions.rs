@@ -2,8 +2,10 @@
 
 use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::XRPRangeException;
+use strum_macros::Display;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Display)]
+#[non_exhaustive]
 pub enum XRPLBinaryCodecException {
     UnexpectedParserSkipOverflow { max: usize, found: usize },
     UnexpectedLengthPrefixRange { min: usize, max: usize },
@@ -77,12 +79,6 @@ impl From<core::num::ParseIntError> for XRPLBinaryCodecException {
 impl From<alloc::string::FromUtf8Error> for XRPLBinaryCodecException {
     fn from(_: alloc::string::FromUtf8Error) -> Self {
         XRPLBinaryCodecException::FromUtf8Error
-    }
-}
-
-impl core::fmt::Display for XRPLBinaryCodecException {
-    fn fmt(&self, f: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
-        write!(f, "XRPLBinaryCodecException: {:?}", self)
     }
 }
 

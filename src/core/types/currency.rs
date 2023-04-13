@@ -1,20 +1,18 @@
 //! Codec for currency property inside an XRPL
 //! issued currency amount json.
 
-use crate::constants::HEX_CURRENCY_REGEX;
-use crate::constants::ISO_CURRENCY_REGEX;
 use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::types::*;
 use crate::core::BinaryParser;
 use crate::utils::exceptions::ISOCodeException;
+use crate::utils::*;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::convert::TryInto;
-use regex::Regex;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
@@ -27,24 +25,12 @@ pub const NATIVE_CODE: &str = "XRP";
 #[serde(try_from = "&str")]
 pub struct Currency(Hash160);
 
-/// Tests if value is a valid 3-char iso code.
-fn _is_iso_code(value: &str) -> bool {
-    let regex = Regex::new(ISO_CURRENCY_REGEX).expect("_is_iso_code");
-    regex.is_match(value)
-}
-
-/// Tests if value is a valid 40-char hex string.
-fn _is_hex(value: &str) -> bool {
-    let regex = Regex::new(HEX_CURRENCY_REGEX).expect("_is_hex");
-    regex.is_match(value)
-}
-
 fn _iso_code_from_hex(value: &[u8]) -> Result<Option<String>, ISOCodeException> {
     let candidate_iso = alloc::str::from_utf8(&value[12..15])?;
 
     if candidate_iso == NATIVE_CODE {
         Err(ISOCodeException::InvalidXRPBytes)
-    } else if _is_iso_code(candidate_iso) {
+    } else if is_iso_code(candidate_iso) {
         Ok(Some(candidate_iso.to_string()))
     } else {
         Ok(None)
@@ -57,7 +43,7 @@ fn _iso_code_from_hex(value: &[u8]) -> Result<Option<String>, ISOCodeException> 
 /// See "Currency codes" subheading in Amount Fields:
 /// `<https://xrpl.org/serialization.html#amount-fields>`
 fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeException> {
-    if !_is_iso_code(value) {
+    if !is_iso_code(value) {
         Err(ISOCodeException::InvalidISOCode)
     } else if value == NATIVE_CODE {
         Ok(Default::default())
@@ -115,11 +101,11 @@ impl TryFrom<&str> for Currency {
     /// Construct a Currency object from a string
     /// representation of a currency.
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if _is_iso_code(value) {
+        if is_iso_code(value) {
             let iso_bytes = _iso_to_bytes(value)?;
             let hash160 = Hash160::new(Some(&iso_bytes))?;
             Ok(Currency(hash160))
-        } else if _is_hex(value) {
+        } else if is_iso_hex(value) {
             Ok(Currency(Hash160::new(Some(&hex::decode(value)?))?))
         } else {
             Err(XRPLHashException::ISOCodeError(
@@ -166,33 +152,6 @@ mod test {
     const USD_ISO: &str = "USD";
 
     #[test]
-    fn test_is_iso_code() {
-        let valid_code = "ABC";
-        let valid_code_numeric = "123";
-        let invalid_code_long = "LONG";
-        let invalid_code_short = "NO";
-
-        assert!(_is_iso_code(valid_code));
-        assert!(_is_iso_code(valid_code_numeric));
-        assert!(!_is_iso_code(invalid_code_long));
-        assert!(!_is_iso_code(invalid_code_short));
-    }
-
-    #[test]
-    fn test_is_hex() {
-        // Valid = 40 char length and only valid hex chars
-        let valid_hex: &str = "0000000000000000000000005553440000000000";
-        let invalid_hex_chars: &str = "USD0000000000000000000005553440000000000";
-        let invalid_hex_long: &str = "0000000000000000000000005553440000000000123455";
-        let invalid_hex_short: &str = "1234";
-
-        assert!(_is_hex(valid_hex));
-        assert!(!_is_hex(invalid_hex_long));
-        assert!(!_is_hex(invalid_hex_short));
-        assert!(!_is_hex(invalid_hex_chars));
-    }
-
-    #[test]
     fn test_iso_to_bytes() {
         // Valid non-XRP
         let usd_iso_bytes = _iso_to_bytes(USD_ISO).unwrap();
@@ -234,7 +193,7 @@ mod test {
         let serialize = serde_json::to_string(&currency).unwrap();
         let deserialize: Currency = serde_json::from_str(&serialize).unwrap();
 
-        assert_eq!(format!("\"{}\"", USD_ISO), serialize);
+        assert_eq!(format!("\"{USD_ISO}\""), serialize);
         assert_eq!(currency.to_string(), deserialize.to_string());
     }
 }
