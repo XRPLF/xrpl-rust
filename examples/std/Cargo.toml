@@ -1,0 +1,33 @@
+[package]
+name = "std"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+xrpl-rust = { path = "../.." }
+
+[[bin]]
+name = "wallet_from_seed"
+path = "src/bin/wallet/wallet_from_seed.rs"
+required-features = [
+]
+
+[[bin]]
+name = "generate_wallet"
+path = "src/bin/wallet/generate_wallet.rs"
+required-features = [
+]
+
+[[bin]]
+name = "send_request"
+path = "src/bin/tokio/net/send_request.rs"
+required-features = [
+]
+
+[[bin]]
+name = "send_request"
+path = "src/bin/transaction/sign_transaction.rs"
+required-features = [
+]
