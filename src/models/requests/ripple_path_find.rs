@@ -79,7 +79,7 @@ impl<'a> Default for RipplePathFind<'a> {
 impl<'a> Model for RipplePathFind<'a> {}
 
 impl<'a> RipplePathFind<'a> {
-    fn new(
+    pub fn new(
         source_account: &'a str,
         destination_account: &'a str,
         destination_amount: Currency<'a>,

@@ -50,7 +50,7 @@ impl<'a> Default for LedgerData<'a> {
 impl<'a> Model for LedgerData<'a> {}
 
 impl<'a> LedgerData<'a> {
-    fn new(
+    pub fn new(
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,
         ledger_index: Option<&'a str>,

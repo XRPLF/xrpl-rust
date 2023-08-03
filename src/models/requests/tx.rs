@@ -46,7 +46,7 @@ impl<'a> Default for Tx<'a> {
 impl<'a> Model for Tx<'a> {}
 
 impl<'a> Tx<'a> {
-    fn new(
+    pub fn new(
         id: Option<&'a str>,
         binary: Option<bool>,
         min_ledger: Option<u32>,

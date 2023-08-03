@@ -114,7 +114,7 @@ impl<'a> Transaction for NFTokenBurn<'a> {
 }
 
 impl<'a> NFTokenBurn<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         nftoken_id: &'a str,
         fee: Option<XRPAmount<'a>>,

@@ -50,7 +50,7 @@ impl<'a> Default for AccountCurrencies<'a> {
 impl<'a> Model for AccountCurrencies<'a> {}
 
 impl<'a> AccountCurrencies<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

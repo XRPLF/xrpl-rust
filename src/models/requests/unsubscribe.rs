@@ -75,7 +75,7 @@ impl<'a> Default for Unsubscribe<'a> {
 impl<'a> Model for Unsubscribe<'a> {}
 
 impl<'a> Unsubscribe<'a> {
-    fn new(
+    pub fn new(
         id: Option<&'a str>,
         books: Option<Vec<UnsubscribeBook<'a>>>,
         streams: Option<Vec<StreamParameter>>,

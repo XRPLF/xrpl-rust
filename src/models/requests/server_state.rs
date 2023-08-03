@@ -36,7 +36,7 @@ impl<'a> Default for ServerState<'a> {
 impl<'a> Model for ServerState<'a> {}
 
 impl<'a> ServerState<'a> {
-    fn new(id: Option<&'a str>) -> Self {
+    pub fn new(id: Option<&'a str>) -> Self {
         Self {
             id,
             command: RequestMethod::ServerState,

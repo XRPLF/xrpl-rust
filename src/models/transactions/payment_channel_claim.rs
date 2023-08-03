@@ -174,7 +174,7 @@ impl<'a> Transaction for PaymentChannelClaim<'a> {
 }
 
 impl<'a> PaymentChannelClaim<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         channel: &'a str,
         fee: Option<XRPAmount<'a>>,

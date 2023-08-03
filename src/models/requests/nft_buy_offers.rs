@@ -42,7 +42,7 @@ impl<'a> Default for NftBuyOffers<'a> {
 impl<'a> Model for NftBuyOffers<'a> {}
 
 impl<'a> NftBuyOffers<'a> {
-    fn new(
+    pub fn new(
         nft_id: &'a str,
         ledger_hash: Option<&'a str>,
         ledger_index: Option<&'a str>,

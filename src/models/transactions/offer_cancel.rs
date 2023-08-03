@@ -110,7 +110,7 @@ impl<'a> Transaction for OfferCancel<'a> {
 }
 
 impl<'a> OfferCancel<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         offer_sequence: u32,
         fee: Option<XRPAmount<'a>>,

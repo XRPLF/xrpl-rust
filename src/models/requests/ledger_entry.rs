@@ -178,7 +178,7 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
 }
 
 impl<'a> LedgerEntry<'a> {
-    fn new(
+    pub fn new(
         id: Option<&'a str>,
         index: Option<&'a str>,
         account_root: Option<&'a str>,

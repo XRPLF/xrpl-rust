@@ -40,7 +40,7 @@ impl<'a> Default for SubmitMultisigned<'a> {
 impl<'a> Model for SubmitMultisigned<'a> {}
 
 impl<'a> SubmitMultisigned<'a> {
-    fn new(id: Option<&'a str>, fail_hard: Option<bool>) -> Self {
+    pub fn new(id: Option<&'a str>, fail_hard: Option<bool>) -> Self {
         Self {
             id,
             fail_hard,

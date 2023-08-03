@@ -162,7 +162,7 @@ impl<'a> Transaction for TrustSet<'a> {
 }
 
 impl<'a> TrustSet<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         limit_amount: IssuedCurrencyAmount<'a>,
         fee: Option<XRPAmount<'a>>,

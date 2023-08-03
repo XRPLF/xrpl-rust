@@ -18,7 +18,8 @@ use zeroize::Zeroize;
 ///
 /// See Cryptographic Keys:
 /// `<https://xrpl.org/cryptographic-keys.html>`
-struct Wallet {
+#[derive(Debug)]
+pub struct Wallet {
     /// The seed from which the public and private keys
     /// are derived.
     pub seed: String,

@@ -37,7 +37,7 @@ impl<'a> Default for Manifest<'a> {
 impl<'a> Model for Manifest<'a> {}
 
 impl<'a> Manifest<'a> {
-    fn new(public_key: &'a str, id: Option<&'a str>) -> Self {
+    pub fn new(public_key: &'a str, id: Option<&'a str>) -> Self {
         Self {
             public_key,
             id,

@@ -50,7 +50,7 @@ impl<'a> Default for GatewayBalances<'a> {
 impl<'a> Model for GatewayBalances<'a> {}
 
 impl<'a> GatewayBalances<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         strict: Option<bool>,

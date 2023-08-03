@@ -76,7 +76,7 @@ impl<'a> Default for AccountChannels<'a> {
 impl<'a> Model for AccountChannels<'a> {}
 
 impl<'a> AccountChannels<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

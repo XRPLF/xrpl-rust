@@ -26,7 +26,7 @@ impl<'a> Default for NftSellOffers<'a> {
 impl<'a> Model for NftSellOffers<'a> {}
 
 impl<'a> NftSellOffers<'a> {
-    fn new(nft_id: &'a str) -> Self {
+    pub fn new(nft_id: &'a str) -> Self {
         Self {
             nft_id,
             command: RequestMethod::NftSellOffers,

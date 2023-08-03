@@ -114,7 +114,7 @@ impl<'a> Transaction for CheckCancel<'a> {
 }
 
 impl<'a> CheckCancel<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         check_id: &'a str,
         fee: Option<XRPAmount<'a>>,

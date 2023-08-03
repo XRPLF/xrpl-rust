@@ -69,7 +69,7 @@ impl<'a> Transaction for SetFee<'a> {
 }
 
 impl<'a> SetFee<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         base_fee: XRPAmount<'a>,
         reference_fee_units: u32,

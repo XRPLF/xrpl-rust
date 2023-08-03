@@ -152,7 +152,7 @@ impl<'a> EscrowCreateError for EscrowCreate<'a> {
 }
 
 impl<'a> EscrowCreate<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         amount: XRPAmount<'a>,
         destination: &'a str,

@@ -174,7 +174,7 @@ impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
 }
 
 impl<'a> NFTokenAcceptOffer<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,

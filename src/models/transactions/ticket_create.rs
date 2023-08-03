@@ -110,7 +110,7 @@ impl<'a> Transaction for TicketCreate<'a> {
 }
 
 impl<'a> TicketCreate<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         ticket_count: u32,
         fee: Option<XRPAmount<'a>>,

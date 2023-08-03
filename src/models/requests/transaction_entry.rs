@@ -43,7 +43,7 @@ impl<'a> Default for TransactionEntry<'a> {
 impl<'a> Model for TransactionEntry<'a> {}
 
 impl<'a> TransactionEntry<'a> {
-    fn new(
+    pub fn new(
         tx_hash: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

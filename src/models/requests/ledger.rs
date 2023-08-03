@@ -76,7 +76,7 @@ impl<'a> Default for Ledger<'a> {
 impl<'a> Model for Ledger<'a> {}
 
 impl<'a> Ledger<'a> {
-    fn new(
+    pub fn new(
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,
         ledger_index: Option<&'a str>,

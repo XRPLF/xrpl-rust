@@ -112,7 +112,7 @@ impl<'a> Transaction for EscrowCancel<'a> {
 }
 
 impl<'a> EscrowCancel<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         owner: &'a str,
         offer_sequence: u32,

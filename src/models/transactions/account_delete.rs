@@ -121,7 +121,7 @@ impl<'a> Transaction for AccountDelete<'a> {
 }
 
 impl<'a> AccountDelete<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         destination: &'a str,
         fee: Option<XRPAmount<'a>>,

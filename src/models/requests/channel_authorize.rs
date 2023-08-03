@@ -120,7 +120,7 @@ impl<'a> ChannelAuthorizeError for ChannelAuthorize<'a> {
 }
 
 impl<'a> ChannelAuthorize<'a> {
-    fn new(
+    pub fn new(
         channel_id: &'a str,
         amount: &'a str,
         id: Option<&'a str>,

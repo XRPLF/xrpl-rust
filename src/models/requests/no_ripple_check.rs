@@ -73,7 +73,7 @@ impl<'a> Default for NoRippleCheck<'a> {
 impl<'a> Model for NoRippleCheck<'a> {}
 
 impl<'a> NoRippleCheck<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         role: NoRippleCheckRole,
         id: Option<&'a str>,

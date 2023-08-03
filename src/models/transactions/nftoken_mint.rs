@@ -237,7 +237,7 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
 }
 
 impl<'a> NFTokenMint<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         nftoken_taxon: u32,
         fee: Option<XRPAmount<'a>>,

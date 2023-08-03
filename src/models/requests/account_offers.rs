@@ -55,7 +55,7 @@ impl<'a> Default for AccountOffers<'a> {
 impl<'a> Model for AccountOffers<'a> {}
 
 impl<'a> AccountOffers<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

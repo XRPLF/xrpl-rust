@@ -226,7 +226,7 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
 }
 
 impl<'a> SignerListSet<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         signer_quorum: u32,
         fee: Option<XRPAmount<'a>>,

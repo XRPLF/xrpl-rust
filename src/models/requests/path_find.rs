@@ -105,7 +105,7 @@ impl<'a> Default for PathFind<'a> {
 impl<'a> Model for PathFind<'a> {}
 
 impl<'a> PathFind<'a> {
-    fn new(
+    pub fn new(
         subcommand: PathFindSubcommand,
         source_account: &'a str,
         destination_account: &'a str,

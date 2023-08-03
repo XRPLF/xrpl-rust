@@ -56,7 +56,7 @@ impl<'a> Default for AccountLines<'a> {
 impl<'a> Model for AccountLines<'a> {}
 
 impl<'a> AccountLines<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

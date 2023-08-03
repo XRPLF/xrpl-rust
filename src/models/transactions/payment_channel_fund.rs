@@ -115,7 +115,7 @@ impl<'a> Transaction for PaymentChannelFund<'a> {
 }
 
 impl<'a> PaymentChannelFund<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         channel: &'a str,
         amount: XRPAmount<'a>,

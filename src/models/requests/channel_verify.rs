@@ -43,7 +43,7 @@ impl<'a> Default for ChannelVerify<'a> {
 impl<'a> Model for ChannelVerify<'a> {}
 
 impl<'a> ChannelVerify<'a> {
-    fn new(
+    pub fn new(
         channel_id: &'a str,
         amount: &'a str,
         public_key: &'a str,

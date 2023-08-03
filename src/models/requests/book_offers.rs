@@ -61,7 +61,7 @@ impl<'a> Default for BookOffers<'a> {
 impl<'a> Model for BookOffers<'a> {}
 
 impl<'a> BookOffers<'a> {
-    fn new(
+    pub fn new(
         taker_gets: Currency<'a>,
         taker_pays: Currency<'a>,
         id: Option<&'a str>,

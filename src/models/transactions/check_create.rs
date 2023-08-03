@@ -121,7 +121,7 @@ impl<'a> Transaction for CheckCreate<'a> {
 }
 
 impl<'a> CheckCreate<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         destination: &'a str,
         send_max: Amount<'a>,

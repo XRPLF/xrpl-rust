@@ -147,7 +147,7 @@ impl<'a> CheckCashError for CheckCash<'a> {
 }
 
 impl<'a> CheckCash<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         check_id: &'a str,
         fee: Option<XRPAmount<'a>>,

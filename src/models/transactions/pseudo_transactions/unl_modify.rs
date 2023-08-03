@@ -78,7 +78,7 @@ impl<'a> Transaction for UNLModify<'a> {
 }
 
 impl<'a> UNLModify<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         ledger_sequence: u32,
         unlmodify_disabling: UNLModifyDisabling,

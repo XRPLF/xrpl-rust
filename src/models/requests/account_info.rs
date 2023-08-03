@@ -59,7 +59,7 @@ impl<'a> Default for AccountInfo<'a> {
 impl<'a> Model for AccountInfo<'a> {}
 
 impl<'a> AccountInfo<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

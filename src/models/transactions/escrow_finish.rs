@@ -144,7 +144,7 @@ impl<'a> EscrowFinishError for EscrowFinish<'a> {
 }
 
 impl<'a> EscrowFinish<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         owner: &'a str,
         offer_sequence: u32,

@@ -255,7 +255,7 @@ impl<'a> NFTokenCreateOfferError for NFTokenCreateOffer<'a> {
 }
 
 impl<'a> NFTokenCreateOffer<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         nftoken_id: &'a str,
         amount: Amount<'a>,

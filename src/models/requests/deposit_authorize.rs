@@ -43,7 +43,7 @@ impl<'a> Default for DepositAuthorized<'a> {
 impl<'a> Model for DepositAuthorized<'a> {}
 
 impl<'a> DepositAuthorized<'a> {
-    fn new(
+    pub fn new(
         source_account: &'a str,
         destination_account: &'a str,
         id: Option<&'a str>,

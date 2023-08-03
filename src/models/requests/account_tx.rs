@@ -71,7 +71,7 @@ impl<'a> Default for AccountTx<'a> {
 impl<'a> Model for AccountTx<'a> {}
 
 impl<'a> AccountTx<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         id: Option<&'a str>,
         ledger_hash: Option<&'a str>,

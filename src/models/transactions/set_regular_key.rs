@@ -114,7 +114,7 @@ impl<'a> Transaction for SetRegularKey<'a> {
 }
 
 impl<'a> SetRegularKey<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,

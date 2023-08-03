@@ -174,7 +174,7 @@ impl<'a> Transaction for OfferCreate<'a> {
 }
 
 impl<'a> OfferCreate<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         taker_gets: Amount<'a>,
         taker_pays: Amount<'a>,

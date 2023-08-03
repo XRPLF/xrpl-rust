@@ -93,7 +93,7 @@ impl<'a> Default for Subscribe<'a> {
 impl<'a> Model for Subscribe<'a> {}
 
 impl<'a> Subscribe<'a> {
-    fn new(
+    pub fn new(
         id: Option<&'a str>,
         books: Option<Vec<SubscribeBook<'a>>>,
         streams: Option<Vec<StreamParameter>>,

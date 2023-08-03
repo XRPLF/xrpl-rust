@@ -103,7 +103,7 @@ impl<'a> Transaction for EnableAmendment<'a> {
 }
 
 impl<'a> EnableAmendment<'a> {
-    fn new(
+    pub fn new(
         account: &'a str,
         amendment: &'a str,
         ledger_sequence: u32,
