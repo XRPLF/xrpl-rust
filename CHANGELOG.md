@@ -16,7 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Examples
   - Wallet from seed
   - New wallet generation
+  - `AsyncWebsocketClient` requests
 - make `new` methods of models public
+- add `AsyncWebsocketClient`
+- update dependencies
 
 ## [[v0.2.0-beta]]
 ### Added
