@@ -25,7 +25,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --no-default-features --features core,models
+          args: --release --no-default-features --features core,models,net,tungstenite
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -33,4 +33,4 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --no-default-features --features core,models
+          args: --no-default-features --features core,models,net,tungstenite
