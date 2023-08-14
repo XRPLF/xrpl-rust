@@ -29,14 +29,14 @@ ed25519-dalek = "1.0.1"
 secp256k1 = { version = "0.27.0", default-features = false, features = [
     "alloc",
 ] }
-bs58 = { version = "0.4.0", default-features = false, features = [
+bs58 = { version = "0.5.0", default-features = false, features = [
     "check",
     "alloc",
 ] }
-indexmap = { version = "1.7.0", features = ["serde"] }
+indexmap = { version = "2.0.0", features = ["serde"] }
 regex = { version = "1.5.4", default-features = false }
-strum = { version = "0.24.1", default-features = false }
-strum_macros = { version = "0.24.2", default-features = false }
+strum = { version = "0.25.0", default-features = false }
+strum_macros = { version = "0.25.2", default-features = false }
 crypto-bigint = { version = "0.5.1" }
 rust_decimal = { version = "1.17.0", default-features = false, features = [
     "serde",
@@ -51,33 +51,63 @@ serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.68", default-features = false, features = [
     "alloc",
 ] }
-serde_with = "2.3.1"
+serde_with = "3.2.0"
 serde_repr = "0.1"
 zeroize = "1.5.7"
-hashbrown = { version = "0.13.2", default-features = false, features = ["serde"] }
+hashbrown = { version = "0.14.0", default-features = false, features = ["serde"] }
 fnv = { version = "1.0.7", default-features = false }
 derive-new = { version = "0.5.9", default-features = false }
 thiserror-no-std = "2.0.2"
 anyhow = { version ="1.0.69", default-features = false }
+tokio = { version = "1.28.0", default-features = false, optional = true }
+url = { version = "2.2.2", default-features = false, optional = true }
+futures = { version = "0.3.28", default-features = false, optional = true }
+rand_core = { version = "0.6.4", default-features = false }
+tokio-tungstenite = { version = "0.20.0", optional = true }
+
+[dependencies.embedded-websocket]
+# git version needed to use `framer_async`
+git = "https://github.com/ninjasource/embedded-websocket"
+version = "0.9.2"
+rev = "8d87d46f46fa0c75e099ca8aad37e8d00c8854f8"
+default-features = false
 
 [dev-dependencies]
-criterion = "0.4.0"
+criterion = "0.5.1"
 cargo-husky = { version = "1.5.0", default-features = false, features = [
     "user-hooks",
 ] }
+tokio = { version = "1.28.2", features = ["full"] }
+tokio-util = { version = "0.7.7", features = ["codec"] }
+bytes = { version = "1.4.0", default-features = false }
 
 [[bench]]
 name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "core", "models", "utils"]
+default = ["std", "core", "models", "utils", "net", "tungstenite"]
 models = ["core", "transactions", "requests", "ledger"]
 transactions = ["core", "amounts", "currencies"]
 requests = ["core", "amounts", "currencies"]
 ledger = ["core", "amounts", "currencies"]
 amounts = ["core"]
 currencies = ["core"]
+net = ["url", "futures"]
+tungstenite = ["tokio/net", "tokio-tungstenite/native-tls"]
 core = ["utils"]
 utils = []
-std = ["rand/std", "regex/std", "chrono/std", "rand/std_rng", "hex/std", "rust_decimal/std", "bs58/std", "serde/std", "indexmap/std", "secp256k1/std"]
+std = [
+    "embedded-websocket/std",
+    "futures/std",
+    "rand/std",
+    "regex/std",
+    "chrono/std",
+    "rand/std_rng",
+    "hex/std",
+    "rust_decimal/std",
+    "bs58/std",
+    "serde/std",
+    "indexmap/std",
+    "secp256k1/std",
+]
