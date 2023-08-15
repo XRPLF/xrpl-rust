@@ -65,17 +65,28 @@ async fn test_embedded_websocket_echo() {
             .unwrap()
             .unwrap();
         match message {
-            EmbeddedWebsocketReadMessageType::Binary(msg) => {
-                assert_eq!(serde_json::to_vec(&account_info).unwrap().as_slice(), msg);
-                break;
-            }
             EmbeddedWebsocketReadMessageType::Ping(_) => {
                 ping_counter += 1;
                 if ping_counter > 1 {
                     panic!("Expected only one ping");
                 }
             }
-            _ => panic!("Expected binary message"),
+            EmbeddedWebsocketReadMessageType::Text(text) => {
+                assert_eq!(
+                    serde_json::from_str::<AccountInfo>(text).unwrap(),
+                    account_info
+                );
+                break;
+            }
+            EmbeddedWebsocketReadMessageType::Binary(_) => {
+                panic!("Expected text message found binary")
+            }
+            EmbeddedWebsocketReadMessageType::Pong(_) => {
+                panic!("Expected text message found pong")
+            }
+            EmbeddedWebsocketReadMessageType::Close(_) => {
+                panic!("Expected text message found close")
+            }
         }
     }
 }

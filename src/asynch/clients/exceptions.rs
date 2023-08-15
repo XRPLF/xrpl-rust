@@ -3,8 +3,11 @@ use core::str::Utf8Error;
 use embedded_websocket::framer_async::FramerError;
 use thiserror_no_std::Error;
 
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Debug, Error)]
 pub enum XRPLWebsocketException<E: Debug> {
+    #[cfg(feature = "tungstenite")]
+    #[error("Unable to connect to websocket")]
+    UnableToConnect(tokio_tungstenite::tungstenite::Error),
     // FramerError
     #[error("I/O error: {0:?}")]
     Io(E),

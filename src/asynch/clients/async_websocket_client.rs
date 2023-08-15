@@ -69,7 +69,7 @@ mod tungstenite {
         fn poll_ready(
             mut self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
-        ) -> core::task::Poll<core::result::Result<(), Self::Error>> {
+        ) -> core::task::Poll<Result<()>> {
             match Pin::new(&mut self.inner).poll_ready(cx) {
                 Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
                 Poll::Ready(Err(error)) => Poll::Ready(Err!(error)),
@@ -77,15 +77,14 @@ mod tungstenite {
             }
         }
 
-        fn start_send(
-            mut self: core::pin::Pin<&mut Self>,
-            item: I,
-        ) -> core::result::Result<(), Self::Error> {
-            match Pin::new(&mut self.inner).start_send(TungsteniteMessage::Text(
-                serde_json::to_string(&item).unwrap(),
-            )) {
-                // TODO: unwrap
-                Ok(()) => Ok(()),
+        fn start_send(mut self: core::pin::Pin<&mut Self>, item: I) -> Result<()> {
+            match serde_json::to_string(&item) {
+                Ok(json) => {
+                    match Pin::new(&mut self.inner).start_send(TungsteniteMessage::Text(json)) {
+                        Ok(()) => Ok(()),
+                        Err(error) => Err!(error),
+                    }
+                }
                 Err(error) => Err!(error),
             }
         }
@@ -93,7 +92,7 @@ mod tungstenite {
         fn poll_flush(
             mut self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
-        ) -> core::task::Poll<core::result::Result<(), Self::Error>> {
+        ) -> core::task::Poll<Result<()>> {
             match Pin::new(&mut self.inner).poll_flush(cx) {
                 Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
                 Poll::Ready(Err(error)) => Poll::Ready(Err!(error)),
@@ -104,7 +103,7 @@ mod tungstenite {
         fn poll_close(
             mut self: core::pin::Pin<&mut Self>,
             cx: &mut core::task::Context<'_>,
-        ) -> core::task::Poll<core::result::Result<(), Self::Error>> {
+        ) -> core::task::Poll<Result<()>> {
             match Pin::new(&mut self.inner).poll_close(cx) {
                 Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
                 Poll::Ready(Err(error)) => Poll::Ready(Err!(error)),
@@ -145,12 +144,17 @@ mod tungstenite {
                 WebsocketOpen,
             >,
         > {
-            let (websocket_stream, _) = tungstenite_connect_async(uri).await.unwrap(); // TODO: unwrap
-
-            Ok(AsyncWebsocketClient {
-                inner: websocket_stream,
-                status: PhantomData::<WebsocketOpen>,
-            })
+            match tungstenite_connect_async(uri).await {
+                Ok((websocket_stream, _)) => Ok(AsyncWebsocketClient {
+                    inner: websocket_stream,
+                    status: PhantomData::<WebsocketOpen>,
+                }),
+                Err(error) => {
+                    Err!(XRPLWebsocketException::UnableToConnect::<anyhow::Error>(
+                        error
+                    ))
+                }
+            }
         }
     }
 }
@@ -174,10 +178,11 @@ where
     {
         let websocket = EmbeddedWebsocket::<Rng, EmbeddedWebsocketClient>::new_client(rng);
         let mut framer = EmbeddedWebsocketFramer::new(websocket);
-        framer
-            .connect(stream, buffer, websocket_options)
-            .await
-            .unwrap(); // TODO: unwrap
+        match framer.connect(stream, buffer, websocket_options).await {
+            Ok(Some(_)) => {}
+            Ok(None) => {}
+            Err(error) => return Err!(XRPLWebsocketException::from(error)),
+        }
 
         Ok(AsyncWebsocketClient {
             inner: framer,
@@ -200,12 +205,13 @@ where
     where
         E: Debug,
     {
-        let len = self
+        match self
             .inner
             .encode::<E>(message_type, end_of_message, from, to)
-            .unwrap(); // TODO: unwrap
-
-        Ok(len)
+        {
+            Ok(bytes_written) => Ok(bytes_written),
+            Err(error) => Err!(XRPLWebsocketException::from(error)),
+        }
     }
 
     pub async fn send<'b, E, R: serde::Serialize>(
@@ -218,18 +224,23 @@ where
     where
         E: Debug,
     {
-        self.inner
-            .write(
-                stream,
-                stream_buf,
-                EmbeddedWebsocketSendMessageType::Binary,
-                end_of_message,
-                serde_json::to_vec(&frame_buf).unwrap().as_slice(),
-            ) // TODO: unwrap
-            .await
-            .unwrap(); // TODO: unwrap
-
-        Ok(())
+        match serde_json::to_vec(&frame_buf) {
+            Ok(frame_buf) => match self
+                .inner
+                .write(
+                    stream,
+                    stream_buf,
+                    EmbeddedWebsocketSendMessageType::Text,
+                    end_of_message,
+                    frame_buf.as_slice(),
+                )
+                .await
+            {
+                Ok(()) => Ok(()),
+                Err(error) => Err!(XRPLWebsocketException::from(error)),
+            },
+            Err(error) => Err!(error),
+        }
     }
 
     pub async fn close<'b, E>(
@@ -242,12 +253,14 @@ where
     where
         E: Debug,
     {
-        self.inner
+        match self
+            .inner
             .close(stream, stream_buf, close_status, status_description)
             .await
-            .unwrap(); // TODO: unwrap
-
-        Ok(())
+        {
+            Ok(()) => Ok(()),
+            Err(error) => Err!(XRPLWebsocketException::from(error)),
+        }
     }
 
     pub async fn next<'a, B: Deref<Target = [u8]>, E>(
