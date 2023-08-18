@@ -8,16 +8,6 @@ pub use embedded_websocket_impl::*;
 #[cfg(feature = "tungstenite")]
 pub use tungstenite_impl::*;
 
-pub use embedded_websocket::{
-    framer_async::{
-        FramerError as EmbeddedWebsocketFramerError, ReadResult as EmbeddedWebsocketReadMessageType,
-    },
-    Error as EmbeddedWebsocketError, WebSocketCloseStatusCode as EmbeddedWebsocketCloseStatusCode,
-    WebSocketOptions as EmbeddedWebsocketOptions,
-    WebSocketSendMessageType as EmbeddedWebsocketSendMessageType,
-    WebSocketState as EmbeddedWebsocketState,
-};
-
 pub struct WebsocketOpen;
 pub struct WebsocketClosed;
 
@@ -34,7 +24,7 @@ impl<T, Status> AsyncWebsocketClient<T, Status> {
 
 #[cfg(feature = "tungstenite")]
 mod tungstenite_impl {
-    use super::*;
+    use super::{WebsocketOpen, WebsocketClosed, AsyncWebsocketClient, Sink, Stream, PhantomData, Err, XRPLWebsocketException};
     use anyhow::Result;
     use core::{pin::Pin, task::Poll};
     use tokio::net::TcpStream;
@@ -162,12 +152,18 @@ mod tungstenite_impl {
 
 #[cfg(feature = "embedded-websocket")]
 mod embedded_websocket_impl {
-    use super::*;
+    use super::{WebsocketOpen, WebsocketClosed, AsyncWebsocketClient, Sink, Stream, PhantomData, Err, XRPLWebsocketException};
     use anyhow::Result;
     use core::{fmt::Debug, ops::Deref};
-    use embedded_websocket::{
-        framer_async::Framer as EmbeddedWebsocketFramer, Client as EmbeddedWebsocketClient,
+    pub use embedded_websocket::{
+        framer_async::{
+            FramerError as EmbeddedWebsocketFramerError, ReadResult as EmbeddedWebsocketReadMessageType, Framer as EmbeddedWebsocketFramer,
+        }, Client as EmbeddedWebsocketClient,
         WebSocket as EmbeddedWebsocket,
+        Error as EmbeddedWebsocketError, WebSocketCloseStatusCode as EmbeddedWebsocketCloseStatusCode,
+        WebSocketOptions as EmbeddedWebsocketOptions,
+        WebSocketSendMessageType as EmbeddedWebsocketSendMessageType,
+        WebSocketState as EmbeddedWebsocketState,
     };
     use rand_core::RngCore;
 

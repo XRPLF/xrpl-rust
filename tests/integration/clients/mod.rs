@@ -1,10 +1,9 @@
-use xrpl::models::requests::AccountInfo;
 
 #[tokio::test]
 #[cfg(feature = "tungstenite")]
 async fn test_websocket_tungstenite_echo() {
-    use super::*;
     use super::super::common::connect_to_wss_tungstinite_echo;
+    use xrpl::models::requests::AccountInfo;
     use xrpl::asynch::clients::async_websocket_client::TungsteniteMessage;
     use futures::{SinkExt, TryStreamExt};
 
@@ -33,8 +32,8 @@ async fn test_websocket_tungstenite_echo() {
 #[tokio::test]
 #[cfg(feature = "embedded-websocket")]
 async fn test_embedded_websocket_echo() {
-    use super::*;
     use super::super::common::{codec::Codec, connect_to_ws_embedded_websocket_tokio_echo};
+    use xrpl::models::requests::AccountInfo;
     use xrpl::asynch::clients::async_websocket_client::EmbeddedWebsocketReadMessageType;
     use tokio_util::codec::Framed;
 
