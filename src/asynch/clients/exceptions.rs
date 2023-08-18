@@ -1,5 +1,6 @@
 use core::fmt::Debug;
 use core::str::Utf8Error;
+#[cfg(feature = "embedded-websocket")]
 use embedded_websocket::framer_async::FramerError;
 use thiserror_no_std::Error;
 
@@ -17,6 +18,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     Utf8(Utf8Error),
     #[error("Invalid HTTP header")]
     HttpHeader,
+    #[cfg(feature = "embedded-websocket")]
     #[error("Websocket error: {0:?}")]
     WebSocket(embedded_websocket::Error),
     #[error("Disconnected")]
@@ -25,6 +27,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     RxBufferTooSmall(usize),
 }
 
+#[cfg(feature = "embedded-websocket")]
 impl<E: Debug> From<FramerError<E>> for XRPLWebsocketException<E> {
     fn from(value: FramerError<E>) -> Self {
         match value {
