@@ -5,8 +5,6 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use alloc::string::ToString;
-
 use crate::{
     constants::{MAX_TRANSFER_FEE, MAX_URI_LENGTH},
     models::{

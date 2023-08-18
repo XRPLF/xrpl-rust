@@ -5,8 +5,6 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use alloc::string::ToString;
-
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::XRPLAccountSetException;
 use crate::{

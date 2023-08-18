@@ -11,7 +11,6 @@ use crate::models::{
     transactions::{Flag, Memo, Signer, Transaction, TransactionType},
     PathStep,
 };
-use alloc::string::ToString;
 
 use crate::Err;
 use crate::_serde::txn_flags;

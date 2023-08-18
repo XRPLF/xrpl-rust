@@ -7,8 +7,6 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use alloc::string::ToString;
-
 use crate::models::{
     model::Model,
     transactions::{Flag, Memo, Signer, Transaction, TransactionType},
