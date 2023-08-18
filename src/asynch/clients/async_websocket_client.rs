@@ -1,17 +1,12 @@
 use super::exceptions::XRPLWebsocketException;
 use crate::Err;
-use alloc::string::ToString;
-use anyhow::Result;
-use core::{fmt::Debug, marker::PhantomData, ops::Deref};
-use embedded_websocket::{
-    framer_async::Framer as EmbeddedWebsocketFramer, Client as EmbeddedWebsocketClient,
-    WebSocket as EmbeddedWebsocket,
-};
+use core::marker::PhantomData;
 use futures::{Sink, Stream};
-use rand_core::RngCore;
 // Exports
+#[cfg(feature = "embedded-websocket")]
+pub use embedded_websocket_impl::*;
 #[cfg(feature = "tungstenite")]
-pub use tungstenite::*;
+pub use tungstenite_impl::*;
 
 pub use embedded_websocket::{
     framer_async::{
@@ -22,9 +17,6 @@ pub use embedded_websocket::{
     WebSocketSendMessageType as EmbeddedWebsocketSendMessageType,
     WebSocketState as EmbeddedWebsocketState,
 };
-
-pub type AsyncWebsocketClientEmbeddedWebsocket<Rng, Status> =
-    AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, Status>;
 
 pub struct WebsocketOpen;
 pub struct WebsocketClosed;
@@ -41,9 +33,9 @@ impl<T, Status> AsyncWebsocketClient<T, Status> {
 }
 
 #[cfg(feature = "tungstenite")]
-mod tungstenite {
+mod tungstenite_impl {
     use super::*;
-    use core::fmt::Display;
+    use anyhow::Result;
     use core::{pin::Pin, task::Poll};
     use tokio::net::TcpStream;
     pub use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
@@ -58,10 +50,14 @@ mod tungstenite {
         Status,
     >;
 
-    impl<T, I> Sink<I> for AsyncWebsocketClient<T, WebsocketOpen>
+    impl<I> Sink<I>
+        for AsyncWebsocketClient<
+            TungsteniteWebsocketStream<TungsteniteMaybeTlsStream<TcpStream>>,
+            WebsocketOpen,
+        >
     where
-        T: Sink<TungsteniteMessage> + Unpin,
-        <T as Sink<TungsteniteMessage>>::Error: Display,
+        // T: Sink<TungsteniteMessage> + Unpin,
+        // <T as Sink<TungsteniteMessage>>::Error: Display,
         I: serde::Serialize,
     {
         type Error = anyhow::Error;
@@ -112,11 +108,16 @@ mod tungstenite {
         }
     }
 
-    impl<T> Stream for AsyncWebsocketClient<T, WebsocketOpen>
-    where
-        T: Stream + Unpin,
+    impl Stream
+        for AsyncWebsocketClient<
+            TungsteniteWebsocketStream<TungsteniteMaybeTlsStream<TcpStream>>,
+            WebsocketOpen,
+        >
+    // where
+    // T: Stream + Unpin,
     {
-        type Item = <T as Stream>::Item;
+        type Item =
+            <TungsteniteWebsocketStream<TungsteniteMaybeTlsStream<TcpStream>> as Stream>::Item;
 
         fn poll_next(
             mut self: Pin<&mut Self>,
@@ -159,139 +160,157 @@ mod tungstenite {
     }
 }
 
-impl<Rng>
-    AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, WebsocketClosed>
-where
-    Rng: RngCore,
-{
-    pub async fn open<'a, B, E>(
-        stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
-        buffer: &'a mut [u8],
-        rng: Rng,
-        websocket_options: &EmbeddedWebsocketOptions<'_>,
-    ) -> Result<
-        AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, WebsocketOpen>,
-    >
-    where
-        B: AsRef<[u8]>,
-        E: Debug,
-    {
-        let websocket = EmbeddedWebsocket::<Rng, EmbeddedWebsocketClient>::new_client(rng);
-        let mut framer = EmbeddedWebsocketFramer::new(websocket);
-        match framer.connect(stream, buffer, websocket_options).await {
-            Ok(Some(_)) => {}
-            Ok(None) => {}
-            Err(error) => return Err!(XRPLWebsocketException::from(error)),
-        }
+#[cfg(feature = "embedded-websocket")]
+mod embedded_websocket_impl {
+    use super::*;
+    use anyhow::Result;
+    use core::{fmt::Debug, ops::Deref};
+    use embedded_websocket::{
+        framer_async::Framer as EmbeddedWebsocketFramer, Client as EmbeddedWebsocketClient,
+        WebSocket as EmbeddedWebsocket,
+    };
+    use rand_core::RngCore;
 
-        Ok(AsyncWebsocketClient {
-            inner: framer,
-            status: PhantomData::<WebsocketOpen>,
-        })
-    }
-}
+    pub type AsyncWebsocketClientEmbeddedWebsocket<Rng, Status> =
+        AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, Status>;
 
-impl<Rng> AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, WebsocketOpen>
-where
-    Rng: RngCore,
-{
-    pub fn encode<E>(
-        &mut self,
-        message_type: EmbeddedWebsocketSendMessageType,
-        end_of_message: bool,
-        from: &[u8],
-        to: &mut [u8],
-    ) -> Result<usize>
+    impl<Rng>
+        AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, WebsocketClosed>
     where
-        E: Debug,
+        Rng: RngCore,
     {
-        match self
-            .inner
-            .encode::<E>(message_type, end_of_message, from, to)
+        pub async fn open<'a, B, E>(
+            stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
+            buffer: &'a mut [u8],
+            rng: Rng,
+            websocket_options: &EmbeddedWebsocketOptions<'_>,
+        ) -> Result<
+            AsyncWebsocketClient<
+                EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>,
+                WebsocketOpen,
+            >,
+        >
+        where
+            B: AsRef<[u8]>,
+            E: Debug,
         {
-            Ok(bytes_written) => Ok(bytes_written),
-            Err(error) => Err!(XRPLWebsocketException::from(error)),
+            let websocket = EmbeddedWebsocket::<Rng, EmbeddedWebsocketClient>::new_client(rng);
+            let mut framer = EmbeddedWebsocketFramer::new(websocket);
+            match framer.connect(stream, buffer, websocket_options).await {
+                Ok(Some(_)) => {}
+                Ok(None) => {}
+                Err(error) => return Err!(XRPLWebsocketException::from(error)),
+            }
+
+            Ok(AsyncWebsocketClient {
+                inner: framer,
+                status: PhantomData::<WebsocketOpen>,
+            })
         }
     }
 
-    pub async fn send<'b, E, R: serde::Serialize>(
-        &mut self,
-        stream: &mut (impl Sink<&'b [u8], Error = E> + Unpin),
-        stream_buf: &'b mut [u8],
-        end_of_message: bool,
-        frame_buf: R,
-    ) -> Result<()>
+    impl<Rng> AsyncWebsocketClient<EmbeddedWebsocketFramer<Rng, EmbeddedWebsocketClient>, WebsocketOpen>
     where
-        E: Debug,
+        Rng: RngCore,
     {
-        match serde_json::to_vec(&frame_buf) {
-            Ok(frame_buf) => match self
+        pub fn encode<E>(
+            &mut self,
+            message_type: EmbeddedWebsocketSendMessageType,
+            end_of_message: bool,
+            from: &[u8],
+            to: &mut [u8],
+        ) -> Result<usize>
+        where
+            E: Debug,
+        {
+            match self
                 .inner
-                .write(
-                    stream,
-                    stream_buf,
-                    EmbeddedWebsocketSendMessageType::Text,
-                    end_of_message,
-                    frame_buf.as_slice(),
-                )
+                .encode::<E>(message_type, end_of_message, from, to)
+            {
+                Ok(bytes_written) => Ok(bytes_written),
+                Err(error) => Err!(XRPLWebsocketException::from(error)),
+            }
+        }
+
+        pub async fn send<'b, E, R: serde::Serialize>(
+            &mut self,
+            stream: &mut (impl Sink<&'b [u8], Error = E> + Unpin),
+            stream_buf: &'b mut [u8],
+            end_of_message: bool,
+            frame_buf: R,
+        ) -> Result<()>
+        where
+            E: Debug,
+        {
+            match serde_json::to_vec(&frame_buf) {
+                Ok(frame_buf) => match self
+                    .inner
+                    .write(
+                        stream,
+                        stream_buf,
+                        EmbeddedWebsocketSendMessageType::Text,
+                        end_of_message,
+                        frame_buf.as_slice(),
+                    )
+                    .await
+                {
+                    Ok(()) => Ok(()),
+                    Err(error) => Err!(XRPLWebsocketException::from(error)),
+                },
+                Err(error) => Err!(error),
+            }
+        }
+
+        pub async fn close<'b, E>(
+            &mut self,
+            stream: &mut (impl Sink<&'b [u8], Error = E> + Unpin),
+            stream_buf: &'b mut [u8],
+            close_status: EmbeddedWebsocketCloseStatusCode,
+            status_description: Option<&str>,
+        ) -> Result<()>
+        where
+            E: Debug,
+        {
+            match self
+                .inner
+                .close(stream, stream_buf, close_status, status_description)
                 .await
             {
                 Ok(()) => Ok(()),
                 Err(error) => Err!(XRPLWebsocketException::from(error)),
-            },
-            Err(error) => Err!(error),
+            }
         }
-    }
 
-    pub async fn close<'b, E>(
-        &mut self,
-        stream: &mut (impl Sink<&'b [u8], Error = E> + Unpin),
-        stream_buf: &'b mut [u8],
-        close_status: EmbeddedWebsocketCloseStatusCode,
-        status_description: Option<&str>,
-    ) -> Result<()>
-    where
-        E: Debug,
-    {
-        match self
-            .inner
-            .close(stream, stream_buf, close_status, status_description)
-            .await
+        pub async fn next<'a, B: Deref<Target = [u8]>, E>(
+            &'a mut self,
+            stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
+            buffer: &'a mut [u8],
+        ) -> Option<Result<EmbeddedWebsocketReadMessageType<'_>>>
+        // TODO: Change to Response as soon as implemented
+        where
+            E: Debug,
         {
-            Ok(()) => Ok(()),
-            Err(error) => Err!(XRPLWebsocketException::from(error)),
+            match self.inner.read(stream, buffer).await {
+                Some(Ok(read_result)) => Some(Ok(read_result)),
+                Some(Err(error)) => Some(Err!(XRPLWebsocketException::from(error))),
+                None => None,
+            }
         }
-    }
 
-    pub async fn next<'a, B: Deref<Target = [u8]>, E>(
-        &'a mut self,
-        stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
-        buffer: &'a mut [u8],
-    ) -> Option<Result<EmbeddedWebsocketReadMessageType<'_>>>
-    // TODO: Change to Response as soon as implemented
-    where
-        E: Debug,
-    {
-        match self.inner.read(stream, buffer).await {
-            Some(Ok(read_result)) => Some(Ok(read_result)),
-            Some(Err(error)) => Some(Err!(XRPLWebsocketException::from(error))),
-            None => None,
-        }
-    }
-
-    pub async fn try_next<'a, B: Deref<Target = [u8]>, E>(
-        &'a mut self,
-        stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
-        buffer: &'a mut [u8],
-    ) -> Result<Option<EmbeddedWebsocketReadMessageType<'_>>>
-    // TODO: Change to Response as soon as implemented
-    where
-        E: Debug,
-    {
-        match self.inner.read(stream, buffer).await {
-            Some(Ok(read_result)) => Ok(Some(read_result)),
-            Some(Err(error)) => Err!(XRPLWebsocketException::from(error)),
-            None => Ok(None),
+        pub async fn try_next<'a, B: Deref<Target = [u8]>, E>(
+            &'a mut self,
+            stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
+            buffer: &'a mut [u8],
+        ) -> Result<Option<EmbeddedWebsocketReadMessageType<'_>>>
+        // TODO: Change to Response as soon as implemented
+        where
+            E: Debug,
+        {
+            match self.inner.read(stream, buffer).await {
+                Some(Ok(read_result)) => Ok(Some(read_result)),
+                Some(Err(error)) => Err!(XRPLWebsocketException::from(error)),
+                None => Ok(None),
+            }
         }
     }
 }

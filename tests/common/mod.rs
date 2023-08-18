@@ -1,12 +1,16 @@
 pub mod codec;
-#[cfg(feature = "tungstenite")]
-use xrpl::asynch::clients::AsyncWebsocketClientTungstenite;
-use xrpl::asynch::clients::{
-    AsyncWebsocketClientEmbeddedWebsocket, EmbeddedWebsocketOptions, WebsocketOpen,
-};
 
-use tokio::net::TcpStream;
+use xrpl::asynch::clients::async_websocket_client::WebsocketOpen;
+#[cfg(feature = "tungstenite")]
+use xrpl::asynch::clients::async_websocket_client::AsyncWebsocketClientTungstenite;
+#[cfg(feature = "embedded-websocket")]
+use xrpl::asynch::clients::async_websocket_client::{
+    AsyncWebsocketClientEmbeddedWebsocket, EmbeddedWebsocketOptions,
+};
+#[cfg(feature = "embedded-websocket")]
 use tokio_util::codec::Framed;
+#[cfg(feature = "embedded-websocket")]
+use tokio::net::TcpStream;
 
 mod constants;
 pub use constants::*;
@@ -21,6 +25,7 @@ pub async fn connect_to_wss_tungstinite_echo() -> AsyncWebsocketClientTungstenit
     websocket
 }
 
+#[cfg(feature = "embedded-websocket")]
 pub async fn connect_to_ws_embedded_websocket_tokio_echo(
     stream: &mut Framed<TcpStream, codec::Codec>,
     buffer: &mut [u8],

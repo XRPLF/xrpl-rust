@@ -1,18 +1,13 @@
-#[cfg(feature = "tungstenite")]
-use super::common::connect_to_wss_tungstinite_echo;
-use super::common::{codec::Codec, connect_to_ws_embedded_websocket_tokio_echo};
-#[cfg(feature = "tungstenite")]
-use futures::{SinkExt, TryStreamExt};
-use tokio_util::codec::Framed;
-use xrpl::asynch::clients::EmbeddedWebsocketReadMessageType;
-
-#[cfg(feature = "tungstenite")]
-use xrpl::asynch::clients::TungsteniteMessage;
 use xrpl::models::requests::AccountInfo;
 
-#[cfg(feature = "tungstenite")]
 #[tokio::test]
+#[cfg(feature = "tungstenite")]
 async fn test_websocket_tungstenite_echo() {
+    use super::*;
+    use super::super::common::connect_to_wss_tungstinite_echo;
+    use xrpl::asynch::clients::async_websocket_client::TungsteniteMessage;
+    use futures::{SinkExt, TryStreamExt};
+
     let mut websocket = connect_to_wss_tungstinite_echo().await;
     let account_info = AccountInfo::new(
         "rJumr5e1HwiuV543H7bqixhtFreChWTaHH",
@@ -36,7 +31,13 @@ async fn test_websocket_tungstenite_echo() {
 }
 
 #[tokio::test]
+#[cfg(feature = "embedded-websocket")]
 async fn test_embedded_websocket_echo() {
+    use super::*;
+    use super::super::common::{codec::Codec, connect_to_ws_embedded_websocket_tokio_echo};
+    use xrpl::asynch::clients::async_websocket_client::EmbeddedWebsocketReadMessageType;
+    use tokio_util::codec::Framed;
+
     let tcp_stream = tokio::net::TcpStream::connect("ws.vi-server.org:80")
         .await
         .unwrap();
