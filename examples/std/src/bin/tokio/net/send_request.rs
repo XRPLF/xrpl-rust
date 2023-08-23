@@ -1,7 +1,6 @@
 use xrpl::asynch::client::{AsyncWebsocketClientTungstenite, TungsteniteMessage};
 use xrpl::models::requests::AccountInfo;
 
-// TODO: add as soon as `AsyncWebsocketClient` is implemented
 #[tokio::main]
 async fn main() {
     let websocket =
