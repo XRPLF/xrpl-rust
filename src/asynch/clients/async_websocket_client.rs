@@ -24,7 +24,10 @@ impl<T, Status> AsyncWebsocketClient<T, Status> {
 
 #[cfg(feature = "tungstenite")]
 mod tungstenite_impl {
-    use super::{WebsocketOpen, WebsocketClosed, AsyncWebsocketClient, Sink, Stream, PhantomData, Err, XRPLWebsocketException};
+    use super::{
+        AsyncWebsocketClient, Err, PhantomData, Sink, Stream, WebsocketClosed, WebsocketOpen,
+        XRPLWebsocketException,
+    };
     use anyhow::Result;
     use core::{pin::Pin, task::Poll};
     use tokio::net::TcpStream;
@@ -46,8 +49,6 @@ mod tungstenite_impl {
             WebsocketOpen,
         >
     where
-        // T: Sink<TungsteniteMessage> + Unpin,
-        // <T as Sink<TungsteniteMessage>>::Error: Display,
         I: serde::Serialize,
     {
         type Error = anyhow::Error;
@@ -103,8 +104,6 @@ mod tungstenite_impl {
             TungsteniteWebsocketStream<TungsteniteMaybeTlsStream<TcpStream>>,
             WebsocketOpen,
         >
-    // where
-    // T: Stream + Unpin,
     {
         type Item =
             <TungsteniteWebsocketStream<TungsteniteMaybeTlsStream<TcpStream>> as Stream>::Item;
@@ -152,15 +151,20 @@ mod tungstenite_impl {
 
 #[cfg(feature = "embedded-websocket")]
 mod embedded_websocket_impl {
-    use super::{WebsocketOpen, WebsocketClosed, AsyncWebsocketClient, Sink, Stream, PhantomData, Err, XRPLWebsocketException};
+    use super::{
+        AsyncWebsocketClient, Err, PhantomData, Sink, Stream, WebsocketClosed, WebsocketOpen,
+        XRPLWebsocketException,
+    };
     use anyhow::Result;
     use core::{fmt::Debug, ops::Deref};
     pub use embedded_websocket::{
         framer_async::{
-            FramerError as EmbeddedWebsocketFramerError, ReadResult as EmbeddedWebsocketReadMessageType, Framer as EmbeddedWebsocketFramer,
-        }, Client as EmbeddedWebsocketClient,
+            Framer as EmbeddedWebsocketFramer, FramerError as EmbeddedWebsocketFramerError,
+            ReadResult as EmbeddedWebsocketReadMessageType,
+        },
+        Client as EmbeddedWebsocketClient, Error as EmbeddedWebsocketError,
         WebSocket as EmbeddedWebsocket,
-        Error as EmbeddedWebsocketError, WebSocketCloseStatusCode as EmbeddedWebsocketCloseStatusCode,
+        WebSocketCloseStatusCode as EmbeddedWebsocketCloseStatusCode,
         WebSocketOptions as EmbeddedWebsocketOptions,
         WebSocketSendMessageType as EmbeddedWebsocketSendMessageType,
         WebSocketState as EmbeddedWebsocketState,
@@ -175,6 +179,7 @@ mod embedded_websocket_impl {
     where
         Rng: RngCore,
     {
+        /// Open a websocket connection.
         pub async fn open<'a, B, E>(
             stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
             buffer: &'a mut [u8],
@@ -209,6 +214,7 @@ mod embedded_websocket_impl {
     where
         Rng: RngCore,
     {
+        /// Encode a message to be sent over the websocket.
         pub fn encode<E>(
             &mut self,
             message_type: EmbeddedWebsocketSendMessageType,
@@ -228,6 +234,7 @@ mod embedded_websocket_impl {
             }
         }
 
+        /// Send a message over the websocket.
         pub async fn send<'b, E, R: serde::Serialize>(
             &mut self,
             stream: &mut (impl Sink<&'b [u8], Error = E> + Unpin),
@@ -257,6 +264,7 @@ mod embedded_websocket_impl {
             }
         }
 
+        /// Close the websocket connection.
         pub async fn close<'b, E>(
             &mut self,
             stream: &mut (impl Sink<&'b [u8], Error = E> + Unpin),
@@ -277,6 +285,7 @@ mod embedded_websocket_impl {
             }
         }
 
+        /// Read a message from the websocket.
         pub async fn next<'a, B: Deref<Target = [u8]>, E>(
             &'a mut self,
             stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
@@ -293,6 +302,9 @@ mod embedded_websocket_impl {
             }
         }
 
+        /// Read a message from the websocket.
+        ///
+        /// This is similar to the `next` method, but returns a `Result<Option<EmbeddedWebsocketReadMessageType>>` rather than an `Option<Result<EmbeddedWebsocketReadMessageType>>`, making for easy use with the ? operator.
         pub async fn try_next<'a, B: Deref<Target = [u8]>, E>(
             &'a mut self,
             stream: &mut (impl Stream<Item = Result<B, E>> + Sink<&'a [u8], Error = E> + Unpin),
