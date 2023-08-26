@@ -46,7 +46,7 @@ async fn test_embedded_websocket_echo() -> Result<()> {
 
     let tcp_stream = tokio::net::TcpStream::connect("ws.vi-server.org:80")
         .await
-        .unwrap();
+        .map_err(|_| anyhow!("Error connecting to websocket"))?;
     let mut framed = Framed::new(tcp_stream, Codec::new());
     let mut buffer = [0u8; 4096];
     let mut websocket =
@@ -71,7 +71,7 @@ async fn test_embedded_websocket_echo() -> Result<()> {
                 EmbeddedWebsocketReadMessageType::Ping(_) => {
                     ping_counter += 1;
                     if ping_counter > 1 {
-                        panic!("Expected only one ping");
+                        return Err(anyhow!("Expected only one ping"));
                     }
                 }
                 EmbeddedWebsocketReadMessageType::Text(text) => {
