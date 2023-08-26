@@ -105,6 +105,8 @@ pub fn posix_to_ripple_time(timestamp: i64) -> Result<i64, XRPLTimeRangeExceptio
 
 #[cfg(test)]
 mod test {
+    use anyhow::{anyhow, Result};
+
     use super::*;
 
     #[test]
@@ -115,10 +117,11 @@ mod test {
 
     #[test]
     fn test_datetime_to_ripple_time() {
-        assert_eq!(
-            Ok(0_i64),
-            datetime_to_ripple_time(Utc.timestamp(RIPPLE_EPOCH, 0))
-        );
+        let actual = match Utc.timestamp_opt(RIPPLE_EPOCH, 0) {
+            LocalResult::Single(dt) => datetime_to_ripple_time(dt),
+            _ => Err(XRPLTimeRangeException::InvalidLocalTime),
+        };
+        assert_eq!(Ok(0_i64), actual);
     }
 
     #[test]
@@ -144,34 +147,52 @@ mod test {
     }
 
     #[test]
-    fn accept_datetime_round_trip() {
-        let current_time: DateTime<Utc> = Utc.timestamp(Utc::now().timestamp(), 0);
+    fn accept_datetime_round_trip() -> Result<()> {
+        let current_time: DateTime<Utc> = match Utc.timestamp_opt(Utc::now().timestamp(), 0) {
+            LocalResult::Single(dt) => dt,
+            _ => return Err(anyhow!("Invalid local time")),
+        };
         let ripple_time: i64 = datetime_to_ripple_time(current_time).unwrap();
         let round_trip_time = ripple_time_to_datetime(ripple_time);
 
         assert_eq!(Ok(current_time), round_trip_time);
+
+        Ok(())
     }
 
     #[test]
-    fn accept_ripple_epoch() {
-        assert_eq!(
-            Ok(Utc.ymd(2000, 1, 1).and_hms(0, 0, 0)),
-            ripple_time_to_datetime(0)
-        );
+    fn accept_ripple_epoch() -> Result<()> {
+        let expected = match Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0) {
+            LocalResult::Single(dt) => dt,
+            _ => return Err(anyhow!("Invalid local time")),
+        };
+        assert_eq!(Ok(expected), ripple_time_to_datetime(0));
+
+        Ok(())
     }
 
     /// "Ripple Epoch" time starts in the year 2000
     #[test]
-    fn accept_datetime_underflow() {
-        let datetime: DateTime<Utc> = Utc.ymd(1999, 1, 1).and_hms(0, 0, 0);
-        assert!(datetime_to_ripple_time(datetime).is_err())
+    fn accept_datetime_underflow() -> Result<()> {
+        let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(1999, 1, 1, 0, 0, 0) {
+            LocalResult::Single(dt) => dt,
+            _ => return Err(anyhow!("Invalid local time")),
+        };
+        assert!(datetime_to_ripple_time(datetime).is_err());
+
+        Ok(())
     }
 
     /// "Ripple Epoch" time starts in the year 2000
     #[test]
-    fn accept_posix_underflow() {
-        let datetime: DateTime<Utc> = Utc.ymd(1999, 1, 1).and_hms(0, 0, 0);
-        assert!(posix_to_ripple_time(datetime.timestamp()).is_err())
+    fn accept_posix_underflow() -> Result<()> {
+        let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(1999, 1, 1, 0, 0, 0) {
+            LocalResult::Single(dt) => dt,
+            _ => return Err(anyhow!("Invalid local time")),
+        };
+        assert!(posix_to_ripple_time(datetime.timestamp()).is_err());
+
+        Ok(())
     }
 
     /// "Ripple Epoch" time's equivalent to the
@@ -180,14 +201,24 @@ mod test {
     /// starting 30 years after UNIX time's signed
     /// 32-bit int.
     #[test]
-    fn accept_datetime_overflow() {
-        let datetime: DateTime<Utc> = Utc.ymd(2137, 1, 1).and_hms(0, 0, 0);
-        assert!(datetime_to_ripple_time(datetime).is_err())
+    fn accept_datetime_overflow() -> Result<()> {
+        let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(2137, 1, 1, 0, 0, 0) {
+            LocalResult::Single(dt) => dt,
+            _ => return Err(anyhow!("Invalid local time")),
+        };
+        assert!(datetime_to_ripple_time(datetime).is_err());
+
+        Ok(())
     }
 
     #[test]
-    fn accept_posix_overflow() {
-        let datetime: DateTime<Utc> = Utc.ymd(2137, 1, 1).and_hms(0, 0, 0);
-        assert!(posix_to_ripple_time(datetime.timestamp()).is_err())
+    fn accept_posix_overflow() -> Result<()> {
+        let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(2137, 1, 1, 0, 0, 0) {
+            LocalResult::Single(dt) => dt,
+            _ => return Err(anyhow!("Invalid local time")),
+        };
+        assert!(posix_to_ripple_time(datetime.timestamp()).is_err());
+
+        Ok(())
     }
 }
