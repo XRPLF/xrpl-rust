@@ -1,5 +1,9 @@
-use xrpl::asynch::client::{AsyncWebsocketClientTungstenite, TungsteniteMessage};
+use xrpl::asynch::clients::async_websocket_client::{
+    AsyncWebsocketClientTungstenite, TungsteniteMessage,
+};
 use xrpl::models::requests::AccountInfo;
+
+use futures::{SinkExt, TryStreamExt};
 
 #[tokio::main]
 async fn main() {
