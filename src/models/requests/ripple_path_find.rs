@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -26,10 +27,10 @@ use crate::models::{currency::Currency, requests::RequestMethod, Model};
 pub struct RipplePathFind<'a> {
     /// Unique address of the account that would send funds
     /// in a transaction.
-    pub source_account: &'a str,
+    pub source_account: Cow<'a, str>,
     /// Unique address of the account that would receive funds
     /// in a transaction.
-    pub destination_account: &'a str,
+    pub destination_account: Cow<'a, str>,
     /// Currency Amount that the destination account would
     /// receive in a transaction. Special case: New in: rippled 0.30.0
     /// You can specify "-1" (for XRP) or provide -1 as the contents
@@ -38,12 +39,12 @@ pub struct RipplePathFind<'a> {
     /// than the amount specified in send_max (if provided).
     pub destination_amount: Currency<'a>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Currency Amount that would be spent in the transaction.
     /// Cannot be used with source_currencies.
     pub send_max: Option<Currency<'a>>,
@@ -63,8 +64,8 @@ pub struct RipplePathFind<'a> {
 impl<'a> Default for RipplePathFind<'a> {
     fn default() -> Self {
         RipplePathFind {
-            source_account: "",
-            destination_account: "",
+            source_account: "".into(),
+            destination_account: "".into(),
             destination_amount: Currency::XRP(XRP::new()),
             id: None,
             ledger_hash: None,
@@ -80,12 +81,12 @@ impl<'a> Model for RipplePathFind<'a> {}
 
 impl<'a> RipplePathFind<'a> {
     pub fn new(
-        source_account: &'a str,
-        destination_account: &'a str,
+        source_account: Cow<'a, str>,
+        destination_account: Cow<'a, str>,
         destination_amount: Currency<'a>,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         send_max: Option<Currency<'a>>,
         source_currencies: Option<Vec<Currency<'a>>>,
     ) -> Self {

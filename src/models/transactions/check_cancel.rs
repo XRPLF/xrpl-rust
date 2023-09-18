@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -30,7 +31,7 @@ pub struct CheckCancel<'a> {
     #[serde(default = "TransactionType::check_cancel")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -50,11 +51,11 @@ pub struct CheckCancel<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -66,7 +67,7 @@ pub struct CheckCancel<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
@@ -81,7 +82,7 @@ pub struct CheckCancel<'a> {
     // See CheckCancel fields:
     // `<https://xrpl.org/checkcancel.html#checkcancel-fields>`
     #[serde(rename = "CheckID")]
-    pub check_id: &'a str,
+    pub check_id: Cow<'a, str>,
 }
 
 impl<'a> Default for CheckCancel<'a> {
@@ -115,16 +116,16 @@ impl<'a> Transaction for CheckCancel<'a> {
 
 impl<'a> CheckCancel<'a> {
     pub fn new(
-        account: &'a str,
-        check_id: &'a str,
+        account: Cow<'a, str>,
+        check_id: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
     ) -> Self {
@@ -154,8 +155,8 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = CheckCancel::new(
-            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo",
-            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0",
+            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
             Some("12".into()),
             None,
             None,
@@ -178,8 +179,8 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = CheckCancel::new(
-            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo",
-            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0",
+            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
             Some("12".into()),
             None,
             None,

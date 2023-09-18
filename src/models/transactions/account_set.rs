@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -84,7 +85,7 @@ pub struct AccountSet<'a> {
     #[serde(default = "TransactionType::account_set")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -104,11 +105,11 @@ pub struct AccountSet<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -120,7 +121,7 @@ pub struct AccountSet<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     #[serde(default)]
     #[serde(with = "txn_flags")]
@@ -141,22 +142,22 @@ pub struct AccountSet<'a> {
     /// The domain that owns this account, as a string of hex
     /// representing the ASCII for the domain in lowercase.
     /// Cannot be more than 256 bytes in length.
-    pub domain: Option<&'a str>,
+    pub domain: Option<Cow<'a, str>>,
     /// Hash of an email address to be used for generating an
     /// avatar image. Conventionally, clients use Gravatar
     /// to display this image.
-    pub email_hash: Option<&'a str>,
+    pub email_hash: Option<Cow<'a, str>>,
     /// Public key for sending encrypted messages to this account.
     /// To set the key, it must be exactly 33 bytes, with the
     /// first byte indicating the key type: 0x02 or 0x03 for
     /// secp256k1 keys, 0xED for Ed25519 keys. To remove the
     /// key, use an empty value.
-    pub message_key: Option<&'a str>,
+    pub message_key: Option<Cow<'a, str>>,
     /// Sets an alternate account that is allowed to mint NFTokens
     /// on this account's behalf using NFTokenMint's Issuer field.
     /// This field is part of the experimental XLS-20 standard
     /// for non-fungible tokens.
-    pub nftoken_minter: Option<&'a str>,
+    pub nftoken_minter: Option<Cow<'a, str>>,
     /// Flag to enable for this account.
     pub set_flag: Option<AccountSetFlag>,
     /// The fee to charge when users transfer this account's tokens,
@@ -261,17 +262,17 @@ impl<'a> AccountSetError for AccountSet<'a> {
         if let Some(tick_size) = self.tick_size {
             if tick_size > MAX_TICK_SIZE {
                 Err(XRPLAccountSetException::ValueTooHigh {
-                    field: "tick_size",
+                    field: "tick_size".into(),
                     max: MAX_TICK_SIZE,
                     found: tick_size,
-                    resource: "",
+                    resource: "".into(),
                 })
             } else if tick_size < MIN_TICK_SIZE && tick_size != DISABLE_TICK_SIZE {
                 Err(XRPLAccountSetException::ValueTooLow {
-                    field: "tick_size",
+                    field: "tick_size".into(),
                     min: MIN_TICK_SIZE,
                     found: tick_size,
-                    resource: "",
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -285,19 +286,19 @@ impl<'a> AccountSetError for AccountSet<'a> {
         if let Some(transfer_rate) = self.transfer_rate {
             if transfer_rate > MAX_TRANSFER_RATE {
                 Err(XRPLAccountSetException::ValueTooHigh {
-                    field: "transfer_rate",
+                    field: "transfer_rate".into(),
                     max: MAX_TRANSFER_RATE,
                     found: transfer_rate,
-                    resource: "",
+                    resource: "".into(),
                 })
             } else if transfer_rate < MIN_TRANSFER_RATE
                 && transfer_rate != SPECIAL_CASE_TRANFER_RATE
             {
                 Err(XRPLAccountSetException::ValueTooLow {
-                    field: "transfer_rate",
+                    field: "transfer_rate".into(),
                     min: MIN_TRANSFER_RATE,
                     found: transfer_rate,
-                    resource: "",
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -308,20 +309,20 @@ impl<'a> AccountSetError for AccountSet<'a> {
     }
 
     fn _get_domain_error(&self) -> Result<(), XRPLAccountSetException> {
-        if let Some(domain) = self.domain {
+        if let Some(domain) = self.domain.clone() {
             if domain.to_lowercase().as_str() != domain {
                 Err(XRPLAccountSetException::InvalidValueFormat {
-                    field: "domain",
+                    field: "domain".into(),
                     found: domain,
-                    format: "lowercase",
-                    resource: "",
+                    format: "lowercase".into(),
+                    resource: "".into(),
                 })
             } else if domain.len() > MAX_DOMAIN_LENGTH {
                 Err(XRPLAccountSetException::ValueTooLong {
-                    field: "domain",
+                    field: "domain".into(),
                     max: MAX_DOMAIN_LENGTH,
                     found: domain.len(),
-                    resource: "",
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -336,7 +337,7 @@ impl<'a> AccountSetError for AccountSet<'a> {
         {
             Err(XRPLAccountSetException::SetAndUnsetSameFlag {
                 found: self.clear_flag.clone().unwrap(),
-                resource: "",
+                resource: "".into(),
             })
         } else {
             Ok(())
@@ -344,24 +345,24 @@ impl<'a> AccountSetError for AccountSet<'a> {
     }
 
     fn _get_nftoken_minter_error(&self) -> Result<(), XRPLAccountSetException> {
-        if let Some(_nftoken_minter) = self.nftoken_minter {
+        if let Some(_nftoken_minter) = self.nftoken_minter.clone() {
             if self.set_flag.is_none() {
                 if let Some(clear_flag) = &self.clear_flag {
                     match clear_flag {
                         AccountSetFlag::AsfAuthorizedNFTokenMinter => {
                             Err(XRPLAccountSetException::SetFieldWhenUnsetRequiredFlag {
-                                field: "nftoken_minter",
+                                field: "nftoken_minter".into(),
                                 flag: AccountSetFlag::AsfAuthorizedNFTokenMinter,
-                                resource: "",
+                                resource: "".into(),
                             })
                         }
                         _ => Ok(()),
                     }
                 } else {
                     Err(XRPLAccountSetException::FieldRequiresFlag {
-                        field: "set_flag",
+                        field: "set_flag".into(),
                         flag: AccountSetFlag::AsfAuthorizedNFTokenMinter,
-                        resource: "",
+                        resource: "".into(),
                     })
                 }
             } else {
@@ -372,8 +373,8 @@ impl<'a> AccountSetError for AccountSet<'a> {
                 AccountSetFlag::AsfAuthorizedNFTokenMinter => {
                     Err(XRPLAccountSetException::FlagRequiresField {
                         flag: AccountSetFlag::AsfAuthorizedNFTokenMinter,
-                        field: "nftoken_minter",
-                        resource: "",
+                        field: "nftoken_minter".into(),
+                        resource: "".into(),
                     })
                 }
                 _ => Ok(()),
@@ -386,26 +387,26 @@ impl<'a> AccountSetError for AccountSet<'a> {
 
 impl<'a> AccountSet<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         flags: Option<Vec<AccountSetFlag>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         clear_flag: Option<AccountSetFlag>,
-        domain: Option<&'a str>,
-        email_hash: Option<&'a str>,
-        message_key: Option<&'a str>,
+        domain: Option<Cow<'a, str>>,
+        email_hash: Option<Cow<'a, str>>,
+        message_key: Option<Cow<'a, str>>,
         set_flag: Option<AccountSetFlag>,
         transfer_rate: Option<u32>,
         tick_size: Option<u32>,
-        nftoken_minter: Option<&'a str>,
+        nftoken_minter: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             transaction_type: TransactionType::AccountSet,
@@ -453,7 +454,7 @@ mod test_account_set_errors {
     fn test_tick_size_error() {
         let mut account_set = AccountSet {
             transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -495,7 +496,7 @@ mod test_account_set_errors {
     fn test_transfer_rate_error() {
         let mut account_set = AccountSet {
             transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -537,7 +538,7 @@ mod test_account_set_errors {
     fn test_domain_error() {
         let mut account_set = AccountSet {
             transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -558,7 +559,7 @@ mod test_account_set_errors {
             tick_size: None,
             nftoken_minter: None,
         };
-        let domain_not_lowercase = Some("https://Example.com/");
+        let domain_not_lowercase = Some("https://Example.com/".into());
         account_set.domain = domain_not_lowercase;
 
         assert_eq!(
@@ -566,7 +567,7 @@ mod test_account_set_errors {
             "The value of the field `domain` does not have the correct format (expected lowercase, found https://Example.com/). For more information see: "
         );
 
-        let domain_too_long = Some("https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let domain_too_long = Some("https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
         account_set.domain = domain_too_long;
 
         assert_eq!(
@@ -579,7 +580,7 @@ mod test_account_set_errors {
     fn test_flag_error() {
         let account_set = AccountSet {
             transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -611,7 +612,7 @@ mod test_account_set_errors {
     fn test_asf_authorized_nftoken_minter_error() {
         let mut account_set = AccountSet {
             transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -632,7 +633,7 @@ mod test_account_set_errors {
             tick_size: None,
             nftoken_minter: None,
         };
-        account_set.nftoken_minter = Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK");
+        account_set.nftoken_minter = Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into());
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -648,7 +649,7 @@ mod test_account_set_errors {
         );
 
         account_set.set_flag = None;
-        account_set.nftoken_minter = Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK");
+        account_set.nftoken_minter = Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into());
         account_set.clear_flag = Some(AccountSetFlag::AsfAuthorizedNFTokenMinter);
 
         assert_eq!(
@@ -665,7 +666,7 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = AccountSet::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             Some("12".into()),
             Some(5),
             None,
@@ -678,9 +679,9 @@ mod test_serde {
             None,
             None,
             None,
-            Some("6578616D706C652E636F6D"),
+            Some("6578616D706C652E636F6D".into()),
             None,
-            Some("03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB"),
+            Some("03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB".into()),
             Some(AccountSetFlag::AsfAccountTxnID),
             None,
             None,
@@ -697,7 +698,7 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = AccountSet::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             Some("12".into()),
             Some(5),
             None,
@@ -710,9 +711,9 @@ mod test_serde {
             None,
             None,
             None,
-            Some("6578616D706C652E636F6D"),
+            Some("6578616D706C652E636F6D".into()),
             None,
-            Some("03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB"),
+            Some("03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB".into()),
             Some(AccountSetFlag::AsfAccountTxnID),
             None,
             None,

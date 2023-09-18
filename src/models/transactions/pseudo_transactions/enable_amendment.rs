@@ -1,4 +1,5 @@
 use crate::_serde::txn_flags;
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -41,7 +42,7 @@ pub struct EnableAmendment<'a> {
     #[serde(default = "TransactionType::enable_amendment")]
     transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -55,7 +56,7 @@ pub struct EnableAmendment<'a> {
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -63,7 +64,7 @@ pub struct EnableAmendment<'a> {
     pub source_tag: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     #[serde(default)]
     #[serde(with = "txn_flags")]
@@ -72,7 +73,7 @@ pub struct EnableAmendment<'a> {
     ///
     /// See EnableAmendment fields:
     /// `<https://xrpl.org/enableamendment.html#enableamendment-fields>`
-    pub amendment: &'a str,
+    pub amendment: Cow<'a, str>,
     pub ledger_sequence: u32,
 }
 
@@ -104,14 +105,14 @@ impl<'a> Transaction for EnableAmendment<'a> {
 
 impl<'a> EnableAmendment<'a> {
     pub fn new(
-        account: &'a str,
-        amendment: &'a str,
+        account: Cow<'a, str>,
+        amendment: Cow<'a, str>,
         ledger_sequence: u32,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
-        signing_pub_key: Option<&'a str>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         flags: Option<Vec<EnableAmendmentFlag>>,
     ) -> Self {
         Self {

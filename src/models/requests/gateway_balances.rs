@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -14,20 +15,20 @@ use crate::models::{requests::RequestMethod, Model};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct GatewayBalances<'a> {
     /// The Address to check. This should be the issuing address.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// If true, only accept an address or public key for the
     /// account parameter. Defaults to false.
     pub strict: Option<bool>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger version to use, or a
     /// shortcut string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// An operational address to exclude from the balances
     /// issued, or an array of such addresses.
-    pub hotwallet: Option<Vec<&'a str>>,
+    pub hotwallet: Option<Vec<Cow<'a, str>>>,
     /// The request method.
     #[serde(default = "RequestMethod::deposit_authorization")]
     pub command: RequestMethod,
@@ -36,7 +37,7 @@ pub struct GatewayBalances<'a> {
 impl<'a> Default for GatewayBalances<'a> {
     fn default() -> Self {
         GatewayBalances {
-            account: "",
+            account: "".into(),
             id: None,
             strict: None,
             ledger_hash: None,
@@ -51,12 +52,12 @@ impl<'a> Model for GatewayBalances<'a> {}
 
 impl<'a> GatewayBalances<'a> {
     pub fn new(
-        account: &'a str,
-        id: Option<&'a str>,
+        account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
         strict: Option<bool>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
-        hotwallet: Option<Vec<&'a str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
+        hotwallet: Option<Vec<Cow<'a, str>>>,
     ) -> Self {
         Self {
             account,

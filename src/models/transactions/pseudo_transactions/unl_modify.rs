@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -35,7 +36,7 @@ pub struct UNLModify<'a> {
     #[serde(default = "TransactionType::unl_modify")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -49,7 +50,7 @@ pub struct UNLModify<'a> {
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -57,7 +58,7 @@ pub struct UNLModify<'a> {
     pub source_tag: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// The custom fields for the UNLModify model.
@@ -66,7 +67,7 @@ pub struct UNLModify<'a> {
     /// `<https://xrpl.org/unlmodify.html#unlmodify-fields>`
     pub ledger_sequence: u32,
     pub unlmodify_disabling: UNLModifyDisabling,
-    pub unlmodify_validator: &'a str,
+    pub unlmodify_validator: Cow<'a, str>,
 }
 
 impl<'a> Model for UNLModify<'a> {}
@@ -79,15 +80,15 @@ impl<'a> Transaction for UNLModify<'a> {
 
 impl<'a> UNLModify<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         ledger_sequence: u32,
         unlmodify_disabling: UNLModifyDisabling,
-        unlmodify_validator: &'a str,
+        unlmodify_validator: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
-        signing_pub_key: Option<&'a str>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             transaction_type: TransactionType::UNLModify,

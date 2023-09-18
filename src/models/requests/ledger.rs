@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -11,12 +12,12 @@ use crate::models::{requests::RequestMethod, Model};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Ledger<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Admin required. If true, return full information on
     /// the entire ledger. Ignored if you did not specify a
     /// ledger version. Defaults to false. (Equivalent to
@@ -77,9 +78,9 @@ impl<'a> Model for Ledger<'a> {}
 
 impl<'a> Ledger<'a> {
     pub fn new(
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         full: Option<bool>,
         accounts: Option<bool>,
         transactions: Option<bool>,

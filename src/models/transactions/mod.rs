@@ -53,6 +53,7 @@ pub use ticket_create::*;
 pub use trust_set::*;
 
 use crate::serde_with_tag;
+use alloc::borrow::Cow;
 use alloc::string::String;
 use derive_new::new;
 use serde::ser::SerializeMap;
@@ -207,9 +208,9 @@ pub struct Memo {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone, new)]
 #[serde(rename_all = "PascalCase")]
 pub struct Signer<'a> {
-    account: &'a str,
-    txn_signature: &'a str,
-    signing_pub_key: &'a str,
+    account: Cow<'a, str>,
+    txn_signature: Cow<'a, str>,
+    signing_pub_key: Cow<'a, str>,
 }
 
 /// Standard functions for transactions.

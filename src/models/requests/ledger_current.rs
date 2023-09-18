@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -13,7 +14,7 @@ use crate::models::{requests::RequestMethod, Model};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct LedgerCurrent<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// The request method.
     #[serde(default = "RequestMethod::ledger_current")]
     pub command: RequestMethod,
@@ -31,7 +32,7 @@ impl<'a> Default for LedgerCurrent<'a> {
 impl<'a> Model for LedgerCurrent<'a> {}
 
 impl<'a> LedgerCurrent<'a> {
-    pub fn new(id: Option<&'a str>) -> Self {
+    pub fn new(id: Option<Cow<'a, str>>) -> Self {
         Self {
             id,
             command: RequestMethod::LedgerCurrent,

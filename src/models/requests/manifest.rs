@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -16,9 +17,9 @@ pub struct Manifest<'a> {
     /// The base58-encoded public key of the validator
     /// to look up. This can be the master public key or
     /// ephemeral public key.
-    pub public_key: &'a str,
+    pub public_key: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// The request method.
     #[serde(default = "RequestMethod::manifest")]
     pub command: RequestMethod,
@@ -27,7 +28,7 @@ pub struct Manifest<'a> {
 impl<'a> Default for Manifest<'a> {
     fn default() -> Self {
         Manifest {
-            public_key: "",
+            public_key: "".into(),
             id: None,
             command: RequestMethod::Manifest,
         }
@@ -37,7 +38,7 @@ impl<'a> Default for Manifest<'a> {
 impl<'a> Model for Manifest<'a> {}
 
 impl<'a> Manifest<'a> {
-    pub fn new(public_key: &'a str, id: Option<&'a str>) -> Self {
+    pub fn new(public_key: Cow<'a, str>, id: Option<Cow<'a, str>>) -> Self {
         Self {
             public_key,
             id,

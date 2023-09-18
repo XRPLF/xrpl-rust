@@ -28,6 +28,7 @@ use derive_new::new;
 pub use model::Model;
 
 use crate::models::currency::{Currency, XRP};
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
@@ -52,11 +53,11 @@ pub enum AccountObjectType {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone, new)]
 #[serde(rename_all = "PascalCase")]
 pub struct PathStep<'a> {
-    account: Option<&'a str>,
-    currency: Option<&'a str>,
-    issuer: Option<&'a str>,
+    account: Option<Cow<'a, str>>,
+    currency: Option<Cow<'a, str>>,
+    issuer: Option<Cow<'a, str>>,
     r#type: Option<u8>,
-    type_hex: Option<&'a str>,
+    type_hex: Option<Cow<'a, str>>,
 }
 
 /// Returns a Currency as XRP for the currency, without a value.

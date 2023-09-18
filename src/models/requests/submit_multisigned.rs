@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -18,7 +19,7 @@ use crate::models::{requests::RequestMethod, Model};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct SubmitMultisigned<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// If true, and the transaction fails locally, do not
     /// retry or relay the transaction to other servers.
     pub fail_hard: Option<bool>,
@@ -40,7 +41,7 @@ impl<'a> Default for SubmitMultisigned<'a> {
 impl<'a> Model for SubmitMultisigned<'a> {}
 
 impl<'a> SubmitMultisigned<'a> {
-    pub fn new(id: Option<&'a str>, fail_hard: Option<bool>) -> Self {
+    pub fn new(id: Option<Cow<'a, str>>, fail_hard: Option<bool>) -> Self {
         Self {
             id,
             fail_hard,

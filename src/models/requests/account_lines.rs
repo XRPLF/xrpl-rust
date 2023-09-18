@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -15,21 +16,21 @@ use crate::models::{requests::RequestMethod, Model};
 pub struct AccountLines<'a> {
     /// A unique identifier for the account, most commonly the
     /// account's Address.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Limit the number of trust lines to retrieve. The server
     /// is not required to honor this value. Must be within the
     /// inclusive range 10 to 400.
     pub limit: Option<u16>,
     /// The Address of a second account. If provided, show only
     /// lines of trust connecting the two accounts.
-    pub peer: Option<&'a str>,
+    pub peer: Option<Cow<'a, str>>,
     /// Value from a previous paginated response. Resume retrieving
     /// data where that response left off.
     pub marker: Option<u32>,
@@ -41,7 +42,7 @@ pub struct AccountLines<'a> {
 impl<'a> Default for AccountLines<'a> {
     fn default() -> Self {
         AccountLines {
-            account: "",
+            account: "".into(),
             id: None,
             ledger_hash: None,
             ledger_index: None,
@@ -57,12 +58,12 @@ impl<'a> Model for AccountLines<'a> {}
 
 impl<'a> AccountLines<'a> {
     pub fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
-        peer: Option<&'a str>,
+        peer: Option<Cow<'a, str>>,
         marker: Option<u32>,
     ) -> Self {
         Self {

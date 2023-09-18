@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -14,7 +15,7 @@ use crate::models::{currency::Currency, default_false, requests::RequestMethod, 
 pub struct SubscribeBook<'a> {
     pub taker_gets: Currency<'a>,
     pub taker_pays: Currency<'a>,
-    pub taker: &'a str,
+    pub taker: Cow<'a, str>,
     #[serde(default = "default_false")]
     pub snapshot: Option<bool>,
     #[serde(default = "default_false")]
@@ -47,7 +48,7 @@ pub enum StreamParameter {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Subscribe<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// Array of objects defining order books  to monitor for
     /// updates, as detailed below.
     pub books: Option<Vec<SubscribeBook<'a>>>,
@@ -57,17 +58,17 @@ pub struct Subscribe<'a> {
     /// for validated transactions. The addresses must be in the
     /// XRP Ledger's base58 format. The server sends a notification
     /// for any transaction that affects at least one of these accounts.
-    pub accounts: Option<Vec<&'a str>>,
+    pub accounts: Option<Vec<Cow<'a, str>>>,
     /// Like accounts, but include transactions that are not
     /// yet finalized.
-    pub accounts_proposed: Option<Vec<&'a str>>,
+    pub accounts_proposed: Option<Vec<Cow<'a, str>>>,
     /// (Optional for Websocket; Required otherwise) URL where the server
     /// sends a JSON-RPC callbacks for each event. Admin-only.
-    pub url: Option<&'a str>,
+    pub url: Option<Cow<'a, str>>,
     /// Username to provide for basic authentication at the callback URL.
-    pub url_username: Option<&'a str>,
+    pub url_username: Option<Cow<'a, str>>,
     /// Password to provide for basic authentication at the callback URL.
-    pub url_password: Option<&'a str>,
+    pub url_password: Option<Cow<'a, str>>,
     /// The request method.
     // #[serde(skip_serializing)]
     #[serde(default = "RequestMethod::subscribe")]
@@ -94,14 +95,14 @@ impl<'a> Model for Subscribe<'a> {}
 
 impl<'a> Subscribe<'a> {
     pub fn new(
-        id: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
         books: Option<Vec<SubscribeBook<'a>>>,
         streams: Option<Vec<StreamParameter>>,
-        accounts: Option<Vec<&'a str>>,
-        accounts_proposed: Option<Vec<&'a str>>,
-        url: Option<&'a str>,
-        url_username: Option<&'a str>,
-        url_password: Option<&'a str>,
+        accounts: Option<Vec<Cow<'a, str>>>,
+        accounts_proposed: Option<Vec<Cow<'a, str>>>,
+        url: Option<Cow<'a, str>>,
+        url_username: Option<Cow<'a, str>>,
+        url_password: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             id,

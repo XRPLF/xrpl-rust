@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -11,7 +12,7 @@ use crate::models::{requests::RequestMethod, Model};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Tx<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// If true, return transaction data and metadata as binary
     /// serialized to hexadecimal strings. If false, return
     /// transaction data and metadata as JSON. The default is false.
@@ -47,7 +48,7 @@ impl<'a> Model for Tx<'a> {}
 
 impl<'a> Tx<'a> {
     pub fn new(
-        id: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
         binary: Option<bool>,
         min_ledger: Option<u32>,
         max_ledger: Option<u32>,

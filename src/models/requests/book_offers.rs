@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -22,12 +23,12 @@ pub struct BookOffers<'a> {
     /// like currency amounts.
     pub taker_pays: Currency<'a>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// If provided, the server does not provide more than
     /// this many offers in the results. The total number of
     /// results returned may be fewer than the limit,
@@ -37,7 +38,7 @@ pub struct BookOffers<'a> {
     /// Unfunded offers placed by this account are always
     /// included in the response. (You can use this to look
     /// up your own orders to cancel them.)
-    pub taker: Option<&'a str>,
+    pub taker: Option<Cow<'a, str>>,
     /// The request method.
     #[serde(default = "RequestMethod::book_offers")]
     pub command: RequestMethod,
@@ -64,11 +65,11 @@ impl<'a> BookOffers<'a> {
     pub fn new(
         taker_gets: Currency<'a>,
         taker_pays: Currency<'a>,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
-        taker: Option<&'a str>,
+        taker: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             taker_gets,

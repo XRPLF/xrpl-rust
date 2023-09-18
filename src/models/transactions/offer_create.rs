@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -63,7 +64,7 @@ pub struct OfferCreate<'a> {
     #[serde(default = "TransactionType::offer_create")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -83,11 +84,11 @@ pub struct OfferCreate<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -99,7 +100,7 @@ pub struct OfferCreate<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     #[serde(default)]
     #[serde(with = "txn_flags")]
@@ -175,17 +176,17 @@ impl<'a> Transaction for OfferCreate<'a> {
 
 impl<'a> OfferCreate<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         taker_gets: Amount<'a>,
         taker_pays: Amount<'a>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         flags: Option<Vec<OfferCreateFlag>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
@@ -225,7 +226,7 @@ mod test {
     fn test_has_flag() {
         let txn: OfferCreate = OfferCreate {
             transaction_type: TransactionType::OfferCreate,
-            account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe",
+            account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
             fee: Some("10".into()),
             sequence: Some(1),
             last_ledger_sequence: Some(72779837),
@@ -254,7 +255,7 @@ mod test {
     fn test_get_transaction_type() {
         let txn: OfferCreate = OfferCreate {
             transaction_type: TransactionType::OfferCreate,
-            account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe",
+            account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
             fee: Some("10".into()),
             sequence: Some(1),
             last_ledger_sequence: Some(72779837),
@@ -290,7 +291,7 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = OfferCreate::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
             Amount::XRPAmount(XRPAmount::from("6000000")),
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "GKO".into(),
@@ -322,7 +323,7 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = OfferCreate::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
             Amount::XRPAmount(XRPAmount::from("6000000")),
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "GKO".into(),

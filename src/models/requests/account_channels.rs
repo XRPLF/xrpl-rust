@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -35,21 +36,21 @@ pub struct AccountChannels<'a> {
     /// The unique identifier of an account, typically the
     /// account's Address. The request returns channels where
     /// this account is the channel's owner/source.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Limit the number of transactions to retrieve. Cannot
     /// be less than 10 or more than 400. The default is 200.
     pub limit: Option<u16>,
     /// The unique identifier of an account, typically the
     /// account's Address. If provided, filter results to
     /// payment channels whose destination is this account.
-    pub destination_account: Option<&'a str>,
+    pub destination_account: Option<Cow<'a, str>>,
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
     pub marker: Option<u32>,
@@ -61,7 +62,7 @@ pub struct AccountChannels<'a> {
 impl<'a> Default for AccountChannels<'a> {
     fn default() -> Self {
         AccountChannels {
-            account: "",
+            account: "".into(),
             id: None,
             ledger_hash: None,
             ledger_index: None,
@@ -77,12 +78,12 @@ impl<'a> Model for AccountChannels<'a> {}
 
 impl<'a> AccountChannels<'a> {
     pub fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
-        destination_account: Option<&'a str>,
+        destination_account: Option<Cow<'a, str>>,
         marker: Option<u32>,
     ) -> Self {
         Self {

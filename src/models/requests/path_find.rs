@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -61,10 +62,10 @@ pub struct PathFind<'a> {
     /// Unique address of the account to find a path
     /// from. (In other words, the account that would
     /// be sending a payment.)
-    pub source_account: &'a str,
+    pub source_account: Cow<'a, str>,
     /// Unique address of the account to find a path to.
     /// (In other words, the account that would receive a payment.)
-    pub destination_account: &'a str,
+    pub destination_account: Cow<'a, str>,
     /// Currency Amount that the destination account would
     /// receive in a transaction. Special case: New in: rippled 0.30.0
     /// You can specify "-1" (for XRP) or provide -1 as the contents of
@@ -73,7 +74,7 @@ pub struct PathFind<'a> {
     /// the amount specified in send_max (if provided).
     pub destination_amount: Currency<'a>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// Currency Amount that would be spent in the transaction.
     /// Not compatible with source_currencies.
     pub send_max: Option<Currency<'a>>,
@@ -91,8 +92,8 @@ impl<'a> Default for PathFind<'a> {
     fn default() -> Self {
         PathFind {
             subcommand: Default::default(),
-            source_account: "",
-            destination_account: "",
+            source_account: "".into(),
+            destination_account: "".into(),
             destination_amount: Currency::XRP(XRP::new()),
             id: None,
             send_max: None,
@@ -107,10 +108,10 @@ impl<'a> Model for PathFind<'a> {}
 impl<'a> PathFind<'a> {
     pub fn new(
         subcommand: PathFindSubcommand,
-        source_account: &'a str,
-        destination_account: &'a str,
+        source_account: Cow<'a, str>,
+        destination_account: Cow<'a, str>,
         destination_amount: Currency<'a>,
-        id: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
         send_max: Option<Currency<'a>>,
         paths: Option<Vec<Vec<PathStep<'a>>>>,
     ) -> Self {

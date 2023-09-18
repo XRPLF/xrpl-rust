@@ -1,5 +1,6 @@
 use crate::Err;
 use anyhow::Result;
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -10,8 +11,8 @@ use crate::models::{requests::RequestMethod, Model};
 /// querying by object ID.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DepositPreauth<'a> {
-    pub owner: &'a str,
-    pub authorized: &'a str,
+    pub owner: Cow<'a, str>,
+    pub authorized: Cow<'a, str>,
 }
 
 /// Required fields for requesting a DirectoryNode if not
@@ -19,8 +20,8 @@ pub struct DepositPreauth<'a> {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Directory<'a> {
-    pub owner: &'a str,
-    pub dir_root: &'a str,
+    pub owner: Cow<'a, str>,
+    pub dir_root: Cow<'a, str>,
     pub sub_index: Option<u8>,
 }
 
@@ -28,7 +29,7 @@ pub struct Directory<'a> {
 /// by object ID.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Escrow<'a> {
-    pub owner: &'a str,
+    pub owner: Cow<'a, str>,
     pub seq: u64,
 }
 
@@ -36,7 +37,7 @@ pub struct Escrow<'a> {
 /// by object ID.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Offer<'a> {
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     pub seq: u64,
 }
 
@@ -44,15 +45,15 @@ pub struct Offer<'a> {
 /// querying by object ID.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Ticket<'a> {
-    pub owner: &'a str,
+    pub owner: Cow<'a, str>,
     pub ticket_sequence: u64,
 }
 
 /// Required fields for requesting a RippleState.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct RippleState<'a> {
-    pub account: &'a str,
-    pub currency: &'a str,
+    pub account: Cow<'a, str>,
+    pub currency: Cow<'a, str>,
 }
 
 /// The ledger_entry method returns a single ledger object
@@ -69,11 +70,11 @@ pub struct RippleState<'a> {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct LedgerEntry<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
-    pub index: Option<&'a str>,
-    pub account_root: Option<&'a str>,
-    pub check: Option<&'a str>,
-    pub payment_channel: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
+    pub index: Option<Cow<'a, str>>,
+    pub account_root: Option<Cow<'a, str>>,
+    pub check: Option<Cow<'a, str>>,
+    pub payment_channel: Option<Cow<'a, str>>,
     pub deposit_preauth: Option<DepositPreauth<'a>>,
     pub directory: Option<Directory<'a>>,
     pub escrow: Option<Escrow<'a>>,
@@ -85,11 +86,11 @@ pub struct LedgerEntry<'a> {
     /// data in JSON format. The default is false.
     pub binary: Option<bool>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut string
     /// (e.g. "validated" or "closed" or "current") to choose a ledger
     /// automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// The request method.
     #[serde(default = "RequestMethod::ledger_entry")]
     pub command: RequestMethod,
@@ -129,7 +130,7 @@ impl<'a: 'static> Model for LedgerEntry<'a> {
 impl<'a> LedgerEntryError for LedgerEntry<'a> {
     fn _get_field_error(&self) -> Result<(), XRPLLedgerEntryException> {
         let mut signing_methods: u32 = 0;
-        for method in [self.index, self.account_root, self.check] {
+        for method in [self.index.clone(), self.account_root.clone(), self.check.clone()] {
             if method.is_some() {
                 signing_methods += 1
             }
@@ -157,17 +158,17 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         }
         if signing_methods != 1 {
             Err(XRPLLedgerEntryException::DefineExactlyOneOf {
-                field1: "index",
-                field2: "account_root",
-                field3: "check",
-                field4: "directory",
-                field5: "offer",
-                field6: "ripple_state",
-                field7: "escrow",
-                field8: "payment_channel",
-                field9: "deposit_preauth",
-                field10: "ticket",
-                resource: "",
+                field1: "index".into(),
+                field2: "account_root".into(),
+                field3: "check".into(),
+                field4: "directory".into(),
+                field5: "offer".into(),
+                field6: "ripple_state".into(),
+                field7: "escrow".into(),
+                field8: "payment_channel".into(),
+                field9: "deposit_preauth".into(),
+                field10: "ticket".into(),
+                resource: "".into(),
             })
         } else {
             Ok(())
@@ -177,11 +178,11 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
 
 impl<'a> LedgerEntry<'a> {
     pub fn new(
-        id: Option<&'a str>,
-        index: Option<&'a str>,
-        account_root: Option<&'a str>,
-        check: Option<&'a str>,
-        payment_channel: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
+        index: Option<Cow<'a, str>>,
+        account_root: Option<Cow<'a, str>>,
+        check: Option<Cow<'a, str>>,
+        payment_channel: Option<Cow<'a, str>>,
         deposit_preauth: Option<DepositPreauth<'a>>,
         directory: Option<Directory<'a>>,
         escrow: Option<Escrow<'a>>,
@@ -189,8 +190,8 @@ impl<'a> LedgerEntry<'a> {
         ripple_state: Option<RippleState<'a>>,
         ticket: Option<Ticket<'a>>,
         binary: Option<bool>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             id,
@@ -231,14 +232,14 @@ mod test_ledger_entry_errors {
             command: RequestMethod::LedgerEntry,
             id: None,
             index: None,
-            account_root: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"),
+            account_root: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
             check: None,
             payment_channel: None,
             deposit_preauth: None,
             directory: None,
             escrow: None,
             offer: Some(Offer {
-                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
             ripple_state: None,
@@ -248,17 +249,17 @@ mod test_ledger_entry_errors {
             ledger_index: None,
         };
         let _expected = XRPLLedgerEntryException::DefineExactlyOneOf {
-            field1: "index",
-            field2: "account_root",
-            field3: "check",
-            field4: "directory",
-            field5: "offer",
-            field6: "ripple_state",
-            field7: "escrow",
-            field8: "payment_channel",
-            field9: "deposit_preauth",
-            field10: "ticket",
-            resource: "",
+            field1: "index".into(),
+            field2: "account_root".into(),
+            field3: "check".into(),
+            field4: "directory".into(),
+            field5: "offer".into(),
+            field6: "ripple_state".into(),
+            field7: "escrow".into(),
+            field8: "payment_channel".into(),
+            field9: "deposit_preauth".into(),
+            field10: "ticket".into(),
+            resource: "".into(),
         };
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),

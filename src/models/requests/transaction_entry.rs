@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -15,14 +16,14 @@ use crate::models::{requests::RequestMethod, Model};
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TransactionEntry<'a> {
     /// Unique hash of the transaction you are looking up.
-    pub tx_hash: &'a str,
+    pub tx_hash: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// The request method.
     #[serde(default = "RequestMethod::transaction_entry")]
     pub command: RequestMethod,
@@ -31,7 +32,7 @@ pub struct TransactionEntry<'a> {
 impl<'a> Default for TransactionEntry<'a> {
     fn default() -> Self {
         TransactionEntry {
-            tx_hash: "",
+            tx_hash: "".into(),
             id: None,
             ledger_hash: None,
             ledger_index: None,
@@ -44,10 +45,10 @@ impl<'a> Model for TransactionEntry<'a> {}
 
 impl<'a> TransactionEntry<'a> {
     pub fn new(
-        tx_hash: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        tx_hash: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             tx_hash,

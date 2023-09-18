@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -13,13 +14,13 @@ use crate::models::{requests::RequestMethod, Model};
 pub struct AccountTx<'a> {
     /// A unique identifier for the account, most commonly the
     /// account's address.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// Use to look for transactions from a single ledger only.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// Use to look for transactions from a single ledger only.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Defaults to false. If set to true, returns transactions
     /// as hex strings instead of JSON.
     pub binary: Option<bool>,
@@ -53,7 +54,7 @@ pub struct AccountTx<'a> {
 impl<'a> Default for AccountTx<'a> {
     fn default() -> Self {
         AccountTx {
-            account: "",
+            account: "".into(),
             id: None,
             ledger_hash: None,
             ledger_index: None,
@@ -72,10 +73,10 @@ impl<'a> Model for AccountTx<'a> {}
 
 impl<'a> AccountTx<'a> {
     pub fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         binary: Option<bool>,
         forward: Option<bool>,
         ledger_index_min: Option<u32>,

@@ -1,5 +1,6 @@
 use crate::Err;
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -31,7 +32,7 @@ pub struct DepositPreauth<'a> {
     #[serde(default = "TransactionType::deposit_preauth")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -51,11 +52,11 @@ pub struct DepositPreauth<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -67,7 +68,7 @@ pub struct DepositPreauth<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
@@ -81,8 +82,8 @@ pub struct DepositPreauth<'a> {
     ///
     /// See DepositPreauth fields:
     /// `<https://xrpl.org/depositpreauth.html#depositpreauth-fields>`
-    pub authorize: Option<&'a str>,
-    pub unauthorize: Option<&'a str>,
+    pub authorize: Option<Cow<'a, str>>,
+    pub unauthorize: Option<Cow<'a, str>>,
 }
 
 impl<'a> Default for DepositPreauth<'a> {
@@ -128,9 +129,9 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
             || (self.authorize.is_some() && self.unauthorize.is_some())
         {
             Err(XRPLDepositPreauthException::DefineExactlyOneOf {
-                field1: "authorize",
-                field2: "unauthorize",
-                resource: "",
+                field1: "authorize".into(),
+                field2: "unauthorize".into(),
+                resource: "".into(),
             })
         } else {
             Ok(())
@@ -140,19 +141,19 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
 
 impl<'a> DepositPreauth<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
-        authorize: Option<&'a str>,
-        unauthorize: Option<&'a str>,
+        authorize: Option<Cow<'a, str>>,
+        unauthorize: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             transaction_type: TransactionType::DepositPreauth,
@@ -190,7 +191,7 @@ mod test_deposit_preauth_exception {
     fn test_authorize_and_unauthorize_error() {
         let deposit_preauth = DepositPreauth {
             transaction_type: TransactionType::DepositPreauth,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -220,7 +221,7 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = DepositPreauth::new(
-            "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8",
+            "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
             Some("10".into()),
             Some(2),
             None,
@@ -231,7 +232,7 @@ mod test_serde {
             None,
             None,
             None,
-            Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"),
+            Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
             None,
         );
         let default_json = r#"{"TransactionType":"DepositPreauth","Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","Fee":"10","Sequence":2,"Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
@@ -245,7 +246,7 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = DepositPreauth::new(
-            "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8",
+            "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
             Some("10".into()),
             Some(2),
             None,
@@ -256,7 +257,7 @@ mod test_serde {
             None,
             None,
             None,
-            Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"),
+            Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
             None,
         );
         let default_json = r#"{"TransactionType":"DepositPreauth","Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de","Fee":"10","Sequence":2}"#;

@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -15,14 +16,14 @@ use crate::models::{default_false, requests::RequestMethod, Model};
 pub struct AccountCurrencies<'a> {
     /// A unique identifier for the account, most commonly
     /// the account's Address.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// If true, then the account field only accepts a public
     /// key or XRP Ledger address. Otherwise, account can be
     /// a secret or passphrase (not recommended).
@@ -37,7 +38,7 @@ pub struct AccountCurrencies<'a> {
 impl<'a> Default for AccountCurrencies<'a> {
     fn default() -> Self {
         AccountCurrencies {
-            account: "",
+            account: "".into(),
             id: None,
             ledger_hash: None,
             ledger_index: None,
@@ -51,10 +52,10 @@ impl<'a> Model for AccountCurrencies<'a> {}
 
 impl<'a> AccountCurrencies<'a> {
     pub fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         strict: Option<bool>,
     ) -> Self {
         Self {

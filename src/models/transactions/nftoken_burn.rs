@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -28,7 +29,7 @@ pub struct NFTokenBurn<'a> {
     #[serde(default = "TransactionType::nftoken_burn")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -48,11 +49,11 @@ pub struct NFTokenBurn<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -64,7 +65,7 @@ pub struct NFTokenBurn<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
@@ -79,8 +80,8 @@ pub struct NFTokenBurn<'a> {
     /// See NFTokenBurn fields:
     /// `<https://xrpl.org/nftokenburn.html#nftokenburn-fields>`
     #[serde(rename = "NFTokenID")]
-    pub nftoken_id: &'a str,
-    pub owner: Option<&'a str>,
+    pub nftoken_id: Cow<'a, str>,
+    pub owner: Option<Cow<'a, str>>,
 }
 
 impl<'a> Default for NFTokenBurn<'a> {
@@ -115,19 +116,19 @@ impl<'a> Transaction for NFTokenBurn<'a> {
 
 impl<'a> NFTokenBurn<'a> {
     pub fn new(
-        account: &'a str,
-        nftoken_id: &'a str,
+        account: Cow<'a, str>,
+        nftoken_id: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
-        owner: Option<&'a str>,
+        owner: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             transaction_type: TransactionType::NFTokenBurn,
@@ -156,8 +157,8 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = NFTokenBurn::new(
-            "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2",
-            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65",
+            "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2".into(),
+            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
             Some("10".into()),
             None,
             None,
@@ -168,7 +169,7 @@ mod test_serde {
             None,
             None,
             None,
-            Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"),
+            Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
         );
         let default_json = r#"{"TransactionType":"NFTokenBurn","Account":"rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2","Fee":"10","NFTokenID":"000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65","Owner":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"}"#;
 
@@ -181,8 +182,8 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = NFTokenBurn::new(
-            "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2",
-            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65",
+            "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2".into(),
+            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
             Some("10".into()),
             None,
             None,
@@ -193,7 +194,7 @@ mod test_serde {
             None,
             None,
             None,
-            Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"),
+            Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
         );
         let default_json = r#"{"TransactionType":"NFTokenBurn","Account":"rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2","Owner":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B","Fee":"10","NFTokenID":"000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65"}"#;
 

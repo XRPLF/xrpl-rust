@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -35,9 +36,9 @@ use crate::models::{requests::RequestMethod, Model};
 pub struct Submit<'a> {
     /// Hex representation of the signed transaction to submit.
     /// This can also be a multi-signed transaction.
-    pub tx_blob: &'a str,
+    pub tx_blob: Cow<'a, str>,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// If true, and the transaction fails locally, do not retry
     /// or relay the transaction to other servers
     pub fail_hard: Option<bool>,
@@ -49,7 +50,7 @@ pub struct Submit<'a> {
 impl<'a> Default for Submit<'a> {
     fn default() -> Self {
         Submit {
-            tx_blob: "",
+            tx_blob: "".into(),
             id: None,
             fail_hard: None,
             command: RequestMethod::Submit,
@@ -60,7 +61,7 @@ impl<'a> Default for Submit<'a> {
 impl<'a> Model for Submit<'a> {}
 
 impl<'a> Submit<'a> {
-    pub fn new(tx_blob: &'a str, id: Option<&'a str>, fail_hard: Option<bool>) -> Self {
+    pub fn new(tx_blob: Cow<'a, str>, id: Option<Cow<'a, str>>, fail_hard: Option<bool>) -> Self {
         Self {
             tx_blob,
             id,

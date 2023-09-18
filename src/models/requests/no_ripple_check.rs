@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
@@ -29,7 +30,7 @@ pub enum NoRippleCheckRole {
 pub struct NoRippleCheck<'a> {
     /// A unique identifier for the account, most commonly the
     /// account's address.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Whether the address refers to a gateway or user.
     /// Recommendations depend on the role of the account.
     /// Issuers must have Default Ripple enabled and must disable
@@ -37,12 +38,12 @@ pub struct NoRippleCheck<'a> {
     /// disabled, and should enable No Ripple on all trust lines.
     pub role: NoRippleCheckRole,
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut string
     /// to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// If true, include an array of suggested transactions, as JSON
     /// objects, that you can sign and submit to fix the problems.
     /// Defaults to false.
@@ -58,7 +59,7 @@ pub struct NoRippleCheck<'a> {
 impl<'a> Default for NoRippleCheck<'a> {
     fn default() -> Self {
         NoRippleCheck {
-            account: "",
+            account: "".into(),
             role: Default::default(),
             id: None,
             ledger_hash: None,
@@ -74,11 +75,11 @@ impl<'a> Model for NoRippleCheck<'a> {}
 
 impl<'a> NoRippleCheck<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         role: NoRippleCheckRole,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         transactions: Option<bool>,
         limit: Option<u16>,
     ) -> Self {

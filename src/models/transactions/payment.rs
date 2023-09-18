@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -60,7 +61,7 @@ pub struct Payment<'a> {
     #[serde(default = "TransactionType::payment")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -80,11 +81,11 @@ pub struct Payment<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -96,7 +97,7 @@ pub struct Payment<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     #[serde(default)]
     #[serde(with = "txn_flags")]
@@ -113,7 +114,7 @@ pub struct Payment<'a> {
     /// See Payment fields:
     /// `<https://xrpl.org/payment.html#payment-fields>`
     pub amount: Amount<'a>,
-    pub destination: &'a str,
+    pub destination: Cow<'a, str>,
     pub destination_tag: Option<u32>,
     pub invoice_id: Option<u32>,
     pub paths: Option<Vec<Vec<PathStep<'a>>>>,
@@ -191,16 +192,16 @@ impl<'a> PaymentError for Payment<'a> {
         if self.amount.is_xrp() && self.send_max.is_none() {
             if self.paths.is_some() {
                 Err(XRPLPaymentException::IllegalOption {
-                    field: "paths",
-                    context: "XRP to XRP payments",
-                    resource: "",
+                    field: "paths".into(),
+                    context: "XRP to XRP payments".into(),
+                    resource: "".into(),
                 })
             } else if self.account == self.destination {
                 Err(XRPLPaymentException::ValueEqualsValueInContext {
-                    field1: "account",
-                    field2: "destination",
-                    context: "XRP to XRP Payments",
-                    resource: "",
+                    field1: "account".into(),
+                    field2: "destination".into(),
+                    context: "XRP to XRP Payments".into(),
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -217,9 +218,9 @@ impl<'a> PaymentError for Payment<'a> {
                 && self.amount.is_xrp()
             {
                 Err(XRPLPaymentException::IllegalOption {
-                    field: "send_max",
-                    context: "XRP to XRP non-partial payments",
-                    resource: "",
+                    field: "send_max".into(),
+                    context: "XRP to XRP non-partial payments".into(),
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -227,15 +228,15 @@ impl<'a> PaymentError for Payment<'a> {
         } else if self.has_flag(&Flag::Payment(PaymentFlag::TfPartialPayment)) {
             Err(XRPLPaymentException::FlagRequiresField {
                 flag: PaymentFlag::TfPartialPayment,
-                field: "send_max",
-                resource: "",
+                field: "send_max".into(),
+                resource: "".into(),
             })
         } else if !self.has_flag(&Flag::Payment(PaymentFlag::TfPartialPayment)) {
             if let Some(_deliver_min) = &self.deliver_min {
                 Err(XRPLPaymentException::IllegalOption {
-                    field: "deliver_min",
-                    context: "XRP to XRP non-partial payments",
-                    resource: "",
+                    field: "deliver_min".into(),
+                    context: "XRP to XRP non-partial payments".into(),
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -248,9 +249,9 @@ impl<'a> PaymentError for Payment<'a> {
     fn _get_exchange_error(&self) -> Result<(), XRPLPaymentException> {
         if self.account == self.destination && self.send_max.is_none() {
             return Err(XRPLPaymentException::OptionRequired {
-                field: "send_max",
-                context: "exchanges",
-                resource: "",
+                field: "send_max".into(),
+                context: "exchanges".into(),
+                resource: "".into(),
             });
         }
 
@@ -260,17 +261,17 @@ impl<'a> PaymentError for Payment<'a> {
 
 impl<'a> Payment<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         amount: Amount<'a>,
-        destination: &'a str,
+        destination: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         flags: Option<Vec<PaymentFlag>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
@@ -327,7 +328,7 @@ mod test_payment_error {
     fn test_xrp_to_xrp_error() {
         let mut payment = Payment {
             transaction_type: TransactionType::Payment,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -340,11 +341,11 @@ mod test_payment_error {
             memos: None,
             signers: None,
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
-            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK",
+            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
             destination_tag: None,
             invoice_id: None,
             paths: Some(vec![vec![PathStep {
-                account: Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"),
+                account: Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
                 currency: None,
                 issuer: None,
                 r#type: None,
@@ -368,7 +369,7 @@ mod test_payment_error {
         );
 
         payment.send_max = None;
-        payment.destination = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb";
+        payment.destination = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into();
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
@@ -380,7 +381,7 @@ mod test_payment_error {
     fn test_partial_payments_eror() {
         let mut payment = Payment {
             transaction_type: TransactionType::Payment,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -393,7 +394,7 @@ mod test_payment_error {
             memos: None,
             signers: None,
             amount: Amount::XRPAmount("1000000".into()),
-            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK",
+            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
             destination_tag: None,
             invoice_id: None,
             paths: None,
@@ -420,7 +421,7 @@ mod test_payment_error {
     fn test_exchange_error() {
         let payment = Payment {
             transaction_type: TransactionType::Payment,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -437,7 +438,7 @@ mod test_payment_error {
                 "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
                 "10".into(),
             )),
-            destination: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            destination: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             destination_tag: None,
             invoice_id: None,
             paths: None,
@@ -463,13 +464,13 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = Payment::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 "1".into(),
             )),
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
             Some("12".into()),
             Some(2),
             None,
@@ -498,13 +499,13 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = Payment::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 "1".into(),
             )),
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
             Some("12".into()),
             Some(2),
             None,

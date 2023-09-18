@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -34,7 +35,7 @@ pub struct UnsubscribeBook<'a> {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Unsubscribe<'a> {
     /// The unique request id.
-    pub id: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
     /// Array of objects defining order books to unsubscribe
     /// from, as explained below.
     pub books: Option<Vec<UnsubscribeBook<'a>>>,
@@ -47,12 +48,12 @@ pub struct Unsubscribe<'a> {
     /// those messages if you previously subscribed to those accounts
     /// specifically. You cannot use this to filter accounts out of
     /// the general transactions stream.)
-    pub accounts: Option<Vec<&'a str>>,
+    pub accounts: Option<Vec<Cow<'a, str>>>,
     /// Like accounts, but for accounts_proposed subscriptions that
     /// included not-yet-validated transactions.
-    pub accounts_proposed: Option<Vec<&'a str>>,
+    pub accounts_proposed: Option<Vec<Cow<'a, str>>>,
     #[serde(skip_serializing)]
-    pub broken: Option<&'a str>,
+    pub broken: Option<Cow<'a, str>>,
     /// The request method.
     #[serde(default = "RequestMethod::unsubscribe")]
     pub command: RequestMethod,
@@ -76,12 +77,12 @@ impl<'a> Model for Unsubscribe<'a> {}
 
 impl<'a> Unsubscribe<'a> {
     pub fn new(
-        id: Option<&'a str>,
+        id: Option<Cow<'a, str>>,
         books: Option<Vec<UnsubscribeBook<'a>>>,
         streams: Option<Vec<StreamParameter>>,
-        accounts: Option<Vec<&'a str>>,
-        accounts_proposed: Option<Vec<&'a str>>,
-        broken: Option<&'a str>,
+        accounts: Option<Vec<Cow<'a, str>>>,
+        accounts_proposed: Option<Vec<Cow<'a, str>>>,
+        broken: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             id,

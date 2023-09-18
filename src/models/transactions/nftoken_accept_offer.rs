@@ -140,9 +140,9 @@ impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
             && self.nftoken_buy_offer.is_none()
         {
             Err(XRPLNFTokenAcceptOfferException::DefineOneOf {
-                field1: "nftoken_sell_offer",
-                field2: "nftoken_buy_offer",
-                resource: "",
+                field1: "nftoken_sell_offer".into(),
+                field2: "nftoken_buy_offer".into(),
+                resource: "".into(),
             })
         } else {
             Ok(())
@@ -156,8 +156,8 @@ impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
                 Ok(nftoken_broker_fee_dec) => {
                     if nftoken_broker_fee_dec.is_zero() {
                         Err!(XRPLNFTokenAcceptOfferException::ValueZero {
-                            field: "nftoken_broker_fee",
-                            resource: "",
+                            field: "nftoken_broker_fee".into(),
+                            resource: "".into(),
                         })
                     } else {
                         Ok(())
@@ -230,7 +230,7 @@ mod test_nftoken_accept_offer_error {
     fn test_brokered_mode_error() {
         let nftoken_accept_offer = NFTokenAcceptOffer {
             transaction_type: TransactionType::NFTokenAcceptOffer,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -257,7 +257,7 @@ mod test_nftoken_accept_offer_error {
     fn test_broker_fee_error() {
         let nftoken_accept_offer = NFTokenAcceptOffer {
             transaction_type: TransactionType::NFTokenAcceptOffer,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             fee: None,
             sequence: None,
             last_ledger_sequence: None,
@@ -269,7 +269,7 @@ mod test_nftoken_accept_offer_error {
             flags: None,
             memos: None,
             signers: None,
-            nftoken_sell_offer: Some(""),
+            nftoken_sell_offer: Some("".into()),
             nftoken_buy_offer: None,
             nftoken_broker_fee: Some(Amount::XRPAmount(XRPAmount::from("0"))),
         };
@@ -291,7 +291,7 @@ mod test_serde {
     #[test]
     fn test_serialize() {
         let default_txn = NFTokenAcceptOffer::new(
-            "r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG",
+            "r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG".into(),
             Some("12".into()),
             Some(68549302),
             Some(75447550),
@@ -306,7 +306,7 @@ mod test_serde {
                 None,
             )]),
             None,
-            Some("68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77"),
+            Some("68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77".into()),
             None,
             None,
         );
@@ -321,7 +321,7 @@ mod test_serde {
     #[test]
     fn test_deserialize() {
         let default_txn = NFTokenAcceptOffer::new(
-            "r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG",
+            "r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG".into(),
             Some("12".into()),
             Some(68549302),
             Some(75447550),
@@ -336,7 +336,7 @@ mod test_serde {
                 None,
             )]),
             None,
-            Some("68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77"),
+            Some("68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77".into()),
             None,
             None,
         );
