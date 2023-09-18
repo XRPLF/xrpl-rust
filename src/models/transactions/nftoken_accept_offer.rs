@@ -1,5 +1,6 @@
 use crate::Err;
 use alloc::vec::Vec;
+use alloc::borrow::Cow;
 use anyhow::Result;
 use core::convert::TryInto;
 use rust_decimal::Decimal;
@@ -34,7 +35,7 @@ pub struct NFTokenAcceptOffer<'a> {
     #[serde(default = "TransactionType::nftoken_accept_offer")]
     pub transaction_type: TransactionType,
     /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Integer amount of XRP, in drops, to be destroyed as a cost
     /// for distributing this transaction to the network. Some
     /// transaction types have different minimum requirements.
@@ -54,11 +55,11 @@ pub struct NFTokenAcceptOffer<'a> {
     /// transaction is only valid if the sending account's
     /// previously-sent transaction matches the provided hash.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -70,7 +71,7 @@ pub struct NFTokenAcceptOffer<'a> {
     pub ticket_sequence: Option<u32>,
     /// The signature that verifies this transaction as originating
     /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
+    pub txn_signature: Option<Cow<'a, str>>,
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
@@ -85,9 +86,9 @@ pub struct NFTokenAcceptOffer<'a> {
     /// See NFTokenAcceptOffer fields:
     /// `<https://xrpl.org/nftokenacceptoffer.html#nftokenacceptoffer-fields>`
     #[serde(rename = "NFTokenSellOffer")]
-    pub nftoken_sell_offer: Option<&'a str>,
+    pub nftoken_sell_offer: Option<Cow<'a, str>>,
     #[serde(rename = "NFTokenBuyOffer")]
-    pub nftoken_buy_offer: Option<&'a str>,
+    pub nftoken_buy_offer: Option<Cow<'a, str>>,
     #[serde(rename = "NFTokenBrokerFee")]
     pub nftoken_broker_fee: Option<Amount<'a>>,
 }
@@ -173,19 +174,19 @@ impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
 
 impl<'a> NFTokenAcceptOffer<'a> {
     pub fn new(
-        account: &'a str,
+        account: Cow<'a, str>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
+        txn_signature: Option<Cow<'a, str>>,
         memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
-        nftoken_sell_offer: Option<&'a str>,
-        nftoken_buy_offer: Option<&'a str>,
+        nftoken_sell_offer: Option<Cow<'a, str>>,
+        nftoken_buy_offer: Option<Cow<'a, str>>,
         nftoken_broker_fee: Option<Amount<'a>>,
     ) -> Self {
         Self {

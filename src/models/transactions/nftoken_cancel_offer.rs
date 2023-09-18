@@ -84,7 +84,7 @@ pub struct NFTokenCancelOffer<'a> {
     /// Lifetime issue
     #[serde(borrow)]
     #[serde(rename = "NFTokenOffers")]
-    pub nftoken_offers: Vec<&'a str>,
+    pub nftoken_offers: Vec<Cow<'a, str>>,
 }
 
 impl<'a> Default for NFTokenCancelOffer<'a> {
@@ -140,7 +140,7 @@ impl<'a> NFTokenCancelOfferError for NFTokenCancelOffer<'a> {
 impl<'a> NFTokenCancelOffer<'a> {
     pub fn new(
         account: Cow<'a, str>,
-        nftoken_offers: Vec<&'a str>,
+        nftoken_offers: Vec<Cow<'a, str>>,
         fee: Option<XRPAmount<'a>>,
         sequence: Option<u32>,
         last_ledger_sequence: Option<u32>,
@@ -220,7 +220,7 @@ mod test_serde {
     fn test_serialize() {
         let default_txn = NFTokenCancelOffer::new(
             "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            vec!["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D"],
+            vec!["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into()],
             None,
             None,
             None,
@@ -244,7 +244,7 @@ mod test_serde {
     fn test_deserialize() {
         let default_txn = NFTokenCancelOffer::new(
             "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            vec!["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D"],
+            vec!["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into()],
             None,
             None,
             None,
