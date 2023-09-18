@@ -1,7 +1,7 @@
 use crate::models::transactions::{AccountSetFlag, PaymentFlag};
+use alloc::borrow::Cow;
 use strum_macros::Display;
 use thiserror_no_std::Error;
-use alloc::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum XRPLTransactionException<'a> {
@@ -153,7 +153,10 @@ pub enum XRPLNFTokenAcceptOfferException<'a> {
     },
     /// The value can not be zero.
     #[error("The value of the field `{field:?}` is not allowed to be zero. For more information see: {resource:?}")]
-    ValueZero { field: Cow<'a, str>, resource: Cow<'a, str> },
+    ValueZero {
+        field: Cow<'a, str>,
+        resource: Cow<'a, str>,
+    },
 }
 
 #[cfg(feature = "std")]
@@ -177,7 +180,10 @@ impl<'a> alloc::error::Error for XRPLNFTokenCancelOfferException<'a> {}
 pub enum XRPLNFTokenCreateOfferException<'a> {
     /// The value can not be zero.
     #[error("The value of the field `{field:?}` is not allowed to be zero. For more information see: {resource:?}")]
-    ValueZero { field: Cow<'a, str>, resource: Cow<'a, str> },
+    ValueZero {
+        field: Cow<'a, str>,
+        resource: Cow<'a, str>,
+    },
     /// A fields value is not allowed to be the same as another fields value.
     #[error("The value of the field `{field1:?}` is not allowed to be the same as the value of the field `{field2:?}`. For more information see: {resource:?}")]
     ValueEqualsValue {

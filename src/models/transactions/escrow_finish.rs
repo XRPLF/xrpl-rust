@@ -213,7 +213,8 @@ mod test_escrow_finish_errors {
             owner: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
             offer_sequence: 10,
             condition: Some(
-                "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100".into(),
+                "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
+                    .into(),
             ),
             fulfillment: None,
         };
@@ -245,7 +246,10 @@ mod test_serde {
             None,
             None,
             None,
-            Some("A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100".into()),
+            Some(
+                "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
+                    .into(),
+            ),
             Some("A0028000".into()),
         );
         let default_json = r#"{"TransactionType":"EscrowFinish","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
@@ -272,7 +276,10 @@ mod test_serde {
             None,
             None,
             None,
-            Some("A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100".into()),
+            Some(
+                "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
+                    .into(),
+            ),
             Some("A0028000".into()),
         );
         let default_json = r#"{"TransactionType":"EscrowFinish","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;

@@ -134,8 +134,8 @@ mod test_serde {
     use crate::models::amount::{Amount, IssuedCurrencyAmount};
     use crate::models::currency::{Currency, IssuedCurrency, XRP};
     use crate::models::ledger::amm::{AuctionSlot, AuthAccount, VoteEntry, AMM};
-    use alloc::string::ToString;
     use alloc::borrow::Cow;
+    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]

@@ -1,7 +1,7 @@
 use crate::models::ledger::LedgerEntryType;
 use crate::models::Model;
-use alloc::{borrow::Cow, string::String};
 use alloc::vec::Vec;
+use alloc::{borrow::Cow, string::String};
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
 
@@ -79,8 +79,8 @@ impl<'a> Amendments<'a> {
 #[cfg(test)]
 mod test_serde {
     use crate::models::ledger::{Amendments, Majority};
-    use alloc::string::ToString;
     use alloc::borrow::Cow;
+    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]
@@ -94,7 +94,8 @@ mod test_serde {
                 Cow::from("740352F2412A9909880C23A559FCECEDA3BE2126FED62FC7660D628A06927F11"),
             ]),
             Some(vec![Majority {
-                amendment: "1562511F573A19AE9BD103B5D6B9E01B3B46805AEC5D3C4805C902B514399146".to_string(),
+                amendment: "1562511F573A19AE9BD103B5D6B9E01B3B46805AEC5D3C4805C902B514399146"
+                    .to_string(),
                 close_time: 535589001,
             }]),
         );

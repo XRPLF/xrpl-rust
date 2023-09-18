@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -99,7 +99,12 @@ impl<'a> Model for ChannelAuthorize<'a> {
 impl<'a> ChannelAuthorizeError for ChannelAuthorize<'a> {
     fn _get_field_error(&self) -> Result<(), XRPLChannelAuthorizeException> {
         let mut signing_methods = Vec::new();
-        for method in [self.secret.clone(), self.seed.clone(), self.seed_hex.clone(), self.passphrase.clone()] {
+        for method in [
+            self.secret.clone(),
+            self.seed.clone(),
+            self.seed_hex.clone(),
+            self.passphrase.clone(),
+        ] {
             if method.is_some() {
                 signing_methods.push(method)
             }

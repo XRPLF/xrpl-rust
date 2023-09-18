@@ -1,6 +1,6 @@
 use crate::Err;
-use anyhow::Result;
 use alloc::borrow::Cow;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -130,7 +130,11 @@ impl<'a: 'static> Model for LedgerEntry<'a> {
 impl<'a> LedgerEntryError for LedgerEntry<'a> {
     fn _get_field_error(&self) -> Result<(), XRPLLedgerEntryException> {
         let mut signing_methods: u32 = 0;
-        for method in [self.index.clone(), self.account_root.clone(), self.check.clone()] {
+        for method in [
+            self.index.clone(),
+            self.account_root.clone(),
+            self.check.clone(),
+        ] {
             if method.is_some() {
                 signing_methods += 1
             }

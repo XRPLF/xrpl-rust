@@ -1,6 +1,6 @@
 use crate::Err;
-use alloc::vec::Vec;
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
 use anyhow::Result;
 use core::convert::TryInto;
 use rust_decimal::Decimal;
@@ -284,8 +284,8 @@ mod test_nftoken_accept_offer_error {
 
 #[cfg(test)]
 mod test_serde {
-    use alloc::vec;
     use alloc::string::ToString;
+    use alloc::vec;
 
     use super::*;
 
@@ -302,7 +302,10 @@ mod test_serde {
             None,
             None,
             Some(vec![Memo::new(
-                Some("61356534373538372D633134322D346663382D616466362D393666383562356435386437".to_string()),
+                Some(
+                    "61356534373538372D633134322D346663382D616466362D393666383562356435386437"
+                        .to_string(),
+                ),
                 None,
                 None,
             )]),
@@ -332,7 +335,10 @@ mod test_serde {
             None,
             None,
             Some(vec![Memo::new(
-                Some("61356534373538372D633134322D346663382D616466362D393666383562356435386437".to_string()),
+                Some(
+                    "61356534373538372D633134322D346663382D616466362D393666383562356435386437"
+                        .to_string(),
+                ),
                 None,
                 None,
             )]),
