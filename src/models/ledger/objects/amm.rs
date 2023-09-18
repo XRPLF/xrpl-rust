@@ -1,6 +1,7 @@
 use crate::models::ledger::LedgerEntryType;
 use crate::models::{amount::Amount, Currency, Model};
 use alloc::borrow::Cow;
+use alloc::string::String;
 use alloc::vec::Vec;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
@@ -10,8 +11,8 @@ use serde_with::skip_serializing_none;
 
 serde_with_tag! {
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct AuthAccount<'a> {
-        pub account: Cow<'a, str>,
+    pub struct AuthAccount {
+        pub account: String,
     }
 }
 
@@ -31,14 +32,13 @@ pub struct AuctionSlot<'a> {
     pub price: Amount<'a>,
     /// A list of at most 4 additional accounts that are authorized to trade at the discounted fee
     /// for this AMM instance.
-    #[serde(borrow = "'a")]
-    pub auth_accounts: Option<Vec<AuthAccount<'a>>>,
+    pub auth_accounts: Option<Vec<AuthAccount>>,
 }
 
 serde_with_tag! {
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct VoteEntry<'a> {
-        pub account: Cow<'a, str>,
+    pub struct VoteEntry {
+        pub account: String,
         pub trading_fee: u16,
         pub vote_weight: u32,
     }
@@ -81,7 +81,7 @@ pub struct AMM<'a> {
     #[serde(borrow = "'a")]
     pub auction_slot: Option<AuctionSlot<'a>>,
     /// A list of vote objects, representing votes on the pool's trading fee.
-    pub vote_slots: Option<Vec<VoteEntry<'a>>>,
+    pub vote_slots: Option<Vec<VoteEntry>>,
 }
 
 impl<'a> Default for AMM<'a> {
@@ -112,7 +112,7 @@ impl<'a> AMM<'a> {
         lptoken_balance: Amount<'a>,
         trading_fee: u16,
         auction_slot: Option<AuctionSlot<'a>>,
-        vote_slots: Option<Vec<VoteEntry<'a>>>,
+        vote_slots: Option<Vec<VoteEntry>>,
     ) -> Self {
         Self {
             ledger_entry_type: LedgerEntryType::AMM,
@@ -134,6 +134,7 @@ mod test_serde {
     use crate::models::amount::{Amount, IssuedCurrencyAmount};
     use crate::models::currency::{Currency, IssuedCurrency, XRP};
     use crate::models::ledger::amm::{AuctionSlot, AuthAccount, VoteEntry, AMM};
+    use alloc::string::ToString;
     use alloc::borrow::Cow;
     use alloc::vec;
 
@@ -163,12 +164,12 @@ mod test_serde {
                     "0.8696263565463045".into(),
                 )),
                 Some(vec![
-                    AuthAccount::new(Cow::from("rMKXGCbJ5d8LbrqthdG46q3f969MVK2Qeg")),
-                    AuthAccount::new(Cow::from("rBepJuTLFJt3WmtLXYAxSjtBWAeQxVbncv")),
+                    AuthAccount::new("rMKXGCbJ5d8LbrqthdG46q3f969MVK2Qeg".to_string()),
+                    AuthAccount::new("rBepJuTLFJt3WmtLXYAxSjtBWAeQxVbncv".to_string()),
                 ]),
             )),
             Some(vec![VoteEntry::new(
-                Cow::from("rJVUeRqDFNs2xqA7ncVE6ZoAhPUoaJJSQm"),
+                "rJVUeRqDFNs2xqA7ncVE6ZoAhPUoaJJSQm".to_string(),
                 600,
                 100000,
             )]),

@@ -53,6 +53,7 @@ pub use ticket_create::*;
 pub use trust_set::*;
 
 use crate::serde_with_tag;
+use alloc::string::String;
 use derive_new::new;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize};
@@ -190,10 +191,10 @@ serde_with_tag! {
 /// `<https://xrpl.org/transaction-common-fields.html#memos-field>`
 // `#[derive(Serialize)]` is defined in the macro
 #[derive(Debug, PartialEq, Eq, Default, Clone, new)]
-pub struct Memo<'a> {
-    pub memo_data: Option<&'a str>,
-    pub memo_format: Option<&'a str>,
-    pub memo_type: Option<&'a str>,
+pub struct Memo {
+    pub memo_data: Option<String>,
+    pub memo_format: Option<String>,
+    pub memo_type: Option<String>,
 }
 }
 

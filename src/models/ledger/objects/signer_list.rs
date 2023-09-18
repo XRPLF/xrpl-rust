@@ -2,7 +2,7 @@ use crate::_serde::lgr_obj_flags;
 use crate::models::ledger::LedgerEntryType;
 use crate::models::Model;
 use alloc::borrow::Cow;
-
+use alloc::string::String;
 use alloc::vec::Vec;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
@@ -26,14 +26,14 @@ serde_with_tag! {
     ///
     /// `<https://xrpl.org/signerlist.html#signer-entry-object>`
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct SignerEntry<'a>{
+    pub struct SignerEntry {
         /// An XRP Ledger address whose signature contributes to the multi-signature.
-        pub account: Cow<'a, str>,
+        pub account: String,
         /// The weight of a signature from this signer.
         pub signer_weight: u16,
         /// Arbitrary hexadecimal data. This can be used to identify the signer or for
         /// other, related purposes.
-        pub wallet_locator: Option<Cow<'a, str>>,
+        pub wallet_locator: Option<String>,
     }
 }
 
@@ -66,8 +66,7 @@ pub struct SignerList<'a> {
     pub previous_txn_lgr_seq: u32,
     /// An array of Signer Entry objects representing the parties who are part of this
     /// signer list.
-    #[serde(borrow = "'a")]
-    pub signer_entries: Vec<SignerEntry<'a>>,
+    pub signer_entries: Vec<SignerEntry>,
     /// An ID for this signer list. Currently always set to 0.
     #[serde(rename = "SignerListID")]
     pub signer_list_id: u32,
@@ -102,7 +101,7 @@ impl<'a> SignerList<'a> {
         owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
-        signer_entries: Vec<SignerEntry<'a>>,
+        signer_entries: Vec<SignerEntry>,
         signer_list_id: u32,
         signer_quorum: u32,
     ) -> Self {
@@ -123,6 +122,7 @@ impl<'a> SignerList<'a> {
 #[cfg(test)]
 mod test_serde {
     use super::*;
+    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]
@@ -134,9 +134,9 @@ mod test_serde {
             Cow::from("5904C0DC72C58A83AEFED2FFC5386356AA83FCA6A88C89D00646E51E687CDBE4"),
             16061435,
             vec![
-                SignerEntry::new(Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"), 2, None),
-                SignerEntry::new(Cow::from("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n"), 1, None),
-                SignerEntry::new(Cow::from("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"), 1, None),
+                SignerEntry::new("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2, None),
+                SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1, None),
+                SignerEntry::new("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1, None),
             ],
             0,
             3,

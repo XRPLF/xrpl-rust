@@ -74,7 +74,7 @@ pub struct CheckCash<'a> {
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
+    pub memos: Option<Vec<Memo>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
@@ -156,7 +156,7 @@ impl<'a> CheckCash<'a> {
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         txn_signature: Option<&'a str>,
-        memos: Option<Vec<Memo<'a>>>,
+        memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         amount: Option<Amount<'a>>,
         deliver_min: Option<Amount<'a>>,

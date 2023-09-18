@@ -96,7 +96,7 @@ pub struct TrustSet<'a> {
     #[serde(with = "txn_flags")]
     pub flags: Option<Vec<TrustSetFlag>>,
     /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
+    pub memos: Option<Vec<Memo>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
@@ -174,7 +174,7 @@ impl<'a> TrustSet<'a> {
         ticket_sequence: Option<u32>,
         txn_signature: Option<&'a str>,
         flags: Option<Vec<TrustSetFlag>>,
-        memos: Option<Vec<Memo<'a>>>,
+        memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         quality_in: Option<u32>,
         quality_out: Option<u32>,

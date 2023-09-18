@@ -102,7 +102,7 @@ pub struct Payment<'a> {
     #[serde(with = "txn_flags")]
     pub flags: Option<Vec<PaymentFlag>>,
     /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
+    pub memos: Option<Vec<Memo>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
@@ -272,7 +272,7 @@ impl<'a> Payment<'a> {
         ticket_sequence: Option<u32>,
         txn_signature: Option<&'a str>,
         flags: Option<Vec<PaymentFlag>>,
-        memos: Option<Vec<Memo<'a>>>,
+        memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         destination_tag: Option<u32>,
         invoice_id: Option<u32>,

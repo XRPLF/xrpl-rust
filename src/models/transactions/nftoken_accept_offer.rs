@@ -74,7 +74,7 @@ pub struct NFTokenAcceptOffer<'a> {
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
+    pub memos: Option<Vec<Memo>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
@@ -182,7 +182,7 @@ impl<'a> NFTokenAcceptOffer<'a> {
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         txn_signature: Option<&'a str>,
-        memos: Option<Vec<Memo<'a>>>,
+        memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         nftoken_sell_offer: Option<&'a str>,
         nftoken_buy_offer: Option<&'a str>,
@@ -284,6 +284,7 @@ mod test_nftoken_accept_offer_error {
 #[cfg(test)]
 mod test_serde {
     use alloc::vec;
+    use alloc::string::ToString;
 
     use super::*;
 
@@ -300,7 +301,7 @@ mod test_serde {
             None,
             None,
             Some(vec![Memo::new(
-                Some("61356534373538372D633134322D346663382D616466362D393666383562356435386437"),
+                Some("61356534373538372D633134322D346663382D616466362D393666383562356435386437".to_string()),
                 None,
                 None,
             )]),
@@ -330,7 +331,7 @@ mod test_serde {
             None,
             None,
             Some(vec![Memo::new(
-                Some("61356534373538372D633134322D346663382D616466362D393666383562356435386437"),
+                Some("61356534373538372D633134322D346663382D616466362D393666383562356435386437".to_string()),
                 None,
                 None,
             )]),

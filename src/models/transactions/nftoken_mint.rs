@@ -102,7 +102,7 @@ pub struct NFTokenMint<'a> {
     #[serde(with = "txn_flags")]
     pub flags: Option<Vec<NFTokenMintFlag>>,
     /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
+    pub memos: Option<Vec<Memo>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
@@ -247,7 +247,7 @@ impl<'a> NFTokenMint<'a> {
         ticket_sequence: Option<u32>,
         txn_signature: Option<&'a str>,
         flags: Option<Vec<NFTokenMintFlag>>,
-        memos: Option<Vec<Memo<'a>>>,
+        memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         issuer: Option<&'a str>,
         transfer_fee: Option<u32>,
@@ -376,6 +376,7 @@ mod test_nftoken_mint_error {
 
 #[cfg(test)]
 mod test_serde {
+    use alloc::string::ToString;
     use alloc::vec;
 
     use super::*;
@@ -394,7 +395,7 @@ mod test_serde {
             None,
             None,
             Some(vec![NFTokenMintFlag::TfTransferable]),
-            Some(vec![Memo::new(Some("72656E74"), None, Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963"))]),
+            Some(vec![Memo::new(Some("72656E74".to_string()), None, Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963".to_string()))]),
             None,
             None,
             Some(314),
@@ -422,7 +423,7 @@ mod test_serde {
             None,
             None,
             Some(vec![NFTokenMintFlag::TfTransferable]),
-            Some(vec![Memo::new(Some("72656E74"), None, Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963"))]),
+            Some(vec![Memo::new(Some("72656E74".to_string()), None, Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963".to_string()))]),
             None,
             None,
             Some(314),

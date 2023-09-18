@@ -1,4 +1,5 @@
-use alloc::borrow::Cow;
+use alloc::string::ToString;
+use alloc::string::String;
 use alloc::vec::Vec;
 use anyhow::Result;
 use derive_new::new;
@@ -17,7 +18,7 @@ serde_with_tag! {
     #[derive(Debug, PartialEq, Eq, Default, Clone, new)]
     #[skip_serializing_none]
     pub struct SignerEntry {
-        pub account: Cow<'static, str>,
+        pub account: String,
         pub signer_weight: u16,
     }
 }
@@ -84,7 +85,7 @@ pub struct SignerListSet<'a> {
     /// Set of bit-flags for this transaction.
     pub flags: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
+    pub memos: Option<Vec<Memo>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
@@ -143,23 +144,23 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
         if let Some(signer_entries) = &self.signer_entries {
             if self.signer_quorum == 0 {
                 Err(XRPLSignerListSetException::ValueCausesValueDeletion {
-                    field1: "signer_entries",
-                    field2: "signer_quorum",
-                    resource: "",
+                    field1: "signer_entries".into(),
+                    field2: "signer_quorum".into(),
+                    resource: "".into(),
                 })
             } else if signer_entries.is_empty() {
                 Err(XRPLSignerListSetException::CollectionTooFewItems {
-                    field: "signer_entries",
+                    field: "signer_entries".into(),
                     min: 1_usize,
                     found: signer_entries.len(),
-                    resource: "",
+                    resource: "".into(),
                 })
             } else if signer_entries.len() > 8 {
                 Err(XRPLSignerListSetException::CollectionTooManyItems {
-                    field: "signer_entries",
+                    field: "signer_entries".into(),
                     max: 8_usize,
                     found: signer_entries.len(),
-                    resource: "",
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -174,7 +175,7 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
         let mut signer_weight_sum: u32 = 0;
         if self.signer_entries.is_some() {
             for signer_entry in self.signer_entries.as_ref().unwrap() {
-                accounts.push(&signer_entry.account);
+                accounts.push(signer_entry.account.clone());
                 let weight: u32 = signer_entry.signer_weight.into();
                 signer_weight_sum += weight;
             }
@@ -184,27 +185,27 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
         for account in accounts.clone() {
             if check_account.contains(&account) {
                 return Err(XRPLSignerListSetException::CollectionItemDuplicate {
-                    field: "signer_entries",
-                    found: account,
-                    resource: "",
+                    field: "signer_entries".into(),
+                    found: account.into(),
+                    resource: "".into(),
                 });
             } else {
                 check_account.push(account);
             }
         }
         if let Some(_signer_entries) = &self.signer_entries {
-            if accounts.contains(&&Cow::Borrowed(self.account)) {
+            if accounts.contains(&self.account.to_string()) {
                 Err(XRPLSignerListSetException::CollectionInvalidItem {
-                    field: "signer_entries",
-                    found: self.account,
-                    resource: "",
+                    field: "signer_entries".into(),
+                    found: self.account.into(),
+                    resource: "".into(),
                 })
             } else if self.signer_quorum > signer_weight_sum {
                 Err(
                     XRPLSignerListSetException::SignerQuorumExceedsSignerWeight {
                         max: signer_weight_sum,
                         found: self.signer_quorum,
-                        resource: "",
+                        resource: "".into(),
                     },
                 )
             } else {
@@ -212,10 +213,10 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
             }
         } else if self.signer_quorum != 0 {
             Err(XRPLSignerListSetException::InvalidValueForValueDeletion {
-                field: "signer_quorum",
+                field: "signer_quorum".into(),
                 expected: 0,
                 found: self.signer_quorum,
-                resource: "",
+                resource: "".into(),
             })
         } else {
             Ok(())
@@ -235,7 +236,7 @@ impl<'a> SignerListSet<'a> {
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         txn_signature: Option<&'a str>,
-        memos: Option<Vec<Memo<'a>>>,
+        memos: Option<Vec<Memo>>,
         signers: Option<Vec<Signer<'a>>>,
         signer_entries: Option<Vec<SignerEntry>>,
     ) -> Self {
@@ -266,7 +267,6 @@ pub trait SignerListSetError {
 
 #[cfg(test)]
 mod test_signer_list_set_error {
-    use alloc::borrow::Cow::Borrowed;
     use alloc::string::ToString;
     use alloc::vec;
 
@@ -292,7 +292,7 @@ mod test_signer_list_set_error {
             signers: None,
             signer_quorum: 0,
             signer_entries: Some(vec![SignerEntry {
-                account: Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(),
                 signer_weight: 2,
             }]),
         };
@@ -338,39 +338,39 @@ mod test_signer_list_set_error {
 
         signer_list_set.signer_entries = Some(vec![
             SignerEntry {
-                account: Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(),
                 signer_weight: 1,
             },
             SignerEntry {
-                account: Borrowed("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"),
+                account: "rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(),
                 signer_weight: 1,
             },
             SignerEntry {
-                account: Borrowed("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"),
+                account: "rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(),
                 signer_weight: 2,
             },
             SignerEntry {
-                account: Borrowed("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"),
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".to_string(),
                 signer_weight: 2,
             },
             SignerEntry {
-                account: Borrowed("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"),
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".to_string(),
                 signer_weight: 1,
             },
             SignerEntry {
-                account: Borrowed("rXTZ5g8X7mrAYEe7iFeM9fiS4ccueyurG"),
+                account: "rXTZ5g8X7mrAYEe7iFeM9fiS4ccueyurG".to_string(),
                 signer_weight: 1,
             },
             SignerEntry {
-                account: Borrowed("rPbMHxs7vy5t6e19tYfqG7XJ6Fog8EPZLk"),
+                account: "rPbMHxs7vy5t6e19tYfqG7XJ6Fog8EPZLk".to_string(),
                 signer_weight: 2,
             },
             SignerEntry {
-                account: Borrowed("r3rhWeE31Jt5sWmi4QiGLMZnY3ENgqw96W"),
+                account: "r3rhWeE31Jt5sWmi4QiGLMZnY3ENgqw96W".to_string(),
                 signer_weight: 3,
             },
             SignerEntry {
-                account: Borrowed("rchGBxcD1A1C2tdxF6papQYZ8kjRKMYcL"),
+                account: "rchGBxcD1A1C2tdxF6papQYZ8kjRKMYcL".to_string(),
                 signer_weight: 2,
             },
         ]);
@@ -382,15 +382,15 @@ mod test_signer_list_set_error {
 
         signer_list_set.signer_entries = Some(vec![
             SignerEntry {
-                account: Borrowed("rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb"),
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".to_string(),
                 signer_weight: 1,
             },
             SignerEntry {
-                account: Borrowed("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"),
+                account: "rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(),
                 signer_weight: 2,
             },
             SignerEntry {
-                account: Borrowed("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"),
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".to_string(),
                 signer_weight: 2,
             },
         ]);
@@ -401,7 +401,7 @@ mod test_signer_list_set_error {
         );
 
         signer_list_set.signer_entries = Some(vec![SignerEntry {
-            account: Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+            account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(),
             signer_weight: 3,
         }]);
         signer_list_set.signer_quorum = 10;
@@ -413,11 +413,11 @@ mod test_signer_list_set_error {
 
         signer_list_set.signer_entries = Some(vec![
             SignerEntry {
-                account: Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(),
                 signer_weight: 3,
             },
             SignerEntry {
-                account: Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(),
                 signer_weight: 2,
             },
         ]);
@@ -432,7 +432,7 @@ mod test_signer_list_set_error {
 
 #[cfg(test)]
 mod test_serde {
-    use alloc::borrow::Cow::Borrowed;
+    use alloc::string::ToString;
     use alloc::vec;
 
     use super::*;
@@ -453,9 +453,9 @@ mod test_serde {
             None,
             None,
             Some(vec![
-                SignerEntry::new(Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"), 2),
-                SignerEntry::new(Borrowed("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"), 1),
-                SignerEntry::new(Borrowed("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n"), 1),
+                SignerEntry::new("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2),
+                SignerEntry::new("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1),
+                SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1),
             ]),
         );
         let default_json = r#"{"TransactionType":"SignerListSet","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Fee":"12","Sequence":null,"LastLedgerSequence":null,"AccountTxnID":null,"SigningPubKey":null,"SourceTag":null,"TicketSequence":null,"TxnSignature":null,"Flags":null,"Memos":null,"Signers":null,"SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;
@@ -482,9 +482,9 @@ mod test_serde {
             None,
             None,
             Some(vec![
-                SignerEntry::new(Borrowed("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"), 2),
-                SignerEntry::new(Borrowed("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"), 1),
-                SignerEntry::new(Borrowed("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n"), 1),
+                SignerEntry::new("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2),
+                SignerEntry::new("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1),
+                SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1),
             ]),
         );
         let default_json = r#"{"TransactionType":"SignerListSet","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Fee":"12","SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;

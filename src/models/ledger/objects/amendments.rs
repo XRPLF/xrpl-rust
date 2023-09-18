@@ -1,6 +1,6 @@
 use crate::models::ledger::LedgerEntryType;
 use crate::models::Model;
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::String};
 use alloc::vec::Vec;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
@@ -11,9 +11,9 @@ use serde_with::skip_serializing_none;
 serde_with_tag! {
     /// `<https://xrpl.org/amendments-object.html#amendments-fields>`
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct Majority<'a> {
+    pub struct Majority {
         /// The Amendment ID of the pending amendment.
-        pub amendment: Cow<'a, str>,
+        pub amendment: String,
         /// The `close_time` field of the ledger version where this amendment most recently gained a
         /// majority.
         pub close_time: u32,
@@ -43,8 +43,7 @@ pub struct Amendments<'a> {
     pub amendments: Option<Vec<Cow<'a, str>>>,
     /// Array of objects describing the status of amendments that have majority support but are not
     /// yet enabled. If omitted, there are no pending amendments with majority support.
-    #[serde(borrow = "'a")]
-    pub majorities: Option<Vec<Majority<'a>>>,
+    pub majorities: Option<Vec<Majority>>,
 }
 
 impl<'a> Model for Amendments<'a> {}
@@ -65,7 +64,7 @@ impl<'a> Amendments<'a> {
     pub fn new(
         index: Cow<'a, str>,
         amendments: Option<Vec<Cow<'a, str>>>,
-        majorities: Option<Vec<Majority<'a>>>,
+        majorities: Option<Vec<Majority>>,
     ) -> Self {
         Self {
             ledger_entry_type: LedgerEntryType::Amendments,
@@ -80,6 +79,7 @@ impl<'a> Amendments<'a> {
 #[cfg(test)]
 mod test_serde {
     use crate::models::ledger::{Amendments, Majority};
+    use alloc::string::ToString;
     use alloc::borrow::Cow;
     use alloc::vec;
 
@@ -94,9 +94,7 @@ mod test_serde {
                 Cow::from("740352F2412A9909880C23A559FCECEDA3BE2126FED62FC7660D628A06927F11"),
             ]),
             Some(vec![Majority {
-                amendment: Cow::from(
-                    "1562511F573A19AE9BD103B5D6B9E01B3B46805AEC5D3C4805C902B514399146",
-                ),
+                amendment: "1562511F573A19AE9BD103B5D6B9E01B3B46805AEC5D3C4805C902B514399146".to_string(),
                 close_time: 535589001,
             }]),
         );

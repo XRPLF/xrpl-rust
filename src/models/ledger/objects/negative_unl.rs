@@ -1,7 +1,7 @@
 use crate::models::ledger::LedgerEntryType;
 use crate::models::Model;
 use alloc::borrow::Cow;
-
+use alloc::string::String;
 use alloc::vec::Vec;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
@@ -12,11 +12,11 @@ use serde_with::skip_serializing_none;
 serde_with_tag! {
     /// Each `DisabledValidator` object represents one disabled validator.
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct DisabledValidator<'a> {
+    pub struct DisabledValidator {
         /// The ledger index when the validator was added to the Negative UNL.
         pub first_ledger_sequence: u32,
         /// The master public key of the validator, in hexadecimal.
-        pub public_key: Cow<'a, str>,
+        pub public_key: String,
     }
 }
 
@@ -40,8 +40,7 @@ pub struct NegativeUNL<'a> {
     pub index: Cow<'a, str>,
     /// A list of `DisabledValidator` objects (see below), each representing a trusted validator
     /// that is currently disabled.
-    #[serde(borrow = "'a")]
-    pub disabled_validators: Option<Vec<DisabledValidator<'a>>>,
+    pub disabled_validators: Option<Vec<DisabledValidator>>,
     /// The public key of a trusted validator that is scheduled to be disabled in the
     /// next flag ledger.
     pub validator_to_disable: Option<Cow<'a, str>>,
@@ -68,7 +67,7 @@ impl<'a> Model for NegativeUNL<'a> {}
 impl<'a> NegativeUNL<'a> {
     pub fn new(
         index: Cow<'a, str>,
-        disabled_validators: Option<Vec<DisabledValidator<'a>>>,
+        disabled_validators: Option<Vec<DisabledValidator>>,
         validator_to_disable: Option<Cow<'a, str>>,
         validator_to_re_enable: Option<Cow<'a, str>>,
     ) -> Self {
@@ -86,6 +85,7 @@ impl<'a> NegativeUNL<'a> {
 #[cfg(test)]
 mod test_serde {
     use super::*;
+    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]
@@ -94,7 +94,7 @@ mod test_serde {
             Cow::from("2E8A59AA9D3B5B186B0B9E0F62E6C02587CA74A4D778938E957B6357D364B244"),
             Some(vec![DisabledValidator::new(
                 1609728,
-                Cow::from("ED6629D456285AE3613B285F65BBFF168D695BA3921F309949AFCD2CA7AFEC16FE"),
+                "ED6629D456285AE3613B285F65BBFF168D695BA3921F309949AFCD2CA7AFEC16FE".to_string(),
             )]),
             None,
             None,

@@ -1,6 +1,7 @@
 use crate::models::transactions::{AccountSetFlag, PaymentFlag};
 use strum_macros::Display;
 use thiserror_no_std::Error;
+use alloc::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum XRPLTransactionException<'a> {
@@ -274,53 +275,53 @@ pub enum XRPLSignerListSetException<'a> {
     /// A field was defined that another field definition would delete.
     #[error("The value of the field `{field1:?}` can not be defined with the field `{field2:?}` because it would cause the deletion of `{field1:?}`. For more information see: {resource:?}")]
     ValueCausesValueDeletion {
-        field1: &'a str,
-        field2: &'a str,
-        resource: &'a str,
+        field1: Cow<'a, str>,
+        field2: Cow<'a, str>,
+        resource: Cow<'a, str>,
     },
     /// A field is expected to have a certain value to be deleted.
     #[error("The field `{field:?}` has the wrong value to be deleted (expected {expected:?}, found {found:?}). For more information see: {resource:?}")]
     InvalidValueForValueDeletion {
-        field: &'a str,
+        field: Cow<'a, str>,
         expected: u32,
         found: u32,
-        resource: &'a str,
+        resource: Cow<'a, str>,
     },
     /// A collection has too few items in it.
     #[error("The value of the field `{field:?}` has too few items in it (min {min:?}, found {found:?}). For more information see: {resource:?}")]
     CollectionTooFewItems {
-        field: &'a str,
+        field: Cow<'a, str>,
         min: usize,
         found: usize,
-        resource: &'a str,
+        resource: Cow<'a, str>,
     },
     /// A collection has too many items in it.
     #[error("The value of the field `{field:?}` has too many items in it (max {max:?}, found {found:?}). For more information see: {resource:?}")]
     CollectionTooManyItems {
-        field: &'a str,
+        field: Cow<'a, str>,
         max: usize,
         found: usize,
-        resource: &'a str,
+        resource: Cow<'a, str>,
     },
     /// A collection is not allowed to have duplicates in it.
     #[error("The value of the field `{field:?}` has a duplicate in it (found {found:?}). For more information see: {resource:?}")]
     CollectionItemDuplicate {
-        field: &'a str,
-        found: &'a str,
-        resource: &'a str,
+        field: Cow<'a, str>,
+        found: Cow<'a, str>,
+        resource: Cow<'a, str>,
     },
     /// A collection contains an invalid value.
     #[error("The field `{field:?}` contains an invalid value (found {found:?}). For more information see: {resource:?}")]
     CollectionInvalidItem {
-        field: &'a str,
-        found: &'a str,
-        resource: &'a str,
+        field: Cow<'a, str>,
+        found: Cow<'a, str>,
+        resource: Cow<'a, str>,
     },
     #[error("The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`. For more information see: {resource:?}")]
     SignerQuorumExceedsSignerWeight {
         max: u32,
         found: u32,
-        resource: &'a str,
+        resource: Cow<'a, str>,
     },
 }
 
