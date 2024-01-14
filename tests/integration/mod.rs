@@ -1,3 +1,3 @@
 use super::common;
 
-mod clients;
+pub mod clients;

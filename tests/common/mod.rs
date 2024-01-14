@@ -3,26 +3,23 @@ pub mod codec;
 use anyhow::anyhow;
 use anyhow::Result;
 
-#[cfg(feature = "embedded-websocket")]
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use tokio::net::TcpStream;
-#[cfg(feature = "embedded-websocket")]
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use tokio_util::codec::Framed;
-#[cfg(feature = "tungstenite")]
-use xrpl::asynch::clients::async_websocket_client::AsyncWebsocketClientTungstenite;
-use xrpl::asynch::clients::async_websocket_client::WebsocketOpen;
-#[cfg(feature = "embedded-websocket")]
-use xrpl::asynch::clients::async_websocket_client::{
-    AsyncWebsocketClientEmbeddedWebsocket, EmbeddedWebsocketOptions,
-};
+#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+use xrpl::asynch::clients::AsyncWebsocketClient;
+use xrpl::asynch::clients::WebsocketOpen;
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+use xrpl::asynch::clients::{AsyncWebsocketClient, EmbeddedWebsocketOptions};
 
 mod constants;
 pub use constants::*;
 
-#[cfg(feature = "tungstenite")]
-pub async fn connect_to_wss_tungstinite_echo(
-) -> Result<AsyncWebsocketClientTungstenite<WebsocketOpen>> {
+#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+pub async fn connect_to_wss_tungstinite_echo() -> Result<AsyncWebsocketClient<WebsocketOpen>> {
     match ECHO_WSS_SERVER.parse() {
-        Ok(url) => match AsyncWebsocketClientTungstenite::open(url).await {
+        Ok(url) => match AsyncWebsocketClient::open(url).await {
             Ok(websocket) => {
                 assert!(websocket.is_open());
                 Ok(websocket)
@@ -33,11 +30,11 @@ pub async fn connect_to_wss_tungstinite_echo(
     }
 }
 
-#[cfg(feature = "embedded-websocket")]
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 pub async fn connect_to_ws_embedded_websocket_tokio_echo(
     stream: &mut Framed<TcpStream, codec::Codec>,
     buffer: &mut [u8],
-) -> Result<AsyncWebsocketClientEmbeddedWebsocket<rand::rngs::ThreadRng, WebsocketOpen>> {
+) -> Result<AsyncWebsocketClient<rand::rngs::ThreadRng, WebsocketOpen>> {
     let rng = rand::thread_rng();
     let websocket_options = EmbeddedWebsocketOptions {
         path: "/mirror",
@@ -47,8 +44,7 @@ pub async fn connect_to_ws_embedded_websocket_tokio_echo(
         additional_headers: None,
     };
 
-    match AsyncWebsocketClientEmbeddedWebsocket::open(stream, buffer, rng, &websocket_options).await
-    {
+    match AsyncWebsocketClient::open(stream, buffer, rng, &websocket_options).await {
         Ok(websocket) => {
             assert!(websocket.is_open());
             Ok(websocket)

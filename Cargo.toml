@@ -80,7 +80,9 @@ criterion = "0.5.1"
 cargo-husky = { version = "1.5.0", default-features = false, features = [
     "user-hooks",
 ] }
+tokio = { version = "1.28.0", features = ["full"] }
 tokio-util = { version = "0.7.7", features = ["codec"] }
+futures-util = "0.3.30"
 bytes = { version = "1.4.0", default-features = false }
 
 [[bench]]
@@ -88,24 +90,20 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = [
-    "std",
-    "core",
-    "models",
-    "utils",
-    "net",
-    "tungstenite",
-    "embedded-websocket",
-]
+default = ["std", "core", "models", "utils", "tungstenite"]
 models = ["core", "transactions", "requests", "ledger"]
 transactions = ["core", "amounts", "currencies"]
 requests = ["core", "amounts", "currencies"]
 ledger = ["core", "amounts", "currencies"]
 amounts = ["core"]
 currencies = ["core"]
-net = ["dep:url", "dep:futures"]
-tungstenite = ["tokio/full", "tokio-tungstenite/native-tls"]
-embedded-websocket = ["dep:embedded-websocket"]
+tungstenite = [
+    "dep:url",
+    "dep:futures",
+    "tokio/full",
+    "tokio-tungstenite/native-tls",
+]
+embedded-ws = ["dep:url", "dep:futures", "dep:embedded-websocket"]
 core = ["utils"]
 utils = []
 std = [

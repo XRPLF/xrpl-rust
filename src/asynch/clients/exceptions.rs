@@ -1,12 +1,12 @@
 use core::fmt::Debug;
 use core::str::Utf8Error;
-#[cfg(feature = "embedded-websocket")]
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use embedded_websocket::framer_async::FramerError;
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
 pub enum XRPLWebsocketException<E: Debug> {
-    #[cfg(feature = "tungstenite")]
+    #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
     #[error("Unable to connect to websocket")]
     UnableToConnect(tokio_tungstenite::tungstenite::Error),
     // FramerError
@@ -18,7 +18,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     Utf8(Utf8Error),
     #[error("Invalid HTTP header")]
     HttpHeader,
-    #[cfg(feature = "embedded-websocket")]
+    #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
     #[error("Websocket error: {0:?}")]
     WebSocket(embedded_websocket::Error),
     #[error("Disconnected")]
@@ -27,7 +27,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     RxBufferTooSmall(usize),
 }
 
-#[cfg(feature = "embedded-websocket")]
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 impl<E: Debug> From<FramerError<E>> for XRPLWebsocketException<E> {
     fn from(value: FramerError<E>) -> Self {
         match value {

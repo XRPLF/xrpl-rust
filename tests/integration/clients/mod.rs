@@ -1,12 +1,11 @@
 use anyhow::anyhow;
 use anyhow::Result;
 
-#[tokio::test]
-#[cfg(feature = "tungstenite")]
-async fn test_websocket_tungstenite_echo() -> Result<()> {
+#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+pub async fn test_websocket_tungstenite_echo() -> Result<()> {
     use super::common::connect_to_wss_tungstinite_echo;
-    use futures::{SinkExt, TryStreamExt};
-    use xrpl::asynch::clients::async_websocket_client::TungsteniteMessage;
+    use futures_util::{SinkExt, TryStreamExt};
+    use xrpl::asynch::clients::TungsteniteMessage;
     use xrpl::models::requests::AccountInfo;
 
     let mut websocket = connect_to_wss_tungstinite_echo().await?;
@@ -22,7 +21,8 @@ async fn test_websocket_tungstenite_echo() -> Result<()> {
 
     websocket.send(&account_info).await?;
     while let Ok(Some(TungsteniteMessage::Text(response))) = websocket.try_next().await {
-        match serde_json::from_str::<AccountInfo>(response.as_str()) {
+        let account_info_echo = serde_json::from_str::<AccountInfo>(response.as_str());
+        match account_info_echo {
             Ok(account_info_echo) => {
                 assert_eq!(account_info, account_info_echo);
                 return Ok(());
@@ -36,12 +36,11 @@ async fn test_websocket_tungstenite_echo() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-#[cfg(feature = "embedded-websocket")]
-async fn test_embedded_websocket_echo() -> Result<()> {
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+pub async fn test_embedded_websocket_echo() -> Result<()> {
     use super::common::{codec::Codec, connect_to_ws_embedded_websocket_tokio_echo};
     use tokio_util::codec::Framed;
-    use xrpl::asynch::clients::async_websocket_client::EmbeddedWebsocketReadMessageType;
+    use xrpl::asynch::clients::EmbeddedWebsocketReadMessageType;
     use xrpl::models::requests::AccountInfo;
 
     let tcp_stream = tokio::net::TcpStream::connect("ws.vi-server.org:80")
