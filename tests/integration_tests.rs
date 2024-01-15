@@ -11,4 +11,6 @@ async fn test_asynch_clients() -> Result<()> {
     return integration::clients::test_websocket_tungstenite_echo().await;
     #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
     return integration::clients::test_embedded_websocket_echo().await;
+    #[cfg(all(feature = "tungstenite", feature = "embedded-ws"))]
+    Ok(())
 }
