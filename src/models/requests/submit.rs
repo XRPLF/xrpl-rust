@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// The submit method applies a transaction and sends it to
 /// the network to be confirmed and included in future ledgers.
 ///
@@ -34,39 +36,34 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Submit<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Hex representation of the signed transaction to submit.
     /// This can also be a multi-signed transaction.
     pub tx_blob: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// If true, and the transaction fails locally, do not retry
     /// or relay the transaction to other servers
     pub fail_hard: Option<bool>,
-    /// The request method.
-    #[serde(default = "RequestMethod::submit")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for Submit<'a> {
-    fn default() -> Self {
-        Submit {
-            tx_blob: "".into(),
-            id: None,
-            fail_hard: None,
-            command: RequestMethod::Submit,
-        }
-    }
 }
 
 impl<'a> Model for Submit<'a> {}
 
+impl<'a> Request for Submit<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> Submit<'a> {
-    pub fn new(tx_blob: Cow<'a, str>, id: Option<Cow<'a, str>>, fail_hard: Option<bool>) -> Self {
+    pub fn new(id: Option<Cow<'a, str>>, tx_blob: Cow<'a, str>, fail_hard: Option<bool>) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::Submit,
+                id,
+            },
             tx_blob,
-            id,
             fail_hard,
-            command: RequestMethod::Submit,
         }
     }
 }

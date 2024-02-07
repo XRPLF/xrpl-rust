@@ -1,12 +1,14 @@
-use crate::_serde::lgr_obj_flags;
 use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::{amount::XRPAmount, Model};
 use alloc::borrow::Cow;
-use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
+
+use super::{CommonFields, LedgerObject};
 
 /// There are several options which can be either enabled or disabled for an account.
 /// These options can be changed with an `AccountSet` transaction.
@@ -50,16 +52,16 @@ pub enum AccountRootFlag {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountRoot<'a> {
-    /// The value `0x0061`, mapped to the string `AccountRoot`, indicates that this is an `AccountRoot`
-    /// object.
-    pub ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean flags enabled for this account.
-    #[serde(with = "lgr_obj_flags")]
-    pub flags: Vec<AccountRootFlag>,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, AccountRootFlag>,
+    // The custom fields for the AccountRoot model.
+    //
+    // See AccountRoot fields:
+    // `<https://xrpl.org/accountroot.html#accountroot-fields>`
     /// The identifying (classic) address of this account.
     pub account: Cow<'a, str>,
     /// The number of objects this account owns in the ledger, which contributes to its owner
@@ -117,41 +119,19 @@ pub struct AccountRoot<'a> {
     pub wallet_size: Option<u32>,
 }
 
-impl<'a> Default for AccountRoot<'a> {
-    fn default() -> Self {
-        Self {
-            flags: Default::default(),
-            index: Default::default(),
-            account: Default::default(),
-            ledger_entry_type: LedgerEntryType::AccountRoot,
-            owner_count: Default::default(),
-            previous_txn_id: Default::default(),
-            previous_txn_lgr_seq: Default::default(),
-            sequence: Default::default(),
-            account_txn_id: Default::default(),
-            balance: Default::default(),
-            burned_nftokens: Default::default(),
-            domain: Default::default(),
-            email_hash: Default::default(),
-            message_key: Default::default(),
-            minted_nftokens: Default::default(),
-            nftoken_minter: Default::default(),
-            regular_key: Default::default(),
-            ticket_count: Default::default(),
-            tick_size: Default::default(),
-            transfer_rate: Default::default(),
-            wallet_locator: Default::default(),
-            wallet_size: Default::default(),
-        }
+impl<'a> Model for AccountRoot<'a> {}
+
+impl<'a> LedgerObject<AccountRootFlag> for AccountRoot<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for AccountRoot<'a> {}
-
 impl<'a> AccountRoot<'a> {
     pub fn new(
-        flags: Vec<AccountRootFlag>,
-        index: Cow<'a, str>,
+        flags: FlagCollection<AccountRootFlag>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         owner_count: u32,
         previous_txn_id: Cow<'a, str>,
@@ -173,9 +153,12 @@ impl<'a> AccountRoot<'a> {
         wallet_size: Option<u32>,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::AccountRoot,
-            flags,
-            index,
+            common_fields: CommonFields::new(
+                flags,
+                LedgerEntryType::AccountRoot,
+                index,
+                ledger_index,
+            ),
             account,
             owner_count,
             previous_txn_id,
@@ -200,16 +183,19 @@ impl<'a> AccountRoot<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
     use alloc::borrow::Cow;
     use alloc::vec;
 
     #[test]
-    fn test_serialize() {
+    fn test_account_root_serde() {
         let account_root = AccountRoot::new(
-            vec![AccountRootFlag::LsfDefaultRipple],
-            Cow::from("13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8"),
+            vec![AccountRootFlag::LsfDefaultRipple].into(),
+            Some(Cow::from(
+                "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8",
+            )),
+            None,
             Cow::from("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"),
             3,
             Cow::from("0D5FB50FA65C9FE1538FD7E398FFFE9D1908DFA4576D8D7A020040686F93C77D"),
@@ -232,12 +218,10 @@ mod test_serde {
             None,
             None,
         );
-        let account_root_json = serde_json::to_string(&account_root).unwrap();
-        let actual = account_root_json.as_str();
-        let expected = r#"{"LedgerEntryType":"AccountRoot","Flags":8388608,"index":"13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OwnerCount":3,"PreviousTxnID":"0D5FB50FA65C9FE1538FD7E398FFFE9D1908DFA4576D8D7A020040686F93C77D","PreviousTxnLgrSeq":14091160,"Sequence":336,"AccountTxnID":"0D5FB50FA65C9FE1538FD7E398FFFE9D1908DFA4576D8D7A020040686F93C77D","Balance":"148446663","Domain":"6D64756F31332E636F6D","EmailHash":"98B4375E1D753E5B91627516F6D70977","MessageKey":"0000000000000000000000070000000300","TransferRate":1004999999}"#;
+        let serialized = serde_json::to_string(&account_root).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: AccountRoot = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(account_root, deserialized);
     }
-
-    // TODO: test_deserialize
 }

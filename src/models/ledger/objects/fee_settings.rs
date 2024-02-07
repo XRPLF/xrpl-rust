@@ -1,9 +1,13 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::Model;
+use crate::models::{ledger::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
+
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 /// The `FeeSettings` object type contains the current base transaction cost and reserve amounts
 /// as determined by fee voting. Each ledger version contains at most one `FeeSettings` object.
@@ -13,16 +17,16 @@ use serde_with::skip_serializing_none;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct FeeSettings<'a> {
-    /// The value `0x0073`, mapped to the string `FeeSettings`, indicates that this object contains
-    /// the ledger's fee settings.
-    pub ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean flags enabled for this object. Currently, the protocol defines no flags
-    /// for `FeeSettings` objects. The value is always `0`.
-    pub flags: u32,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the FeeSettings model.
+    //
+    // See FeeSettings fields:
+    // `<https://xrpl.org/feesettings.html#feesettings-fields>`
     /// The transaction cost of the "reference transaction" in drops of XRP as hexadecimal.
     pub base_fee: Cow<'a, str>,
     /// The BaseFee translated into "fee units".
@@ -33,34 +37,30 @@ pub struct FeeSettings<'a> {
     pub reserve_increment: u32,
 }
 
-impl<'a> Default for FeeSettings<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::FeeSettings,
-            flags: Default::default(),
-            index: Default::default(),
-            base_fee: Default::default(),
-            reference_fee_units: Default::default(),
-            reserve_base: Default::default(),
-            reserve_increment: Default::default(),
-        }
+impl<'a> Model for FeeSettings<'a> {}
+
+impl<'a> LedgerObject<NoFlags> for FeeSettings<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for FeeSettings<'a> {}
-
 impl<'a> FeeSettings<'a> {
     pub fn new(
-        index: Cow<'a, str>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         base_fee: Cow<'a, str>,
         reference_fee_units: u32,
         reserve_base: u32,
         reserve_increment: u32,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::FeeSettings,
-            flags: 0,
-            index,
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::FeeSettings,
+                index,
+                ledger_index,
+            },
             base_fee,
             reference_fee_units,
             reserve_base,
@@ -70,24 +70,25 @@ impl<'a> FeeSettings<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let fee_settings = FeeSettings::new(
-            Cow::from("4BC50C9B0D8515D3EAAE1E74B29A95804346C491EE1A95BF25E4AAB854A6A651"),
+            Some(Cow::from(
+                "4BC50C9B0D8515D3EAAE1E74B29A95804346C491EE1A95BF25E4AAB854A6A651",
+            )),
+            None,
             Cow::from("000000000000000A"),
             10,
             20000000,
             5000000,
         );
-        let fee_settings_json = serde_json::to_string(&fee_settings).unwrap();
-        let actual = fee_settings_json.as_str();
-        let expected = r#"{"LedgerEntryType":"FeeSettings","Flags":0,"index":"4BC50C9B0D8515D3EAAE1E74B29A95804346C491EE1A95BF25E4AAB854A6A651","BaseFee":"000000000000000A","ReferenceFeeUnits":10,"ReserveBase":20000000,"ReserveIncrement":5000000}"#;
+        let serialized = serde_json::to_string(&fee_settings).unwrap();
 
-        assert_eq!(expected, actual)
+        let deserialized: FeeSettings = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(fee_settings, deserialized);
     }
-
-    // TODO: test_deserialize
 }

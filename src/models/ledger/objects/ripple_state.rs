@@ -1,13 +1,15 @@
-use crate::_serde::lgr_obj_flags;
 use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::{amount::Amount, Model};
 use alloc::borrow::Cow;
-use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
@@ -42,16 +44,16 @@ pub enum RippleStateFlag {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct RippleState<'a> {
-    /// The value 0x0072, mapped to the string RippleState, indicates that this object
-    /// is a RippleState object.
-    ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean options enabled for this object.
-    #[serde(with = "lgr_obj_flags")]
-    flags: Vec<RippleStateFlag>,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, RippleStateFlag>,
+    // The custom fields for the RippleState model.
+    //
+    // See RippleState fields:
+    // `<https://xrpl.org/ripplestate.html#ripplestate-fields>`
     /// The balance of the trust line, from the perspective of the low account. A negative
     /// balance indicates that the high account holds tokens issued by the low account.
     pub balance: Amount<'a>,
@@ -87,33 +89,19 @@ pub struct RippleState<'a> {
     pub low_quality_out: Option<u32>,
 }
 
-impl<'a> Default for RippleState<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::RippleState,
-            flags: Default::default(),
-            index: Default::default(),
-            balance: Default::default(),
-            high_limit: Default::default(),
-            high_node: Default::default(),
-            low_limit: Default::default(),
-            low_node: Default::default(),
-            previous_txn_id: Default::default(),
-            previous_txn_lgr_seq: Default::default(),
-            high_quality_in: Default::default(),
-            high_quality_out: Default::default(),
-            low_quality_in: Default::default(),
-            low_quality_out: Default::default(),
-        }
+impl<'a> Model for RippleState<'a> {}
+
+impl<'a> LedgerObject<RippleStateFlag> for RippleState<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for RippleState<'a> {}
-
 impl<'a> RippleState<'a> {
     pub fn new(
-        flags: Vec<RippleStateFlag>,
-        index: Cow<'a, str>,
+        flags: FlagCollection<RippleStateFlag>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         balance: Amount<'a>,
         high_limit: Amount<'a>,
         high_node: Cow<'a, str>,
@@ -127,9 +115,12 @@ impl<'a> RippleState<'a> {
         low_quality_out: Option<u32>,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::RippleState,
-            flags,
-            index,
+            common_fields: CommonFields {
+                flags,
+                ledger_entry_type: LedgerEntryType::RippleState,
+                index,
+                ledger_index,
+            },
             balance,
             high_limit,
             high_node,
@@ -146,16 +137,19 @@ impl<'a> RippleState<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
     use crate::models::amount::IssuedCurrencyAmount;
     use alloc::{borrow::Cow, vec};
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let ripple_state = RippleState::new(
-            vec![RippleStateFlag::LsfHighReserve, RippleStateFlag::LsfLowAuth],
-            Cow::from("9CA88CDEDFF9252B3DE183CE35B038F57282BC9503CDFA1923EF9A95DF0D6F7B"),
+            vec![RippleStateFlag::LsfHighReserve, RippleStateFlag::LsfLowAuth].into(),
+            Some(Cow::from(
+                "9CA88CDEDFF9252B3DE183CE35B038F57282BC9503CDFA1923EF9A95DF0D6F7B",
+            )),
+            None,
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rrrrrrrrrrrrrrrrrrrrBZbvji".into(),
@@ -180,12 +174,10 @@ mod test_serde {
             None,
             None,
         );
-        let ripple_state_json = serde_json::to_string(&ripple_state).unwrap();
-        let actual = ripple_state_json.as_str();
-        let expected = r#"{"LedgerEntryType":"RippleState","Flags":393216,"index":"9CA88CDEDFF9252B3DE183CE35B038F57282BC9503CDFA1923EF9A95DF0D6F7B","Balance":{"currency":"USD","issuer":"rrrrrrrrrrrrrrrrrrrrBZbvji","value":"-10"},"HighLimit":{"currency":"USD","issuer":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","value":"110"},"HighNode":"0000000000000000","LowLimit":{"currency":"USD","issuer":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","value":"0"},"LowNode":"0000000000000000","PreviousTxnID":"E3FE6EA3D48F0C2B639448020EA4F03D4F4F8FFDB243A852A0F59177921B4879","PreviousTxnLgrSeq":14090896}"#;
+        let serialized = serde_json::to_string(&ripple_state).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: RippleState = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(ripple_state, deserialized);
     }
-
-    // TODO: test_deserialize
 }

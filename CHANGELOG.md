@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - make `new` methods of models public
 - add `AsyncWebsocketClient`
 - update dependencies
+- add devcontainer
 
 ## [[v0.2.0-beta]]
 ### Added

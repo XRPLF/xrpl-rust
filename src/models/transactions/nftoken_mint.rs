@@ -10,14 +10,15 @@ use crate::{
     constants::{MAX_TRANSFER_FEE, MAX_URI_LENGTH},
     models::{
         model::Model,
-        transactions::{Flag, Memo, Signer, Transaction, TransactionType},
+        transactions::{Memo, Signer, Transaction, TransactionType},
     },
     Err,
 };
 
-use crate::_serde::txn_flags;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::XRPLNFTokenMintException;
+
+use super::{CommonFields, FlagCollection};
 
 /// Transactions of the NFTokenMint type support additional values
 /// in the Flags field. This enum represents those options.
@@ -57,92 +58,36 @@ pub struct NFTokenMint<'a> {
     //
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
-    #[serde(default = "TransactionType::nftoken_mint")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: Cow<'a, str>,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Highest ledger index this transaction can appear in.
-    /// Specifying this field places a strict upper limit on how long
-    /// the transaction can wait to be validated or rejected.
-    /// See Reliable Transaction Submission for more details.
-    pub last_ledger_sequence: Option<u32>,
-    /// Hash value identifying another transaction. If provided, this
-    /// transaction is only valid if the sending account's
-    /// previously-sent transaction matches the provided hash.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<Cow<'a, str>>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<Cow<'a, str>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The sequence number of the ticket to use in place
-    /// of a Sequence number. If this is provided, Sequence must
-    /// be 0. Cannot be used with AccountTxnID.
-    pub ticket_sequence: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<Cow<'a, str>>,
-    /// Set of bit-flags for this transaction.
-    #[serde(default)]
-    #[serde(with = "txn_flags")]
-    pub flags: Option<Vec<NFTokenMintFlag>>,
-    /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction is
-    /// made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
-    /// The custom fields for the NFTokenMint model.
-    ///
-    /// See NFTokenMint fields:
-    /// `<https://xrpl.org/nftokenmint.html#nftokenmint-fields>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NFTokenMintFlag>,
+    // The custom fields for the NFTokenMint model.
+    //
+    // See NFTokenMint fields:
+    // `<https://xrpl.org/nftokenmint.html#nftokenmint-fields>`
+    /// An arbitrary taxon, or shared identifier, for a series or collection of related NFTs.
+    /// To mint a series of NFTs, give them all the same taxon.
     #[serde(rename = "NFTokenTaxon")]
     pub nftoken_taxon: u32,
+    /// The issuer of the token, if the sender of the account is issuing it on behalf of
+    /// another account. This field must be omitted if the account sending the transaction
+    /// is the issuer of the NFToken. If provided, the issuer's AccountRoot object must have
+    /// the NFTokenMinter field set to the sender of this transaction (this transaction's
+    /// Account field).
     pub issuer: Option<Cow<'a, str>>,
+    /// The value specifies the fee charged by the issuer for secondary sales of the NFToken,
+    /// if such sales are allowed. Valid values for this field are between 0 and 50000
+    /// inclusive, allowing transfer rates of between 0.00% and 50.00% in increments of
+    /// 0.001. If this field is provided, the transaction MUST have the tfTransferable
+    /// flag enabled.
     pub transfer_fee: Option<u32>,
+    /// Up to 256 bytes of arbitrary data. In JSON, this should be encoded as a string of
+    /// hexadecimal. You can use the xrpl.convertStringToHex  utility to convert a URI to
+    /// its hexadecimal equivalent. This is intended to be a URI that points to the data or
+    /// metadata associated with the NFT. The contents could decode to an HTTP or HTTPS URL,
+    /// an IPFS URI, a magnet link, immediate data encoded as an RFC 2379 "data" URL , or
+    /// even an issuer-specific encoding. The URI is NOT checked for validity.
     #[serde(rename = "URI")]
     pub uri: Option<Cow<'a, str>>,
-}
-
-impl<'a> Default for NFTokenMint<'a> {
-    fn default() -> Self {
-        Self {
-            transaction_type: TransactionType::NFTokenMint,
-            account: Default::default(),
-            fee: Default::default(),
-            sequence: Default::default(),
-            last_ledger_sequence: Default::default(),
-            account_txn_id: Default::default(),
-            signing_pub_key: Default::default(),
-            source_tag: Default::default(),
-            ticket_sequence: Default::default(),
-            txn_signature: Default::default(),
-            flags: Default::default(),
-            memos: Default::default(),
-            signers: Default::default(),
-            nftoken_taxon: Default::default(),
-            issuer: Default::default(),
-            transfer_fee: Default::default(),
-            uri: Default::default(),
-        }
-    }
 }
 
 impl<'a: 'static> Model for NFTokenMint<'a> {
@@ -160,33 +105,20 @@ impl<'a: 'static> Model for NFTokenMint<'a> {
     }
 }
 
-impl<'a> Transaction for NFTokenMint<'a> {
-    fn has_flag(&self, flag: &Flag) -> bool {
-        let mut flags = &Vec::new();
-
-        if let Some(flag_set) = self.flags.as_ref() {
-            flags = flag_set;
-        }
-
-        match flag {
-            Flag::NFTokenMint(nftoken_mint_flag) => match nftoken_mint_flag {
-                NFTokenMintFlag::TfBurnable => flags.contains(&NFTokenMintFlag::TfBurnable),
-                NFTokenMintFlag::TfOnlyXRP => flags.contains(&NFTokenMintFlag::TfOnlyXRP),
-                NFTokenMintFlag::TfTransferable => flags.contains(&NFTokenMintFlag::TfTransferable),
-            },
-            _ => false,
-        }
+impl<'a> Transaction<NFTokenMintFlag> for NFTokenMint<'a> {
+    fn has_flag(&self, flag: &NFTokenMintFlag) -> bool {
+        self.common_fields.has_flag(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.transaction_type.clone()
     }
 }
 
 impl<'a> NFTokenMintError for NFTokenMint<'a> {
     fn _get_issuer_error(&self) -> Result<(), XRPLNFTokenMintException> {
         if let Some(issuer) = self.issuer.clone() {
-            if issuer == self.account {
+            if issuer == self.common_fields.account {
                 Err(XRPLNFTokenMintException::ValueEqualsValue {
                     field1: "issuer".into(),
                     field2: "account".into(),
@@ -238,36 +170,34 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
 impl<'a> NFTokenMint<'a> {
     pub fn new(
         account: Cow<'a, str>,
-        nftoken_taxon: u32,
-        fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
-        last_ledger_sequence: Option<u32>,
         account_txn_id: Option<Cow<'a, str>>,
-        signing_pub_key: Option<Cow<'a, str>>,
+        fee: Option<XRPAmount<'a>>,
+        flags: Option<FlagCollection<NFTokenMintFlag>>,
+        last_ledger_sequence: Option<u32>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<Cow<'a, str>>,
-        flags: Option<Vec<NFTokenMintFlag>>,
-        memos: Option<Vec<Memo>>,
-        signers: Option<Vec<Signer<'a>>>,
+        nftoken_taxon: u32,
         issuer: Option<Cow<'a, str>>,
         transfer_fee: Option<u32>,
         uri: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::NFTokenMint,
-            account,
-            fee,
-            sequence,
-            last_ledger_sequence,
-            account_txn_id,
-            signing_pub_key,
-            source_tag,
-            ticket_sequence,
-            txn_signature,
-            flags,
-            memos,
-            signers,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::NFTokenMint,
+                account_txn_id,
+                fee,
+                flags,
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+            },
             nftoken_taxon,
             issuer,
             transfer_fee,
@@ -292,25 +222,22 @@ mod test_nftoken_mint_error {
 
     #[test]
     fn test_issuer_error() {
-        let nftoken_mint = NFTokenMint {
-            transaction_type: TransactionType::NFTokenMint,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            nftoken_taxon: 0,
-            issuer: Some("rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into()),
-            transfer_fee: None,
-            uri: None,
-        };
+        let nftoken_mint = NFTokenMint::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            Some("rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into()),
+            None,
+            None,
+        );
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
@@ -320,25 +247,22 @@ mod test_nftoken_mint_error {
 
     #[test]
     fn test_transfer_fee_error() {
-        let nftoken_mint = NFTokenMint {
-            transaction_type: TransactionType::NFTokenMint,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            nftoken_taxon: 0,
-            issuer: None,
-            transfer_fee: Some(50001),
-            uri: None,
-        };
+        let nftoken_mint = NFTokenMint::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            None,
+            Some(50001),
+            None,
+        );
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
@@ -348,25 +272,22 @@ mod test_nftoken_mint_error {
 
     #[test]
     fn test_uri_error() {
-        let nftoken_mint = NFTokenMint {
-            transaction_type: TransactionType::NFTokenMint,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            nftoken_taxon: 0,
-            issuer: None,
-            transfer_fee: None,
-            uri: Some("wss://xrplcluster.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
-        };
+        let nftoken_mint = NFTokenMint::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            None,
+            None,
+            Some("wss://xrplcluster.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+        );
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
@@ -376,64 +297,39 @@ mod test_nftoken_mint_error {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use alloc::string::ToString;
     use alloc::vec;
 
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let default_txn = NFTokenMint::new(
             "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
-            0,
+            None,
             Some("10".into()),
+            Some(vec![NFTokenMintFlag::TfTransferable].into()),
             None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(vec![NFTokenMintFlag::TfTransferable]),
             Some(vec![Memo::new(Some("72656E74".to_string()), None, Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963".to_string()))]),
             None,
+            None,
+            None,
+            None,
+            0,
             None,
             Some(314),
             Some("697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469".into()),
         );
-        let default_json = r#"{"TransactionType":"NFTokenMint","Account":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B","Fee":"10","Flags":8,"Memos":[{"Memo":{"MemoData":"72656E74","MemoFormat":null,"MemoType":"687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963"}}],"NFTokenTaxon":0,"TransferFee":314,"URI":"697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469"}"#;
+        let default_json_str = r#"{"Account":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B","TransactionType":"NFTokenMint","Fee":"10","Flags":8,"Memos":[{"Memo":{"MemoData":"72656E74","MemoFormat":null,"MemoType":"687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963"}}],"NFTokenTaxon":0,"TransferFee":314,"URI":"697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469"}"#;
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
 
-        let txn_as_string = serde_json::to_string(&default_txn).unwrap();
-        let txn_json = txn_as_string.as_str();
-
-        assert_eq!(txn_json, default_json);
-    }
-
-    #[test]
-    fn test_deserialize() {
-        let default_txn = NFTokenMint::new(
-            "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
-            0,
-            Some("10".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(vec![NFTokenMintFlag::TfTransferable]),
-            Some(vec![Memo::new(Some("72656E74".to_string()), None, Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963".to_string()))]),
-            None,
-            None,
-            Some(314),
-            Some("697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469".into()),
-        );
-        let default_json = r#"{"TransactionType":"NFTokenMint","Account":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B","TransferFee":314,"NFTokenTaxon":0,"Flags":8,"Fee":"10","URI":"697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469","Memos":[{"Memo":{"MemoType":"687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963","MemoFormat":null,"MemoData":"72656E74"}}]}"#;
-
-        let txn_as_obj: NFTokenMint = serde_json::from_str(default_json).unwrap();
-
-        assert_eq!(txn_as_obj, default_txn);
+        // Deserialize
+        let deserialized: NFTokenMint = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
     }
 }

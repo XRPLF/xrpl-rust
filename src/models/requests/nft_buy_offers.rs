@@ -4,10 +4,15 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// This method retrieves all of buy offers for the specified NFToken.
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct NftBuyOffers<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The unique identifier of a NFToken object.
     pub nft_id: Cow<'a, str>,
     /// A 20-byte hex string for the ledger version to use.
@@ -22,28 +27,19 @@ pub struct NftBuyOffers<'a> {
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::nft_buy_offers")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for NftBuyOffers<'a> {
-    fn default() -> Self {
-        NftBuyOffers {
-            nft_id: "".into(),
-            ledger_hash: None,
-            ledger_index: None,
-            limit: None,
-            marker: None,
-            command: RequestMethod::NftBuyOffers,
-        }
-    }
 }
 
 impl<'a> Model for NftBuyOffers<'a> {}
 
+impl<'a> Request for NftBuyOffers<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> NftBuyOffers<'a> {
     pub fn new(
+        id: Option<Cow<'a, str>>,
         nft_id: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
@@ -51,12 +47,15 @@ impl<'a> NftBuyOffers<'a> {
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::NftBuyOffers,
+                id,
+            },
             nft_id,
             ledger_hash,
             ledger_index,
             limit,
             marker,
-            command: RequestMethod::NftBuyOffers,
         }
     }
 }

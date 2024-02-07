@@ -1,5 +1,6 @@
 use crate::models::transactions::{AccountSetFlag, PaymentFlag};
 use alloc::borrow::Cow;
+use core::fmt::Debug;
 use strum_macros::Display;
 use thiserror_no_std::Error;
 

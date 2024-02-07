@@ -10,8 +10,8 @@ pub async fn test_websocket_tungstenite_echo() -> Result<()> {
 
     let mut websocket = connect_to_wss_tungstinite_echo().await?;
     let account_info = AccountInfo::new(
-        "rJumr5e1HwiuV543H7bqixhtFreChWTaHH".into(),
         None,
+        "rJumr5e1HwiuV543H7bqixhtFreChWTaHH".into(),
         None,
         None,
         None,
@@ -51,8 +51,8 @@ pub async fn test_embedded_websocket_echo() -> Result<()> {
     let mut websocket =
         connect_to_ws_embedded_websocket_tokio_echo(&mut framed, &mut buffer).await?;
     let account_info = AccountInfo::new(
-        "rJumr5e1HwiuV543H7bqixhtFreChWTaHH".into(),
         None,
+        "rJumr5e1HwiuV543H7bqixhtFreChWTaHH".into(),
         None,
         None,
         None,

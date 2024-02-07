@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// The transaction_entry method retrieves information on a
 /// single transaction from a specific ledger version.
 /// (The tx method, by contrast, searches all ledgers for
@@ -15,47 +17,41 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TransactionEntry<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Unique hash of the transaction you are looking up.
     pub tx_hash: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
     pub ledger_index: Option<Cow<'a, str>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::transaction_entry")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for TransactionEntry<'a> {
-    fn default() -> Self {
-        TransactionEntry {
-            tx_hash: "".into(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            command: RequestMethod::TransactionEntry,
-        }
-    }
 }
 
 impl<'a> Model for TransactionEntry<'a> {}
 
+impl<'a> Request for TransactionEntry<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> TransactionEntry<'a> {
     pub fn new(
-        tx_hash: Cow<'a, str>,
         id: Option<Cow<'a, str>>,
+        tx_hash: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::TransactionEntry,
+                id,
+            },
             tx_hash,
-            id,
             ledger_hash,
             ledger_index,
-            command: RequestMethod::TransactionEntry,
         }
     }
 }

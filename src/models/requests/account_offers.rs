@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// This request retrieves a list of offers made by a given account
 /// that are outstanding as of a particular ledger version.
 ///
@@ -12,11 +14,12 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountOffers<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's Address.
     pub account: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string identifying the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or "current",
@@ -33,32 +36,20 @@ pub struct AccountOffers<'a> {
     /// Value from a previous paginated response. Resume retrieving
     /// data where that response left off.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_offers")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountOffers<'a> {
-    fn default() -> Self {
-        AccountOffers {
-            account: "".into(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            limit: None,
-            strict: None,
-            marker: None,
-            command: RequestMethod::AccountOffers,
-        }
-    }
 }
 
 impl<'a> Model for AccountOffers<'a> {}
 
+impl<'a> Request for AccountOffers<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> AccountOffers<'a> {
     pub fn new(
-        account: Cow<'a, str>,
         id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
@@ -66,14 +57,16 @@ impl<'a> AccountOffers<'a> {
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountOffers,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             limit,
             strict,
             marker,
-            command: RequestMethod::AccountOffers,
         }
     }
 }

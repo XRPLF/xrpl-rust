@@ -4,33 +4,35 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// This method retrieves all of sell offers for the specified NFToken.
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct NftSellOffers<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The unique identifier of a NFToken object.
     pub nft_id: Cow<'a, str>,
-    /// The request method.
-    #[serde(default = "RequestMethod::nft_sell_offers")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for NftSellOffers<'a> {
-    fn default() -> Self {
-        NftSellOffers {
-            nft_id: "".into(),
-            command: RequestMethod::NftSellOffers,
-        }
-    }
 }
 
 impl<'a> Model for NftSellOffers<'a> {}
 
+impl<'a> Request for NftSellOffers<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> NftSellOffers<'a> {
-    pub fn new(nft_id: Cow<'a, str>) -> Self {
+    pub fn new(id: Option<Cow<'a, str>>, nft_id: Cow<'a, str>) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::NftSellOffers,
+                id,
+            },
             nft_id,
-            command: RequestMethod::NftSellOffers,
         }
     }
 }

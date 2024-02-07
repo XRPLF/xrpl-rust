@@ -3,8 +3,10 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::currency::{Currency, XRP};
+use crate::models::currency::Currency;
 use crate::models::{requests::RequestMethod, Model, PathStep};
+
+use super::{CommonFields, Request};
 
 /// A path is an array. Each member of a path is an object that specifies a step on that path.
 pub type Path<'a> = Vec<PathStep<'a>>;
@@ -57,12 +59,9 @@ pub enum PathFindSubcommand {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PathFind<'a> {
-    /// Use "create" to send the create sub-command.
-    pub subcommand: PathFindSubcommand,
-    /// Unique address of the account to find a path
-    /// from. (In other words, the account that would
-    /// be sending a payment.)
-    pub source_account: Cow<'a, str>,
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Unique address of the account to find a path to.
     /// (In other words, the account that would receive a payment.)
     pub destination_account: Cow<'a, str>,
@@ -73,57 +72,51 @@ pub struct PathFind<'a> {
     /// to deliver as much as possible, while spending no more than
     /// the amount specified in send_max (if provided).
     pub destination_amount: Currency<'a>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
-    /// Currency Amount that would be spent in the transaction.
-    /// Not compatible with source_currencies.
-    pub send_max: Option<Currency<'a>>,
+    /// Unique address of the account to find a path
+    /// from. (In other words, the account that would
+    /// be sending a payment.)
+    pub source_account: Cow<'a, str>,
+    /// Use "create" to send the create sub-command.
+    pub subcommand: PathFindSubcommand,
     /// Array of arrays of objects, representing payment paths to check.
     /// You can use this to keep updated on changes to particular paths
     /// you already know about, or to check the overall cost to make a
     /// payment along a certain path.
     pub paths: Option<Vec<Path<'a>>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::path_find")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for PathFind<'a> {
-    fn default() -> Self {
-        PathFind {
-            subcommand: Default::default(),
-            source_account: "".into(),
-            destination_account: "".into(),
-            destination_amount: Currency::XRP(XRP::new()),
-            id: None,
-            send_max: None,
-            paths: None,
-            command: RequestMethod::PathFind,
-        }
-    }
+    /// Currency Amount that would be spent in the transaction.
+    /// Not compatible with source_currencies.
+    pub send_max: Option<Currency<'a>>,
 }
 
 impl<'a> Model for PathFind<'a> {}
 
+impl<'a> Request for PathFind<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> PathFind<'a> {
     pub fn new(
-        subcommand: PathFindSubcommand,
-        source_account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
         destination_amount: Currency<'a>,
-        id: Option<Cow<'a, str>>,
-        send_max: Option<Currency<'a>>,
+        source_account: Cow<'a, str>,
+        subcommand: PathFindSubcommand,
         paths: Option<Vec<Vec<PathStep<'a>>>>,
+        send_max: Option<Currency<'a>>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::PathFind,
+                id,
+            },
             subcommand,
             source_account,
             destination_account,
             destination_amount,
-            id,
             send_max,
             paths,
-            command: RequestMethod::PathFind,
         }
     }
 }

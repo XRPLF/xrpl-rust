@@ -11,6 +11,8 @@ use crate::{
     Err,
 };
 
+use super::{CommonFields, Request};
+
 /// The channel_authorize method creates a signature that can  be
 /// used to redeem a specific amount of XRP from a payment channel.
 ///
@@ -31,6 +33,9 @@ use crate::{
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ChannelAuthorize<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The unique ID of the payment channel to use.
     pub channel_id: Cow<'a, str>,
     /// Cumulative amount of XRP, in drops, to authorize.
@@ -38,8 +43,6 @@ pub struct ChannelAuthorize<'a> {
     /// of XRP from this channel, the signature created by this
     /// method can be redeemed for the difference.
     pub amount: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// The secret key to use to sign the claim. This must be
     /// the same key pair as the public key specified in the
     /// channel. Cannot be used with seed, seed_hex, or passphrase.
@@ -66,25 +69,6 @@ pub struct ChannelAuthorize<'a> {
     /// The signing algorithm of the cryptographic key pair provided.
     /// Valid types are secp256k1 or ed25519. The default is secp256k1.
     pub key_type: Option<CryptoAlgorithm>,
-    /// The request method.
-    #[serde(default = "RequestMethod::channel_authorize")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for ChannelAuthorize<'a> {
-    fn default() -> Self {
-        ChannelAuthorize {
-            channel_id: "".into(),
-            amount: "".into(),
-            id: None,
-            secret: None,
-            seed: None,
-            seed_hex: None,
-            passphrase: None,
-            key_type: None,
-            command: RequestMethod::ChannelAuthorize,
-        }
-    }
 }
 
 impl<'a> Model for ChannelAuthorize<'a> {
@@ -93,6 +77,12 @@ impl<'a> Model for ChannelAuthorize<'a> {
             Err(error) => Err!(error),
             Ok(_no_error) => Ok(()),
         }
+    }
+}
+
+impl<'a> Request for ChannelAuthorize<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
     }
 }
 
@@ -125,9 +115,9 @@ impl<'a> ChannelAuthorizeError for ChannelAuthorize<'a> {
 
 impl<'a> ChannelAuthorize<'a> {
     pub fn new(
+        id: Option<Cow<'a, str>>,
         channel_id: Cow<'a, str>,
         amount: Cow<'a, str>,
-        id: Option<Cow<'a, str>>,
         secret: Option<Cow<'a, str>>,
         seed: Option<Cow<'a, str>>,
         seed_hex: Option<Cow<'a, str>>,
@@ -135,15 +125,17 @@ impl<'a> ChannelAuthorize<'a> {
         key_type: Option<CryptoAlgorithm>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::ChannelAuthorize,
+                id,
+            },
             channel_id,
             amount,
-            id,
             secret,
             seed,
             seed_hex,
             passphrase,
             key_type,
-            command: RequestMethod::ChannelAuthorize,
         }
     }
 }
@@ -162,21 +154,39 @@ mod test_channel_authorize_errors {
 
     #[test]
     fn test_fields_error() {
-        let channel_authorize = ChannelAuthorize {
-            command: RequestMethod::ChannelAuthorize,
-            channel_id: "5DB01B7FFED6B67E6B0414DED11E051D2EE2B7619CE0EAA6286D67A3A4D5BDB3".into(),
-            amount: "1000000".into(),
-            id: None,
-            secret: None,
-            seed: Some("".into()),
-            seed_hex: Some("".into()),
-            passphrase: None,
-            key_type: Some(CryptoAlgorithm::SECP256K1),
-        };
+        let channel_authorize = ChannelAuthorize::new(
+            None,
+            "5DB01B7FFED6B67E6B0414DED11E051D2EE2B7619CE0EAA6286D67A3A4D5BDB3".into(),
+            "1000000".into(),
+            None,
+            Some("".into()),
+            Some("".into()),
+            None,
+            Some(CryptoAlgorithm::SECP256K1),
+        );
 
         assert_eq!(
             channel_authorize.validate().unwrap_err().to_string().as_str(),
             "The field `secret` can not be defined with `seed`, `seed_hex`, `passphrase`. Define exactly one of them. For more information see: "
         );
+    }
+
+    #[test]
+    fn test_serde() {
+        let req = ChannelAuthorize::new(
+            None,
+            "5DB01B7FFED6B67E6B0414DED11E051D2EE2B7619CE0EAA6286D67A3A4D5BDB3".into(),
+            "1000000".into(),
+            None,
+            Some("".into()),
+            None,
+            None,
+            Some(CryptoAlgorithm::SECP256K1),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+
+        let deserialized: ChannelAuthorize = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(req, deserialized);
     }
 }

@@ -14,7 +14,7 @@
 	// 	}
 	// ]
 	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "rustup --version",
+	"postStartCommand": "rustup --version && rustup component add rustfmt && rustup component add clippy",
 	// Configure tool-specific properties.
 	"customizations": {
 		"vscode": {

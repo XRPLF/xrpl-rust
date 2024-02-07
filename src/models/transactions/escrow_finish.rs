@@ -6,11 +6,14 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::transactions::XRPLEscrowFinishException;
+use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
     model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
 };
+
+use super::CommonFields;
 
 /// Finishes an Escrow and delivers XRP from a held payment to the recipient.
 ///
@@ -28,87 +31,20 @@ pub struct EscrowFinish<'a> {
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
     /// The type of transaction.
-    #[serde(default = "TransactionType::escrow_finish")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: Cow<'a, str>,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Highest ledger index this transaction can appear in.
-    /// Specifying this field places a strict upper limit on how long
-    /// the transaction can wait to be validated or rejected.
-    /// See Reliable Transaction Submission for more details.
-    pub last_ledger_sequence: Option<u32>,
-    /// Hash value identifying another transaction. If provided, this
-    /// transaction is only valid if the sending account's
-    /// previously-sent transaction matches the provided hash.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<Cow<'a, str>>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<Cow<'a, str>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The sequence number of the ticket to use in place
-    /// of a Sequence number. If this is provided, Sequence must
-    /// be 0. Cannot be used with AccountTxnID.
-    pub ticket_sequence: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<Cow<'a, str>>,
-    /// Set of bit-flags for this transaction.
-    pub flags: Option<u32>,
-    /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction is
-    /// made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
-    /// The custom fields for the EscrowFinish model.
-    ///
-    /// See EscrowFinish fields:
-    /// `<https://xrpl.org/escrowfinish.html#escrowfinish-fields>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the EscrowFinish model.
+    //
+    // See EscrowFinish fields:
+    // `<https://xrpl.org/escrowfinish.html#escrowfinish-fields>`
+    /// Address of the source account that funded the held payment.
     pub owner: Cow<'a, str>,
+    /// Transaction sequence of EscrowCreate transaction that created the held payment to finish.
     pub offer_sequence: u32,
+    /// Hex value matching the previously-supplied PREIMAGE-SHA-256 crypto-condition  of the held payment.
     pub condition: Option<Cow<'a, str>>,
+    /// Hex value of the PREIMAGE-SHA-256 crypto-condition fulfillment  matching the held payment's Condition.
     pub fulfillment: Option<Cow<'a, str>>,
-}
-
-impl<'a> Default for EscrowFinish<'a> {
-    fn default() -> Self {
-        Self {
-            transaction_type: TransactionType::EscrowFinish,
-            account: Default::default(),
-            fee: Default::default(),
-            sequence: Default::default(),
-            last_ledger_sequence: Default::default(),
-            account_txn_id: Default::default(),
-            signing_pub_key: Default::default(),
-            source_tag: Default::default(),
-            ticket_sequence: Default::default(),
-            txn_signature: Default::default(),
-            flags: Default::default(),
-            memos: Default::default(),
-            signers: Default::default(),
-            owner: Default::default(),
-            offer_sequence: Default::default(),
-            condition: Default::default(),
-            fulfillment: Default::default(),
-        }
-    }
 }
 
 impl<'a: 'static> Model for EscrowFinish<'a> {
@@ -120,9 +56,9 @@ impl<'a: 'static> Model for EscrowFinish<'a> {
     }
 }
 
-impl<'a> Transaction for EscrowFinish<'a> {
+impl<'a> Transaction<NoFlags> for EscrowFinish<'a> {
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.transaction_type.clone()
     }
 }
 
@@ -145,35 +81,33 @@ impl<'a> EscrowFinishError for EscrowFinish<'a> {
 impl<'a> EscrowFinish<'a> {
     pub fn new(
         account: Cow<'a, str>,
-        owner: Cow<'a, str>,
-        offer_sequence: u32,
-        fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
-        last_ledger_sequence: Option<u32>,
         account_txn_id: Option<Cow<'a, str>>,
-        signing_pub_key: Option<Cow<'a, str>>,
+        fee: Option<XRPAmount<'a>>,
+        last_ledger_sequence: Option<u32>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<Cow<'a, str>>,
-        memos: Option<Vec<Memo>>,
-        signers: Option<Vec<Signer<'a>>>,
+        owner: Cow<'a, str>,
+        offer_sequence: u32,
         condition: Option<Cow<'a, str>>,
         fulfillment: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::EscrowFinish,
-            account,
-            fee,
-            sequence,
-            last_ledger_sequence,
-            account_txn_id,
-            signing_pub_key,
-            source_tag,
-            ticket_sequence,
-            txn_signature,
-            flags: None,
-            memos,
-            signers,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::EscrowFinish,
+                account_txn_id,
+                fee,
+                flags: None,
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+            },
             owner,
             offer_sequence,
             condition,
@@ -196,28 +130,24 @@ mod test_escrow_finish_errors {
 
     #[test]
     fn test_condition_and_fulfillment_error() {
-        let escrow_finish = EscrowFinish {
-            transaction_type: TransactionType::EscrowCancel,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            owner: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            offer_sequence: 10,
-            condition: Some(
+        let escrow_finish = EscrowFinish::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            10,
+            Some(
                 "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
                     .into(),
             ),
-            fulfillment: None,
-        };
+            None,
+        );
 
         assert_eq!(
             escrow_finish.validate().unwrap_err().to_string().as_str(),
@@ -227,65 +157,38 @@ mod test_escrow_finish_errors {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let default_txn = EscrowFinish::new(
             "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             7,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
             Some(
                 "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
                     .into(),
             ),
             Some("A0028000".into()),
         );
-        let default_json = r#"{"TransactionType":"EscrowFinish","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowFinish","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
 
-        let txn_as_string = serde_json::to_string(&default_txn).unwrap();
-        let txn_json = txn_as_string.as_str();
-
-        assert_eq!(txn_json, default_json);
-    }
-
-    #[test]
-    fn test_deserialize() {
-        let default_txn = EscrowFinish::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            7,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(
-                "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
-                    .into(),
-            ),
-            Some("A0028000".into()),
-        );
-        let default_json = r#"{"TransactionType":"EscrowFinish","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
-
-        let txn_as_obj: EscrowFinish = serde_json::from_str(default_json).unwrap();
-
-        assert_eq!(txn_as_obj, default_txn);
+        // Deserialize
+        let deserialized: EscrowFinish = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
     }
 }

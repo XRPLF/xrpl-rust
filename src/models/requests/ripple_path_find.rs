@@ -3,8 +3,9 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::currency::XRP;
 use crate::models::{currency::Currency, requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// The ripple_path_find method is a simpl<'a>ified version of
 /// the path_find method that provides a single response with
@@ -25,9 +26,9 @@ use crate::models::{currency::Currency, requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct RipplePathFind<'a> {
-    /// Unique address of the account that would send funds
-    /// in a transaction.
-    pub source_account: Cow<'a, str>,
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Unique address of the account that would receive funds
     /// in a transaction.
     pub destination_account: Cow<'a, str>,
@@ -38,8 +39,9 @@ pub struct RipplePathFind<'a> {
     /// path to deliver as much as possible, while spending no more
     /// than the amount specified in send_max (if provided).
     pub destination_amount: Currency<'a>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
+    /// Unique address of the account that would send funds
+    /// in a transaction.
+    pub source_account: Cow<'a, str>,
     /// A 20-byte hex string for the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
@@ -56,50 +58,39 @@ pub struct RipplePathFind<'a> {
     /// currencies available up to a maximum of 88 different
     /// currency/issuer pairs.
     pub source_currencies: Option<Vec<Currency<'a>>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::ripple_path_find")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for RipplePathFind<'a> {
-    fn default() -> Self {
-        RipplePathFind {
-            source_account: "".into(),
-            destination_account: "".into(),
-            destination_amount: Currency::XRP(XRP::new()),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            send_max: None,
-            source_currencies: None,
-            command: RequestMethod::RipplePathFind,
-        }
-    }
 }
 
 impl<'a> Model for RipplePathFind<'a> {}
 
+impl<'a> Request for RipplePathFind<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> RipplePathFind<'a> {
     pub fn new(
-        source_account: Cow<'a, str>,
+        id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
         destination_amount: Currency<'a>,
-        id: Option<Cow<'a, str>>,
+        source_account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         send_max: Option<Currency<'a>>,
         source_currencies: Option<Vec<Currency<'a>>>,
     ) -> Self {
         Self {
-            source_account,
+            common_fields: CommonFields {
+                command: RequestMethod::RipplePathFind,
+                id,
+            },
             destination_account,
             destination_amount,
-            id,
+            source_account,
             ledger_hash,
             ledger_index,
             send_max,
             source_currencies,
-            command: RequestMethod::RipplePathFind,
         }
     }
 }

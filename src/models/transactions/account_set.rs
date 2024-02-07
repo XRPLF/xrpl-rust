@@ -7,19 +7,20 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::XRPLAccountSetException;
+use crate::models::transactions::{CommonFields, XRPLAccountSetException};
 use crate::{
-    _serde::txn_flags,
     constants::{
         DISABLE_TICK_SIZE, MAX_DOMAIN_LENGTH, MAX_TICK_SIZE, MAX_TRANSFER_RATE, MIN_TICK_SIZE,
         MIN_TRANSFER_RATE, SPECIAL_CASE_TRANFER_RATE,
     },
     models::{
         model::Model,
-        transactions::{Flag, Memo, Signer, Transaction, TransactionType},
+        transactions::{Memo, Signer, Transaction, TransactionType},
     },
     Err,
 };
+
+use super::FlagCollection;
 
 /// Transactions of the AccountSet type support additional values
 /// in the Flags field. This enum represents those options.
@@ -27,7 +28,7 @@ use crate::{
 /// See AccountSet flags:
 /// `<https://xrpl.org/accountset.html#accountset-flags>`
 #[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter, Copy,
 )]
 #[repr(u32)]
 pub enum AccountSetFlag {
@@ -74,65 +75,12 @@ pub enum AccountSetFlag {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountSet<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
-    #[serde(default = "TransactionType::account_set")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: Cow<'a, str>,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Highest ledger index this transaction can appear in.
-    /// Specifying this field places a strict upper limit on how long
-    /// the transaction can wait to be validated or rejected.
-    /// See Reliable Transaction Submission for more details.
-    pub last_ledger_sequence: Option<u32>,
-    /// Hash value identifying another transaction. If provided, this
-    /// transaction is only valid if the sending account's
-    /// previously-sent transaction matches the provided hash.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<Cow<'a, str>>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<Cow<'a, str>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The sequence number of the ticket to use in place
-    /// of a Sequence number. If this is provided, Sequence must
-    /// be 0. Cannot be used with AccountTxnID.
-    pub ticket_sequence: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<Cow<'a, str>>,
-    /// Set of bit-flags for this transaction.
-    #[serde(default)]
-    #[serde(with = "txn_flags")]
-    pub flags: Option<Vec<AccountSetFlag>>,
-    /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction is
-    /// made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, AccountSetFlag>,
     // The custom fields for the AccountSet model.
     //
     // See AccountSet fields:
@@ -172,34 +120,6 @@ pub struct AccountSet<'a> {
     pub tick_size: Option<u32>,
 }
 
-impl<'a> Default for AccountSet<'a> {
-    fn default() -> Self {
-        Self {
-            transaction_type: TransactionType::AccountSet,
-            account: Default::default(),
-            fee: Default::default(),
-            sequence: Default::default(),
-            last_ledger_sequence: Default::default(),
-            account_txn_id: Default::default(),
-            signing_pub_key: Default::default(),
-            source_tag: Default::default(),
-            ticket_sequence: Default::default(),
-            txn_signature: Default::default(),
-            flags: Default::default(),
-            memos: Default::default(),
-            signers: Default::default(),
-            clear_flag: Default::default(),
-            domain: Default::default(),
-            email_hash: Default::default(),
-            message_key: Default::default(),
-            nftoken_minter: Default::default(),
-            set_flag: Default::default(),
-            transfer_rate: Default::default(),
-            tick_size: Default::default(),
-        }
-    }
-}
-
 impl<'a: 'static> Model for AccountSet<'a> {
     fn get_errors(&self) -> Result<()> {
         match self._get_tick_size_error() {
@@ -221,39 +141,13 @@ impl<'a: 'static> Model for AccountSet<'a> {
     }
 }
 
-impl<'a> Transaction for AccountSet<'a> {
-    fn has_flag(&self, flag: &Flag) -> bool {
-        let mut flags = &Vec::new();
-
-        if let Some(flag_set) = self.flags.as_ref() {
-            flags = flag_set;
-        }
-
-        match flag {
-            Flag::AccountSet(account_set_flag) => match account_set_flag {
-                AccountSetFlag::AsfAccountTxnID => flags.contains(&AccountSetFlag::AsfAccountTxnID),
-                AccountSetFlag::AsfAuthorizedNFTokenMinter => {
-                    flags.contains(&AccountSetFlag::AsfAuthorizedNFTokenMinter)
-                }
-                AccountSetFlag::AsfDefaultRipple => {
-                    flags.contains(&AccountSetFlag::AsfDefaultRipple)
-                }
-                AccountSetFlag::AsfDepositAuth => flags.contains(&AccountSetFlag::AsfDepositAuth),
-                AccountSetFlag::AsfDisableMaster => {
-                    flags.contains(&AccountSetFlag::AsfDisableMaster)
-                }
-                AccountSetFlag::AsfDisallowXRP => flags.contains(&AccountSetFlag::AsfDisallowXRP),
-                AccountSetFlag::AsfGlobalFreeze => flags.contains(&AccountSetFlag::AsfGlobalFreeze),
-                AccountSetFlag::AsfNoFreeze => flags.contains(&AccountSetFlag::AsfNoFreeze),
-                AccountSetFlag::AsfRequireAuth => flags.contains(&AccountSetFlag::AsfRequireAuth),
-                AccountSetFlag::AsfRequireDest => flags.contains(&AccountSetFlag::AsfRequireDest),
-            },
-            _ => false,
-        }
+impl<'a> Transaction<AccountSetFlag> for AccountSet<'a> {
+    fn has_flag(&self, flag: &AccountSetFlag) -> bool {
+        self.common_fields.has_flag(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.get_transaction_type()
     }
 }
 
@@ -388,17 +282,15 @@ impl<'a> AccountSetError for AccountSet<'a> {
 impl<'a> AccountSet<'a> {
     pub fn new(
         account: Cow<'a, str>,
-        fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
-        last_ledger_sequence: Option<u32>,
         account_txn_id: Option<Cow<'a, str>>,
-        signing_pub_key: Option<Cow<'a, str>>,
+        fee: Option<XRPAmount<'a>>,
+        flags: Option<FlagCollection<AccountSetFlag>>,
+        last_ledger_sequence: Option<u32>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<Cow<'a, str>>,
-        flags: Option<Vec<AccountSetFlag>>,
-        memos: Option<Vec<Memo>>,
-        signers: Option<Vec<Signer<'a>>>,
         clear_flag: Option<AccountSetFlag>,
         domain: Option<Cow<'a, str>>,
         email_hash: Option<Cow<'a, str>>,
@@ -409,19 +301,19 @@ impl<'a> AccountSet<'a> {
         nftoken_minter: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::AccountSet,
-            account,
-            fee,
-            sequence,
-            last_ledger_sequence,
-            account_txn_id,
-            signing_pub_key,
-            source_tag,
-            ticket_sequence,
-            txn_signature,
-            flags,
-            memos,
-            signers,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::AccountSet,
+                account_txn_id,
+                fee,
+                flags,
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+            },
             clear_flag,
             domain,
             email_hash,
@@ -452,29 +344,26 @@ mod test_account_set_errors {
 
     #[test]
     fn test_tick_size_error() {
-        let mut account_set = AccountSet {
-            transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            clear_flag: None,
-            domain: None,
-            email_hash: None,
-            message_key: None,
-            set_flag: None,
-            transfer_rate: None,
-            tick_size: None,
-            nftoken_minter: None,
-        };
+        let mut account_set = AccountSet::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         let tick_size_too_low = Some(2);
         account_set.tick_size = tick_size_too_low;
 
@@ -494,29 +383,26 @@ mod test_account_set_errors {
 
     #[test]
     fn test_transfer_rate_error() {
-        let mut account_set = AccountSet {
-            transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            clear_flag: None,
-            domain: None,
-            email_hash: None,
-            message_key: None,
-            set_flag: None,
-            transfer_rate: None,
-            tick_size: None,
-            nftoken_minter: None,
-        };
+        let mut account_set = AccountSet::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         let tick_size_too_low = Some(999999999);
         account_set.transfer_rate = tick_size_too_low;
 
@@ -536,29 +422,26 @@ mod test_account_set_errors {
 
     #[test]
     fn test_domain_error() {
-        let mut account_set = AccountSet {
-            transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            clear_flag: None,
-            domain: None,
-            email_hash: None,
-            message_key: None,
-            set_flag: None,
-            transfer_rate: None,
-            tick_size: None,
-            nftoken_minter: None,
-        };
+        let mut account_set = AccountSet::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         let domain_not_lowercase = Some("https://Example.com/".into());
         account_set.domain = domain_not_lowercase;
 
@@ -578,29 +461,26 @@ mod test_account_set_errors {
 
     #[test]
     fn test_flag_error() {
-        let account_set = AccountSet {
-            transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            clear_flag: Some(AccountSetFlag::AsfDisallowXRP),
-            domain: None,
-            email_hash: None,
-            message_key: None,
-            set_flag: Some(AccountSetFlag::AsfDisallowXRP),
-            transfer_rate: None,
-            tick_size: None,
-            nftoken_minter: None,
-        };
+        let account_set = AccountSet::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(AccountSetFlag::AsfDisallowXRP),
+            None,
+            None,
+            None,
+            Some(AccountSetFlag::AsfDisallowXRP),
+            None,
+            None,
+            None,
+        );
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -610,29 +490,26 @@ mod test_account_set_errors {
 
     #[test]
     fn test_asf_authorized_nftoken_minter_error() {
-        let mut account_set = AccountSet {
-            transaction_type: TransactionType::AccountSet,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            clear_flag: None,
-            domain: None,
-            email_hash: None,
-            message_key: None,
-            set_flag: None,
-            transfer_rate: None,
-            tick_size: None,
-            nftoken_minter: None,
-        };
+        let mut account_set = AccountSet::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
         account_set.nftoken_minter = Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into());
 
         assert_eq!(
@@ -660,21 +537,19 @@ mod test_account_set_errors {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let default_txn = AccountSet::new(
             "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
             Some("12".into()),
+            None,
+            None,
+            None,
             Some(5),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
             None,
             None,
             None,
@@ -687,42 +562,15 @@ mod test_serde {
             None,
             None,
         );
-        let default_json = r#"{"TransactionType":"AccountSet","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Fee":"12","Sequence":5,"Domain":"6578616D706C652E636F6D","MessageKey":"03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB","SetFlag":5}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"AccountSet","Fee":"12","Sequence":5,"Domain":"6578616D706C652E636F6D","MessageKey":"03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB","SetFlag":5}"#;
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
 
-        let txn_as_string = serde_json::to_string(&default_txn).unwrap();
-        let txn_json = txn_as_string.as_str();
-
-        assert_eq!(txn_json, default_json);
-    }
-
-    #[test]
-    fn test_deserialize() {
-        let default_txn = AccountSet::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            Some("12".into()),
-            Some(5),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some("6578616D706C652E636F6D".into()),
-            None,
-            Some("03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB".into()),
-            Some(AccountSetFlag::AsfAccountTxnID),
-            None,
-            None,
-            None,
-        );
-        let default_json = r#"{"TransactionType":"AccountSet","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Fee":"12","Sequence":5,"Domain":"6578616D706C652E636F6D","MessageKey":"03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB","SetFlag":5}"#;
-
-        let txn_as_obj: AccountSet = serde_json::from_str(default_json).unwrap();
-
-        assert_eq!(txn_as_obj, default_txn);
+        // Deserialize
+        let deserialized: AccountSet = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
     }
 }

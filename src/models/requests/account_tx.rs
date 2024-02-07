@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// This request retrieves from the ledger a list of
 /// transactions that involved the specified account.
 ///
@@ -12,11 +14,12 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountTx<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's address.
     pub account: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// Use to look for transactions from a single ledger only.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// Use to look for transactions from a single ledger only.
@@ -46,35 +49,20 @@ pub struct AccountTx<'a> {
     /// if there is a change in the server's range of available
     /// ledgers.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_tx")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountTx<'a> {
-    fn default() -> Self {
-        AccountTx {
-            account: "".into(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            binary: None,
-            forward: None,
-            ledger_index_min: None,
-            ledger_index_max: None,
-            limit: None,
-            marker: None,
-            command: RequestMethod::AccountTx,
-        }
-    }
 }
 
 impl<'a> Model for AccountTx<'a> {}
 
+impl<'a> Request for AccountTx<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> AccountTx<'a> {
     pub fn new(
-        account: Cow<'a, str>,
         id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         binary: Option<bool>,
@@ -85,8 +73,11 @@ impl<'a> AccountTx<'a> {
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountTx,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             binary,
@@ -95,7 +86,6 @@ impl<'a> AccountTx<'a> {
             ledger_index_max,
             limit,
             marker,
-            command: RequestMethod::AccountTx,
         }
     }
 }

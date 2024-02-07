@@ -1,5 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -10,11 +11,13 @@ use crate::models::{
     Model,
 };
 
+use super::{CommonFields, Request};
+
 /// Format for elements in the `books` array for Unsubscribe only.
 ///
 /// See Unsubscribe:
 /// `<https://xrpl.org/unsubscribe.html>`
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
 #[serde(rename_all(serialize = "PascalCase", deserialize = "snake_case"))]
 pub struct UnsubscribeBook<'a> {
     pub taker_gets: Currency<'a>,
@@ -34,15 +37,9 @@ pub struct UnsubscribeBook<'a> {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Unsubscribe<'a> {
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
-    /// Array of objects defining order books to unsubscribe
-    /// from, as explained below.
-    pub books: Option<Vec<UnsubscribeBook<'a>>>,
-    /// Array of string names of generic streams to unsubscribe
-    /// from, including ledger, server, transactions,
-    /// and transactions_proposed.
-    pub streams: Option<Vec<StreamParameter>>,
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Array of unique account addresses to stop receiving updates
     /// for, in the XRP Ledger's base58 format. (This only stops
     /// those messages if you previously subscribed to those accounts
@@ -52,46 +49,44 @@ pub struct Unsubscribe<'a> {
     /// Like accounts, but for accounts_proposed subscriptions that
     /// included not-yet-validated transactions.
     pub accounts_proposed: Option<Vec<Cow<'a, str>>>,
+    /// Array of objects defining order books to unsubscribe
+    /// from, as explained below.
+    pub books: Option<Vec<UnsubscribeBook<'a>>>,
     #[serde(skip_serializing)]
     pub broken: Option<Cow<'a, str>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::unsubscribe")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for Unsubscribe<'a> {
-    fn default() -> Self {
-        Unsubscribe {
-            id: None,
-            books: None,
-            streams: None,
-            accounts: None,
-            accounts_proposed: None,
-            broken: None,
-            command: RequestMethod::Unsubscribe,
-        }
-    }
+    /// Array of string names of generic streams to unsubscribe
+    /// from, including ledger, server, transactions,
+    /// and transactions_proposed.
+    pub streams: Option<Vec<StreamParameter>>,
 }
 
 impl<'a> Model for Unsubscribe<'a> {}
 
+impl<'a> Request for Unsubscribe<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> Unsubscribe<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
-        books: Option<Vec<UnsubscribeBook<'a>>>,
-        streams: Option<Vec<StreamParameter>>,
         accounts: Option<Vec<Cow<'a, str>>>,
         accounts_proposed: Option<Vec<Cow<'a, str>>>,
+        books: Option<Vec<UnsubscribeBook<'a>>>,
         broken: Option<Cow<'a, str>>,
+        streams: Option<Vec<StreamParameter>>,
     ) -> Self {
         Self {
-            id,
+            common_fields: CommonFields {
+                command: RequestMethod::Unsubscribe,
+                id,
+            },
             books,
             streams,
             accounts,
             accounts_proposed,
             broken,
-            command: RequestMethod::Unsubscribe,
         }
     }
 }

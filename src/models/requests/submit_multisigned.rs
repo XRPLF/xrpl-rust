@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// The server_state command asks the server for various
 /// machine-readable information about the rippled server's
 /// current state. The response is almost the same as the
@@ -18,34 +20,30 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct SubmitMultisigned<'a> {
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// If true, and the transaction fails locally, do not
     /// retry or relay the transaction to other servers.
     pub fail_hard: Option<bool>,
-    /// The request method.
-    #[serde(default = "RequestMethod::submit_multisigned")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for SubmitMultisigned<'a> {
-    fn default() -> Self {
-        SubmitMultisigned {
-            id: None,
-            fail_hard: None,
-            command: RequestMethod::SubmitMultisigned,
-        }
-    }
 }
 
 impl<'a> Model for SubmitMultisigned<'a> {}
 
+impl<'a> Request for SubmitMultisigned<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> SubmitMultisigned<'a> {
     pub fn new(id: Option<Cow<'a, str>>, fail_hard: Option<bool>) -> Self {
         Self {
-            id,
+            common_fields: CommonFields {
+                command: RequestMethod::SubmitMultisigned,
+                id,
+            },
             fail_hard,
-            command: RequestMethod::SubmitMultisigned,
         }
     }
 }

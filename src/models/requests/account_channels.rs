@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::CommonFields;
+
 /// This request returns information about an account's Payment
 /// Channels. This includes only channels where the specified
 /// account is the channel's source, not the destination.
@@ -21,7 +23,7 @@ use crate::models::{requests::RequestMethod, Model};
 /// ```
 /// use xrpl::models::requests::AccountChannels;
 ///
-/// let json = r#"{"account":"rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr","marker":12345678,"command":"account_channels"}"#.to_string();
+/// let json = r#"{"command":"account_channels","account":"rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr","marker":12345678}"#.to_string();
 /// let model: AccountChannels = serde_json::from_str(&json).expect("");
 /// let revert: Option<String> = match serde_json::to_string(&model) {
 ///     Ok(model) => Some(model),
@@ -33,12 +35,13 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountChannels<'a> {
+    /// Common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The unique identifier of an account, typically the
     /// account's Address. The request returns channels where
     /// this account is the channel's owner/source.
     pub account: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
@@ -54,47 +57,31 @@ pub struct AccountChannels<'a> {
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_channels")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountChannels<'a> {
-    fn default() -> Self {
-        AccountChannels {
-            account: "".into(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            limit: None,
-            destination_account: None,
-            marker: None,
-            command: RequestMethod::AccountChannels,
-        }
-    }
 }
 
 impl<'a> Model for AccountChannels<'a> {}
 
 impl<'a> AccountChannels<'a> {
     pub fn new(
-        account: Cow<'a, str>,
         id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
+        destination_account: Option<Cow<'a, str>>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
-        destination_account: Option<Cow<'a, str>>,
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountChannels,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             limit,
             destination_account,
             marker,
-            command: RequestMethod::AccountChannels,
         }
     }
 }

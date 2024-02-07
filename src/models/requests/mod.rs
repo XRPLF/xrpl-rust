@@ -43,10 +43,12 @@ pub use account_nfts::*;
 pub use account_objects::*;
 pub use account_offers::*;
 pub use account_tx::*;
+use alloc::borrow::Cow;
 pub use book_offers::*;
 pub use channel_authorize::*;
 pub use channel_verify::*;
 pub use deposit_authorize::*;
+use derive_new::new;
 pub use exceptions::*;
 pub use fee::*;
 pub use gateway_balances::*;
@@ -63,6 +65,7 @@ pub use path_find::*;
 pub use ping::*;
 pub use random::*;
 pub use ripple_path_find::*;
+use serde_with::skip_serializing_none;
 pub use server_info::*;
 pub use server_state::*;
 pub use submit::*;
@@ -135,115 +138,24 @@ pub enum RequestMethod {
     Random,
 }
 
-/// For use with serde defaults.
-/// TODO Find a better way
-impl RequestMethod {
-    fn account_channels() -> Self {
-        RequestMethod::AccountChannels
+/// The base fields for all request models.
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct CommonFields<'a> {
+    /// The request method.
+    pub command: RequestMethod,
+    /// The unique request id.
+    pub id: Option<Cow<'a, str>>,
+}
+
+impl Request for CommonFields<'_> {
+    fn get_command(&self) -> RequestMethod {
+        self.command.clone()
     }
-    fn account_currencies() -> Self {
-        RequestMethod::AccountCurrencies
-    }
-    fn account_info() -> Self {
-        RequestMethod::AccountInfo
-    }
-    fn account_lines() -> Self {
-        RequestMethod::AccountLines
-    }
-    fn account_nfts() -> Self {
-        RequestMethod::AccountNfts
-    }
-    fn account_objects() -> Self {
-        RequestMethod::AccountObjects
-    }
-    fn account_offers() -> Self {
-        RequestMethod::AccountOffers
-    }
-    fn account_tx() -> Self {
-        RequestMethod::AccountTx
-    }
-    fn book_offers() -> Self {
-        RequestMethod::BookOffers
-    }
-    fn channel_authorize() -> Self {
-        RequestMethod::ChannelAuthorize
-    }
-    fn channel_verify() -> Self {
-        RequestMethod::ChannelVerify
-    }
-    fn deposit_authorization() -> Self {
-        RequestMethod::DepositAuthorized
-    }
-    fn fee() -> Self {
-        RequestMethod::Fee
-    }
-    fn ledger_closed() -> Self {
-        RequestMethod::LedgerClosed
-    }
-    fn ledger_current() -> Self {
-        RequestMethod::LedgerCurrent
-    }
-    fn ledger_data() -> Self {
-        RequestMethod::LedgerData
-    }
-    fn ledger_entry() -> Self {
-        RequestMethod::LedgerEntry
-    }
-    fn ledger() -> Self {
-        RequestMethod::Ledger
-    }
-    fn manifest() -> Self {
-        RequestMethod::Manifest
-    }
-    fn nft_buy_offers() -> Self {
-        RequestMethod::NftBuyOffers
-    }
-    fn nft_sell_offers() -> Self {
-        RequestMethod::NftSellOffers
-    }
-    fn no_ripple_check() -> Self {
-        RequestMethod::NoRippleCheck
-    }
-    fn path_find() -> Self {
-        RequestMethod::PathFind
-    }
-    fn ripple_path_find() -> Self {
-        RequestMethod::RipplePathFind
-    }
-    fn ping() -> Self {
-        RequestMethod::Ping
-    }
-    fn random() -> Self {
-        RequestMethod::Random
-    }
-    fn server_info() -> Self {
-        RequestMethod::ServerInfo
-    }
-    fn server_state() -> Self {
-        RequestMethod::ServerState
-    }
-    fn submit() -> Self {
-        RequestMethod::Submit
-    }
-    fn sign_for() -> Self {
-        RequestMethod::SignFor
-    }
-    fn sign() -> Self {
-        RequestMethod::Sign
-    }
-    fn submit_multisigned() -> Self {
-        RequestMethod::SubmitMultisigned
-    }
-    fn subscribe() -> Self {
-        RequestMethod::Subscribe
-    }
-    fn unsubscribe() -> Self {
-        RequestMethod::Unsubscribe
-    }
-    fn transaction_entry() -> Self {
-        RequestMethod::TransactionEntry
-    }
-    fn tx() -> Self {
-        RequestMethod::Tx
-    }
+}
+
+/// The base trait for all request models.
+/// Used to identify the model as a request.
+pub trait Request {
+    fn get_command(&self) -> RequestMethod;
 }

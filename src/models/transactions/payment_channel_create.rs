@@ -1,13 +1,17 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
+use crate::models::NoFlags;
 use crate::models::{
     model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
 };
+
+use super::CommonFields;
 
 /// Create a unidirectional channel and fund it with XRP.
 ///
@@ -25,135 +29,75 @@ pub struct PaymentChannelCreate<'a> {
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
     /// The type of transaction.
-    #[serde(default = "TransactionType::payment_channel_create")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: Cow<'a, str>,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Highest ledger index this transaction can appear in.
-    /// Specifying this field places a strict upper limit on how long
-    /// the transaction can wait to be validated or rejected.
-    /// See Reliable Transaction Submission for more details.
-    pub last_ledger_sequence: Option<u32>,
-    /// Hash value identifying another transaction. If provided, this
-    /// transaction is only valid if the sending account's
-    /// previously-sent transaction matches the provided hash.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<Cow<'a, str>>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<Cow<'a, str>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The sequence number of the ticket to use in place
-    /// of a Sequence number. If this is provided, Sequence must
-    /// be 0. Cannot be used with AccountTxnID.
-    pub ticket_sequence: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<Cow<'a, str>>,
-    /// Set of bit-flags for this transaction.
-    pub flags: Option<u32>,
-    /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction is
-    /// made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
-    /// The custom fields for the PaymentChannelCreate model.
-    ///
-    /// See PaymentChannelCreate fields:
-    /// `<https://xrpl.org/paymentchannelcreate.html#paymentchannelcreate-fields>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the PaymentChannelCreate model.
+    //
+    // See PaymentChannelCreate fields:
+    // `<https://xrpl.org/paymentchannelcreate.html#paymentchannelcreate-fields>`
+    /// Amount of XRP, in drops, to deduct from the sender's balance and set aside in this channel.
+    /// While the channel is open, the XRP can only go to the Destination address. When the channel
+    /// closes, any unclaimed XRP is returned to the source address's balance.
     pub amount: XRPAmount<'a>,
+    /// Address to receive XRP claims against this channel. This is also known as the
+    /// "destination address" for the channel. Cannot be the same as the sender (Account).
     pub destination: Cow<'a, str>,
+    /// Amount of time the source address must wait before closing the channel if it has unclaimed XRP.
     pub settle_delay: u32,
+    /// The 33-byte public key of the key pair the source will use to sign claims against this channel,
+    /// in hexadecimal. This can be any secp256k1 or Ed25519 public key. For more information on key
+    /// pairs, see Key Derivation
     pub public_key: Cow<'a, str>,
+    /// The time, in seconds since the Ripple Epoch, when this channel expires. Any transaction that
+    /// would modify the channel after this time closes the channel without otherwise affecting it.
+    /// This value is immutable; the channel can be closed earlier than this time but cannot remain
+    /// open after this time.
     pub cancel_after: Option<u32>,
+    /// Arbitrary tag to further specify the destination for this payment channel, such as a hosted
+    /// recipient at the destination address.
     pub destination_tag: Option<u32>,
-}
-
-impl<'a> Default for PaymentChannelCreate<'a> {
-    fn default() -> Self {
-        Self {
-            transaction_type: TransactionType::PaymentChannelCreate,
-            account: Default::default(),
-            fee: Default::default(),
-            sequence: Default::default(),
-            last_ledger_sequence: Default::default(),
-            account_txn_id: Default::default(),
-            signing_pub_key: Default::default(),
-            source_tag: Default::default(),
-            ticket_sequence: Default::default(),
-            txn_signature: Default::default(),
-            flags: Default::default(),
-            memos: Default::default(),
-            signers: Default::default(),
-            amount: Default::default(),
-            destination: Default::default(),
-            settle_delay: Default::default(),
-            public_key: Default::default(),
-            cancel_after: Default::default(),
-            destination_tag: Default::default(),
-        }
-    }
 }
 
 impl<'a> Model for PaymentChannelCreate<'a> {}
 
-impl<'a> Transaction for PaymentChannelCreate<'a> {
+impl<'a> Transaction<NoFlags> for PaymentChannelCreate<'a> {
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.transaction_type.clone()
     }
 }
 
 impl<'a> PaymentChannelCreate<'a> {
     pub fn new(
         account: Cow<'a, str>,
-        amount: XRPAmount<'a>,
-        destination: Cow<'a, str>,
-        settle_delay: u32,
-        public_key: Cow<'a, str>,
-        fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
-        last_ledger_sequence: Option<u32>,
         account_txn_id: Option<Cow<'a, str>>,
-        signing_pub_key: Option<Cow<'a, str>>,
+        fee: Option<XRPAmount<'a>>,
+        last_ledger_sequence: Option<u32>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<Cow<'a, str>>,
-        memos: Option<Vec<Memo>>,
-        signers: Option<Vec<Signer<'a>>>,
+        amount: XRPAmount<'a>,
+        destination: Cow<'a, str>,
+        public_key: Cow<'a, str>,
+        settle_delay: u32,
         cancel_after: Option<u32>,
         destination_tag: Option<u32>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::PaymentChannelCreate,
-            account,
-            fee,
-            sequence,
-            last_ledger_sequence,
-            account_txn_id,
-            signing_pub_key,
-            source_tag,
-            ticket_sequence,
-            txn_signature,
-            flags: None,
-            memos,
-            signers,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::PaymentChannelCreate,
+                account_txn_id,
+                fee,
+                flags: None,
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+            },
             amount,
             destination,
             settle_delay,
@@ -165,17 +109,14 @@ impl<'a> PaymentChannelCreate<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let default_txn = PaymentChannelCreate::new(
             "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            XRPAmount::from("10000"),
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            86400,
-            "32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into(),
+            None,
             None,
             None,
             None,
@@ -183,45 +124,22 @@ mod test_serde {
             None,
             Some(11747),
             None,
-            None,
-            None,
-            None,
-            Some(533171558),
-            Some(23480),
-        );
-        let default_json = r#"{"TransactionType":"PaymentChannelCreate","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","SourceTag":11747,"Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SettleDelay":86400,"PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A","CancelAfter":533171558,"DestinationTag":23480}"#;
-
-        let txn_as_string = serde_json::to_string(&default_txn).unwrap();
-        let txn_json = txn_as_string.as_str();
-
-        assert_eq!(txn_json, default_json);
-    }
-
-    #[test]
-    fn test_deserialize() {
-        let default_txn = PaymentChannelCreate::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             XRPAmount::from("10000"),
             "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            86400,
             "32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(11747),
-            None,
-            None,
-            None,
-            None,
+            86400,
             Some(533171558),
             Some(23480),
         );
-        let default_json = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"PaymentChannelCreate","Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SettleDelay":86400,"PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A","CancelAfter":533171558,"DestinationTag":23480,"SourceTag":11747}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"PaymentChannelCreate","SourceTag":11747,"Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SettleDelay":86400,"PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A","CancelAfter":533171558,"DestinationTag":23480}"#;
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
 
-        let txn_as_obj: PaymentChannelCreate = serde_json::from_str(default_json).unwrap();
-
-        assert_eq!(txn_as_obj, default_txn);
+        // Deserialize
+        let deserialized: PaymentChannelCreate = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
     }
 }

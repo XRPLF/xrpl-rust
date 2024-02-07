@@ -1,15 +1,15 @@
-use crate::_serde::lgr_obj_flags;
 use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::{amount::Amount, Model};
 use alloc::borrow::Cow;
-
-use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
@@ -32,16 +32,16 @@ pub enum OfferFlag {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct Offer<'a> {
-    /// The value `0x006F`, mapped to the string `Offer`, indicates that this object
-    /// describes an `Offer`.
-    ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean flags enabled for this offer.
-    #[serde(with = "lgr_obj_flags")]
-    flags: Vec<OfferFlag>,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, OfferFlag>,
+    // The custom fields for the Offer model.
+    //
+    // See Offer fields:
+    // `<https://xrpl.org/offer.html#offer-fields>`
     /// The address of the account that owns this `Offer`.
     pub account: Cow<'a, str>,
     /// The ID of the `Offer Directory` that links to this Offer.
@@ -69,32 +69,19 @@ pub struct Offer<'a> {
     pub expiration: Option<u32>,
 }
 
-impl<'a> Default for Offer<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::Offer,
-            flags: Default::default(),
-            index: Default::default(),
-            account: Default::default(),
-            book_directory: Default::default(),
-            book_node: Default::default(),
-            owner_node: Default::default(),
-            previous_txn_id: Default::default(),
-            previous_txn_lgr_seq: Default::default(),
-            sequence: Default::default(),
-            taker_gets: Default::default(),
-            taker_pays: Default::default(),
-            expiration: Default::default(),
-        }
+impl<'a> Model for Offer<'a> {}
+
+impl<'a> LedgerObject<OfferFlag> for Offer<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for Offer<'a> {}
-
 impl<'a> Offer<'a> {
     pub fn new(
-        flags: Vec<OfferFlag>,
-        index: Cow<'a, str>,
+        flags: FlagCollection<OfferFlag>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         book_directory: Cow<'a, str>,
         book_node: Cow<'a, str>,
@@ -107,9 +94,12 @@ impl<'a> Offer<'a> {
         expiration: Option<u32>,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::Offer,
-            flags,
-            index,
+            common_fields: CommonFields {
+                flags,
+                ledger_entry_type: LedgerEntryType::Offer,
+                index,
+                ledger_index,
+            },
             account,
             book_directory,
             book_node,
@@ -125,17 +115,20 @@ impl<'a> Offer<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
     use crate::models::amount::IssuedCurrencyAmount;
     use alloc::borrow::Cow;
     use alloc::vec;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let offer = Offer::new(
-            vec![OfferFlag::LsfSell],
-            Cow::from("96F76F27D8A327FC48753167EC04A46AA0E382E6F57F32FD12274144D00F1797"),
+            vec![OfferFlag::LsfSell].into(),
+            Some(Cow::from(
+                "96F76F27D8A327FC48753167EC04A46AA0E382E6F57F32FD12274144D00F1797",
+            )),
+            None,
             Cow::from("rBqb89MRQJnMPq8wTwEbtz4kvxrEDfcYvt"),
             Cow::from("ACC27DE91DBA86FC509069EAF4BC511D73128B780F2E54BF5E07A369E2446000"),
             Cow::from("0000000000000000"),
@@ -151,12 +144,10 @@ mod test_serde {
             Amount::XRPAmount("79550000000".into()),
             None,
         );
-        let offer_json = serde_json::to_string(&offer).unwrap();
-        let actual = offer_json.as_str();
-        let expected = r#"{"LedgerEntryType":"Offer","Flags":131072,"index":"96F76F27D8A327FC48753167EC04A46AA0E382E6F57F32FD12274144D00F1797","Account":"rBqb89MRQJnMPq8wTwEbtz4kvxrEDfcYvt","BookDirectory":"ACC27DE91DBA86FC509069EAF4BC511D73128B780F2E54BF5E07A369E2446000","BookNode":"0000000000000000","OwnerNode":"0000000000000000","PreviousTxnID":"F0AB71E777B2DA54B86231E19B82554EF1F8211F92ECA473121C655BFC5329BF","PreviousTxnLgrSeq":14524914,"Sequence":866,"TakerGets":{"currency":"XAG","issuer":"r9Dr5xwkeLegBeXq6ujinjSBLQzQ1zQGjH","value":"37"},"TakerPays":"79550000000"}"#;
+        let serialized = serde_json::to_string(&offer).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: Offer = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(offer, deserialized);
     }
-
-    // TODO: test_deserialize
 }

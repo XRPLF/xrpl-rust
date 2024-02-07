@@ -5,6 +5,8 @@ use strum_macros::Display;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// Represents the object types that an AccountObjects
 /// Request can ask for.
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display)]
@@ -31,11 +33,12 @@ pub enum AccountObjectType {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountObjects<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's address.
     pub account: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
@@ -56,33 +59,20 @@ pub struct AccountObjects<'a> {
     /// Value from a previous paginated response. Resume retrieving
     /// data where that response left off.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_objects")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountObjects<'a> {
-    fn default() -> Self {
-        AccountObjects {
-            account: "".into(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            r#type: None,
-            deletion_blockers_only: None,
-            limit: None,
-            marker: None,
-            command: RequestMethod::AccountObjects,
-        }
-    }
 }
 
 impl<'a> Model for AccountObjects<'a> {}
 
+impl<'a> Request for AccountObjects<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> AccountObjects<'a> {
     pub fn new(
-        account: Cow<'a, str>,
         id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         r#type: Option<AccountObjectType>,
@@ -91,15 +81,17 @@ impl<'a> AccountObjects<'a> {
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             r#type,
             deletion_blockers_only,
             limit,
             marker,
-            command: RequestMethod::AccountObjects,
         }
     }
 }

@@ -62,3 +62,9 @@ impl<'a> From<XRPAmount<'a>> for Amount<'a> {
         Self::XRPAmount(value)
     }
 }
+
+impl<'a> From<&'a str> for Amount<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::XRPAmount(value.into())
+    }
+}

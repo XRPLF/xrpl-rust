@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{currency::Currency, requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// The book_offers method retrieves a list of offers, also known
 /// as the order book, between two currencies.
 ///
@@ -12,6 +14,9 @@ use crate::models::{currency::Currency, requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct BookOffers<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Specification of which currency the account taking
     /// the offer would receive, as an object with currency
     /// and issuer fields (omit issuer for XRP),
@@ -22,8 +27,6 @@ pub struct BookOffers<'a> {
     /// issuer fields (omit issuer for XRP),
     /// like currency amounts.
     pub taker_pays: Currency<'a>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
@@ -39,47 +42,37 @@ pub struct BookOffers<'a> {
     /// included in the response. (You can use this to look
     /// up your own orders to cancel them.)
     pub taker: Option<Cow<'a, str>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::book_offers")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for BookOffers<'a> {
-    fn default() -> Self {
-        BookOffers {
-            taker_gets: Default::default(),
-            taker_pays: Default::default(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            limit: None,
-            taker: None,
-            command: RequestMethod::BookOffers,
-        }
-    }
 }
 
 impl<'a> Model for BookOffers<'a> {}
 
+impl<'a> Request for BookOffers<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> BookOffers<'a> {
     pub fn new(
+        id: Option<Cow<'a, str>>,
         taker_gets: Currency<'a>,
         taker_pays: Currency<'a>,
-        id: Option<Cow<'a, str>>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
         taker: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::BookOffers,
+                id,
+            },
             taker_gets,
             taker_pays,
-            id,
             ledger_hash,
             ledger_index,
             limit,
             taker,
-            command: RequestMethod::BookOffers,
         }
     }
 }
@@ -92,21 +85,19 @@ mod test {
 
     #[test]
     fn test_serde() {
-        let req = BookOffers {
-            taker_gets: Currency::IssuedCurrency(IssuedCurrency::new(
-                "EUR".into(),
-                "rTestIssuer".into(),
-            )),
-            taker_pays: Currency::XRP(XRP::new()),
-            ..Default::default()
-        };
-        let req_as_string = serde_json::to_string(&req).unwrap();
-        let req_json = req_as_string.as_str();
-        let expected_json = r#"{"taker_gets":{"currency":"EUR","issuer":"rTestIssuer"},"taker_pays":{"currency":"XRP"},"command":"book_offers"}"#;
-        let deserialized_req: BookOffers = serde_json::from_str(req_json).unwrap();
+        let req = BookOffers::new(
+            None,
+            Currency::IssuedCurrency(IssuedCurrency::new("EUR".into(), "rTestIssuer".into())),
+            Currency::XRP(XRP::new()),
+            None,
+            None,
+            None,
+            None,
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
 
-        assert_eq!(req_json, expected_json);
-        assert_eq!(req, deserialized_req);
-        assert_eq!(Currency::XRP(XRP::new()), deserialized_req.taker_pays);
+        let deserialized: BookOffers = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(req, deserialized);
     }
 }

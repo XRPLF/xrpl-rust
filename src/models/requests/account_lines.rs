@@ -4,6 +4,8 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
+use super::{CommonFields, Request};
+
 /// This request returns information about an account's trust
 /// lines, including balances in all non-XRP currencies and
 /// assets. All information retrieved is relative to a particular
@@ -14,11 +16,12 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountLines<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's Address.
     pub account: Cow<'a, str>,
-    /// The unique request id.
-    pub id: Option<Cow<'a, str>>,
     /// A 20-byte hex string for the ledger version to use.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
@@ -31,50 +34,35 @@ pub struct AccountLines<'a> {
     /// The Address of a second account. If provided, show only
     /// lines of trust connecting the two accounts.
     pub peer: Option<Cow<'a, str>>,
-    /// Value from a previous paginated response. Resume retrieving
-    /// data where that response left off.
-    pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_lines")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountLines<'a> {
-    fn default() -> Self {
-        AccountLines {
-            account: "".into(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            limit: None,
-            peer: None,
-            marker: None,
-            command: RequestMethod::AccountLines,
-        }
-    }
 }
 
 impl<'a> Model for AccountLines<'a> {}
 
+impl<'a> Request for AccountLines<'a> {
+    fn get_command(&self) -> RequestMethod {
+        self.common_fields.command.clone()
+    }
+}
+
 impl<'a> AccountLines<'a> {
     pub fn new(
-        account: Cow<'a, str>,
         id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
         peer: Option<Cow<'a, str>>,
-        marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountLines,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             limit,
             peer,
-            marker,
-            command: RequestMethod::AccountLines,
         }
     }
 }

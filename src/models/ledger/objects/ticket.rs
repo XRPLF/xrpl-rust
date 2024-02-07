@@ -1,10 +1,13 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::Model;
+use crate::models::{ledger::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 /// The `Ticket` object type represents a `Ticket`, which tracks an account sequence number that
 /// has been set aside for future use. You can create new tickets with a `TicketCreate` transaction.
@@ -12,16 +15,16 @@ use serde_with::skip_serializing_none;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct Ticket<'a> {
-    /// The value 0x0054, mapped to the string Ticket, indicates that this object
-    /// is a Ticket object.
-    pub ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean flags enabled for this object. Currently, the protocol defines
-    /// no flags for Ticket objects. The value is always 0.
-    pub flags: u32,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the Ticket model.
+    //
+    // See Ticket fields:
+    // `<https://xrpl.org/ticket.html#ticket-fields>`
     /// The account that owns this Ticket.
     pub account: Cow<'a, str>,
     /// A hint indicating which page of the owner directory links to this object, in case the
@@ -37,26 +40,18 @@ pub struct Ticket<'a> {
     pub ticket_sequence: u32,
 }
 
-impl<'a> Default for Ticket<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::Ticket,
-            flags: Default::default(),
-            index: Default::default(),
-            account: Default::default(),
-            owner_node: Default::default(),
-            previous_txn_id: Default::default(),
-            previous_txn_lgr_seq: Default::default(),
-            ticket_sequence: Default::default(),
-        }
+impl<'a> Model for Ticket<'a> {}
+
+impl<'a> LedgerObject<NoFlags> for Ticket<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for Ticket<'a> {}
-
 impl<'a> Ticket<'a> {
     pub fn new(
-        index: Cow<'a, str>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
@@ -64,9 +59,12 @@ impl<'a> Ticket<'a> {
         ticket_sequence: u32,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::Ticket,
-            flags: 0,
-            index,
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Ticket,
+                index,
+                ledger_index,
+            },
             account,
             owner_node,
             previous_txn_id,
@@ -77,25 +75,24 @@ impl<'a> Ticket<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let ticket = Ticket::new(
-            Cow::from("ForTest"),
+            Some(Cow::from("ForTest")),
+            None,
             Cow::from("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"),
             Cow::from("0000000000000000"),
             Cow::from("F19AD4577212D3BEACA0F75FE1BA1644F2E854D46E8D62E9C95D18E9708CBFB1"),
             4,
             3,
         );
-        let ticket_json = serde_json::to_string(&ticket).unwrap();
-        let actual = ticket_json.as_str();
-        let expected = r#"{"LedgerEntryType":"Ticket","Flags":0,"index":"ForTest","Account":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de","OwnerNode":"0000000000000000","PreviousTxnID":"F19AD4577212D3BEACA0F75FE1BA1644F2E854D46E8D62E9C95D18E9708CBFB1","PreviousTxnLgrSeq":4,"TicketSequence":3}"#;
+        let serialized = serde_json::to_string(&ticket).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: Ticket = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(ticket, deserialized);
     }
-
-    // TODO: test_deserialize
 }
