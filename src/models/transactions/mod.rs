@@ -54,10 +54,7 @@ pub use ticket_create::*;
 pub use trust_set::*;
 
 use crate::models::amount::XRPAmount;
-use crate::{
-    _serde::txn_flags,
-    serde_with_tag,
-};
+use crate::{_serde::txn_flags, serde_with_tag};
 use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::vec::Vec;
