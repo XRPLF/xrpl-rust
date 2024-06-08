@@ -36,9 +36,13 @@ pub struct LedgerData<'a> {
 
 impl<'a> Model for LedgerData<'a> {}
 
-impl<'a> Request for LedgerData<'a> {
-    fn get_command(&self) -> RequestMethod {
-        self.common_fields.command.clone()
+impl<'a> Request<'a> for LedgerData<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
     }
 }
 

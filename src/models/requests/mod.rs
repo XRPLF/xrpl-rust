@@ -148,14 +148,9 @@ pub struct CommonFields<'a> {
     pub id: Option<Cow<'a, str>>,
 }
 
-impl Request for CommonFields<'_> {
-    fn get_command(&self) -> RequestMethod {
-        self.command.clone()
-    }
-}
-
 /// The base trait for all request models.
 /// Used to identify the model as a request.
-pub trait Request {
-    fn get_command(&self) -> RequestMethod;
+pub trait Request<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a>;
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a>;
 }

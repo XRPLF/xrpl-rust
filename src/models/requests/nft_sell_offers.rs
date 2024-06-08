@@ -19,9 +19,13 @@ pub struct NftSellOffers<'a> {
 
 impl<'a> Model for NftSellOffers<'a> {}
 
-impl<'a> Request for NftSellOffers<'a> {
-    fn get_command(&self) -> RequestMethod {
-        self.common_fields.command.clone()
+impl<'a> Request<'a> for NftSellOffers<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
     }
 }
 

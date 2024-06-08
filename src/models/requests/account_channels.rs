@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::CommonFields;
+use super::{CommonFields, Request};
 
 /// This request returns information about an account's Payment
 /// Channels. This includes only channels where the specified
@@ -83,5 +83,15 @@ impl<'a> AccountChannels<'a> {
             destination_account,
             marker,
         }
+    }
+}
+
+impl<'a> Request<'a> for AccountChannels<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
     }
 }
