@@ -14,6 +14,8 @@ pub mod model;
 #[cfg(feature = "requests")]
 #[allow(clippy::too_many_arguments)]
 pub mod requests;
+#[cfg(feature = "results")]
+pub mod results;
 #[cfg(feature = "transactions")]
 #[allow(clippy::too_many_arguments)]
 pub mod transactions;
