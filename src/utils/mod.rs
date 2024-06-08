@@ -8,7 +8,10 @@ pub use self::time_conversion::*;
 pub use self::xrpl_conversion::*;
 
 use crate::constants::*;
+use alloc::string::String;
+use alloc::string::ToString;
 use alloc::vec::Vec;
+use rand::Rng;
 use regex::Regex;
 
 /// Determine if the address string is a hex address.
@@ -63,6 +66,12 @@ pub fn is_iso_code(value: &str) -> bool {
 pub fn is_iso_hex(value: &str) -> bool {
     let regex = Regex::new(HEX_CURRENCY_REGEX).expect("_is_hex");
     regex.is_match(value)
+}
+
+/// Generate a random id.
+pub fn get_random_id<T: rand_core::RngCore>(rng: &mut T) -> String {
+    let id: u32 = rng.gen();
+    id.to_string()
 }
 
 /// Converter to byte array with endianness.
