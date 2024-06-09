@@ -26,7 +26,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     Disconnected,
     #[error("Read buffer is too small (size: {0:?})")]
     RxBufferTooSmall(usize),
-    #[error("Unexpected result type")]
+    #[error("Unexpected message type")]
     UnexpectedMessageType,
     #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
     #[error("Embedded I/O error: {0:?}")]

@@ -5,6 +5,7 @@ use core::{
 };
 
 use alloc::{
+    dbg, panic,
     string::{String, ToString},
     sync::Arc,
 };
@@ -193,7 +194,8 @@ where
             Some(Ok(ReadResult::Text(t))) => Ok(t.len()),
             Some(Ok(ReadResult::Binary(b))) => Ok(b.len()),
             Some(Ok(ReadResult::Ping(_))) => Ok(0),
-            Some(Ok(_)) => Err(XRPLWebsocketException::<E>::UnexpectedMessageType),
+            Some(Ok(ReadResult::Pong(_))) => Ok(0),
+            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebsocketException::<E>::Disconnected),
             Some(Err(error)) => Err(XRPLWebsocketException::<E>::from(error)),
             None => Err(XRPLWebsocketException::<E>::Disconnected),
         }
