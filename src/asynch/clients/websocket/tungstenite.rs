@@ -113,7 +113,16 @@ where
                 Ok(message) => match message {
                     TungsteniteMessage::Text(response) => Poll::Ready(Some(Ok(response))),
                     TungsteniteMessage::Binary(response) => {
-                        let response_string = String::from_utf8(response).unwrap();
+                        let response_string = match String::from_utf8(response) {
+                            Ok(string) => string,
+                            Err(error) => {
+                                return Poll::Ready(Some(Err!(XRPLWebsocketException::<
+                                    anyhow::Error,
+                                >::Utf8(
+                                    error.utf8_error()
+                                ))));
+                            }
+                        };
                         Poll::Ready(Some(Ok(response_string)))
                     }
                     _ => Poll::Ready(Some(Err!(
@@ -157,9 +166,9 @@ where
         websocket_base.setup_request_future(id).await;
     }
 
-    async fn handle_message(&mut self, message: String) {
+    async fn handle_message(&mut self, message: String) -> Result<()> {
         let mut websocket_base = self.websocket_base.lock().await;
-        websocket_base.handle_message(message).await;
+        websocket_base.handle_message(message).await
     }
 
     async fn pop_message(&mut self) -> String {
@@ -167,7 +176,7 @@ where
         websocket_base.pop_message().await
     }
 
-    async fn request_impl(&mut self, id: String) -> String {
+    async fn request_impl(&mut self, id: String) -> Result<String> {
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base.request_impl(id).await
     }
@@ -186,16 +195,23 @@ where
     ) -> Result<XRPLResponse<'_, Res, Req>> {
         let request_id = self.set_request_id::<Res, Req>(&mut request);
         let mut websocket = self.websocket.lock().await;
-        websocket
-            .send(TungsteniteMessage::Text(
-                serde_json::to_string(&request).unwrap(),
-            ))
+        let request_string = match serde_json::to_string(&request) {
+            Ok(request_string) => request_string,
+            Err(error) => return Err!(error),
+        };
+        match websocket
+            .send(TungsteniteMessage::Text(request_string))
             .await
-            .unwrap();
+        {
+            Ok(()) => (),
+            Err(error) => return Err!(error),
+        }
         let mut websocket_base = self.websocket_base.lock().await;
-        let message = websocket_base.request_impl(request_id.to_string()).await;
-        let response = serde_json::from_str(&message).unwrap();
-        Ok(response)
+        let message = websocket_base.request_impl(request_id.to_string()).await?;
+        match serde_json::from_str(&message) {
+            Ok(response) => Ok(response),
+            Err(error) => Err!(error),
+        }
     }
 
     // async fn get_common_fields(&self) -> Result<CommonFields<'a>> {

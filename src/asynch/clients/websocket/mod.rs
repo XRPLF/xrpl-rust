@@ -9,6 +9,7 @@ use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
+use exceptions::XRPLWebsocketException;
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -52,7 +53,10 @@ where
     <T as ErrorType>::Error: Display,
 {
     async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()> {
-        let message = serde_json::to_string(&message).unwrap();
+        let message = match serde_json::to_string(&message) {
+            Ok(message) => message,
+            Err(error) => return Err!(error),
+        };
         let message_buffer = message.as_bytes();
         match self.write(message_buffer).await {
             Ok(_) => Ok(()),
@@ -74,12 +78,18 @@ where
                     if u_size == 0 {
                         continue;
                     }
-                    let response_str = core::str::from_utf8(&buffer[..u_size]).unwrap();
-                    self.handle_message(response_str.to_string()).await;
+                    let response_str = match core::str::from_utf8(&buffer[..u_size]) {
+                        Ok(response_str) => response_str,
+                        Err(error) => {
+                            return Err!(XRPLWebsocketException::<anyhow::Error>::Utf8(error))
+                        }
+                    };
+                    self.handle_message(response_str.to_string()).await?;
                     let message = self.pop_message().await;
-                    dbg!(&message);
-                    let response = serde_json::from_str(&message).unwrap();
-                    return Ok(response);
+                    match serde_json::from_str(&message) {
+                        Ok(response) => return Ok(response),
+                        Err(error) => return Err!(error),
+                    }
                 }
                 Err(error) => return Err!(error),
             }
@@ -94,7 +104,10 @@ where
     <T as Sink<String>>::Error: Debug + Display,
 {
     async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()> {
-        let message = serde_json::to_string(&message).unwrap();
+        let message = match serde_json::to_string(&message) {
+            Ok(message) => message,
+            Err(error) => return Err!(error),
+        };
         match self.send(message).await {
             Ok(()) => Ok(()),
             Err(error) => Err!(error),
@@ -109,16 +122,15 @@ where
     ) -> Result<XRPLResponse<'_, Res, Req>> {
         match self.next().await {
             Some(Ok(item)) => {
-                let xrpl_response = serde_json::from_str(&item).unwrap();
-                self.handle_message(xrpl_response).await;
+                self.handle_message(item).await?;
                 let message = self.pop_message().await;
-                let response = serde_json::from_str(&message).unwrap();
-                Ok(response)
+                match serde_json::from_str(&message) {
+                    Ok(response) => Ok(response),
+                    Err(error) => Err!(error),
+                }
             }
             Some(Err(error)) => Err!(error),
-            None => {
-                todo!()
-            }
+            None => Err!(XRPLWebsocketException::<anyhow::Error>::Disconnected),
         }
     }
 }

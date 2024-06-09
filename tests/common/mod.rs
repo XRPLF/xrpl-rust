@@ -18,7 +18,7 @@ pub use constants::*;
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 pub async fn connect_to_wss_tungstinite_echo(
 ) -> Result<AsyncWebsocketClient<SingleExecutorMutex, WebsocketOpen>> {
-    match ECHO_WSS_SERVER.parse() {
+    match XRPL_TEST_NET.parse() {
         Ok(url) => match AsyncWebsocketClient::open(url).await {
             Ok(websocket) => {
                 // assert!(websocket.is_open());
@@ -45,7 +45,7 @@ pub async fn connect_to_ws_embedded_websocket_tokio_echo(
     >,
 > {
     let rng = rand_core::OsRng;
-    let url = XRPL_TEST_NET.parse().unwrap();
+    let url = ECHO_WS_SERVER.parse().unwrap();
     match AsyncWebsocketClient::open(rng, stream, url).await {
         Ok(websocket) => {
             // assert!(websocket.is_open());

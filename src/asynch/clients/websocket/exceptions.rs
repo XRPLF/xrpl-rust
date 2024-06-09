@@ -31,6 +31,12 @@ pub enum XRPLWebsocketException<E: Debug> {
     #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
     #[error("Embedded I/O error: {0:?}")]
     EmbeddedIoError(ErrorKind),
+    #[error("Missing request channel sender.")]
+    MissingRequestSender,
+    #[error("Missing request channel receiver.")]
+    MissingRequestReceiver,
+    #[error("Invalid message.")]
+    InvalidMessage,
 }
 
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]

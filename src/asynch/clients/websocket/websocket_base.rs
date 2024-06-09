@@ -1,7 +1,10 @@
 use alloc::string::{String, ToString};
+use anyhow::Result;
 use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Channel};
 use futures::channel::oneshot::{self, Receiver, Sender};
 use hashbrown::HashMap;
+
+use crate::{asynch::clients::exceptions::XRPLWebsocketException, Err};
 
 const _MAX_CHANNEL_MSG_CNT: usize = 10;
 
@@ -33,9 +36,9 @@ where
 pub(crate) trait MessageHandler {
     /// Setup an empty future for a request.
     async fn setup_request_future(&mut self, id: String);
-    async fn handle_message(&mut self, message: String);
+    async fn handle_message(&mut self, message: String) -> Result<()>;
     async fn pop_message(&mut self) -> String;
-    async fn request_impl(&mut self, id: String) -> String;
+    async fn request_impl(&mut self, id: String) -> Result<String>;
 }
 
 impl<M> MessageHandler for WebsocketBase<M>
@@ -48,34 +51,46 @@ where
         self.request_senders.insert(id, sender);
     }
 
-    async fn handle_message(&mut self, message: String) {
-        let message_value = serde_json::to_value(&message).unwrap();
+    async fn handle_message(&mut self, message: String) -> Result<()> {
+        let message_value = match serde_json::to_value(&message) {
+            Ok(value) => value,
+            Err(error) => return Err!(error),
+        };
         let id = match message_value.get("id") {
-            Some(id) => {
-                let id = id.as_str().unwrap().to_string();
-                if id == String::new() {
-                    todo!("`id` must not be an empty string")
-                }
-                id
-            }
+            Some(id) => match id.as_str() {
+                Some(id) => id.to_string(),
+                None => return Err!(XRPLWebsocketException::<anyhow::Error>::InvalidMessage),
+            },
             None => String::new(),
         };
         if let Some(_receiver) = self.pending_requests.get(&id) {
-            let sender = self.request_senders.remove(&id).unwrap();
-            sender.send(message).unwrap();
+            let sender = match self.request_senders.remove(&id) {
+                Some(sender) => sender,
+                None => return Err!(XRPLWebsocketException::<anyhow::Error>::MissingRequestSender),
+            };
+            match sender.send(message) {
+                Ok(()) => (),
+                Err(error) => return Err!(error),
+            };
         } else {
             self.messages.send(message).await;
         }
+        Ok(())
     }
 
     async fn pop_message(&mut self) -> String {
         self.messages.receive().await
     }
 
-    async fn request_impl(&mut self, id: String) -> String {
+    async fn request_impl(&mut self, id: String) -> Result<String> {
         self.setup_request_future(id.clone()).await;
-        let fut = self.pending_requests.remove(&id).unwrap();
-        let message = fut.await.unwrap();
-        serde_json::from_str(&message).unwrap()
+        let fut = match self.pending_requests.remove(&id) {
+            Some(fut) => fut,
+            None => return Err!(XRPLWebsocketException::<anyhow::Error>::MissingRequestReceiver),
+        };
+        match fut.await {
+            Ok(message) => Ok(message),
+            Err(error) => return Err!(error),
+        }
     }
 }

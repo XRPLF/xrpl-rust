@@ -17,13 +17,11 @@ pub async fn test_websocket_tungstenite_echo() -> Result<()> {
     );
 
     websocket.xrpl_send(account_info).await.unwrap();
-    loop {
-        let t = websocket
-            .xrpl_receive::<AccountInfo<'_>, AccountInfo<'_>>()
-            .await
-            .unwrap();
-        dbg!("{:?}", t);
-    }
+    let _ = websocket
+        .xrpl_receive::<AccountInfo<'_>, AccountInfo<'_>>()
+        .await
+        .unwrap();
+    Ok(())
 }
 
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
@@ -49,12 +47,8 @@ pub async fn test_embedded_websocket_echo() -> Result<()> {
         None,
     );
     websocket.xrpl_send(account_info).await?;
-
-    let t = websocket
+    let _ = websocket
         .xrpl_receive::<AccountInfo<'_>, AccountInfo<'_>>()
-        .await
-        .unwrap();
-    dbg!("{:?}", t);
-    panic!();
+        .await?;
     Ok(())
 }
