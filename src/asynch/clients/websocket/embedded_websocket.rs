@@ -5,7 +5,6 @@ use core::{
 };
 
 use alloc::{
-    dbg, panic,
     string::{String, ToString},
     sync::Arc,
 };
@@ -14,7 +13,7 @@ use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::mutex::Mutex;
 use embedded_io_async::{ErrorType, Read, Write};
 use embedded_websocket::{
-    framer_async::{Framer, FramerError, ReadResult},
+    framer_async::{Framer, ReadResult},
     Client, WebSocketClient, WebSocketOptions, WebSocketSendMessageType,
 };
 use futures_core::Stream;

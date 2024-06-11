@@ -46,7 +46,7 @@ chrono = { version = "0.4.19", default-features = false, features = [
     "clock",
 ] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
-rand = { version = "0.8.4", default-features = false, features = ["getrandom"] }
+rand = { version = "0.8.5", default-features = false, features = ["getrandom"] }
 serde = { version = "1.0.130", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0.68", default-features = false, features = [
     "alloc",
@@ -81,7 +81,7 @@ cargo-husky = { version = "1.5.0", default-features = false, features = [
 ] }
 tokio = { version = "1.28.0", features = ["full"] }
 tokio-util = { version = "0.7.7", features = ["codec"] }
-rand = { version = "0.8.4", default-features = false, features = [
+rand = { version = "0.8.5", default-features = false, features = [
     "getrandom",
     "std",
     "std_rng",
