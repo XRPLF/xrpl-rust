@@ -12,6 +12,7 @@ async fn test_asynch_clients() -> Result<()> {
     return integration::clients::test_websocket_tungstenite_test_net().await;
     #[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
     return integration::clients::test_embedded_websocket_echo().await;
+    #[allow(unreachable_code)]
     Ok(())
 }
 
@@ -22,5 +23,6 @@ async fn test_asynch_clients_request() -> Result<()> {
     return integration::clients::test_websocket_tungstenite_request().await;
     #[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
     return integration::clients::test_embedded_websocket_request().await;
+    #[allow(unreachable_code)]
     Ok(())
 }
