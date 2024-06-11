@@ -1,7 +1,6 @@
-use crate::{
-    models::{requests::Request, results::XRPLResponse},
-    utils::get_random_id,
-};
+use crate::models::{requests::Request, results::XRPLResponse};
+#[cfg(feature = "std")]
+use crate::utils::get_random_id;
 use alloc::borrow::Cow;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

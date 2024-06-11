@@ -2,7 +2,7 @@ use anyhow::Result;
 
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 pub async fn test_websocket_tungstenite_test_net() -> Result<()> {
-    use super::common::connect_to_wss_tungstinite_test_net;
+    use crate::common::connect_to_wss_tungstinite_test_net;
     use xrpl::{
         asynch::clients::XRPLWebsocketIO, models::requests::Fee, models::results::FeeResult,
     };
@@ -21,7 +21,7 @@ pub async fn test_websocket_tungstenite_test_net() -> Result<()> {
 
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 pub async fn test_websocket_tungstenite_request() -> Result<()> {
-    use super::common::connect_to_wss_tungstinite_test_net;
+    use crate::common::connect_to_wss_tungstinite_test_net;
     use xrpl::{asynch::clients::AsyncClient, models::requests::Fee, models::results::FeeResult};
 
     let websocket = connect_to_wss_tungstinite_test_net().await?;
@@ -32,9 +32,9 @@ pub async fn test_websocket_tungstenite_request() -> Result<()> {
     Ok(())
 }
 
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+#[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
 pub async fn test_embedded_websocket_echo() -> Result<()> {
-    use super::common::connect_to_ws_embedded_websocket_tokio_echo;
+    use crate::common::connect_to_ws_embedded_websocket_tokio_echo;
     use tokio_util::codec::Framed;
     use xrpl::asynch::clients::codec::Codec;
     use xrpl::asynch::clients::XRPLWebsocketIO;
@@ -55,9 +55,9 @@ pub async fn test_embedded_websocket_echo() -> Result<()> {
     Ok(())
 }
 
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+#[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
 pub async fn test_embedded_websocket_request() -> Result<()> {
-    use super::common::connect_to_ws_embedded_websocket_tokio_echo;
+    use crate::common::connect_to_ws_embedded_websocket_tokio_echo;
     use tokio_util::codec::Framed;
     use xrpl::asynch::clients::codec::Codec;
     use xrpl::asynch::clients::AsyncClient;

@@ -94,7 +94,7 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "core", "models", "utils", "embedded-ws"]
+default = ["std", "core", "models", "utils", "tungstenite"]
 models = ["core", "transactions", "requests", "ledger", "results"]
 transactions = ["core", "amounts", "currencies"]
 requests = ["core", "amounts", "currencies"]
