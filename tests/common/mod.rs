@@ -16,7 +16,7 @@ mod constants;
 pub use constants::*;
 
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
-pub async fn connect_to_wss_tungstinite_echo(
+pub async fn connect_to_wss_tungstinite_test_net(
 ) -> Result<AsyncWebsocketClient<SingleExecutorMutex, WebsocketOpen>> {
     match XRPL_WSS_TEST_NET.parse() {
         Ok(url) => match AsyncWebsocketClient::open(url).await {

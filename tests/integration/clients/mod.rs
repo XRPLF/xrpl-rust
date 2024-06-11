@@ -1,13 +1,13 @@
 use anyhow::Result;
 
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
-pub async fn test_websocket_tungstenite_echo() -> Result<()> {
-    use super::common::connect_to_wss_tungstinite_echo;
+pub async fn test_websocket_tungstenite_test_net() -> Result<()> {
+    use super::common::connect_to_wss_tungstinite_test_net;
     use xrpl::{
         asynch::clients::XRPLWebsocketIO, models::requests::Fee, models::results::FeeResult,
     };
 
-    let mut websocket = connect_to_wss_tungstinite_echo().await?;
+    let mut websocket = connect_to_wss_tungstinite_test_net().await?;
     let fee = Fee::new(None);
 
     websocket.xrpl_send(fee).await.unwrap();
@@ -15,6 +15,19 @@ pub async fn test_websocket_tungstenite_echo() -> Result<()> {
         .xrpl_receive::<FeeResult<'_>, Fee<'_>>()
         .await
         .unwrap();
+    assert!(message.unwrap().result.is_some());
+    Ok(())
+}
+
+#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+pub async fn test_websocket_tungstenite_request() -> Result<()> {
+    use super::common::connect_to_wss_tungstinite_test_net;
+    use xrpl::{asynch::clients::AsyncClient, models::requests::Fee, models::results::FeeResult};
+
+    let websocket = connect_to_wss_tungstinite_test_net().await?;
+    let fee = Fee::new(None);
+
+    let message = websocket.request::<FeeResult<'_>, _>(fee).await.unwrap();
     assert!(message.result.is_some());
     Ok(())
 }

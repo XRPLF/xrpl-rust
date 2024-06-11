@@ -3,16 +3,17 @@ use crate::models::{requests::Request, results::XRPLResponse};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-pub trait AsyncClient: Client {
+#[allow(async_fn_in_trait)]
+pub trait AsyncClient<'a>: Client<'a> {
     async fn request<
         Res: Serialize + for<'de> Deserialize<'de>,
-        Req: Serialize + for<'de> Deserialize<'de> + for<'a> Request<'a>,
+        Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
     >(
-        &self,
+        &'a self,
         request: Req,
     ) -> Result<XRPLResponse<'_, Res, Req>> {
         self.request_impl(request).await
     }
 }
 
-impl<T: Client> AsyncClient for T {}
+impl<'a, T: Client<'a>> AsyncClient<'a> for T {}

@@ -9,7 +9,6 @@ use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
-use exceptions::XRPLWebsocketException;
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -44,7 +43,7 @@ pub trait XRPLWebsocketIO {
         Req: Serialize + for<'de> Deserialize<'de> + Debug,
     >(
         &mut self,
-    ) -> Result<XRPLResponse<'_, Res, Req>>;
+    ) -> Result<Option<XRPLResponse<'_, Res, Req>>>;
 }
 
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
@@ -119,7 +118,7 @@ where
         Req: Serialize + for<'de> Deserialize<'de> + Debug,
     >(
         &mut self,
-    ) -> Result<XRPLResponse<'_, Res, Req>> {
+    ) -> Result<Option<XRPLResponse<'_, Res, Req>>> {
         match self.next().await {
             Some(Ok(item)) => {
                 self.handle_message(item).await?;
@@ -130,7 +129,7 @@ where
                 }
             }
             Some(Err(error)) => Err!(error),
-            None => Err!(XRPLWebsocketException::<anyhow::Error>::Disconnected),
+            None => Ok(None),
         }
     }
 }

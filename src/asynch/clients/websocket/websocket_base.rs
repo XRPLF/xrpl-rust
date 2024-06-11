@@ -3,6 +3,7 @@ use anyhow::Result;
 use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Channel};
 use futures::channel::oneshot::{self, Receiver, Sender};
 use hashbrown::HashMap;
+use serde_json::Value;
 
 use crate::{asynch::clients::exceptions::XRPLWebsocketException, Err};
 
@@ -31,6 +32,12 @@ where
             messages: Channel::new(),
         }
     }
+
+    pub fn close(&mut self) {
+        self.pending_requests.clear();
+        self.request_senders.clear();
+        self.messages.clear();
+    }
 }
 
 pub(crate) trait MessageHandler {
@@ -38,7 +45,7 @@ pub(crate) trait MessageHandler {
     async fn setup_request_future(&mut self, id: String);
     async fn handle_message(&mut self, message: String) -> Result<()>;
     async fn pop_message(&mut self) -> String;
-    async fn request_impl(&mut self, id: String) -> Result<String>;
+    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>>;
 }
 
 impl<M> MessageHandler for WebsocketBase<M>
@@ -46,13 +53,16 @@ where
     M: RawMutex,
 {
     async fn setup_request_future(&mut self, id: String) {
+        if self.pending_requests.contains_key(&id) {
+            return;
+        }
         let (sender, receiver) = oneshot::channel::<String>();
         self.pending_requests.insert(id.clone(), receiver);
         self.request_senders.insert(id, sender);
     }
 
     async fn handle_message(&mut self, message: String) -> Result<()> {
-        let message_value = match serde_json::to_value(&message) {
+        let message_value: Value = match serde_json::from_str(&message) {
             Ok(value) => value,
             Err(error) => return Err!(error),
         };
@@ -82,15 +92,21 @@ where
         self.messages.receive().await
     }
 
-    async fn request_impl(&mut self, id: String) -> Result<String> {
-        self.setup_request_future(id.clone()).await;
-        let fut = match self.pending_requests.remove(&id) {
+    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>> {
+        let fut = match self.pending_requests.get_mut(&id) {
             Some(fut) => fut,
             None => return Err!(XRPLWebsocketException::<anyhow::Error>::MissingRequestReceiver),
         };
-        match fut.await {
-            Ok(message) => Ok(message),
-            Err(error) => return Err!(error),
+        match fut.try_recv() {
+            Ok(Some(message)) => {
+                // Remove the future from the hashmap.
+                self.pending_requests.remove(&id);
+                Ok(Some(message))
+            }
+            Ok(None) => Ok(None),
+            Err(error) => {
+                return Err!(error);
+            }
         }
     }
 }
