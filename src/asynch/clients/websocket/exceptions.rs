@@ -20,6 +20,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     Utf8(Utf8Error),
     #[error("Invalid HTTP header")]
     HttpHeader,
+    #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
     #[error("Websocket error: {0:?}")]
     WebSocket(embedded_websocket::Error),
     #[error("Disconnected")]

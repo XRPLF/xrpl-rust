@@ -158,6 +158,8 @@ mod test_escrow_finish_errors {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
+
     use super::*;
 
     #[test]
@@ -182,9 +184,9 @@ mod tests {
         );
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowFinish","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
         // Serialize
-        let default_json_value = serde_json::to_value(default_json_str).unwrap();
-        let serialized_string = serde_json::to_string(&default_txn).unwrap();
-        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        let default_json_value: Value = serde_json::from_str(default_json_str).unwrap();
+        // let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&default_txn).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
         // Deserialize

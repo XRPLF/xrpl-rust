@@ -27,10 +27,12 @@ pub trait Client<'a> {
             Some(id) => id,
             None => {
                 #[cfg(feature = "std")]
-                let mut rng = rand::thread_rng();
+                {
+                    let mut rng = rand::thread_rng();
+                    Cow::Owned(get_random_id(&mut rng))
+                }
                 #[cfg(not(feature = "std"))]
                 unimplemented!("get_random_id is not yet implemented for no_std. Please provide an `id` in the request.");
-                Cow::Owned(get_random_id(&mut rng))
             }
         };
         request.get_common_fields_mut().id = Some(request_id.clone());

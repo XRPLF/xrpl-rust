@@ -61,7 +61,9 @@ thiserror-no-std = "2.0.2"
 anyhow = { version = "1.0.69", default-features = false }
 tokio = { version = "1.28.0", default-features = false, optional = true }
 url = { version = "2.2.2", default-features = false, optional = true }
-futures = { version = "0.3.28", default-features = false, optional = true }
+futures = { version = "0.3.28", default-features = false, features = [
+    "alloc",
+], optional = true }
 rand_core = { version = "0.6.4", default-features = false }
 tokio-tungstenite = { version = "0.20.0", optional = true }
 embassy-sync = { version = "0.6.0", default-features = false }
