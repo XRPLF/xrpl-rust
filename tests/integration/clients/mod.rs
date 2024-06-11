@@ -44,7 +44,7 @@ pub async fn test_embedded_websocket_echo() -> Result<()> {
     let tcp_stream = tokio::net::TcpStream::connect("ws.vi-server.org:80")
         .await
         .unwrap();
-    let mut framed = Framed::new(tcp_stream, Codec);
+    let framed = Framed::new(tcp_stream, Codec);
     let mut websocket = connect_to_ws_embedded_websocket_tokio_echo(framed).await?;
     let fee = Fee::new(None);
     websocket.xrpl_send(fee).await?;
@@ -52,5 +52,24 @@ pub async fn test_embedded_websocket_echo() -> Result<()> {
         .xrpl_receive::<FeeResult<'_>, Fee<'_>>()
         .await
         .unwrap();
+    Ok(())
+}
+
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+pub async fn test_embedded_websocket_request() -> Result<()> {
+    use super::common::connect_to_ws_embedded_websocket_tokio_echo;
+    use tokio_util::codec::Framed;
+    use xrpl::asynch::clients::codec::Codec;
+    use xrpl::asynch::clients::AsyncClient;
+    use xrpl::models::requests::Fee;
+    use xrpl::models::results::FeeResult;
+
+    let tcp_stream = tokio::net::TcpStream::connect("ws.vi-server.org:80")
+        .await
+        .unwrap();
+    let framed = Framed::new(tcp_stream, Codec);
+    let websocket = connect_to_ws_embedded_websocket_tokio_echo(framed).await?;
+    let fee = Fee::new(None);
+    let _res = websocket.request::<FeeResult, _>(fee).await?;
     Ok(())
 }

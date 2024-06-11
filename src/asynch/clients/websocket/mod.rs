@@ -9,6 +9,8 @@ use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+use exceptions::XRPLWebsocketException;
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -68,7 +70,7 @@ where
         Req: Serialize + for<'de> Deserialize<'de> + Debug,
     >(
         &mut self,
-    ) -> Result<XRPLResponse<'_, Res, Req>> {
+    ) -> Result<Option<XRPLResponse<'_, Res, Req>>> {
         let mut buffer = [0; 1024];
         loop {
             match self.read(&mut buffer).await {

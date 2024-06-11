@@ -153,6 +153,20 @@ where
             Err(error) => Err(XRPLWebsocketException::<E>::from(error)),
         }
     }
+
+    async fn do_read(&self, buf: &mut [u8]) -> Result<usize, <Self as ErrorType>::Error> {
+        let mut inner = self.websocket.lock().await;
+        let mut tcp = self.tcp.lock().await;
+        match inner.read(tcp.deref_mut(), buf).await {
+            Some(Ok(ReadResult::Text(t))) => Ok(t.len()),
+            Some(Ok(ReadResult::Binary(b))) => Ok(b.len()),
+            Some(Ok(ReadResult::Ping(_))) => Ok(0),
+            Some(Ok(ReadResult::Pong(_))) => Ok(0),
+            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebsocketException::<E>::Disconnected),
+            Some(Err(error)) => Err(XRPLWebsocketException::<E>::from(error)),
+            None => Err(XRPLWebsocketException::<E>::Disconnected),
+        }
+    }
 }
 
 impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> ErrorType
@@ -188,17 +202,7 @@ where
     Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
 {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-        let mut inner = self.websocket.lock().await;
-        let mut tcp = self.tcp.lock().await;
-        match inner.read(tcp.deref_mut(), buf).await {
-            Some(Ok(ReadResult::Text(t))) => Ok(t.len()),
-            Some(Ok(ReadResult::Binary(b))) => Ok(b.len()),
-            Some(Ok(ReadResult::Ping(_))) => Ok(0),
-            Some(Ok(ReadResult::Pong(_))) => Ok(0),
-            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebsocketException::<E>::Disconnected),
-            Some(Err(error)) => Err(XRPLWebsocketException::<E>::from(error)),
-            None => Err(XRPLWebsocketException::<E>::Disconnected),
-        }
+        self.do_read(buf).await
     }
 }
 
@@ -225,28 +229,34 @@ where
         websocket_base.pop_message().await
     }
 
-    async fn request_impl(&mut self, id: String) -> Result<String> {
+    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>> {
         let mut websocket_base = self.websocket_base.lock().await;
-        websocket_base.request_impl(id).await
+        websocket_base.try_recv_request(id).await
     }
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> ClientTrait
+impl<'a, const BUF: usize, M, Tcp, B, E, Rng: RngCore> ClientTrait<'a>
     for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
 where
     M: RawMutex,
     B: Deref<Target = [u8]> + AsRef<[u8]>,
     E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Stream<Item = Result<B, E>> + for<'b> Sink<&'b [u8], Error = E> + Unpin,
 {
     async fn request_impl<
         Res: Serialize + for<'de> Deserialize<'de>,
-        Req: Serialize + for<'de> Deserialize<'de> + for<'a> Request<'a>,
+        Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
     >(
-        &self,
+        &'a self,
         mut request: Req,
     ) -> Result<XRPLResponse<'_, Res, Req>> {
+        // setup request future
         let request_id = self.set_request_id::<Res, Req>(&mut request);
+        let mut websocket_base = self.websocket_base.lock().await;
+        websocket_base
+            .setup_request_future(request_id.to_string())
+            .await;
+        // send request
         let request_string = match serde_json::to_string(&request) {
             Ok(request_string) => request_string,
             Err(error) => return Err!(error),
@@ -254,12 +264,35 @@ where
         if let Err(error) = self.do_write(request_string.as_bytes()).await {
             return Err!(error);
         }
-        let mut websocket_base = self.websocket_base.lock().await;
-        let message = websocket_base.request_impl(request_id.to_string()).await?;
-        let response = match serde_json::from_str(&message) {
-            Ok(response) => response,
-            Err(error) => return Err!(error),
-        };
-        Ok(response)
+        // wait for response
+        loop {
+            let mut rx_buffer = [0; 1024];
+            match self.do_read(&mut rx_buffer).await {
+                Ok(u_size) => {
+                    // If the buffer is empty, continue to the next iteration.
+                    if u_size == 0 {
+                        continue;
+                    }
+                    let message_str = match core::str::from_utf8(&rx_buffer[..u_size]) {
+                        Ok(response_str) => response_str,
+                        Err(error) => return Err!(XRPLWebsocketException::<E>::Utf8(error)),
+                    };
+                    websocket_base
+                        .handle_message(message_str.to_string())
+                        .await?;
+                    let message_opt = websocket_base
+                        .try_recv_request(request_id.to_string())
+                        .await?;
+                    if let Some(message) = message_opt {
+                        let response = match serde_json::from_str(&message) {
+                            Ok(response) => response,
+                            Err(error) => return Err!(error),
+                        };
+                        return Ok(response);
+                    }
+                }
+                Err(error) => return Err!(error),
+            }
+        }
     }
 }
