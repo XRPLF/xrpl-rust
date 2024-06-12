@@ -5,7 +5,8 @@ use futures::channel::oneshot::{self, Receiver, Sender};
 use hashbrown::HashMap;
 use serde_json::Value;
 
-use crate::{asynch::clients::exceptions::XRPLWebsocketException, Err};
+use super::exceptions::XRPLWebsocketException;
+use crate::Err;
 
 const _MAX_CHANNEL_MSG_CNT: usize = 10;
 

@@ -6,11 +6,8 @@ use alloc::string::String;
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use alloc::string::ToString;
 use anyhow::Result;
-use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
-use exceptions::XRPLWebsocketException;
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -22,7 +19,8 @@ use websocket_base::MessageHandler;
 pub mod codec;
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 mod embedded_websocket;
-pub mod exceptions;
+mod exceptions;
+pub use exceptions::XRPLWebsocketException;
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
 mod tungstenite;
 
@@ -33,9 +31,6 @@ pub use tungstenite::AsyncWebsocketClient;
 
 pub struct WebsocketOpen;
 pub struct WebsocketClosed;
-
-pub type MultiExecutorMutex = CriticalSectionRawMutex;
-pub type SingleExecutorMutex = NoopRawMutex;
 
 #[allow(async_fn_in_trait)]
 pub trait XRPLWebsocketIO {

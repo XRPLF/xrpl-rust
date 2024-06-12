@@ -26,3 +26,12 @@ async fn test_asynch_clients_request() -> Result<()> {
     #[allow(unreachable_code)]
     Ok(())
 }
+
+#[cfg(feature = "json-rpc")]
+#[tokio::test]
+async fn test_asynch_clients_json_rpc() -> Result<()> {
+    #[cfg(feature = "json-rpc")]
+    return integration::clients::test_json_rpc().await;
+    #[allow(unreachable_code)]
+    Ok(())
+}

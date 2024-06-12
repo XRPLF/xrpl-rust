@@ -1,7 +1,8 @@
 use super::exceptions::XRPLWebsocketException;
-use super::{SingleExecutorMutex, WebsocketClosed, WebsocketOpen};
+use super::{WebsocketClosed, WebsocketOpen};
 use crate::asynch::clients::client::Client;
 use crate::asynch::clients::websocket::websocket_base::{MessageHandler, WebsocketBase};
+use crate::asynch::clients::SingleExecutorMutex;
 use crate::models::requests::Request;
 use crate::models::results::XRPLResponse;
 use crate::Err;

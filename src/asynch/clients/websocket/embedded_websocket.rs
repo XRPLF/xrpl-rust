@@ -22,7 +22,8 @@ use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use super::{SingleExecutorMutex, WebsocketClosed, WebsocketOpen};
+use super::{WebsocketClosed, WebsocketOpen};
+use crate::asynch::clients::SingleExecutorMutex;
 use crate::{
     asynch::clients::{
         client::Client as ClientTrait,
