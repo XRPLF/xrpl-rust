@@ -1,7 +1,8 @@
-use strum_macros::Display;
 use thiserror_no_std::Error;
 
-#[derive(Debug, Error, Display)]
+#[derive(Debug, Error)]
 pub enum XRPLJsonRpcException {
-    ReqwlessError(reqwless::Error),
+    #[cfg(feature = "json-rpc")]
+    #[error("Reqwless error")]
+    ReqwlessError,
 }

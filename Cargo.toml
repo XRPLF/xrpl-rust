@@ -76,7 +76,8 @@ bytes = { version = "1.4.0", default-features = false }
 embassy-futures = "0.1.1"
 embedded-websocket = { version = "0.9.3", optional = true }
 reqwless = { version = "0.12.0", optional = true }
-embedded-nal-async = "0.7.1"
+embedded-nal-async = { version = "0.7.1", optional = true }
+reqwest = { version = "0.12.4", features = ["json"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -96,7 +97,7 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "core", "models", "utils", "tungstenite", "json-rpc"]
+default = ["std", "core", "models", "utils", "tungstenite", "json-rpc-std"]
 models = ["core", "transactions", "requests", "ledger", "results"]
 transactions = ["core", "amounts", "currencies"]
 requests = ["core", "amounts", "currencies"]
@@ -104,7 +105,8 @@ results = ["core", "amounts", "currencies"]
 ledger = ["core", "amounts", "currencies"]
 amounts = ["core"]
 currencies = ["core"]
-json-rpc = ["reqwless"]
+json-rpc = ["reqwless", "embedded-nal-async"]
+json-rpc-std = ["reqwest"]
 tungstenite = [
     "url",
     "futures",

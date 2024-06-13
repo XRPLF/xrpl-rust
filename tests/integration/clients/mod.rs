@@ -74,19 +74,19 @@ pub async fn test_embedded_websocket_request() -> Result<()> {
     Ok(())
 }
 
-pub async fn test_json_rpc() -> Result<()> {
+#[cfg(feature = "json-rpc-std")]
+pub async fn test_json_rpc_std() -> Result<()> {
     use xrpl::{
-        asynch::clients::AsyncJsonRpcClient, models::requests::Fee, models::results::FeeResult,
+        asynch::clients::{AsyncClient, AsyncJsonRpcClient, SingleExecutorMutex},
+        models::requests::Fee,
+        models::results::FeeResult,
     };
-    let tcp_stream = tokio::net::TcpStream::connect("ws.vi-server.org:80")
+    let client: AsyncJsonRpcClient<SingleExecutorMutex> =
+        AsyncJsonRpcClient::new("https://s1.ripple.com:51234/".parse().unwrap());
+    let fee_result = client
+        .request::<FeeResult, _>(Fee::new(None))
         .await
         .unwrap();
-    let mut client = AsyncJsonRpcClient::new(
-        "https://s.altnet.rippletest.net:51234".into(),
-        &tcp_stream,
-        &reqwest::Client::new(),
-    );
-    let server_state = client.request::<FeeResult, _>(Fee::new(None)).await?;
-    assert!(server_state.result.state.is_some());
+    assert!(fee_result.result.is_some());
     Ok(())
 }
