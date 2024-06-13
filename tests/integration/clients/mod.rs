@@ -74,7 +74,7 @@ pub async fn test_embedded_websocket_request() -> Result<()> {
     Ok(())
 }
 
-#[cfg(feature = "json-rpc-std")]
+#[cfg(all(feature = "json-rpc-std", not(feature = "json-rpc")))]
 pub async fn test_json_rpc_std() -> Result<()> {
     use xrpl::{
         asynch::clients::{AsyncClient, AsyncJsonRpcClient, SingleExecutorMutex},

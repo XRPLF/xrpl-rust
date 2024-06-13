@@ -180,7 +180,7 @@ mod no_std_client {
     }
 }
 
-#[cfg(feature = "json-rpc")]
+#[cfg(all(feature = "json-rpc", not(feature = "json-rpc-std")))]
 pub use no_std_client::AsyncJsonRpcClient;
-#[cfg(feature = "json-rpc-std")]
+#[cfg(all(feature = "json-rpc-std", not(feature = "json-rpc")))]
 pub use std_client::AsyncJsonRpcClient;
