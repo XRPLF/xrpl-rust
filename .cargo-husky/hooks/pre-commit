@@ -6,6 +6,7 @@ cargo fmt
 cargo test --no-default-features --features core,models,utils
 cargo test --no-default-features --features core,models,utils,embedded-ws
 cargo test --no-default-features --features core,models,utils,tungstenite
+cargo test --no-default-features --features core,models,utils,json-rpc-std
 cargo test --all-features
 cargo clippy --fix --allow-staged
 cargo doc --no-deps
