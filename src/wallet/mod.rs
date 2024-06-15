@@ -10,7 +10,6 @@ use crate::core::keypairs::generate_seed;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
-use alloc::vec;
 use zeroize::Zeroize;
 
 /// The cryptographic keys needed to control an
@@ -88,11 +87,9 @@ impl Wallet {
 impl ToString for Wallet {
     /// Returns a string representation of a Wallet.
     fn to_string(&self) -> String {
-        let string_list = vec![
-            format!("public_key: {}", self.public_key),
+        let string_list = [format!("public_key: {}", self.public_key),
             format!("private_key: {}", "-HIDDEN-"),
-            format!("classic_address: {}", self.classic_address),
-        ];
+            format!("classic_address: {}", self.classic_address)];
 
         string_list.join("-")
     }

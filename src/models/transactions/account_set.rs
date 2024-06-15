@@ -230,7 +230,7 @@ impl<'a> AccountSetError for AccountSet<'a> {
         if self.clear_flag.is_some() && self.set_flag.is_some() && self.clear_flag == self.set_flag
         {
             Err(XRPLAccountSetException::SetAndUnsetSameFlag {
-                found: self.clear_flag.clone().unwrap(),
+                found: self.clear_flag.unwrap(),
                 resource: "".into(),
             })
         } else {

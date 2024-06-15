@@ -106,7 +106,7 @@ where
             }
             Ok(None) => Ok(None),
             Err(error) => {
-                return Err!(error);
+                Err!(error)
             }
         }
     }

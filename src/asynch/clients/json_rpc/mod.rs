@@ -79,7 +79,7 @@ mod std_client {
             request: Req,
         ) -> Result<XRPLResponse<'_, Res, Req>> {
             let client = self.client.lock().await;
-            let response = match client
+            match client
                 .post(self.url.as_ref())
                 .body(request_to_json_rpc(&request)?)
                 .send()
@@ -90,9 +90,7 @@ mod std_client {
                     Err(error) => Err!(error),
                 },
                 Err(error) => Err!(error),
-            };
-
-            response
+            }
         }
     }
 }
