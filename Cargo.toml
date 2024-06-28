@@ -59,18 +59,14 @@ fnv = { version = "1.0.7", default-features = false }
 derive-new = { version = "0.5.9", default-features = false }
 thiserror-no-std = "2.0.2"
 anyhow = { version = "1.0.69", default-features = false }
-tokio = { version = "1.28.0", default-features = false, optional = true }
 url = { version = "2.2.2", default-features = false, optional = true }
-futures = { version = "0.3.28", default-features = false, features = [
+futures = { version = "0.3.30", default-features = false, features = [
     "alloc",
 ], optional = true }
 rand_core = { version = "0.6.4", default-features = false }
-tokio-tungstenite = { version = "0.20.0", optional = true }
+tokio-tungstenite = { version = "0.23.1", optional = true }
 embassy-sync = { version = "0.6.0", default-features = false }
 embedded-io-async = "0.6.1"
-futures-sink = { version = "0.3.30", default-features = false }
-futures-core = { version = "0.3.30", default-features = false }
-futures-util = { version = "0.3.30", optional = true }
 tokio-util = { version = "0.7.7", features = ["codec"], optional = true }
 bytes = { version = "1.4.0", default-features = false }
 embassy-futures = "0.1.1"
@@ -81,16 +77,16 @@ reqwest = { version = "0.12.4", features = ["json"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
-cargo-husky = { version = "1.5.0", default-features = false, features = [
-    "user-hooks",
-] }
-tokio = { version = "1.28.0", features = ["full"] }
-tokio-util = { version = "0.7.7", features = ["codec"] }
-rand = { version = "0.8.5", default-features = false, features = [
-    "getrandom",
-    "std",
-    "std_rng",
-] }
+tokio = { version = "1.38.0", features = ["full"] }
+# cargo-husky = { version = "1.5.0", default-features = false, features = [
+#     "user-hooks",
+# ] }
+# tokio-util = { version = "0.7.7", features = ["codec"] }
+# rand = { version = "0.8.5", default-features = false, features = [
+#     "getrandom",
+#     "std",
+#     "std_rng",
+# ] }
 
 [[bench]]
 name = "benchmarks"
@@ -105,15 +101,9 @@ results = ["core", "amounts", "currencies"]
 ledger = ["core", "amounts", "currencies"]
 amounts = ["core"]
 currencies = ["core"]
-json-rpc = ["reqwless", "embedded-nal-async"]
-json-rpc-std = ["reqwest"]
-tungstenite = [
-    "url",
-    "futures",
-    "tokio/net",
-    "tokio-tungstenite/native-tls",
-    "futures-util",
-]
+json-rpc = ["url", "reqwless", "embedded-nal-async"]
+json-rpc-std = ["url", "reqwest"]
+tungstenite = ["url", "futures", "tokio-tungstenite/native-tls"]
 embedded-ws = ["url", "futures", "embedded-websocket"]
 core = ["utils"]
 utils = []

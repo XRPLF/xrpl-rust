@@ -1,35 +1,28 @@
-use xrpl::asynch::clients::async_websocket_client::{
-    AsyncWebsocketClientTungstenite, TungsteniteMessage,
+use serde_json::Value;
+use tokio_tungstenite::connect_async;
+use xrpl::asynch::clients::{
+    AsyncWebsocketClient, SingleExecutorMutex, WebsocketOpen, XRPLWebsocketIO,
 };
-use xrpl::models::requests::AccountInfo;
-
-use futures::{SinkExt, TryStreamExt};
+use xrpl::models::requests::{StreamParameter, Subscribe};
 
 #[tokio::main]
 async fn main() {
-    let websocket =
-        AsyncWebsocketClientTungstenite::open("wss://xrplcluster.com/".parse().unwrap())
-            .await
-            .unwrap();
-    assert!(websocket.is_open());
-
-    let account_info = AccountInfo::new(
-        "rJumr5e1HwiuV543H7bqixhtFreChWTaHH",
+    let stream = connect_async("wss://xrplcluster.com/").await.unwrap().0;
+    let mut websocket: AsyncWebsocketClient<_, SingleExecutorMutex, WebsocketOpen> =
+        AsyncWebsocketClient::open(stream).await.unwrap();
+    let subscribe = Subscribe::new(
         None,
         None,
         None,
+        None,
+        Some(vec![StreamParameter::Ledger]),
         None,
         None,
         None,
     );
-
-    websocket.send(&account_info).await.unwrap();
-
-    while let Ok(Some(TungsteniteMessage::Text(response))) = websocket.try_next().await {
-        let account_info_echo: AccountInfo = serde_json::from_str(response.as_str()).unwrap();
-        println!("account_info_echo: {:?}", account_info_echo);
-
-        websocket.close().await.unwrap();
+    websocket.xrpl_send(subscribe).await.unwrap();
+    while let Ok(Some(account_info_echo)) = websocket.xrpl_receive::<Value, Subscribe>().await {
+        println!("subscription message: {:?}", account_info_echo);
         break;
     }
 }

@@ -41,7 +41,8 @@ where
     }
 }
 
-pub(crate) trait MessageHandler {
+#[allow(async_fn_in_trait)]
+pub trait MessageHandler {
     /// Setup an empty future for a request.
     async fn setup_request_future(&mut self, id: String);
     async fn handle_message(&mut self, message: String) -> Result<()>;

@@ -15,34 +15,23 @@ use core::{pin::Pin, task::Poll};
 use embassy_futures::block_on;
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::mutex::Mutex;
-use futures::{Sink, Stream, StreamExt};
-use futures_util::SinkExt;
+use futures::{Sink, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::net::TcpStream;
-use tokio_tungstenite::{
-    connect_async as tungstenite_connect_async, MaybeTlsStream as TungsteniteMaybeTlsStream,
-    WebSocketStream as TungsteniteWebsocketStream,
-};
-use url::Url;
+use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
 
-pub use tokio_tungstenite::tungstenite::Message as TungsteniteMessage;
-
-pub type AsyncWebsocketConnection<M> =
-    Arc<Mutex<M, TungsteniteWebsocketStream<TungsteniteMaybeTlsStream<TcpStream>>>>;
-
-pub struct AsyncWebsocketClient<M = SingleExecutorMutex, Status = WebsocketClosed>
+pub struct AsyncWebsocketClient<T, M = SingleExecutorMutex, Status = WebsocketClosed>
 where
     M: RawMutex,
 {
-    websocket: AsyncWebsocketConnection<M>,
+    websocket: Arc<Mutex<M, T>>,
     websocket_base: Arc<Mutex<M, WebsocketBase<M>>>,
     status: PhantomData<Status>,
 }
 
-impl<M> Sink<String> for AsyncWebsocketClient<M, WebsocketOpen>
+impl<T, M> Sink<String> for AsyncWebsocketClient<T, M, WebsocketOpen>
 where
+    T: Sink<TungsteniteMessage, Error = tokio_tungstenite::tungstenite::Error> + Unpin,
     M: RawMutex,
-    Self: Unpin,
 {
     type Error = anyhow::Error;
 
@@ -91,8 +80,9 @@ where
     }
 }
 
-impl<M> Stream for AsyncWebsocketClient<M, WebsocketOpen>
+impl<T, M> Stream for AsyncWebsocketClient<T, M, WebsocketOpen>
 where
+    T: Stream<Item = Result<TungsteniteMessage, tokio_tungstenite::tungstenite::Error>> + Unpin,
     M: RawMutex,
 {
     type Item = Result<String>;
@@ -134,27 +124,20 @@ where
     }
 }
 
-impl<M> AsyncWebsocketClient<M, WebsocketClosed>
+impl<T, M> AsyncWebsocketClient<T, M, WebsocketClosed>
 where
     M: RawMutex,
 {
-    pub async fn open(uri: Url) -> Result<AsyncWebsocketClient<M, WebsocketOpen>> {
-        match tungstenite_connect_async(uri).await {
-            Ok((websocket_stream, _)) => Ok(AsyncWebsocketClient {
-                websocket: Arc::new(Mutex::new(websocket_stream)),
-                websocket_base: Arc::new(Mutex::new(WebsocketBase::new())),
-                status: PhantomData::<WebsocketOpen>,
-            }),
-            Err(error) => {
-                Err!(XRPLWebsocketException::UnableToConnect::<anyhow::Error>(
-                    error
-                ))
-            }
-        }
+    pub async fn open(stream: T) -> Result<AsyncWebsocketClient<T, M, WebsocketOpen>> {
+        Ok(AsyncWebsocketClient {
+            websocket: Arc::new(Mutex::new(stream)),
+            websocket_base: Arc::new(Mutex::new(WebsocketBase::new())),
+            status: PhantomData::<WebsocketOpen>,
+        })
     }
 }
 
-impl<M> MessageHandler for AsyncWebsocketClient<M, WebsocketOpen>
+impl<T, M> MessageHandler for AsyncWebsocketClient<T, M, WebsocketOpen>
 where
     M: RawMutex,
 {
@@ -179,17 +162,22 @@ where
     }
 }
 
-impl<'a, M> Client<'a> for AsyncWebsocketClient<M, WebsocketOpen>
+impl<T, M> Client for AsyncWebsocketClient<T, M, WebsocketOpen>
 where
+    T: Stream<Item = Result<TungsteniteMessage, tokio_tungstenite::tungstenite::Error>>
+        + Sink<TungsteniteMessage, Error = tokio_tungstenite::tungstenite::Error>
+        + Unpin,
     M: RawMutex,
 {
     async fn request_impl<
+        'a: 'b,
+        'b,
         Res: Serialize + for<'de> Deserialize<'de>,
         Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
     >(
-        &'a self,
+        &self,
         mut request: Req,
-    ) -> Result<XRPLResponse<'_, Res, Req>> {
+    ) -> Result<XRPLResponse<'b, Res, Req>> {
         // setup request future
         let request_id = self.set_request_id::<Res, Req>(&mut request);
         let mut websocket_base = self.websocket_base.lock().await;
@@ -250,17 +238,4 @@ where
             }
         }
     }
-
-    // async fn get_common_fields(&self) -> Result<CommonFields<'a>> {
-    //     let server_state = self
-    //         .request::<results::server_state::ServerState>(requests::ServerState::new(None))
-    //         .await?;
-    //     let state = server_state.result.state;
-    //     let common_fields = CommonFields {
-    //         network_id: state.network_id,
-    //         build_version: Some(state.build_version),
-    //     };
-
-    //     Ok(common_fields)
-    // }
 }

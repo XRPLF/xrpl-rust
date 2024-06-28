@@ -4,16 +4,18 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[allow(async_fn_in_trait)]
-pub trait AsyncClient<'a>: Client<'a> {
+pub trait AsyncClient: Client {
     async fn request<
+        'a: 'b,
+        'b,
         Res: Serialize + for<'de> Deserialize<'de>,
         Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
     >(
-        &'a self,
+        &self,
         request: Req,
-    ) -> Result<XRPLResponse<'_, Res, Req>> {
+    ) -> Result<XRPLResponse<'b, Res, Req>> {
         self.request_impl(request).await
     }
 }
 
-impl<'a, T: Client<'a>> AsyncClient<'a> for T {}
+impl<T: Client> AsyncClient for T {}

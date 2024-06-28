@@ -16,8 +16,8 @@ use embedded_websocket::{
     framer_async::{Framer, ReadResult},
     Client, WebSocketClient, WebSocketOptions, WebSocketSendMessageType,
 };
-use futures_core::Stream;
-use futures_sink::Sink;
+use futures::Sink;
+use futures::Stream;
 use rand_core::RngCore;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -235,7 +235,7 @@ where
     }
 }
 
-impl<'a, const BUF: usize, M, Tcp, B, E, Rng: RngCore> ClientTrait<'a>
+impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> ClientTrait
     for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
 where
     M: RawMutex,
@@ -244,12 +244,14 @@ where
     Tcp: Stream<Item = Result<B, E>> + for<'b> Sink<&'b [u8], Error = E> + Unpin,
 {
     async fn request_impl<
+        'a: 'b,
+        'b,
         Res: Serialize + for<'de> Deserialize<'de>,
         Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
     >(
-        &'a self,
+        &self,
         mut request: Req,
-    ) -> Result<XRPLResponse<'_, Res, Req>> {
+    ) -> Result<XRPLResponse<'b, Res, Req>> {
         // setup request future
         let request_id = self.set_request_id::<Res, Req>(&mut request);
         let mut websocket_base = self.websocket_base.lock().await;

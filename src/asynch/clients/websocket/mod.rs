@@ -1,4 +1,4 @@
-use core::fmt::{Debug, Display};
+use core::fmt::Debug;
 
 use crate::{models::results::XRPLResponse, Err};
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
@@ -6,6 +6,8 @@ use alloc::string::String;
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use alloc::string::ToString;
 use anyhow::Result;
+#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+use core::fmt::Display;
 #[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
@@ -35,6 +37,7 @@ pub struct WebsocketClosed;
 #[allow(async_fn_in_trait)]
 pub trait XRPLWebsocketIO {
     async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()>;
+
     async fn xrpl_receive<
         Res: Serialize + for<'de> Deserialize<'de> + Debug,
         Req: Serialize + for<'de> Deserialize<'de> + Debug,
@@ -94,10 +97,9 @@ where
 }
 
 #[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
-impl<T> XRPLWebsocketIO for T
+impl<T: ?Sized> XRPLWebsocketIO for T
 where
-    T: Stream<Item = Result<String>> + Sink<String> + MessageHandler + Unpin,
-    <T as Sink<String>>::Error: Debug + Display,
+    T: Stream<Item = Result<String>> + Sink<String, Error = anyhow::Error> + MessageHandler + Unpin,
 {
     async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()> {
         let message = match serde_json::to_string(&message) {

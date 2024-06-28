@@ -67,17 +67,19 @@ mod std_client {
         }
     }
 
-    impl<'a, M> Client<'a> for AsyncJsonRpcClient<M>
+    impl<M> Client for AsyncJsonRpcClient<M>
     where
         M: RawMutex,
     {
         async fn request_impl<
+            'a: 'b,
+            'b,
             Res: Serialize + for<'de> Deserialize<'de>,
             Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
         >(
-            &'a self,
+            &self,
             request: Req,
-        ) -> Result<XRPLResponse<'_, Res, Req>> {
+        ) -> Result<XRPLResponse<'b, Res, Req>> {
             let client = self.client.lock().await;
             match client
                 .post(self.url.as_ref())
@@ -137,19 +139,21 @@ mod no_std_client {
         }
     }
 
-    impl<'a, const BUF: usize, T, D, M> Client<'a> for AsyncJsonRpcClient<'a, BUF, T, D, M>
+    impl<const BUF: usize, T, D, M> Client for AsyncJsonRpcClient<'_, BUF, T, D, M>
     where
         M: RawMutex,
-        T: TcpConnect + 'a,
-        D: Dns + 'a,
+        T: TcpConnect,
+        D: Dns,
     {
         async fn request_impl<
+            'a: 'b,
+            'b,
             Res: Serialize + for<'de> Deserialize<'de>,
             Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
         >(
-            &'a self,
+            &self,
             request: Req,
-        ) -> Result<XRPLResponse<'_, Res, Req>> {
+        ) -> Result<XRPLResponse<'b, Res, Req>> {
             let request_json_rpc = request_to_json_rpc(&request)?;
             let request_buf = request_json_rpc.as_bytes();
             let mut rx_buffer = [0; BUF];
