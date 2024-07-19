@@ -144,7 +144,7 @@ mod _no_std {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b, Res, Req>> {
+        ) -> Result<XRPLResponse<'b>> {
             let request_json_rpc = request_to_json_rpc(&request)?;
             let request_buf = request_json_rpc.as_bytes();
             let mut rx_buffer = [0; BUF];
@@ -159,7 +159,7 @@ mod _no_std {
                     {
                         Err!(XRPLJsonRpcException::ReqwlessError)
                     } else {
-                        match serde_json::from_slice::<XRPLResponse<'_, Res, Req>>(&rx_buffer) {
+                        match serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer) {
                             Ok(response) => Ok(response),
                             Err(error) => Err!(error),
                         }
