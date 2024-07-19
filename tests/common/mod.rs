@@ -1,31 +1,18 @@
 mod constants;
 
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
 mod tungstenite_clients {
     use super::constants::*;
     use anyhow::anyhow;
     use anyhow::Result;
-    use tokio::net::TcpStream;
-    use tokio_tungstenite::connect_async;
-    use tokio_tungstenite::MaybeTlsStream;
-    use tokio_tungstenite::WebSocketStream;
     use xrpl::asynch::clients::AsyncWebsocketClient;
     use xrpl::asynch::clients::{SingleExecutorMutex, WebsocketOpen};
 
-    pub async fn connect_to_wss_tungstinite_test_net<'a>() -> Result<
-        AsyncWebsocketClient<
-            WebSocketStream<MaybeTlsStream<TcpStream>>,
-            SingleExecutorMutex,
-            WebsocketOpen,
-        >,
-    > {
-        let stream = connect_async(XRPL_WSS_TEST_NET.to_string())
-            .await
-            .unwrap()
-            .0;
-        match AsyncWebsocketClient::open(stream).await {
+    pub async fn connect_to_wss_tungstinite_test_net<'a>(
+    ) -> Result<AsyncWebsocketClient<SingleExecutorMutex, WebsocketOpen>> {
+        match AsyncWebsocketClient::open(XRPL_WSS_TEST_NET.parse().unwrap()).await {
             Ok(websocket) => {
-                // assert!(websocket.is_open());
+                assert!(websocket.is_open());
                 Ok(websocket)
             }
             Err(err) => Err(anyhow!("Error connecting to websocket: {:?}", err)),
@@ -33,7 +20,7 @@ mod tungstenite_clients {
     }
 }
 
-#[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", feature = "std", not(feature = "websocket-std")))]
 mod embedded_ws_clients {
     use super::constants::*;
     use anyhow::anyhow;
@@ -70,7 +57,7 @@ mod embedded_ws_clients {
     }
 }
 
-#[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", feature = "std", not(feature = "websocket-std")))]
 pub use embedded_ws_clients::*;
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
 pub use tungstenite_clients::*;
