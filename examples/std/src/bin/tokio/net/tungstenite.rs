@@ -1,4 +1,3 @@
-use serde_json::Value;
 use tokio_tungstenite::connect_async;
 use xrpl::asynch::clients::{
     AsyncWebsocketClient, SingleExecutorMutex, WebsocketOpen, XRPLWebsocketIO,
@@ -7,11 +6,12 @@ use xrpl::models::requests::{StreamParameter, Subscribe};
 
 #[tokio::main]
 async fn main() {
-    let stream = connect_async("wss://xrplcluster.com/").await.unwrap().0;
-    let mut websocket: AsyncWebsocketClient<_, SingleExecutorMutex, WebsocketOpen> =
-        AsyncWebsocketClient::open(stream).await.unwrap();
+    let mut websocket: AsyncWebsocketClient<SingleExecutorMutex, _> =
+        AsyncWebsocketClient::open("wss://xrplcluster.com/".parse().unwrap())
+            .await
+            .unwrap();
     let subscribe = Subscribe::new(
-        None,
+        Some("my_id".into()),
         None,
         None,
         None,
@@ -20,9 +20,10 @@ async fn main() {
         None,
         None,
     );
-    websocket.xrpl_send(subscribe).await.unwrap();
-    while let Ok(Some(account_info_echo)) = websocket.xrpl_receive::<Value, Subscribe>().await {
+    websocket.xrpl_send(subscribe.into()).await.unwrap();
+    loop {
+        let account_info_echo = websocket.xrpl_receive().await.unwrap().unwrap();
         println!("subscription message: {:?}", account_info_echo);
-        break;
+        // break;
     }
 }
