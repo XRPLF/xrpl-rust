@@ -1,12 +1,9 @@
 use alloc::{string::String, sync::Arc};
 use anyhow::Result;
 use embassy_sync::{blocking_mutex::raw::RawMutex, mutex::Mutex};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-use crate::{
-    models::{requests::Request, results::XRPLResponse},
-    Err,
-};
+use crate::{models::results::XRPLResponse, Err};
 
 mod exceptions;
 pub use exceptions::XRPLJsonRpcException;
@@ -30,7 +27,9 @@ fn request_to_json_rpc(request: &impl Serialize) -> Result<String> {
 }
 
 #[cfg(feature = "json-rpc-std")]
-mod std_client {
+mod _std {
+    use crate::models::requests::XRPLRequest;
+
     use super::*;
     use reqwest::Client as HttpClient;
     use url::Url;
@@ -71,15 +70,10 @@ mod std_client {
     where
         M: RawMutex,
     {
-        async fn request_impl<
-            'a: 'b,
-            'b,
-            Res: Serialize + for<'de> Deserialize<'de>,
-            Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
-        >(
+        async fn request_impl<'a: 'b, 'b>(
             &self,
-            request: Req,
-        ) -> Result<XRPLResponse<'b, Res, Req>> {
+            request: XRPLRequest<'a>,
+        ) -> Result<XRPLResponse<'b>> {
             let client = self.client.lock().await;
             match client
                 .post(self.url.as_ref())
@@ -98,7 +92,9 @@ mod std_client {
 }
 
 #[cfg(feature = "json-rpc")]
-mod no_std_client {
+mod _no_std {
+    use crate::models::requests::XRPLRequest;
+
     use super::*;
     use embedded_nal_async::{Dns, TcpConnect};
     use reqwless::{
@@ -145,14 +141,9 @@ mod no_std_client {
         T: TcpConnect,
         D: Dns,
     {
-        async fn request_impl<
-            'a: 'b,
-            'b,
-            Res: Serialize + for<'de> Deserialize<'de>,
-            Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
-        >(
+        async fn request_impl<'a: 'b, 'b>(
             &self,
-            request: Req,
+            request: XRPLRequest<'a>,
         ) -> Result<XRPLResponse<'b, Res, Req>> {
             let request_json_rpc = request_to_json_rpc(&request)?;
             let request_buf = request_json_rpc.as_bytes();
@@ -183,6 +174,6 @@ mod no_std_client {
 }
 
 #[cfg(all(feature = "json-rpc", not(feature = "json-rpc-std")))]
-pub use no_std_client::AsyncJsonRpcClient;
+pub use _no_std::AsyncJsonRpcClient;
 #[cfg(all(feature = "json-rpc-std", not(feature = "json-rpc")))]
-pub use std_client::AsyncJsonRpcClient;
+pub use _std::AsyncJsonRpcClient;

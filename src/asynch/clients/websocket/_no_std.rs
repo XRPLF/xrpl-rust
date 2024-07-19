@@ -19,17 +19,16 @@ use embedded_websocket::{
 use futures::Sink;
 use futures::Stream;
 use rand_core::RngCore;
-use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::{WebsocketClosed, WebsocketOpen};
-use crate::asynch::clients::SingleExecutorMutex;
+use crate::{asynch::clients::SingleExecutorMutex, models::requests::XRPLRequest};
 use crate::{
     asynch::clients::{
         client::Client as ClientTrait,
         websocket::websocket_base::{MessageHandler, WebsocketBase},
     },
-    models::{requests::Request, results::XRPLResponse},
+    models::results::XRPLResponse,
     Err,
 };
 
@@ -243,17 +242,12 @@ where
     E: Debug + Display,
     Tcp: Stream<Item = Result<B, E>> + for<'b> Sink<&'b [u8], Error = E> + Unpin,
 {
-    async fn request_impl<
-        'a: 'b,
-        'b,
-        Res: Serialize + for<'de> Deserialize<'de>,
-        Req: Serialize + for<'de> Deserialize<'de> + Request<'a>,
-    >(
+    async fn request_impl<'a: 'b, 'b>(
         &self,
-        mut request: Req,
-    ) -> Result<XRPLResponse<'b, Res, Req>> {
+        mut request: XRPLRequest<'a>,
+    ) -> Result<XRPLResponse<'b>> {
         // setup request future
-        let request_id = self.set_request_id::<Res, Req>(&mut request);
+        let request_id = self.set_request_id(&mut request);
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base
             .setup_request_future(request_id.to_string())

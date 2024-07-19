@@ -1,57 +1,52 @@
-use core::fmt::Debug;
-
-use crate::{models::results::XRPLResponse, Err};
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+use crate::{
+    models::{requests::XRPLRequest, results::XRPLResponse},
+    Err,
+};
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
 use alloc::string::String;
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
 use alloc::string::ToString;
 use anyhow::Result;
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
 use core::fmt::Display;
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
 use futures::{Sink, SinkExt, Stream, StreamExt};
-use serde::{Deserialize, Serialize};
 
 mod websocket_base;
 use websocket_base::MessageHandler;
 
-#[cfg(all(feature = "embedded-ws", feature = "std", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+mod _no_std;
+#[cfg(feature = "websocket-codec")]
 pub mod codec;
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
-mod embedded_websocket;
 mod exceptions;
 pub use exceptions::XRPLWebsocketException;
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
-mod tungstenite;
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+mod _std;
 
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
-pub use embedded_websocket::AsyncWebsocketClient;
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
-pub use tungstenite::AsyncWebsocketClient;
+#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+pub use _no_std::*;
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+pub use _std::*;
 
 pub struct WebsocketOpen;
 pub struct WebsocketClosed;
 
 #[allow(async_fn_in_trait)]
 pub trait XRPLWebsocketIO {
-    async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()>;
+    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()>;
 
-    async fn xrpl_receive<
-        Res: Serialize + for<'de> Deserialize<'de> + Debug,
-        Req: Serialize + for<'de> Deserialize<'de> + Debug,
-    >(
-        &mut self,
-    ) -> Result<Option<XRPLResponse<'_, Res, Req>>>;
+    async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>>;
 }
 
-#[cfg(all(feature = "embedded-ws", not(feature = "tungstenite")))]
+#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
 impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLWebsocketIO for T
 where
     <T as ErrorType>::Error: Display,
 {
-    async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()> {
+    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()> {
         let message = match serde_json::to_string(&message) {
             Ok(message) => message,
             Err(error) => return Err!(error),
@@ -63,12 +58,7 @@ where
         }
     }
 
-    async fn xrpl_receive<
-        Res: Serialize + for<'de> Deserialize<'de> + Debug,
-        Req: Serialize + for<'de> Deserialize<'de> + Debug,
-    >(
-        &mut self,
-    ) -> Result<Option<XRPLResponse<'_, Res, Req>>> {
+    async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>> {
         let mut buffer = [0; 1024];
         loop {
             match self.read(&mut buffer).await {
@@ -96,12 +86,12 @@ where
     }
 }
 
-#[cfg(all(feature = "tungstenite", not(feature = "embedded-ws")))]
+#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
 impl<T: ?Sized> XRPLWebsocketIO for T
 where
     T: Stream<Item = Result<String>> + Sink<String, Error = anyhow::Error> + MessageHandler + Unpin,
 {
-    async fn xrpl_send<Req: Serialize>(&mut self, message: Req) -> Result<()> {
+    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()> {
         let message = match serde_json::to_string(&message) {
             Ok(message) => message,
             Err(error) => return Err!(error),
@@ -112,12 +102,7 @@ where
         }
     }
 
-    async fn xrpl_receive<
-        Res: Serialize + for<'de> Deserialize<'de> + Debug,
-        Req: Serialize + for<'de> Deserialize<'de> + Debug,
-    >(
-        &mut self,
-    ) -> Result<Option<XRPLResponse<'_, Res, Req>>> {
+    async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>> {
         match self.next().await {
             Some(Ok(item)) => {
                 self.handle_message(item).await?;

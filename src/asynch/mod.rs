@@ -1,6 +1,6 @@
 #[cfg(any(
-    feature = "tungstenite",
-    feature = "embedded-ws",
+    feature = "websocket-std",
+    feature = "websocket",
     feature = "json-rpc-std",
     feature = "json-rpc"
 ))]
