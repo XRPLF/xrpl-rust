@@ -22,11 +22,11 @@ proc-macro = true
 
 [dependencies]
 lazy_static = "1.4.0"
-sha2 = "0.10.2"
+sha2 = { version = "0.10.2", default-features = false }
 rand_hc = "0.3.1"
 ripemd = "0.1.1"
-ed25519-dalek = "1.0.1"
-secp256k1 = { version = "0.27.0", default-features = false, features = [
+ed25519-dalek = { version = "2.1.1" }
+secp256k1 = { version = "0.29.0", default-features = false, features = [
     "alloc",
 ] }
 bs58 = { version = "0.5.0", default-features = false, features = [
@@ -35,8 +35,8 @@ bs58 = { version = "0.5.0", default-features = false, features = [
 ] }
 indexmap = { version = "2.0.0", features = ["serde"] }
 regex = { version = "1.5.4", default-features = false }
-strum = { version = "0.25.0", default-features = false }
-strum_macros = { version = "0.25.2", default-features = false }
+strum = { version = "0.26.3", default-features = false }
+strum_macros = { version = "0.26.4", default-features = false }
 crypto-bigint = { version = "0.5.1" }
 rust_decimal = { version = "1.17.0", default-features = false, features = [
     "serde",
@@ -56,70 +56,75 @@ serde_repr = "0.1"
 zeroize = "1.5.7"
 hashbrown = { version = "0.14.5", features = ["serde"] }
 fnv = { version = "1.0.7", default-features = false }
-derive-new = { version = "0.5.9", default-features = false }
+derive-new = { version = "0.6.0", default-features = false }
 thiserror-no-std = "2.0.2"
 anyhow = { version = "1.0.69", default-features = false }
 
 # networking
-url = { version = "2.2.2", default-features = false, optional = true }
-futures = { version = "0.3.30", default-features = false, features = [
-    "alloc",
-], optional = true }
-embassy-sync = { version = "0.6.0", default-features = false }
-rand_core = { version = "0.6.4", default-features = false }
-# std websocket
-embassy-futures = { version = "0.1.1", optional = true }
-tokio-tungstenite = { version = "0.23.1", features = [
-    "native-tls",
-], optional = true }
-tungstenite = { version = "0.23.0", optional = true }
-tokio-util = { version = "0.7.11", features = ["codec"], optional = true }
-tokio = { version = "1.0", features = ["full"], optional = true }
-# no-std websocket
-bytes = { version = "1.4.0", default-features = false, optional = true }
+url = { version = "2.2.1", default-features = false, optional = true }
+# websocket
+embassy-sync = { version = "0.6.0", optional = true }
 embedded-io-async = { version = "0.6.1", optional = true }
-embedded-websocket = { version = "0.9.3", optional = true }
-# std json-rpc
-reqwest = { version = "0.12.5", features = ["json"], optional = true }
-# no-std json-rpc
-reqwless = { version = "0.12.0", optional = true }
+embedded-websocket = { version = "0.9.3", default-features = false, optional = true }
+futures = { version = "0.3.30", optional = true }
+# websocket-codec
+bytes = { version = "1.7.1", default-features = false, optional = true }
+tokio-util = { version = "0.7.11", features = ["codec"], optional = true }
+# websocket-std
+embassy-futures = { version = "0.1.1", optional = true }
+tokio = { version = "1.0", default-features = false, features = [
+    "net",
+], optional = true }
+tokio-tungstenite = { version = "0.23.1", optional = true }
 embedded-nal-async = { version = "0.7.1", optional = true }
+# json-rpc
+reqwless = { version = "0.12.1", optional = true }
+# json-rpc-std
+reqwest = { version = "0.12.5", features = ["json"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
 tokio = { version = "1.0", features = ["full"] }
-tokio-util = { version = "0.7.11", features = ["codec"] }
 
 [[bench]]
 name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "core", "models", "utils", "websocket-std"]
-models = ["core", "transactions", "requests", "ledger", "results"]
-transactions = ["core", "amounts", "currencies"]
-requests = ["core", "amounts", "currencies"]
-results = ["core", "amounts", "currencies"]
-ledger = ["core", "amounts", "currencies"]
-amounts = ["core"]
-currencies = ["core"]
-json-rpc = ["url", "reqwless", "embedded-nal-async"]
-json-rpc-std = ["url", "reqwest"]
-websocket = ["url", "futures", "embedded-websocket", "embedded-io-async"]
-websocket-codec = ["bytes", "tokio-util"]
-websocket-std = [
+default = ["std", "core", "models", "websocket", "websocket-codec"]
+models = ["transactions", "ledger", "requests", "results"]
+transactions = ["amounts", "currencies"]
+requests = ["amounts", "currencies"]
+results = ["amounts", "currencies"]
+ledger = ["amounts", "currencies"]
+amounts = []
+currencies = []
+json-rpc = ["requests", "results", "url"]
+json-rpc-std = ["requests", "results", "url"]
+websocket = [
+    "requests",
+    "results",
     "url",
+    "embassy-sync",
+    "embedded-io-async",
+    "embedded-websocket",
     "futures",
-    "tungstenite",
+]
+websocket-codec = ["requests", "results", "bytes", "tokio-util"]
+websocket-std = [
+    "requests",
+    "results",
+    "url",
+    "embassy-sync",
+    "futures",
+    "embassy-futures",
     "tokio",
     "tokio-tungstenite",
-    "embassy-futures",
 ]
 core = ["utils"]
+wallet = ["core"]
 utils = []
 std = [
-    "embedded-websocket/std",
-    "futures/std",
     "rand/std",
     "regex/std",
     "chrono/std",

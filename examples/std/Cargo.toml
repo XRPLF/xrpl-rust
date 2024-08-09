@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 xrpl-rust = { path = "../.." }
-tokio = { version = "1.0", features = ["full"], optional = true }
-tokio-tungstenite = "0.23.1"
+tokio = { version = "1.0", features = ["full"] }
+rand = "0.8.5"
+tokio-util = { version = "0.7.11", features = ["codec"] }
 
 [[bin]]
 name = "wallet_from_seed"
@@ -24,6 +25,10 @@ required-features = []
 name = "tungstenite"
 path = "src/bin/tokio/net/tungstenite.rs"
 required-features = ["tokio"]
+
+[[bin]]
+name = "websocket"
+path = "src/bin/tokio/net/websocket.rs"
 
 [[bin]]
 name = "sign_request"

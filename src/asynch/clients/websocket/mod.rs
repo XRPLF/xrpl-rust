@@ -19,7 +19,7 @@ use websocket_base::MessageHandler;
 
 #[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
 mod _no_std;
-#[cfg(feature = "websocket-codec")]
+#[cfg(all(feature = "websocket-codec", feature = "std"))]
 pub mod codec;
 mod exceptions;
 pub use exceptions::XRPLWebsocketException;

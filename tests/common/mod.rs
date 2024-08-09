@@ -25,6 +25,7 @@ mod embedded_ws_clients {
     use super::constants::*;
     use anyhow::anyhow;
     use anyhow::Result;
+    use rand::rngs::OsRng;
     use std::io;
     use tokio::net::TcpStream;
     use tokio_util::codec::Framed;
@@ -40,12 +41,12 @@ mod embedded_ws_clients {
             Framed<TcpStream, Codec>,
             Vec<u8>,
             io::Error,
-            rand_core::OsRng,
+            OsRng,
             SingleExecutorMutex,
             WebsocketOpen,
         >,
     > {
-        let rng = rand_core::OsRng;
+        let rng = OsRng {};
         let url = ECHO_WS_SERVER.parse().unwrap();
         match AsyncWebsocketClient::open(rng, stream, url).await {
             Ok(websocket) => {

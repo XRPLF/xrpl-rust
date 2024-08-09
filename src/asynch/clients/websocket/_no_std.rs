@@ -18,7 +18,7 @@ use embedded_websocket::{
 };
 use futures::Sink;
 use futures::Stream;
-use rand_core::RngCore;
+use rand::RngCore;
 use url::Url;
 
 use super::{WebsocketClosed, WebsocketOpen};
