@@ -25,7 +25,10 @@ lazy_static = "1.4.0"
 sha2 = { version = "0.10.2", default-features = false }
 rand_hc = "0.3.1"
 ripemd = "0.1.1"
-ed25519-dalek = { version = "2.1.1" }
+ed25519-dalek = { version = "2.1.1", default-features = false, features = [
+    "alloc",
+    "zeroize",
+] }
 secp256k1 = { version = "0.29.0", default-features = false, features = [
     "alloc",
 ] }
@@ -91,7 +94,7 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "core", "models", "websocket", "websocket-codec"]
+default = ["std", "utils", "wallet", "models", "websocket"]
 models = ["transactions", "ledger", "requests", "results"]
 transactions = ["amounts", "currencies"]
 requests = ["amounts", "currencies"]
