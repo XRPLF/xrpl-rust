@@ -25,6 +25,8 @@ pub mod signer_list_set;
 pub mod ticket_create;
 pub mod trust_set;
 
+use core::fmt::Debug;
+
 pub use account_delete::*;
 pub use account_set::*;
 pub use check_cancel::*;
@@ -54,9 +56,10 @@ pub use ticket_create::*;
 pub use trust_set::*;
 
 use crate::models::amount::XRPAmount;
+use crate::Err;
 use crate::{_serde::txn_flags, serde_with_tag};
 use alloc::borrow::Cow;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use anyhow::Result;
 use derive_new::new;
@@ -162,6 +165,10 @@ where
     pub last_ledger_sequence: Option<u32>,
     /// Additional arbitrary information used to identify this transaction.
     pub memos: Option<Vec<Memo>>,
+    /// The network ID of the chain this transaction is intended for.
+    /// MUST BE OMITTED for Mainnet and some test networks.
+    /// REQUIRED on chains whose network ID is 1025 or higher.
+    pub network_id: Option<u32>,
     /// The sequence number of the account sending the transaction.
     /// A transaction is only valid if the Sequence number is exactly
     /// 1 greater than the previous transaction from the same account.
@@ -172,6 +179,10 @@ where
     /// made. Conventionally, a refund should specify the initial
     /// payment's SourceTag as the refund payment's DestinationTag.
     pub signers: Option<Vec<Signer<'a>>>,
+    /// Hex representation of the public key that corresponds to the
+    /// private key used to sign this transaction. If an empty string,
+    /// indicates a multi-signature is present in the Signers field instead.
+    pub signing_pub_key: Option<Cow<'a, str>>,
     /// Arbitrary integer used to identify the reason for this
     /// payment, or a sender on whose behalf this transaction
     /// is made. Conventionally, a refund should specify the initial
@@ -181,6 +192,9 @@ where
     /// of a Sequence number. If this is provided, Sequence must
     /// be 0. Cannot be used with AccountTxnID.
     pub ticket_sequence: Option<u32>,
+    /// The signature that verifies this transaction as originating
+    /// from the account it says it is from.
+    pub txn_signature: Option<Cow<'a, str>>,
 }
 
 impl<'a, T> CommonFields<'a, T>
@@ -195,10 +209,13 @@ where
         flags: Option<FlagCollection<T>>,
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
+        network_id: Option<u32>,
         sequence: Option<u32>,
         signers: Option<Vec<Signer<'a>>>,
+        signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
+        txn_signature: Option<Cow<'a, str>>,
     ) -> Self {
         CommonFields {
             account,
@@ -208,15 +225,18 @@ where
             flags,
             last_ledger_sequence,
             memos,
+            network_id,
             sequence,
             signers,
+            signing_pub_key,
             source_tag,
             ticket_sequence,
+            txn_signature,
         }
     }
 }
 
-impl<'a, T> Transaction<T> for CommonFields<'a, T>
+impl<'a, T> Transaction<'a, T> for CommonFields<'a, T>
 where
     T: IntoEnumIterator + Serialize + PartialEq + core::fmt::Debug,
 {
@@ -229,6 +249,14 @@ where
 
     fn get_transaction_type(&self) -> TransactionType {
         self.transaction_type.clone()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, T> {
+        self
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, T> {
+        self
     }
 }
 
@@ -273,9 +301,10 @@ pub struct Signer<'a> {
 }
 
 /// Standard functions for transactions.
-pub trait Transaction<T>
+pub trait Transaction<'a, T>
 where
-    T: IntoEnumIterator + Serialize,
+    Self: Serialize,
+    T: IntoEnumIterator + Serialize + Debug + PartialEq,
 {
     fn has_flag(&self, flag: &T) -> bool {
         let _txn_flag = flag;
@@ -283,6 +312,17 @@ where
     }
 
     fn get_transaction_type(&self) -> TransactionType;
+
+    fn get_common_fields(&self) -> &CommonFields<'_, T>;
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, T>;
+
+    fn get_field_value(&self, field: &str) -> Result<Option<String>> {
+        match serde_json::to_value(self) {
+            Ok(value) => Ok(value.get(field).map(|v| v.to_string())),
+            Err(e) => Err!(e),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display, AsRefStr)]

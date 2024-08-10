@@ -7,7 +7,6 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::amount::exceptions::XRPLAmountException;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::XRPLNFTokenAcceptOfferException;
 use crate::models::NoFlags;
@@ -70,9 +69,17 @@ impl<'a: 'static> Model for NFTokenAcceptOffer<'a> {
     }
 }
 
-impl<'a> Transaction<NoFlags> for NFTokenAcceptOffer<'a> {
+impl<'a> Transaction<'a, NoFlags> for NFTokenAcceptOffer<'a> {
     fn get_transaction_type(&self) -> TransactionType {
-        self.common_fields.transaction_type.clone()
+        self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        self.common_fields.get_mut_common_fields()
     }
 }
 
@@ -93,20 +100,14 @@ impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
     }
     fn _get_nftoken_broker_fee_error(&self) -> Result<()> {
         if let Some(nftoken_broker_fee) = &self.nftoken_broker_fee {
-            let nftoken_broker_fee_decimal: Result<Decimal, XRPLAmountException> =
-                nftoken_broker_fee.clone().try_into();
-            match nftoken_broker_fee_decimal {
-                Ok(nftoken_broker_fee_dec) => {
-                    if nftoken_broker_fee_dec.is_zero() {
-                        Err!(XRPLNFTokenAcceptOfferException::ValueZero {
-                            field: "nftoken_broker_fee".into(),
-                            resource: "".into(),
-                        })
-                    } else {
-                        Ok(())
-                    }
-                }
-                Err(decimal_error) => Err!(decimal_error),
+            let nftoken_broker_fee_decimal: Decimal = nftoken_broker_fee.clone().try_into()?;
+            if nftoken_broker_fee_decimal.is_zero() {
+                Err!(XRPLNFTokenAcceptOfferException::ValueZero {
+                    field: "nftoken_broker_fee".into(),
+                    resource: "".into(),
+                })
+            } else {
+                Ok(())
             }
         } else {
             Ok(())
@@ -142,6 +143,9 @@ impl<'a> NFTokenAcceptOffer<'a> {
                 signers,
                 source_tag,
                 ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
             },
             nftoken_sell_offer,
             nftoken_buy_offer,

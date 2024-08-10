@@ -1,5 +1,5 @@
-use crate::models::amount::exceptions::XRPLAmountException;
 use crate::models::Model;
+use crate::{models::amount::exceptions::XRPLAmountException, Err};
 use alloc::borrow::Cow;
 use core::convert::TryInto;
 use core::str::FromStr;
@@ -26,12 +26,24 @@ impl<'a> IssuedCurrencyAmount<'a> {
 }
 
 impl<'a> TryInto<Decimal> for IssuedCurrencyAmount<'a> {
-    type Error = XRPLAmountException;
+    type Error = anyhow::Error;
 
     fn try_into(self) -> Result<Decimal, Self::Error> {
         match Decimal::from_str(&self.value) {
             Ok(decimal) => Ok(decimal),
-            Err(decimal_error) => Err(XRPLAmountException::ToDecimalError(decimal_error)),
+            Err(decimal_error) => Err!(XRPLAmountException::ToDecimalError(decimal_error)),
         }
+    }
+}
+
+impl<'a> PartialOrd for IssuedCurrencyAmount<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.value.partial_cmp(&other.value)
+    }
+}
+
+impl<'a> Ord for IssuedCurrencyAmount<'a> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.value.cmp(&other.value)
     }
 }

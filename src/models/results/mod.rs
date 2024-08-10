@@ -1,25 +1,73 @@
+use core::convert::{TryFrom, TryInto};
+
 use alloc::{
     borrow::Cow,
+    format,
     string::{String, ToString},
     vec::Vec,
 };
+use anyhow::Result;
+use exceptions::XRPLResultException;
 use serde::{Deserialize, Serialize};
-
-mod fee;
-pub use fee::{Fee, *};
 use serde_json::{Map, Value};
+
+pub mod account_info;
+pub mod exceptions;
+pub mod fee;
+pub mod ledger;
+pub mod server_state;
+
+pub use account_info::*;
+pub use fee::*;
+pub use ledger::*;
+pub use server_state::*;
+
+use crate::Err;
 
 use super::requests::XRPLRequest;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
     Fee(Fee<'a>),
-    Custom(Value),
+    AccountInfo(AccountInfo<'a>),
+    Ledger(Ledger<'a>),
+    ServerState(ServerState<'a>),
+    Other(Value),
 }
 
 impl<'a> From<Fee<'a>> for XRPLResult<'a> {
     fn from(fee: Fee<'a>) -> Self {
         XRPLResult::Fee(fee)
+    }
+}
+
+impl<'a> From<AccountInfo<'a>> for XRPLResult<'a> {
+    fn from(account_info: AccountInfo<'a>) -> Self {
+        XRPLResult::AccountInfo(account_info)
+    }
+}
+
+impl<'a> From<Ledger<'a>> for XRPLResult<'a> {
+    fn from(ledger: Ledger<'a>) -> Self {
+        XRPLResult::Ledger(ledger)
+    }
+}
+
+impl<'a> From<ServerState<'a>> for XRPLResult<'a> {
+    fn from(server_state: ServerState<'a>) -> Self {
+        XRPLResult::ServerState(server_state)
+    }
+}
+
+impl XRPLResult<'_> {
+    pub(crate) fn get_name(&self) -> String {
+        match self {
+            XRPLResult::Fee(_) => "Fee".to_string(),
+            XRPLResult::AccountInfo(_) => "AccountInfo".to_string(),
+            XRPLResult::Ledger(_) => "Ledger".to_string(),
+            XRPLResult::ServerState(_) => "ServerState".to_string(),
+            XRPLResult::Other(_) => "Other".to_string(),
+        }
     }
 }
 
@@ -128,6 +176,23 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
 impl<'a> XRPLResponse<'a> {
     pub fn is_success(&self) -> bool {
         self.status == Some(ResponseStatus::Success)
+    }
+
+    pub fn try_into_result<T: TryFrom<XRPLResult<'a>, Error = anyhow::Error>>(self) -> Result<T> {
+        match self.result {
+            Some(result) => result.try_into(),
+            None => {
+                if let Some(error) = self.error {
+                    Err!(XRPLResultException::ResponseError(format!(
+                        "{}: {}",
+                        error,
+                        self.error_message.unwrap_or_default()
+                    )))
+                } else {
+                    Err!(XRPLResultException::ExpectedResultOrError)
+                }
+            }
+        }
     }
 }
 

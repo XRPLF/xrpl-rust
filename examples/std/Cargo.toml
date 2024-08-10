@@ -22,7 +22,7 @@ path = "src/bin/wallet/generate_wallet.rs"
 required-features = []
 
 [[bin]]
-name = "tungstenite"
+name = "websocket-std"
 path = "src/bin/tokio/net/tungstenite.rs"
 required-features = ["tokio"]
 

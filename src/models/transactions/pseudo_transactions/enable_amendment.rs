@@ -52,13 +52,21 @@ pub struct EnableAmendment<'a> {
 
 impl<'a> Model for EnableAmendment<'a> {}
 
-impl<'a> Transaction<EnableAmendmentFlag> for EnableAmendment<'a> {
+impl<'a> Transaction<'a, EnableAmendmentFlag> for EnableAmendment<'a> {
     fn has_flag(&self, flag: &EnableAmendmentFlag) -> bool {
         self.common_fields.has_flag(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
-        self.common_fields.transaction_type.clone()
+        self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, EnableAmendmentFlag> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, EnableAmendmentFlag> {
+        self.common_fields.get_mut_common_fields()
     }
 }
 
@@ -90,6 +98,9 @@ impl<'a> EnableAmendment<'a> {
                 signers,
                 source_tag,
                 ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
             },
             amendment,
             ledger_sequence,

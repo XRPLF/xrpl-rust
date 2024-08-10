@@ -41,9 +41,17 @@ pub struct CheckCancel<'a> {
 
 impl<'a> Model for CheckCancel<'a> {}
 
-impl<'a> Transaction<NoFlags> for CheckCancel<'a> {
+impl<'a> Transaction<'a, NoFlags> for CheckCancel<'a> {
     fn get_transaction_type(&self) -> TransactionType {
         self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        self.common_fields.get_mut_common_fields()
     }
 }
 
@@ -73,6 +81,9 @@ impl<'a> CheckCancel<'a> {
                 signers,
                 source_tag,
                 ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
             },
             check_id,
         }
