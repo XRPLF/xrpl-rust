@@ -96,40 +96,57 @@ name = "benchmarks"
 harness = false
 
 [features]
-default = ["std", "utils", "wallet", "models", "websocket-std"]
-models = ["transactions", "ledger", "requests", "results"]
-transactions = ["amounts", "currencies"]
-requests = ["amounts", "currencies"]
-results = ["amounts", "currencies"]
-ledger = ["amounts", "currencies"]
-amounts = []
-currencies = []
-json-rpc = ["requests", "results", "url"]
-json-rpc-std = ["requests", "results", "url"]
-websocket = [
-    "requests",
-    "results",
-    "url",
-    "embassy-sync",
-    "embedded-io-async",
-    "embedded-websocket",
-    "futures",
+default = [
+    "std",
+    "core",
+    "wallet",
+    "models",
+    "utils",
+    "helpers",
+    "websocket-std",
 ]
-websocket-codec = ["requests", "results", "bytes", "tokio-util"]
-websocket-std = [
+models = ["core", "transactions", "requests", "ledger", "results"]
+transactions = ["core", "amounts", "currencies"]
+requests = ["core", "amounts", "currencies"]
+results = ["core", "amounts", "currencies"]
+ledger = ["core", "amounts", "currencies"]
+helpers = ["account-helpers", "ledger-helpers", "transaction-helpers"]
+account-helpers = ["amounts", "currencies", "requests", "results"]
+ledger-helpers = ["amounts", "currencies", "requests", "results"]
+transaction-helpers = [
+    "amounts",
+    "currencies",
     "requests",
     "results",
+    "transactions",
+    "ledger",
+]
+amounts = ["core"]
+currencies = ["core"]
+json-rpc = ["url", "reqwless", "embedded-nal-async"]
+json-rpc-std = ["url", "reqwest"]
+wallet = ["core"]
+websocket = [
     "url",
-    "embassy-sync",
     "futures",
-    "embassy-futures",
+    "embedded-websocket",
+    "embedded-io-async",
+    "embassy-sync",
+]
+websocket-codec = ["bytes", "tokio-util"]
+websocket-std = [
+    "url",
+    "futures",
     "tokio",
     "tokio-tungstenite",
+    "embassy-futures",
+    "embassy-sync",
 ]
 core = ["utils"]
-wallet = ["core"]
 utils = []
 std = [
+    "embedded-websocket/std",
+    "futures/std",
     "rand/std",
     "regex/std",
     "chrono/std",
