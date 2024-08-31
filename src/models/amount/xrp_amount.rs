@@ -111,6 +111,14 @@ impl<'a> TryInto<Decimal> for XRPAmount<'a> {
     }
 }
 
+impl<'a> TryInto<Cow<'a, str>> for XRPAmount<'a> {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Cow<'a, str>, Self::Error> {
+        Ok(self.0)
+    }
+}
+
 impl<'a> PartialOrd for XRPAmount<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.0.cmp(&other.0))

@@ -2,6 +2,7 @@
 
 pub mod exceptions;
 pub mod time_conversion;
+pub(crate) mod transactions;
 pub mod xrpl_conversion;
 
 pub use self::time_conversion::*;
@@ -69,7 +70,7 @@ pub fn is_iso_hex(value: &str) -> bool {
 }
 
 /// Generate a random id.
-pub fn get_random_id<T: rand::RngCore>(rng: &mut T) -> String {
+pub fn get_random_id<T: rand_core::RngCore>(rng: &mut T) -> String {
     let id: u32 = rng.gen();
     id.to_string()
 }

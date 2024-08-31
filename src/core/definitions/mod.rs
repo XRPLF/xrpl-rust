@@ -65,7 +65,7 @@ pub struct FieldHeader {
 /// let field_instance: FieldInstance =
 ///     FieldInstance::new(&field_info, "Generic", field_header);
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldInstance {
     pub nth: i16,
     pub is_vl_encoded: bool,
@@ -146,10 +146,10 @@ impl ToBytes for FieldHeader {
 
         if self.type_code < 16 {
             if self.field_code < 16 {
-                let shift = self.type_code << 4 | self.field_code;
+                let shift = (self.type_code << 4 | self.field_code) as u8;
                 header_bytes.extend_from_slice(&shift.to_be_bytes());
             } else {
-                let shift = self.type_code << 4;
+                let shift = (self.type_code << 4) as u8;
 
                 header_bytes.extend_from_slice(&shift.to_be_bytes());
                 header_bytes.extend_from_slice(&self.field_code.to_be_bytes());

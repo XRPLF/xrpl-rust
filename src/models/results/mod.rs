@@ -16,11 +16,13 @@ pub mod exceptions;
 pub mod fee;
 pub mod ledger;
 pub mod server_state;
+pub mod submit;
 
 pub use account_info::*;
 pub use fee::*;
 pub use ledger::*;
 pub use server_state::*;
+pub use submit::*;
 
 use crate::Err;
 
@@ -32,6 +34,7 @@ pub enum XRPLResult<'a> {
     AccountInfo(AccountInfo<'a>),
     Ledger(Ledger<'a>),
     ServerState(ServerState<'a>),
+    Submit(Submit<'a>),
     Other(Value),
 }
 
@@ -59,6 +62,32 @@ impl<'a> From<ServerState<'a>> for XRPLResult<'a> {
     }
 }
 
+impl<'a> From<Submit<'a>> for XRPLResult<'a> {
+    fn from(submit: Submit<'a>) -> Self {
+        XRPLResult::Submit(submit)
+    }
+}
+
+impl<'a> From<Value> for XRPLResult<'a> {
+    fn from(value: Value) -> Self {
+        XRPLResult::Other(value)
+    }
+}
+
+impl<'a> TryInto<Value> for XRPLResult<'a> {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Value> {
+        match self {
+            XRPLResult::Other(value) => Ok(value),
+            res => match serde_json::to_value(res) {
+                Ok(value) => Ok(value),
+                Err(e) => Err!(e),
+            },
+        }
+    }
+}
+
 impl XRPLResult<'_> {
     pub(crate) fn get_name(&self) -> String {
         match self {
@@ -66,6 +95,7 @@ impl XRPLResult<'_> {
             XRPLResult::AccountInfo(_) => "AccountInfo".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
+            XRPLResult::Submit(_) => "Submit".to_string(),
             XRPLResult::Other(_) => "Other".to_string(),
         }
     }

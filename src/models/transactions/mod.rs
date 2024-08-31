@@ -236,6 +236,21 @@ where
     }
 }
 
+impl<T> CommonFields<'_, T>
+where
+    T: IntoEnumIterator + Serialize + core::fmt::Debug,
+{
+    pub fn is_signed(&self) -> bool {
+        if let Some(signers) = &self.signers {
+            signers
+                .iter()
+                .all(|signer| signer.txn_signature.len() > 0 && signer.signing_pub_key.len() > 0)
+        } else {
+            self.txn_signature.is_some() && self.signing_pub_key.is_some()
+        }
+    }
+}
+
 impl<'a, T> Transaction<'a, T> for CommonFields<'a, T>
 where
     T: IntoEnumIterator + Serialize + PartialEq + core::fmt::Debug,
@@ -295,9 +310,9 @@ pub struct Memo {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone, new)]
 #[serde(rename_all = "PascalCase")]
 pub struct Signer<'a> {
-    account: Cow<'a, str>,
-    txn_signature: Cow<'a, str>,
-    signing_pub_key: Cow<'a, str>,
+    pub account: Cow<'a, str>,
+    pub txn_signature: Cow<'a, str>,
+    pub signing_pub_key: Cow<'a, str>,
 }
 
 /// Standard functions for transactions.

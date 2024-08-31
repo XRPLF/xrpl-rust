@@ -14,3 +14,11 @@ pub enum XRPLTransactionException<'a> {
     #[error("Invalid rippled version: {0}")]
     InvalidRippledVersion(Cow<'a, str>),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLSignTransactionException<'a> {
+    #[error("{0:?} value does not match X-Address tag")]
+    TagFieldMismatch(&'a str),
+    #[error("Fee value of {0:?} is likely entered incorrectly, since it is much larger than the typical XRP transaction cost. If this is intentional, use `check_fee=Some(false)`.")]
+    FeeTooHigh(Cow<'a, str>),
+}

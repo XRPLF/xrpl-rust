@@ -36,7 +36,8 @@ pub struct Types {
     pub hash_256: i16,
     pub u_int_8: i16,
     pub vector_256: i16,
-    pub serialized_dict: i16,
+    #[serde(rename = "STObject")]
+    pub st_object: i16,
     pub unknown: i16,
     pub transaction: i16,
     pub hash_160: i16,
@@ -46,7 +47,8 @@ pub struct Types {
     pub not_present: i16,
     pub u_int_64: i16,
     pub u_int_32: i16,
-    pub serialized_list: i16,
+    #[serde(rename = "STArray")]
+    pub st_array: i16,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -23,6 +23,16 @@ pub enum XRPLTransactionException<'a> {
 impl<'a> alloc::error::Error for XRPLTransactionException<'a> {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLTransactionFieldException<'a> {
+    #[error("Transaction is missing common field `{0:?}`")]
+    FieldMissing(&'a str),
+    #[error("There is no transaction common field `{0:?}`")]
+    InvalidCommonField(&'a str),
+    #[error("There is no account field named `{0:?}`")]
+    UnknownAccountField(&'a str),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum XRPLAccountSetException<'a> {
     /// A fields value exceeds its maximum value.
     #[error("The value of the field `{field:?}` is defined above its maximum (max {max:?}, found {found:?}). For more information see: {resource:?}")]

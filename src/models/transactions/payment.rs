@@ -119,7 +119,7 @@ impl<'a> Transaction<'a, PaymentFlag> for Payment<'a> {
     }
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, PaymentFlag> {
-        self.common_fields.get_mut_common_fields()
+        &mut self.common_fields
     }
 }
 

@@ -64,12 +64,13 @@ thiserror-no-std = "2.0.2"
 anyhow = { version = "1.0.69", default-features = false }
 
 # networking
-url = { version = "2.2.1", default-features = false, optional = true }
+url = { version = "2.2.2", default-features = false, optional = true }
 # websocket
 embassy-sync = { version = "0.6.0", optional = true }
 embedded-io-async = { version = "0.6.1", optional = true }
 embedded-websocket = { version = "0.9.3", default-features = false, optional = true }
 futures = { version = "0.3.30", optional = true }
+rand_core = { version = "0.6.4", default-features = false }
 # websocket-codec
 bytes = { version = "1.7.1", default-features = false, optional = true }
 tokio-util = { version = "0.7.11", features = ["codec"], optional = true }
@@ -90,6 +91,7 @@ reqwest = { version = "0.12.5", features = ["json"], optional = true }
 [dev-dependencies]
 criterion = "0.5.1"
 tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7.11", features = ["codec"] }
 
 [[bench]]
 name = "benchmarks"
@@ -114,6 +116,7 @@ helpers = ["account-helpers", "ledger-helpers", "transaction-helpers"]
 account-helpers = ["amounts", "currencies", "requests", "results"]
 ledger-helpers = ["amounts", "currencies", "requests", "results"]
 transaction-helpers = [
+    "wallet",
     "amounts",
     "currencies",
     "requests",
