@@ -35,6 +35,30 @@ pub async fn get_latest_validated_ledger_sequence(client: &impl AsyncClient) -> 
         .ledger_index)
 }
 
+pub async fn get_latest_open_ledger_sequence(client: &impl AsyncClient) -> Result<u32> {
+    let ledger_response = client
+        .request(
+            Ledger::new(
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("open".into()),
+                None,
+                None,
+                None,
+            )
+            .into(),
+        )
+        .await?;
+
+    Ok(ledger_response
+        .try_into_result::<LedgerResult<'_>>()?
+        .ledger_index)
+}
+
 pub enum FeeType {
     Open,
     Minimum,
