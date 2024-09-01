@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 pub mod account_info;
+pub mod account_tx;
 pub mod exceptions;
 pub mod fee;
 pub mod ledger;
@@ -19,6 +20,7 @@ pub mod server_state;
 pub mod submit;
 
 pub use account_info::*;
+pub use account_tx::*;
 pub use fee::*;
 pub use ledger::*;
 pub use server_state::*;
@@ -30,23 +32,30 @@ use super::requests::XRPLRequest;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
-    Fee(Fee<'a>),
     AccountInfo(AccountInfo<'a>),
+    AccountTx(AccountTx<'a>),
+    Fee(Fee<'a>),
     Ledger(Ledger<'a>),
     ServerState(ServerState<'a>),
     Submit(Submit<'a>),
     Other(Value),
 }
 
-impl<'a> From<Fee<'a>> for XRPLResult<'a> {
-    fn from(fee: Fee<'a>) -> Self {
-        XRPLResult::Fee(fee)
-    }
-}
-
 impl<'a> From<AccountInfo<'a>> for XRPLResult<'a> {
     fn from(account_info: AccountInfo<'a>) -> Self {
         XRPLResult::AccountInfo(account_info)
+    }
+}
+
+impl<'a> From<AccountTx<'a>> for XRPLResult<'a> {
+    fn from(account_tx: AccountTx<'a>) -> Self {
+        XRPLResult::AccountTx(account_tx)
+    }
+}
+
+impl<'a> From<Fee<'a>> for XRPLResult<'a> {
+    fn from(fee: Fee<'a>) -> Self {
+        XRPLResult::Fee(fee)
     }
 }
 
@@ -91,8 +100,9 @@ impl<'a> TryInto<Value> for XRPLResult<'a> {
 impl XRPLResult<'_> {
     pub(crate) fn get_name(&self) -> String {
         match self {
-            XRPLResult::Fee(_) => "Fee".to_string(),
             XRPLResult::AccountInfo(_) => "AccountInfo".to_string(),
+            XRPLResult::AccountTx(_) => "AccountTx".to_string(),
+            XRPLResult::Fee(_) => "Fee".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
