@@ -87,6 +87,7 @@ embedded-nal-async = { version = "0.7.1", optional = true }
 reqwless = { version = "0.12.1", optional = true }
 # json-rpc-std
 reqwest = { version = "0.12.5", features = ["json"], optional = true }
+embassy-time = { version = "0.3.2", optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -123,6 +124,7 @@ transaction-helpers = [
     "results",
     "transactions",
     "ledger",
+    "embassy-time",
 ]
 amounts = ["core"]
 currencies = ["core"]
@@ -160,4 +162,6 @@ std = [
     "serde/std",
     "indexmap/std",
     "secp256k1/std",
+    "embassy-time/std",
 ]
+embassy-time = ["dep:embassy-time"]

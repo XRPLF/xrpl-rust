@@ -1,4 +1,7 @@
 pub mod exceptions;
+mod submit_and_wait;
+
+pub use submit_and_wait::*;
 
 use crate::{
     asynch::{
@@ -45,6 +48,70 @@ const RESTRICTED_NETWORKS: u16 = 1024;
 const REQUIRED_NETWORKID_VERSION: &str = "1.11.0";
 const LEDGER_OFFSET: u8 = 20;
 
+pub fn sign<'a, T, F>(transaction: &mut T, wallet: &Wallet, multisign: bool) -> Result<()>
+where
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
+{
+    if multisign {
+        let serialized_for_signing =
+            encode_for_multisigning(transaction, wallet.classic_address.clone().into())?;
+        let serialized_bytes = match hex::decode(serialized_for_signing) {
+            Ok(bytes) => bytes,
+            Err(e) => return Err!(e),
+        };
+        let signature = match keypairs_sign(&serialized_bytes, &wallet.private_key) {
+            Ok(signature) => signature,
+            Err(e) => return Err!(e),
+        };
+        let signer = Signer::new(
+            wallet.classic_address.clone().into(),
+            signature.into(),
+            wallet.public_key.clone().into(),
+        );
+        transaction.get_mut_common_fields().signers = Some(vec![signer]);
+
+        Ok(())
+    } else {
+        prepare_transaction(transaction, wallet)?;
+        let serialized_for_signing = encode_for_signing(transaction)?;
+        let serialized_bytes = match hex::decode(serialized_for_signing) {
+            Ok(bytes) => bytes,
+            Err(e) => return Err!(e),
+        };
+        let signature = match keypairs_sign(&serialized_bytes, &wallet.private_key) {
+            Ok(signature) => signature,
+            Err(e) => return Err!(e),
+        };
+        transaction.get_mut_common_fields().txn_signature = Some(signature.into());
+
+        Ok(())
+    }
+}
+
+pub async fn sign_and_submit<'a, 'b, T, F, C>(
+    transaction: &mut T,
+    client: &'b C,
+    wallet: &Wallet,
+    autofill: bool,
+    check_fee: bool,
+) -> Result<SubmitResult<'a>>
+where
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
+    C: AsyncClient,
+{
+    if autofill {
+        autofill_and_sign(transaction, client, wallet, check_fee).await?;
+    } else {
+        if check_fee {
+            check_txn_fee(transaction, client).await?;
+        }
+        sign(transaction, wallet, false)?;
+    }
+    submit(transaction, client).await
+}
+
 pub async fn autofill<'a, 'b, F, T, C>(
     transaction: &mut T,
     client: &'b C,
@@ -75,6 +142,44 @@ where
     }
 
     Ok(())
+}
+
+pub async fn autofill_and_sign<'a, 'b, T, F, C>(
+    transaction: &mut T,
+    client: &'b C,
+    wallet: &Wallet,
+    check_fee: bool,
+) -> Result<()>
+where
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
+    C: AsyncClient,
+{
+    if check_fee {
+        check_txn_fee(transaction, client).await?;
+    }
+    autofill(transaction, client, None).await?;
+    sign(transaction, wallet, false)?;
+
+    Ok(())
+}
+
+pub async fn submit<'a, T, F, C>(transaction: &T, client: &C) -> Result<SubmitResult<'a>>
+where
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
+    C: AsyncClient,
+{
+    let txn_blob = encode(transaction)?;
+    let req = Submit::new(None, txn_blob.into(), None);
+    let res = client.request(req.into()).await?;
+    match res.try_into_result::<SubmitResult<'_>>() {
+        Ok(value) => {
+            let submit_result = SubmitResult::from(value);
+            Ok(submit_result)
+        }
+        Err(e) => Err!(e),
+    }
 }
 
 pub async fn calculate_fee_per_transaction_type<'a, 'b, 'c, T, F, C>(
@@ -260,102 +365,6 @@ enum AccountFieldType {
     Destination,
 }
 
-pub async fn sign_and_submit<'a, 'b, T, F, C>(
-    transaction: &mut T,
-    client: &'b C,
-    wallet: &Wallet,
-    autofill: bool,
-    check_fee: bool,
-) -> Result<SubmitResult<'a>>
-where
-    F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
-    C: AsyncClient,
-{
-    if autofill {
-        autofill_and_sign(transaction, client, wallet, check_fee).await?;
-    } else {
-        if check_fee {
-            check_txn_fee(transaction, client).await?;
-        }
-        sign(transaction, wallet, false)?;
-    }
-    submit(transaction, client).await
-}
-
-pub fn sign<'a, T, F>(transaction: &mut T, wallet: &Wallet, multisign: bool) -> Result<()>
-where
-    F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
-{
-    if multisign {
-        let serialized_for_signing =
-            encode_for_multisigning(transaction, wallet.classic_address.clone().into())?;
-        let serialized_bytes = hex::decode(serialized_for_signing).unwrap();
-        let signature = keypairs_sign(&serialized_bytes, &wallet.private_key).unwrap();
-        let signer = Signer::new(
-            wallet.classic_address.clone().into(),
-            signature.into(),
-            wallet.public_key.clone().into(),
-        );
-        transaction.get_mut_common_fields().signers = Some(vec![signer]);
-
-        Ok(())
-    } else {
-        prepare_transaction(transaction, wallet)?;
-        let serialized_for_signing = encode_for_signing(transaction)?;
-        let serialized_bytes = match hex::decode(serialized_for_signing) {
-            Ok(bytes) => bytes,
-            Err(e) => return Err!(e),
-        };
-        let signature = match keypairs_sign(&serialized_bytes, &wallet.private_key) {
-            Ok(signature) => signature,
-            Err(e) => return Err!(e),
-        };
-        transaction.get_mut_common_fields().txn_signature = Some(signature.into());
-
-        Ok(())
-    }
-}
-
-pub async fn autofill_and_sign<'a, 'b, T, F, C>(
-    transaction: &mut T,
-    client: &'b C,
-    wallet: &Wallet,
-    check_fee: bool,
-) -> Result<()>
-where
-    F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
-    C: AsyncClient,
-{
-    if check_fee {
-        check_txn_fee(transaction, client).await?;
-    }
-    autofill(transaction, client, None).await?;
-    sign(transaction, wallet, false)?;
-
-    Ok(())
-}
-
-pub async fn submit<'a, T, F, C>(transaction: &T, client: &C) -> Result<SubmitResult<'a>>
-where
-    F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
-    C: AsyncClient,
-{
-    let txn_blob = encode(transaction)?;
-    let req = Submit::new(None, txn_blob.into(), None);
-    let res = client.request(req.into()).await?;
-    match res.try_into_result::<SubmitResult<'_>>() {
-        Ok(value) => {
-            let submit_result = SubmitResult::from(value);
-            Ok(submit_result)
-        }
-        Err(e) => Err!(e),
-    }
-}
-
 async fn check_txn_fee<'a, 'b, T, F, C>(transaction: &mut T, client: &'b C) -> Result<()>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
@@ -538,8 +547,8 @@ mod test_sign {
         wallet::Wallet,
     };
 
-    #[test]
-    fn test_sign() {
+    #[tokio::test]
+    async fn test_sign() {
         let wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
         let mut tx = AccountSet::new(
             Cow::from(wallet.classic_address.clone()),

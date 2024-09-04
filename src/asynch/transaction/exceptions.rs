@@ -21,4 +21,20 @@ pub enum XRPLSignTransactionException<'a> {
     TagFieldMismatch(&'a str),
     #[error("Fee value of {0:?} is likely entered incorrectly, since it is much larger than the typical XRP transaction cost. If this is intentional, use `check_fee=Some(false)`.")]
     FeeTooHigh(Cow<'a, str>),
+    #[error("Wallet is required to sign transaction")]
+    WalletRequired,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLSubmitAndWaitException<'a> {
+    #[error("Transaction submission failed: {0}")]
+    SubmissionFailed(Cow<'a, str>),
+    #[error("The latest validated ledger sequence {validated_ledger_sequence} is greater than the LastLedgerSequence {last_ledger_sequence} in the Transaction. Prelim result: {prelim_result}")]
+    SubmissionTimeout {
+        last_ledger_sequence: u32,
+        validated_ledger_sequence: u32,
+        prelim_result: Cow<'a, str>,
+    },
+    #[error("Expected field in the transaction metadata: {0}")]
+    ExpectedFieldInTxMeta(Cow<'a, str>),
 }

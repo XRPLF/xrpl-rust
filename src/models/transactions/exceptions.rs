@@ -17,6 +17,7 @@ pub enum XRPLTransactionException<'a> {
     XRPLNFTokenMintError(XRPLNFTokenMintException<'a>),
     XRPLPaymentError(XRPLPaymentException<'a>),
     XRPLSignerListSetError(XRPLSignerListSetException<'a>),
+    TxMustBeSigned,
 }
 
 #[cfg(feature = "std")]

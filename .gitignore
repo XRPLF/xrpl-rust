@@ -20,3 +20,5 @@ Cargo.lock
 src/main.rs
 
 **/.DS_Store
+
+rustc-ice*

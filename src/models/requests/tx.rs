@@ -30,6 +30,8 @@ pub struct Tx<'a> {
     /// the server cannot find the transaction, it confirms whether
     /// it was able to search all the ledgers in this range.
     pub min_ledger: Option<u32>,
+    /// The 256-bit hash of the transaction to look up, as hexadecimal.
+    pub transaction: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for Tx<'a> {}
@@ -50,6 +52,7 @@ impl<'a> Tx<'a> {
         binary: Option<bool>,
         max_ledger: Option<u32>,
         min_ledger: Option<u32>,
+        transaction: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -59,6 +62,7 @@ impl<'a> Tx<'a> {
             binary,
             min_ledger,
             max_ledger,
+            transaction,
         }
     }
 }

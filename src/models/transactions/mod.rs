@@ -29,6 +29,7 @@ use core::fmt::Debug;
 
 pub use account_delete::*;
 pub use account_set::*;
+use alloc::format;
 pub use check_cancel::*;
 pub use check_cash::*;
 pub use check_create::*;
@@ -50,11 +51,14 @@ pub use payment_channel_create::*;
 pub use payment_channel_fund::*;
 pub use pseudo_transactions::*;
 
+use serde::de::DeserializeOwned;
 pub use set_regular_key::*;
+use sha2::{Digest, Sha512};
 pub use signer_list_set::*;
 pub use ticket_create::*;
 pub use trust_set::*;
 
+use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
 use crate::Err;
 use crate::{_serde::txn_flags, serde_with_tag};
@@ -70,6 +74,8 @@ use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, Display};
 
 use super::FlagCollection;
+
+const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
 /// Enum containing the different Transaction types.
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
@@ -238,7 +244,7 @@ where
 
 impl<T> CommonFields<'_, T>
 where
-    T: IntoEnumIterator + Serialize + core::fmt::Debug,
+    T: IntoEnumIterator + Serialize + Debug + PartialEq + Clone,
 {
     pub fn is_signed(&self) -> bool {
         if let Some(signers) = &self.signers {
@@ -338,6 +344,31 @@ where
             Err(e) => Err!(e),
         }
     }
+
+    /// Hashes the Transaction object as the ledger does. Only valid for signed
+    /// Transaction objects.
+    fn get_hash(&self) -> Result<Cow<str>>
+    where
+        Self: Serialize + DeserializeOwned + Debug + Clone,
+    {
+        // if !self.is_signed() {
+        //     return Err!(XRPLTransactionException::TxMustBeSigned);
+        // }
+        let prefix = format!("{:X}", TRANSACTION_HASH_PREFIX);
+        let encoded_tx = encode(self)?;
+        let encoded = prefix + &encoded_tx;
+        let encoded_bytes = match hex::decode(&encoded) {
+            Ok(bytes) => bytes,
+            Err(e) => return Err!(e),
+        };
+        let mut hasher = Sha512::new();
+        hasher.update(&encoded_bytes);
+        let hash = hasher.finalize();
+        let hex_string = hex::encode_upper(hash);
+        let result = hex_string[..64].to_string();
+
+        Ok(result.into())
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display, AsRefStr)]
@@ -350,4 +381,44 @@ pub enum Flag {
     PaymentChannelClaim(PaymentChannelClaimFlag),
     TrustSet(TrustSetFlag),
     EnableAmendment(EnableAmendmentFlag),
+}
+
+#[cfg(test)]
+mod test_tx_common_fields {
+    use super::*;
+    use crate::{
+        asynch::transaction::sign,
+        models::{amount::IssuedCurrencyAmount, transactions::OfferCreate},
+        wallet::Wallet,
+    };
+
+    #[tokio::test]
+    async fn test_get_hash() {
+        let mut wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
+        let mut txn = OfferCreate::new(
+            "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
+            None,
+            Some("10".into()),
+            Some(FlagCollection::default()),
+            Some(16409087),
+            None,
+            Some(16409064),
+            None,
+            None,
+            None,
+            "13100000".into(),
+            IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
+                "10".into(),
+            )
+            .into(),
+            None,
+            None,
+        );
+        sign(&mut txn, &mut wallet, false).unwrap();
+        let expected_hash = "39530980D3D6F848E619BF05A57988D42A62075289B99C5728CBDE0D1710284B";
+
+        assert_eq!(&txn.get_hash().unwrap(), expected_hash);
+    }
 }

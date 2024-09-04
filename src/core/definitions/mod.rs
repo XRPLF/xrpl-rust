@@ -152,15 +152,15 @@ impl ToBytes for FieldHeader {
                 let shift = (self.type_code << 4) as u8;
 
                 header_bytes.extend_from_slice(&shift.to_be_bytes());
-                header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+                header_bytes.extend_from_slice(&(self.field_code as u8).to_be_bytes());
             }
         } else if self.field_code < 16 {
-            header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
-            header_bytes.extend_from_slice(&self.type_code.to_be_bytes());
+            header_bytes.extend_from_slice(&(self.field_code as u8).to_be_bytes());
+            header_bytes.extend_from_slice(&(self.type_code as u8).to_be_bytes());
         } else {
             header_bytes.extend_from_slice(&[0]);
-            header_bytes.extend_from_slice(&self.type_code.to_be_bytes());
-            header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+            header_bytes.extend_from_slice(&(self.type_code as u8).to_be_bytes());
+            header_bytes.extend_from_slice(&(self.field_code as u8).to_be_bytes());
         }
 
         header_bytes

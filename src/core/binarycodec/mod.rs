@@ -74,6 +74,7 @@ where
     if let Some(p) = prefix {
         buffer.extend(p);
     }
+
     let json_value = match serde_json::to_value(prepared_transaction) {
         Ok(v) => v,
         Err(e) => {
@@ -81,12 +82,11 @@ where
         }
     };
     let st_object = STObject::try_from_value(json_value, signing_only)?;
-
     buffer.extend(st_object.as_ref());
+
     if let Some(s) = suffix {
         buffer.extend(s);
     }
-
     let hex_string = buffer.encode_hex_upper::<String>();
 
     Ok(hex_string)
