@@ -1,15 +1,15 @@
 use core::convert::{TryFrom, TryInto};
 
 use alloc::{
-    borrow::Cow,
-    dbg, format,
+    borrow::{Cow, ToOwned},
+    format,
     string::{String, ToString},
     vec::Vec,
 };
 use anyhow::Result;
 use exceptions::XRPLResultException;
-use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::{value::Index, Map, Value};
 
 pub mod account_info;
 pub mod account_tx;
@@ -18,6 +18,7 @@ pub mod fee;
 pub mod ledger;
 pub mod server_state;
 pub mod submit;
+pub mod tx;
 
 pub use account_info::*;
 pub use account_tx::*;
@@ -25,10 +26,108 @@ pub use fee::*;
 pub use ledger::*;
 pub use server_state::*;
 pub use submit::*;
+pub use tx::*;
 
 use crate::Err;
 
 use super::requests::XRPLRequest;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum XRPLOptionalResult<T> {
+    Result(T),
+    Other(XRPLOtherResult),
+}
+
+impl<T> XRPLOptionalResult<T> {
+    pub fn unwrap(self) -> T {
+        match self {
+            XRPLOptionalResult::Result(result) => result,
+            XRPLOptionalResult::Other(_) => {
+                panic!("{}", XRPLResultException::UnwrapOnOther.to_string())
+            }
+        }
+    }
+
+    /// Try to convert the result into an expected XRPL result.
+    pub fn try_into_result(self) -> Result<T> {
+        match self {
+            XRPLOptionalResult::Result(result) => Ok(result),
+            XRPLOptionalResult::Other(other) => Err!(XRPLResultException::ExpectedResult(other)),
+        }
+    }
+
+    /// Get a value from the result by index.
+    pub fn try_get_typed<I, U>(&self, index: I) -> Result<U>
+    where
+        T: Serialize,
+        I: Index,
+        U: DeserializeOwned,
+    {
+        match self {
+            XRPLOptionalResult::Result(result) => match serde_json::to_value(result) {
+                Ok(value) => match value.get(index) {
+                    Some(value) => match serde_json::from_value(value.to_owned()) {
+                        Ok(value) => Ok(value),
+                        Err(e) => Err!(e),
+                    },
+                    None => Err!(XRPLResultException::IndexNotFound),
+                },
+                Err(e) => Err!(e),
+            },
+            XRPLOptionalResult::Other(other) => other.try_get_typed(index),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct XRPLOtherResult(Value);
+
+impl TryFrom<XRPLResult<'_>> for XRPLOtherResult {
+    type Error = anyhow::Error;
+
+    fn try_from(result: XRPLResult) -> Result<Self> {
+        match result {
+            XRPLResult::Other(value) => Ok(value),
+            res => Err!(XRPLResultException::UnexpectedResultType(
+                "Other".to_string(),
+                res.get_name()
+            )),
+        }
+    }
+}
+
+impl From<Value> for XRPLOtherResult {
+    fn from(value: Value) -> Self {
+        XRPLOtherResult(value)
+    }
+}
+
+impl Into<Value> for XRPLOtherResult {
+    fn into(self) -> Value {
+        self.0
+    }
+}
+
+impl XRPLOtherResult {
+    pub fn get(&self, index: impl Index) -> Option<&Value> {
+        self.0.get(index)
+    }
+
+    pub fn try_get_typed<I, T>(&self, index: I) -> Result<T>
+    where
+        I: Index,
+        T: DeserializeOwned,
+    {
+        match self.0.get(index) {
+            Some(value) => match serde_json::from_value(value.clone()) {
+                Ok(value) => Ok(value),
+                Err(e) => Err!(e),
+            },
+            None => Err!(XRPLResultException::IndexNotFound),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
@@ -38,7 +137,8 @@ pub enum XRPLResult<'a> {
     Ledger(Ledger<'a>),
     ServerState(ServerState<'a>),
     Submit(Submit<'a>),
-    Other(Value),
+    Tx(Tx<'a>),
+    Other(XRPLOtherResult),
 }
 
 impl<'a> From<AccountInfo<'a>> for XRPLResult<'a> {
@@ -77,9 +177,21 @@ impl<'a> From<Submit<'a>> for XRPLResult<'a> {
     }
 }
 
+impl<'a> From<Tx<'a>> for XRPLResult<'a> {
+    fn from(tx: Tx<'a>) -> Self {
+        XRPLResult::Tx(tx)
+    }
+}
+
 impl<'a> From<Value> for XRPLResult<'a> {
     fn from(value: Value) -> Self {
-        XRPLResult::Other(value)
+        XRPLResult::Other(XRPLOtherResult(value))
+    }
+}
+
+impl<'a> From<XRPLOtherResult> for XRPLResult<'a> {
+    fn from(other: XRPLOtherResult) -> Self {
+        XRPLResult::Other(other)
     }
 }
 
@@ -88,7 +200,7 @@ impl<'a> TryInto<Value> for XRPLResult<'a> {
 
     fn try_into(self) -> Result<Value> {
         match self {
-            XRPLResult::Other(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(value)) => Ok(value),
             res => match serde_json::to_value(res) {
                 Ok(value) => Ok(value),
                 Err(e) => Err!(e),
@@ -106,6 +218,7 @@ impl XRPLResult<'_> {
             XRPLResult::Ledger(_) => "Ledger".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
+            XRPLResult::Tx(_) => "Tx".to_string(),
             XRPLResult::Other(_) => "Other".to_string(),
         }
     }
@@ -213,15 +326,31 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
     }
 }
 
+impl TryInto<Value> for XRPLResponse<'_> {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<Value> {
+        match serde_json::to_value(self) {
+            Ok(value) => Ok(value),
+            Err(e) => Err!(e),
+        }
+    }
+}
+
 impl<'a> XRPLResponse<'a> {
     pub fn is_success(&self) -> bool {
         self.status == Some(ResponseStatus::Success)
     }
 
-    pub fn try_into_result<T: TryFrom<XRPLResult<'a>, Error = anyhow::Error>>(self) -> Result<T> {
-        dbg!(self.result.clone());
+    pub fn try_into_opt_result<T>(self) -> Result<XRPLOptionalResult<T>>
+    where
+        T: TryFrom<XRPLResult<'a>, Error = anyhow::Error>,
+    {
         match self.result {
-            Some(result) => result.try_into(),
+            Some(result) => match result.clone().try_into() {
+                Ok(result) => Ok(XRPLOptionalResult::Result(result)),
+                Err(_) => Ok(XRPLOptionalResult::Other(result.try_into()?)),
+            },
             None => {
                 if let Some(error) = self.error {
                     Err!(XRPLResultException::ResponseError(format!(
@@ -233,6 +362,16 @@ impl<'a> XRPLResponse<'a> {
                     Err!(XRPLResultException::ExpectedResultOrError)
                 }
             }
+        }
+    }
+
+    pub fn try_into_result<T>(self) -> Result<T>
+    where
+        T: TryFrom<XRPLResult<'a>, Error = anyhow::Error>,
+    {
+        match self.try_into_opt_result()? {
+            XRPLOptionalResult::Result(result) => Ok(result),
+            XRPLOptionalResult::Other(other) => Err!(XRPLResultException::ExpectedResult(other)),
         }
     }
 }

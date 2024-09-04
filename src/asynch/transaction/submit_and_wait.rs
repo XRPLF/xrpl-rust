@@ -160,12 +160,6 @@ where
     }
 }
 
-#[cfg(all(
-    feature = "websocket-std",
-    not(feature = "websocket"),
-    feature = "transactions",
-    feature = "wallet"
-))]
 #[cfg(test)]
 mod test_submit_and_wait {
     use super::*;
