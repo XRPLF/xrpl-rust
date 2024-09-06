@@ -1,11 +1,5 @@
-use alloc::{
-    dbg,
-    string::{String, ToString},
-    sync::Arc,
-    vec,
-};
+use alloc::{string::ToString, vec};
 use anyhow::Result;
-use embassy_sync::{blocking_mutex::raw::RawMutex, mutex::Mutex};
 use serde::Serialize;
 use serde_json::{Map, Value};
 use url::Url;
@@ -21,6 +15,7 @@ pub use exceptions::XRPLJsonRpcException;
 
 use super::client::Client;
 
+#[allow(async_fn_in_trait)]
 pub trait XRPLFaucet: Client {
     fn get_faucet_url(&self, url: Option<Url>) -> Result<Url>
     where
@@ -58,7 +53,7 @@ mod _std {
     use crate::models::requests::{FundFaucet, XRPLRequest};
 
     use super::*;
-    use alloc::{dbg, format, string::ToString};
+    use alloc::string::ToString;
     use reqwest::Client as HttpClient;
     use url::Url;
 
@@ -79,17 +74,14 @@ mod _std {
         ) -> Result<XRPLResponse<'b>> {
             let client = HttpClient::new();
             let request_json_rpc = request_to_json_rpc(&request)?;
-            dbg!(&request_json_rpc);
             let response = client
                 .post(self.url.as_ref())
                 .json(&request_json_rpc)
                 .send()
                 .await;
-            dbg!(&response);
             match response {
                 Ok(response) => match response.text().await {
                     Ok(response) => {
-                        dbg!(&response);
                         Ok(serde_json::from_str::<XRPLResponse<'b>>(&response).unwrap())
                     }
                     Err(error) => Err!(error),
@@ -108,28 +100,21 @@ mod _std {
             let faucet_url = self.get_faucet_url(url)?;
             let client = HttpClient::new();
             let request_json_rpc = serde_json::to_value(&request).unwrap();
-            dbg!(&request_json_rpc);
             let response = client
                 .post(&faucet_url.to_string())
                 .json(&request_json_rpc)
                 .send()
                 .await;
-            dbg!(&response);
             match response {
                 Ok(response) => {
                     if response.status().is_success() {
-                        dbg!("Success");
-                        dbg!(&response);
                         Ok(())
                     } else {
-                        dbg!("Error");
-                        dbg!(&response);
                         todo!()
                         // Err!(XRPLJsonRpcException::RequestError())
                     }
                 }
                 Err(error) => {
-                    dbg!("req Error");
                     Err!(error)
                 }
             }

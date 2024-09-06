@@ -1,6 +1,6 @@
 pub mod exceptions;
 
-use alloc::{borrow::Cow, dbg};
+use alloc::borrow::Cow;
 use anyhow::Result;
 use exceptions::XRPLFaucetException;
 use url::Url;
@@ -14,7 +14,7 @@ use crate::{
 
 use super::{
     account::get_xrp_balance,
-    clients::{AsyncClient, Client, XRPLFaucet},
+    clients::{Client, XRPLFaucet},
 };
 
 const TEST_FAUCET_URL: &'static str = "https://faucet.altnet.rippletest.net/accounts";
@@ -41,8 +41,7 @@ where
         },
     };
     let address = &wallet.classic_address;
-    dbg!(address);
-    let starting_balance = 0.into(); // check_balance(client, address.into()).await;
+    let starting_balance = check_balance(client, address.into()).await;
     let user_agent = user_agent.unwrap_or("xrpl-rust".into());
     fund_wallet(
         client,
@@ -58,8 +57,6 @@ where
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         if !is_funded {
             let balance = check_balance(client, address.into()).await;
-            dbg!(&balance);
-            dbg!(&starting_balance);
             if balance > starting_balance {
                 is_funded = true;
             }
@@ -108,8 +105,9 @@ async fn check_balance<'a: 'b, 'b, C>(client: &C, address: Cow<'a, str>) -> XRPA
 where
     C: Client,
 {
-    get_xrp_balance(address, client, None).await.unwrap()
-    // .unwrap_or(XRPAmount::default())
+    get_xrp_balance(address, client, None)
+        .await
+        .unwrap_or(XRPAmount::default())
 }
 
 async fn fund_wallet<'a: 'b, 'b, C>(
@@ -132,11 +130,11 @@ where
     Ok(())
 }
 
+#[cfg(all(feature = "json-rpc-std", feature = "helpers", feature = "models"))]
 #[cfg(test)]
 mod test_faucet_wallet_generation {
     use super::*;
     use crate::asynch::clients::json_rpc::AsyncJsonRpcClient;
-    use alloc::dbg;
     use url::Url;
 
     #[tokio::test]
@@ -146,7 +144,9 @@ mod test_faucet_wallet_generation {
         let wallet = generate_faucet_wallet(&client, None, None, None, None)
             .await
             .unwrap();
-        dbg!(&wallet);
-        assert_eq!(wallet.classic_address.len(), 34);
+        let balance = get_xrp_balance(wallet.classic_address.clone().into(), &client, None)
+            .await
+            .unwrap();
+        assert!(balance > 0.into());
     }
 }

@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, dbg};
+use alloc::borrow::Cow;
 use anyhow::Result;
 
 use crate::{
@@ -75,7 +75,7 @@ where
         None,
         Some(ledger_index),
         None,
-        Some(true),
+        None,
         None,
     )
     .into();
