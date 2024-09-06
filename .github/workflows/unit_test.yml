@@ -41,4 +41,4 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --no-default-features --features websocket-std,helpers
+          args: --no-default-features --features std,websocket-std,helpers
