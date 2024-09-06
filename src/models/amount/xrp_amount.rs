@@ -12,10 +12,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Represents an amount of XRP in Drops.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct XRPAmount<'a>(pub Cow<'a, str>);
 
 impl<'a> Model for XRPAmount<'a> {}
+
+impl Default for XRPAmount<'_> {
+    fn default() -> Self {
+        Self("0".into())
+    }
+}
 
 // implement Deserializing from Cow<str>, &str, String, Decimal, f64, u32, and Value
 impl<'de, 'a> Deserialize<'de> for XRPAmount<'a> {
@@ -121,12 +127,16 @@ impl<'a> TryInto<Cow<'a, str>> for XRPAmount<'a> {
 
 impl<'a> PartialOrd for XRPAmount<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.0.cmp(&other.0))
+        let self_decimal: Decimal = self.clone().try_into().unwrap();
+        let other_decimal: Decimal = other.clone().try_into().unwrap();
+        Some(self_decimal.cmp(&other_decimal))
     }
 }
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.0.cmp(&other.0)
+        let self_decimal: Decimal = self.clone().try_into().unwrap();
+        let other_decimal: Decimal = other.clone().try_into().unwrap();
+        self_decimal.cmp(&other_decimal)
     }
 }

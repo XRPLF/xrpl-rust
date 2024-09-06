@@ -30,6 +30,7 @@ where
 {
     websocket: Arc<Mutex<M, TokioTungsteniteMaybeTlsStream>>,
     websocket_base: Arc<Mutex<M, WebsocketBase<M>>>,
+    uri: Url,
     status: PhantomData<Status>,
 }
 
@@ -141,6 +142,7 @@ where
         Ok(AsyncWebsocketClient {
             websocket: Arc::new(Mutex::new(stream)),
             websocket_base: Arc::new(Mutex::new(WebsocketBase::new())),
+            uri,
             status: PhantomData::<WebsocketOpen>,
         })
     }
@@ -199,6 +201,10 @@ impl<M> Client for AsyncWebsocketClient<M, WebsocketOpen>
 where
     M: RawMutex,
 {
+    fn get_host(&self) -> Url {
+        self.uri.clone()
+    }
+
     async fn request_impl<'a: 'b, 'b>(
         &self,
         mut request: XRPLRequest<'a>,

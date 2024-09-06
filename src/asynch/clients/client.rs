@@ -6,10 +6,13 @@ use crate::models::{
 use crate::utils::get_random_id;
 use alloc::borrow::{Cow, ToOwned};
 use anyhow::Result;
+use url::Url;
 
 #[allow(async_fn_in_trait)]
 pub trait Client {
     async fn request_impl<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> Result<XRPLResponse<'b>>;
+
+    fn get_host(&self) -> Url;
 
     fn set_request_id(&self, request: &mut XRPLRequest<'_>) -> () {
         let common_fields = request.get_common_fields_mut();

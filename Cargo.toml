@@ -106,16 +106,22 @@ default = [
     "models",
     "utils",
     "helpers",
-    "websocket-std",
+    "json-rpc-std",
 ]
 models = ["core", "transactions", "requests", "ledger", "results"]
 transactions = ["core", "amounts", "currencies"]
 requests = ["core", "amounts", "currencies"]
 results = ["core", "amounts", "currencies"]
 ledger = ["core", "amounts", "currencies"]
-helpers = ["account-helpers", "ledger-helpers", "transaction-helpers"]
+helpers = [
+    "account-helpers",
+    "ledger-helpers",
+    "transaction-helpers",
+    "wallet-helpers",
+]
 account-helpers = ["amounts", "currencies", "requests", "results"]
 ledger-helpers = ["amounts", "currencies", "requests", "results"]
+wallet-helpers = ["requests", "results"]
 transaction-helpers = [
     "wallet",
     "amounts",
@@ -128,8 +134,8 @@ transaction-helpers = [
 ]
 amounts = ["core"]
 currencies = ["core"]
-json-rpc = ["url", "reqwless", "embedded-nal-async"]
-json-rpc-std = ["url", "reqwest"]
+json-rpc = ["url", "reqwless", "embassy-sync", "embedded-nal-async"]
+json-rpc-std = ["url", "reqwest", "embassy-sync", "tokio"]
 wallet = ["core"]
 websocket = [
     "url",

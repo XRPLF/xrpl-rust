@@ -11,3 +11,5 @@ pub mod clients;
 pub mod ledger;
 #[cfg(feature = "transaction-helpers")]
 pub mod transaction;
+#[cfg(feature = "wallet-helpers")]
+pub mod wallet;
