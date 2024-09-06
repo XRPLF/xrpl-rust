@@ -383,6 +383,14 @@ pub enum Flag {
     EnableAmendment(EnableAmendmentFlag),
 }
 
+#[cfg(all(
+    feature = "websocket-std",
+    not(feature = "websocket"),
+    feature = "transactions",
+    feature = "transaction-helpers",
+    feature = "amounts",
+    feature = "wallet"
+))]
 #[cfg(test)]
 mod test_tx_common_fields {
     use super::*;
