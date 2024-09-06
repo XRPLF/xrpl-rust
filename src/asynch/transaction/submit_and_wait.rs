@@ -162,6 +162,7 @@ where
 
 #[cfg(all(
     feature = "websocket-std",
+    not(feature = "websocket"),
     feature = "transactions",
     feature = "wallet"
 ))]
