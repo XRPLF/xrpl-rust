@@ -54,6 +54,7 @@ pub struct AsyncWebsocketClient<
     websocket: Arc<Mutex<M, Framer<Rng, Client>>>,
     tx_buffer: [u8; BUF],
     websocket_base: Arc<Mutex<M, WebsocketBase<M>>>,
+    uri: Url,
     status: PhantomData<Status>,
 }
 
@@ -124,6 +125,7 @@ where
             websocket,
             tx_buffer: buffer,
             websocket_base: Arc::new(Mutex::new(WebsocketBase::new())),
+            uri: url,
             status: PhantomData::<WebsocketOpen>,
         })
     }
@@ -245,6 +247,10 @@ where
     E: Debug + Display,
     Tcp: Stream<Item = Result<B, E>> + for<'b> Sink<&'b [u8], Error = E> + Unpin,
 {
+    fn get_host(&self) -> Url {
+        self.uri.clone()
+    }
+
     async fn request_impl<'a: 'b, 'b>(
         &self,
         mut request: XRPLRequest<'a>,
