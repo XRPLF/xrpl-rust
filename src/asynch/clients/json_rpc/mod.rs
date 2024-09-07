@@ -124,9 +124,11 @@ mod _std {
 
 #[cfg(feature = "json-rpc")]
 mod _no_std {
-    use crate::models::requests::XRPLRequest;
+    use crate::{asynch::clients::SingleExecutorMutex, models::requests::XRPLRequest};
 
     use super::*;
+    use alloc::sync::Arc;
+    use embassy_sync::{blocking_mutex::raw::RawMutex, mutex::Mutex};
     use embedded_nal_async::{Dns, TcpConnect};
     use reqwless::{
         client::{HttpClient, TlsConfig},
@@ -177,7 +179,8 @@ mod _no_std {
             request: XRPLRequest<'a>,
         ) -> Result<XRPLResponse<'b>> {
             let request_json_rpc = request_to_json_rpc(&request)?;
-            let request_buf = request_json_rpc.as_bytes();
+            let request_string = request_json_rpc.to_string();
+            let request_buf = request_string.as_bytes();
             let mut rx_buffer = [0; BUF];
             let mut client = self.client.lock().await;
             let response = match client.request(Method::POST, self.url.as_str()).await {
@@ -200,6 +203,10 @@ mod _no_std {
             };
 
             response
+        }
+
+        fn get_host(&self) -> Url {
+            self.url.clone()
         }
     }
 }

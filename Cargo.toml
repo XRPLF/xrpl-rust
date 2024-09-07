@@ -106,7 +106,7 @@ default = [
     "models",
     "utils",
     "helpers",
-    "json-rpc-std",
+    "websocket-std",
 ]
 models = ["core", "transactions", "requests", "ledger", "results"]
 transactions = ["core", "amounts", "currencies"]
