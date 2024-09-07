@@ -130,7 +130,12 @@ where
     Ok(())
 }
 
-#[cfg(all(feature = "json-rpc-std", feature = "helpers", feature = "models"))]
+#[cfg(all(
+    feature = "json-rpc-std",
+    not(feature = "json-rpc"),
+    feature = "helpers",
+    feature = "models"
+))]
 #[cfg(test)]
 mod test_faucet_wallet_generation {
     use super::*;
