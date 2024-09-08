@@ -87,7 +87,7 @@ mod _std {
             let client = HttpClient::new();
             let request_json_rpc = serde_json::to_value(&request).unwrap();
             let response = client
-                .post(&faucet_url.to_string())
+                .post(faucet_url.to_string())
                 .json(&request_json_rpc)
                 .send()
                 .await;

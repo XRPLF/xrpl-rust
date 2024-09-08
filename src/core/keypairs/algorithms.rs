@@ -414,7 +414,7 @@ impl CryptoImplementation for Ed25519 {
             .as_slice()
             .try_into()
             .map_err(|_| XRPLKeypairsException::InvalidSecret)?;
-        let private: ed25519_dalek::SecretKey = (*raw_private_slice).into();
+        let private: ed25519_dalek::SecretKey = *raw_private_slice;
         let mut signing_key: ed25519_dalek::SigningKey = private.into();
         let signature = signing_key.sign(message);
 

@@ -17,8 +17,8 @@ use super::{
     clients::{Client, XRPLFaucet},
 };
 
-const TEST_FAUCET_URL: &'static str = "https://faucet.altnet.rippletest.net/accounts";
-const DEV_FAUCET_URL: &'static str = "https://faucet.devnet.rippletest.net/accounts";
+const TEST_FAUCET_URL: &str = "https://faucet.altnet.rippletest.net/accounts";
+const DEV_FAUCET_URL: &str = "https://faucet.devnet.rippletest.net/accounts";
 
 const TIMEOUT_SECS: u8 = 40;
 
@@ -91,8 +91,8 @@ where
         let host_str = host.host_str().unwrap();
         if host_str.contains("altnet") || host_str.contains("testnet") {
             match Url::parse(TEST_FAUCET_URL) {
-                Ok(url) => return Ok(url),
-                Err(error) => return Err!(error),
+                Ok(url) => Ok(url),
+                Err(error) => Err!(error),
             }
         } else if host_str.contains("devnet") {
             match Url::parse(DEV_FAUCET_URL) {

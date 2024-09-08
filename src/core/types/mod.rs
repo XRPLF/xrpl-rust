@@ -101,7 +101,7 @@ impl XRPLTypes {
                 "UInt8" => Ok(XRPLTypes::UInt8(value as u8)),
                 "UInt16" => Ok(XRPLTypes::UInt16(value as u16)),
                 "UInt32" => Ok(XRPLTypes::UInt32(value as u32)),
-                "UInt64" => Ok(XRPLTypes::UInt64(value as u64)),
+                "UInt64" => Ok(XRPLTypes::UInt64(value)),
                 _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else if let Some(value) = value.as_object() {
@@ -151,9 +151,9 @@ impl XRPLTypes {
     }
 }
 
-impl Into<SerializedType> for XRPLTypes {
-    fn into(self) -> SerializedType {
-        match self {
+impl From<XRPLTypes> for SerializedType {
+    fn from(val: XRPLTypes) -> Self {
+        match val {
             XRPLTypes::AccountID(account_id) => SerializedType::from(account_id),
             XRPLTypes::Amount(amount) => SerializedType::from(amount),
             XRPLTypes::Blob(blob) => SerializedType::from(blob),
@@ -383,7 +383,7 @@ impl STObject {
 
         let mut sorted_keys: Vec<FieldInstance> = Vec::new();
         for (field, _) in &value_xaddress_handled {
-            let field_instance = get_field_instance(&field);
+            let field_instance = get_field_instance(field);
             if let Some(field_instance) = field_instance {
                 if value_xaddress_handled.contains_key(&field_instance.name)
                     && field_instance.is_serialized

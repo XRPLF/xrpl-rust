@@ -26,4 +26,4 @@ pub enum XRPLFlagsException {
 }
 
 #[cfg(feature = "std")]
-impl<'a> alloc::error::Error for XRPLFlagsException {}
+impl alloc::error::Error for XRPLFlagsException {}

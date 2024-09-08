@@ -1,5 +1,7 @@
 //! Methods for working with XRPL wallets.
 
+use core::fmt::Display;
+
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::classic_address_to_xaddress;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
@@ -7,9 +9,7 @@ use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::generate_seed;
-use alloc::format;
 use alloc::string::String;
-use alloc::string::ToString;
 use zeroize::Zeroize;
 
 /// The cryptographic keys needed to control an
@@ -84,15 +84,13 @@ impl Wallet {
     }
 }
 
-impl ToString for Wallet {
+impl Display for Wallet {
     /// Returns a string representation of a Wallet.
-    fn to_string(&self) -> String {
-        let string_list = [
-            format!("public_key: {}", self.public_key),
-            format!("private_key: {}", "-HIDDEN-"),
-            format!("classic_address: {}", self.classic_address),
-        ];
-
-        string_list.join("-")
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(
+            f,
+            "Wallet {{ public_key: {}, private_key: -HIDDEN-, classic_address: {} }}",
+            self.public_key, self.classic_address
+        )
     }
 }

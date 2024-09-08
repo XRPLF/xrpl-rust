@@ -91,9 +91,9 @@ impl From<Value> for XRPLOtherResult {
     }
 }
 
-impl Into<Value> for XRPLOtherResult {
-    fn into(self) -> Value {
-        self.0
+impl From<XRPLOtherResult> for Value {
+    fn from(val: XRPLOtherResult) -> Self {
+        val.0
     }
 }
 
@@ -330,18 +330,16 @@ impl<'a> XRPLResponse<'a> {
     pub fn is_success(&self) -> bool {
         if let Some(status) = &self.status {
             status == &ResponseStatus::Success
-        } else {
-            if let Some(result) = &self.result {
-                match serde_json::to_value(result) {
-                    Ok(value) => match value.get("status") {
-                        Some(Value::String(status)) => status == "success",
-                        _ => false,
-                    },
+        } else if let Some(result) = &self.result {
+            match serde_json::to_value(result) {
+                Ok(value) => match value.get("status") {
+                    Some(Value::String(status)) => status == "success",
                     _ => false,
-                }
-            } else {
-                false
+                },
+                _ => false,
             }
+        } else {
+            false
         }
     }
 

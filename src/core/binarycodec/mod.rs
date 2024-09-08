@@ -39,9 +39,9 @@ where
     )
 }
 
-pub fn encode_for_multisigning<'a, T>(
+pub fn encode_for_multisigning<T>(
     prepared_transaction: &T,
-    signing_account: Cow<'a, str>,
+    signing_account: Cow<'_, str>,
 ) -> Result<String>
 where
     T: Serialize + DeserializeOwned + Clone + Debug,

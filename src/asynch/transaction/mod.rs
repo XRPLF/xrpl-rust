@@ -175,7 +175,7 @@ where
     let res = client.request(req.into()).await?;
     match res.try_into_result::<SubmitResult<'_>>() {
         Ok(value) => {
-            let submit_result = SubmitResult::from(value);
+            let submit_result = value;
             Ok(submit_result)
         }
         Err(e) => Err!(e),
@@ -444,18 +444,18 @@ where
             Ok(t) => t,
             Err(error) => return Err!(error),
         };
-        validate_transaction_has_field(prepared_transaction, &account_field_name)?;
-        set_transaction_field_value(prepared_transaction, &account_field_name, address)?;
+        validate_transaction_has_field(prepared_transaction, account_field_name)?;
+        set_transaction_field_value(prepared_transaction, account_field_name, address)?;
 
-        if validate_transaction_has_field(prepared_transaction, &tag_field_name).is_ok()
-            && get_transaction_field_value(prepared_transaction, &tag_field_name).unwrap_or(Some(0))
+        if validate_transaction_has_field(prepared_transaction, tag_field_name).is_ok()
+            && get_transaction_field_value(prepared_transaction, tag_field_name).unwrap_or(Some(0))
                 != tag
         {
             Err!(XRPLSignTransactionException::TagFieldMismatch(
-                &tag_field_name
+                tag_field_name
             ))
         } else {
-            set_transaction_field_value(prepared_transaction, &tag_field_name, tag)?;
+            set_transaction_field_value(prepared_transaction, tag_field_name, tag)?;
 
             Ok(())
         }

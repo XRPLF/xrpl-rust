@@ -129,9 +129,9 @@ where
             }
         }
     }
-    return Err!(XRPLSubmitAndWaitException::SubmissionFailed(
+    Err!(XRPLSubmitAndWaitException::SubmissionFailed(
         "Transaction not included in ledger".into()
-    ));
+    ))
 }
 
 async fn get_signed_transaction<'a, T, F, C>(

@@ -21,7 +21,7 @@ where
             Some(signers) => signers,
             None => return Err!(XRPLMultisignException::NoSigners),
         };
-        let tx_signer = match tx_signers.get(0) {
+        let tx_signer = match tx_signers.first() {
             Some(signer) => signer,
             None => return Err!(XRPLMultisignException::NoSigners),
         };

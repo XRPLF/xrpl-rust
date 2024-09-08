@@ -22,7 +22,7 @@ pub trait Client {
 
     fn get_host(&self) -> Url;
 
-    fn set_request_id(&self, request: &mut XRPLRequest<'_>) -> () {
+    fn set_request_id(&self, request: &mut XRPLRequest<'_>) {
         let common_fields = request.get_common_fields_mut();
         common_fields.id = match &common_fields.id {
             Some(id) => Some(id.to_owned()),
