@@ -9,8 +9,8 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{CommonFields, FlagCollection, Memo, Signer};
 use crate::models::{
-    Model,
     transactions::{Transaction, TransactionType},
+    Model,
 };
 
 #[derive(

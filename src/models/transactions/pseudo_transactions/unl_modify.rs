@@ -10,8 +10,8 @@ use crate::models::transactions::{CommonFields, Memo, Signer};
 use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
-    Model,
     transactions::{Transaction, TransactionType},
+    Model,
 };
 
 #[derive(

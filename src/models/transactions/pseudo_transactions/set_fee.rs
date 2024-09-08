@@ -8,8 +8,8 @@ use crate::models::amount::XRPAmount;
 use crate::models::transactions::{CommonFields, Memo, Signer};
 use crate::models::NoFlags;
 use crate::models::{
-    Model,
     transactions::{Transaction, TransactionType},
+    Model,
 };
 
 /// See SetFee:

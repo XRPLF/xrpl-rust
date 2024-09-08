@@ -8,8 +8,8 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     amount::Amount,
-    Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 
 use crate::models::amount::XRPAmount;
