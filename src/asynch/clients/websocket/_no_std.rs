@@ -1,8 +1,4 @@
-use core::{
-    fmt::{Debug, Display},
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-};
+use core::{marker::PhantomData, ops::DerefMut};
 
 use alloc::{
     string::{String, ToString},
@@ -16,12 +12,10 @@ use embedded_websocket::{
     framer_async::{Framer, ReadResult},
     Client, WebSocketClient, WebSocketOptions, WebSocketSendMessageType,
 };
-use futures::Sink;
-use futures::Stream;
-use rand_core::RngCore;
+use rand::RngCore;
 use url::Url;
 
-use super::{WebsocketClosed, WebsocketOpen};
+use super::{WebSocketClosed, WebSocketOpen};
 use crate::{
     asynch::clients::SingleExecutorMutex,
     models::requests::{Request, XRPLRequest},
@@ -37,18 +31,15 @@ use crate::{
 
 use super::exceptions::XRPLWebsocketException;
 
-pub struct AsyncWebsocketClient<
+pub struct AsyncWebSocketClient<
     const BUF: usize,
     Tcp,
-    B,
-    E,
     Rng: RngCore,
     M = SingleExecutorMutex,
-    Status = WebsocketClosed,
+    Status = WebSocketClosed,
 > where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
 {
     tcp: Arc<Mutex<M, Tcp>>,
     websocket: Arc<Mutex<M, Framer<Rng, Client>>>,
@@ -58,19 +49,18 @@ pub struct AsyncWebsocketClient<
     status: PhantomData<Status>,
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore>
-    AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketClosed>
+impl<const BUF: usize, M, Tcp, Rng: RngCore> AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketClosed>
 where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
 {
     pub async fn open(
-        rng: Rng,
         tcp: Tcp,
         url: Url,
-    ) -> Result<AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>> {
+        rng: Rng,
+        sub_protocols: Option<&[&str]>,
+        additional_headers: Option<&[&str]>,
+    ) -> Result<AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>> {
         // replace the scheme with http or https
         let scheme = match url.scheme() {
             "wss" => "https",
@@ -89,15 +79,15 @@ where
         let path = url.path();
         let host = match url.host_str() {
             Some(host) => host,
-            None => return Err!(XRPLWebsocketException::<E>::Disconnected),
+            None => return Err!(XRPLWebsocketException::<anyhow::Error>::Disconnected),
         };
         let origin = scheme.to_string() + "://" + host + ":" + &port + path;
         let websocket_options = WebSocketOptions {
             path,
             host,
             origin: &origin,
-            sub_protocols: None,
-            additional_headers: None,
+            sub_protocols,
+            additional_headers,
         };
         let websocket = Arc::new(Mutex::new(Framer::new(WebSocketClient::new_client(rng))));
         let tcp = Arc::new(Mutex::new(tcp));
@@ -120,24 +110,30 @@ where
             }
         }
 
-        Ok(AsyncWebsocketClient {
+        Ok(AsyncWebSocketClient {
             tcp,
             websocket,
             tx_buffer: buffer,
             websocket_base: Arc::new(Mutex::new(WebsocketBase::new())),
             uri: url,
-            status: PhantomData::<WebsocketOpen>,
+            status: PhantomData::<WebSocketOpen>,
         })
     }
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore>
-    AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
+impl<const BUF: usize, M, Tcp, Rng: RngCore> ErrorType
+    for AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
 where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
+{
+    type Error = XRPLWebsocketException<<Tcp as ErrorType>::Error>;
+}
+
+impl<const BUF: usize, M, Tcp, Rng: RngCore> AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
+where
+    M: RawMutex,
+    Tcp: Read + Write + Unpin,
 {
     async fn do_write(&self, buf: &[u8]) -> Result<usize, <Self as ErrorType>::Error> {
         let mut inner = self.websocket.lock().await;
@@ -154,7 +150,7 @@ where
             .await
         {
             Ok(()) => Ok(buf.len()),
-            Err(error) => Err(XRPLWebsocketException::<E>::from(error)),
+            Err(error) => Err(XRPLWebsocketException::from(error)),
         }
     }
 
@@ -166,57 +162,40 @@ where
             Some(Ok(ReadResult::Binary(b))) => Ok(b.len()),
             Some(Ok(ReadResult::Ping(_))) => Ok(0),
             Some(Ok(ReadResult::Pong(_))) => Ok(0),
-            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebsocketException::<E>::Disconnected),
-            Some(Err(error)) => Err(XRPLWebsocketException::<E>::from(error)),
-            None => Err(XRPLWebsocketException::<E>::Disconnected),
+            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebsocketException::Disconnected),
+            Some(Err(error)) => Err(XRPLWebsocketException::from(error)),
+            None => Err(XRPLWebsocketException::Disconnected),
         }
     }
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> ErrorType
-    for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
+impl<const BUF: usize, M, Tcp, Rng: RngCore> Write
+    for AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
 where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
-{
-    type Error = XRPLWebsocketException<E>;
-}
-
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> Write
-    for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
-where
-    M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
 {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         self.do_write(buf).await
     }
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> Read
-    for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
+impl<const BUF: usize, M, Tcp, Rng: RngCore> Read
+    for AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
 where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
 {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         self.do_read(buf).await
     }
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> MessageHandler
-    for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
+impl<const BUF: usize, M, Tcp, Rng: RngCore> MessageHandler
+    for AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
 where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'a> Sink<&'a [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
 {
     async fn setup_request_future(&mut self, id: String) {
         let mut websocket_base = self.websocket_base.lock().await;
@@ -239,13 +218,11 @@ where
     }
 }
 
-impl<const BUF: usize, M, Tcp, B, E, Rng: RngCore> ClientTrait
-    for AsyncWebsocketClient<BUF, Tcp, B, E, Rng, M, WebsocketOpen>
+impl<const BUF: usize, M, Tcp, Rng: RngCore> ClientTrait
+    for AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
 where
     M: RawMutex,
-    B: Deref<Target = [u8]> + AsRef<[u8]>,
-    E: Debug + Display,
-    Tcp: Stream<Item = Result<B, E>> + for<'b> Sink<&'b [u8], Error = E> + Unpin,
+    Tcp: Read + Write + Unpin,
 {
     fn get_host(&self) -> Url {
         self.uri.clone()
@@ -281,7 +258,9 @@ where
                     }
                     let message_str = match core::str::from_utf8(&rx_buffer[..u_size]) {
                         Ok(response_str) => response_str,
-                        Err(error) => return Err!(XRPLWebsocketException::<E>::Utf8(error)),
+                        Err(error) => {
+                            return Err!(XRPLWebsocketException::<anyhow::Error>::Utf8(error))
+                        }
                     };
                     websocket_base
                         .handle_message(message_str.to_string())

@@ -5,7 +5,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::{
-    models::transactions::{Transaction, XRPLTransactionFieldException},
+    models::transactions::{exceptions::XRPLTransactionFieldException, Transaction},
     Err,
 };
 

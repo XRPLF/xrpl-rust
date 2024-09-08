@@ -4,9 +4,9 @@ use alloc::string::ToString;
 use anyhow::Result;
 
 use crate::models::{
-    amount::XRPAmount,
-    requests::{Fee, Ledger},
-    results::{Drops, Fee as FeeResult, Ledger as LedgerResult},
+    requests::{fee::Fee, ledger::Ledger},
+    results::{fee::Drops, fee::Fee as FeeResult, ledger::Ledger as LedgerResult},
+    XRPAmount,
 };
 
 use super::clients::AsyncClient;

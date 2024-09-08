@@ -16,12 +16,12 @@ use crate::{
         keypairs::sign as keypairs_sign,
     },
     models::{
-        amount::XRPAmount,
-        exceptions::XRPLModelException,
-        requests::{ServerState, Submit},
-        results::{ServerState as ServerStateResult, Submit as SubmitResult},
-        transactions::{Signer, Transaction, TransactionType, XRPLTransactionFieldException},
-        Model,
+        requests::{server_state::ServerState, submit::Submit},
+        results::{server_state::ServerState as ServerStateResult, submit::Submit as SubmitResult},
+        transactions::{
+            exceptions::XRPLTransactionFieldException, Signer, Transaction, TransactionType,
+        },
+        Model, XRPAmount, XRPLModelException,
     },
     utils::transactions::{
         get_transaction_field_value, set_transaction_field_value, validate_transaction_has_field,
@@ -481,15 +481,15 @@ where
     }
 }
 
-#[cfg(all(feature = "websocket-std", feature = "std", not(feature = "websocket")))]
+#[cfg(all(feature = "websocket", feature = "std"))]
 #[cfg(test)]
 mod test_autofill {
     use super::autofill;
     use crate::{
-        asynch::clients::{AsyncWebsocketClient, SingleExecutorMutex},
+        asynch::clients::{AsyncWebSocketClient, SingleExecutorMutex},
         models::{
-            amount::{IssuedCurrencyAmount, XRPAmount},
-            transactions::{OfferCreate, Transaction},
+            transactions::{offer_create::OfferCreate, Transaction},
+            IssuedCurrencyAmount, XRPAmount,
         },
     };
     use anyhow::Result;
@@ -517,7 +517,7 @@ mod test_autofill {
             None,
             None,
         );
-        let client = AsyncWebsocketClient::<SingleExecutorMutex, _>::open(
+        let client = AsyncWebSocketClient::<SingleExecutorMutex, _>::open(
             "wss://testnet.xrpl-labs.com/".parse().unwrap(),
         )
         .await
@@ -533,17 +533,17 @@ mod test_autofill {
     }
 }
 
-#[cfg(all(feature = "websocket-std", feature = "std", not(feature = "websocket")))]
+#[cfg(all(feature = "websocket", feature = "std"))]
 #[cfg(test)]
 mod test_sign {
     use alloc::borrow::Cow;
 
     use crate::{
         asynch::{
-            clients::{AsyncWebsocketClient, SingleExecutorMutex},
+            clients::{AsyncWebSocketClient, SingleExecutorMutex},
             transaction::{autofill_and_sign, sign},
         },
-        models::transactions::{AccountSet, Transaction},
+        models::transactions::{account_set::AccountSet, Transaction},
         wallet::Wallet,
     };
 
@@ -602,7 +602,7 @@ mod test_sign {
             None,
             None,
         );
-        let client = AsyncWebsocketClient::<SingleExecutorMutex, _>::open(
+        let client = AsyncWebSocketClient::<SingleExecutorMutex, _>::open(
             "wss://testnet.xrpl-labs.com/".parse().unwrap(),
         )
         .await

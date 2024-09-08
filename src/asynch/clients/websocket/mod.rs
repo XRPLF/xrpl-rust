@@ -2,37 +2,35 @@ use crate::{
     models::{requests::XRPLRequest, results::XRPLResponse},
     Err,
 };
-#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+#[cfg(feature = "std")]
 use alloc::string::String;
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(not(feature = "std"))]
 use alloc::string::ToString;
 use anyhow::Result;
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(not(feature = "std"))]
 use core::fmt::Display;
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(not(feature = "std"))]
 use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
-#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+#[cfg(feature = "std")]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 
 mod websocket_base;
 use websocket_base::MessageHandler;
 
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 mod _no_std;
-#[cfg(all(feature = "websocket-codec", feature = "std"))]
-pub mod codec;
 mod exceptions;
-pub use exceptions::XRPLWebsocketException;
-#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+pub use exceptions::*;
+#[cfg(all(feature = "websocket", feature = "std"))]
 mod _std;
 
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 pub use _no_std::*;
-#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+#[cfg(all(feature = "websocket", feature = "std"))]
 pub use _std::*;
 
-pub struct WebsocketOpen;
-pub struct WebsocketClosed;
+pub struct WebSocketOpen;
+pub struct WebSocketClosed;
 
 #[allow(async_fn_in_trait)]
 pub trait XRPLWebsocketIO {
@@ -41,7 +39,7 @@ pub trait XRPLWebsocketIO {
     async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>>;
 }
 
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(not(feature = "std"))]
 impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLWebsocketIO for T
 where
     <T as ErrorType>::Error: Display,
@@ -86,7 +84,7 @@ where
     }
 }
 
-#[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
+#[cfg(feature = "std")]
 impl<T: ?Sized> XRPLWebsocketIO for T
 where
     T: Stream<Item = Result<String>> + Sink<String, Error = anyhow::Error> + MessageHandler + Unpin,

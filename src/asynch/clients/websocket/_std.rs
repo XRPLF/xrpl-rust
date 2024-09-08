@@ -1,5 +1,5 @@
 use super::exceptions::XRPLWebsocketException;
-use super::{WebsocketClosed, WebsocketOpen};
+use super::{WebSocketClosed, WebSocketOpen};
 use crate::asynch::clients::client::Client;
 use crate::asynch::clients::websocket::websocket_base::{MessageHandler, WebsocketBase};
 use crate::asynch::clients::SingleExecutorMutex;
@@ -24,7 +24,7 @@ use tokio_tungstenite::connect_async as tokio_tungstenite_connect_async;
 
 type TokioTungsteniteMaybeTlsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
-pub struct AsyncWebsocketClient<M = SingleExecutorMutex, Status = WebsocketClosed>
+pub struct AsyncWebSocketClient<M = SingleExecutorMutex, Status = WebSocketClosed>
 where
     M: RawMutex,
 {
@@ -34,7 +34,7 @@ where
     status: PhantomData<Status>,
 }
 
-impl<M> Sink<String> for AsyncWebsocketClient<M, WebsocketOpen>
+impl<M> Sink<String> for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
@@ -85,7 +85,7 @@ where
     }
 }
 
-impl<M> Stream for AsyncWebsocketClient<M, WebsocketOpen>
+impl<M> Stream for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
@@ -130,25 +130,25 @@ where
     }
 }
 
-impl<M> AsyncWebsocketClient<M, WebsocketClosed>
+impl<M> AsyncWebSocketClient<M, WebSocketClosed>
 where
     M: RawMutex,
 {
-    pub async fn open(uri: Url) -> Result<AsyncWebsocketClient<M, WebsocketOpen>> {
+    pub async fn open(uri: Url) -> Result<AsyncWebSocketClient<M, WebSocketOpen>> {
         let stream = match tokio_tungstenite_connect_async(uri.to_string()).await {
             Ok((stream, _)) => stream,
             Err(error) => return Err!(error),
         };
-        Ok(AsyncWebsocketClient {
+        Ok(AsyncWebSocketClient {
             websocket: Arc::new(Mutex::new(stream)),
             websocket_base: Arc::new(Mutex::new(WebsocketBase::new())),
             uri,
-            status: PhantomData::<WebsocketOpen>,
+            status: PhantomData::<WebSocketOpen>,
         })
     }
 }
 
-impl<M> AsyncWebsocketClient<M, WebsocketOpen>
+impl<M> AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
@@ -163,16 +163,16 @@ where
     }
 }
 
-impl<M, Status> AsyncWebsocketClient<M, Status>
+impl<M, Status> AsyncWebSocketClient<M, Status>
 where
     M: RawMutex,
 {
     pub fn is_open(&self) -> bool {
-        core::any::type_name::<Status>() == core::any::type_name::<WebsocketOpen>()
+        core::any::type_name::<Status>() == core::any::type_name::<WebSocketOpen>()
     }
 }
 
-impl<M> MessageHandler for AsyncWebsocketClient<M, WebsocketOpen>
+impl<M> MessageHandler for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
@@ -197,7 +197,7 @@ where
     }
 }
 
-impl<M> Client for AsyncWebsocketClient<M, WebsocketOpen>
+impl<M> Client for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {

@@ -9,14 +9,14 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 use crate::{
     constants::{MAX_TRANSFER_FEE, MAX_URI_LENGTH},
     models::{
-        model::Model,
         transactions::{Memo, Signer, Transaction, TransactionType},
+        Model,
     },
     Err,
 };
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::XRPLNFTokenMintException;
+use crate::models::transactions::exceptions::XRPLNFTokenMintException;
 
 use super::{CommonFields, FlagCollection};
 

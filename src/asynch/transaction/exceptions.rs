@@ -3,7 +3,7 @@ use core::num::ParseIntError;
 use alloc::borrow::Cow;
 use thiserror_no_std::Error;
 
-use crate::models::amount::XRPAmount;
+use crate::models::XRPAmount;
 
 #[derive(Error, Debug, PartialEq)]
 pub enum XRPLTransactionException<'a> {

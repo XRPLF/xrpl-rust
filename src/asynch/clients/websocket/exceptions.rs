@@ -1,16 +1,13 @@
 use core::fmt::Debug;
 use core::str::Utf8Error;
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_io_async::{Error as EmbeddedIoError, ErrorKind};
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_websocket::framer_async::FramerError;
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
 pub enum XRPLWebsocketException<E: Debug> {
-    #[cfg(all(feature = "websocket-std", not(feature = "websocket")))]
-    #[error("Unable to connect to websocket")]
-    UnableToConnect(tokio_tungstenite::tungstenite::Error),
     // FramerError
     #[error("I/O error: {0:?}")]
     Io(E),
@@ -20,7 +17,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     Utf8(Utf8Error),
     #[error("Invalid HTTP header")]
     HttpHeader,
-    #[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+    #[cfg(all(feature = "websocket", not(feature = "std")))]
     #[error("Websocket error: {0:?}")]
     WebSocket(embedded_websocket::Error),
     #[error("Disconnected")]
@@ -29,7 +26,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     RxBufferTooSmall(usize),
     #[error("Unexpected message type")]
     UnexpectedMessageType,
-    #[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+    #[cfg(all(feature = "websocket", not(feature = "std")))]
     #[error("Embedded I/O error: {0:?}")]
     EmbeddedIoError(ErrorKind),
     #[error("Missing request channel sender.")]
@@ -40,7 +37,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     InvalidMessage,
 }
 
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 impl<E: Debug> From<FramerError<E>> for XRPLWebsocketException<E> {
     fn from(value: FramerError<E>) -> Self {
         match value {
@@ -55,7 +52,7 @@ impl<E: Debug> From<FramerError<E>> for XRPLWebsocketException<E> {
     }
 }
 
-#[cfg(all(feature = "websocket", not(feature = "websocket-std")))]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 impl<E: Debug> EmbeddedIoError for XRPLWebsocketException<E> {
     fn kind(&self) -> ErrorKind {
         match self {

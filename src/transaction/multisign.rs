@@ -40,7 +40,7 @@ mod test {
 
     use super::*;
     use crate::asynch::transaction::sign;
-    use crate::models::transactions::AccountSet;
+    use crate::models::transactions::account_set::AccountSet;
     use crate::wallet::Wallet;
 
     #[tokio::test]

@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{CommonFields, XRPLDepositPreauthException};
+use crate::models::transactions::{exceptions::XRPLDepositPreauthException, CommonFields};
 use crate::models::NoFlags;
 use crate::models::{
-    model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 
 /// A DepositPreauth transaction gives another account pre-approval

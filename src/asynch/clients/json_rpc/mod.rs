@@ -2,30 +2,13 @@ use alloc::{string::ToString, vec};
 use anyhow::Result;
 use serde::Serialize;
 use serde_json::{Map, Value};
-use url::Url;
 
-use crate::{
-    asynch::wallet::get_faucet_url,
-    models::{requests::FundFaucet, results::XRPLResponse},
-    Err,
-};
+use crate::{models::results::XRPLResponse, Err};
 
 mod exceptions;
 pub use exceptions::XRPLJsonRpcException;
 
 use super::client::Client;
-
-#[allow(async_fn_in_trait)]
-pub trait XRPLFaucet: Client {
-    fn get_faucet_url(&self, url: Option<Url>) -> Result<Url>
-    where
-        Self: Sized + Client,
-    {
-        get_faucet_url(self, url)
-    }
-
-    async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()>;
-}
 
 /// Renames the requests field `command` to `method` for JSON-RPC.
 fn request_to_json_rpc(request: &impl Serialize) -> Result<Value> {
@@ -48,9 +31,12 @@ fn request_to_json_rpc(request: &impl Serialize) -> Result<Value> {
     Ok(Value::Object(json_rpc_request))
 }
 
-#[cfg(feature = "json-rpc-std")]
+#[cfg(all(feature = "json-rpc", feature = "std"))]
 mod _std {
-    use crate::models::requests::{FundFaucet, XRPLRequest};
+    use crate::{
+        asynch::clients::XRPLFaucet,
+        models::requests::{FundFaucet, XRPLRequest},
+    };
 
     use super::*;
     use alloc::string::ToString;
@@ -122,9 +108,12 @@ mod _std {
     }
 }
 
-#[cfg(feature = "json-rpc")]
+#[cfg(all(feature = "json-rpc", not(feature = "std")))]
 mod _no_std {
-    use crate::{asynch::clients::SingleExecutorMutex, models::requests::XRPLRequest};
+    use crate::{
+        asynch::clients::{SingleExecutorMutex, XRPLFaucet},
+        models::requests::{FundFaucet, XRPLRequest},
+    };
 
     use super::*;
     use alloc::sync::Arc;
@@ -153,7 +142,7 @@ mod _no_std {
         T: TcpConnect + 'a,
         D: Dns + 'a,
     {
-        pub fn new(url: Url, tcp: &'a T, dns: &'a D) -> Self {
+        pub fn connect(url: Url, tcp: &'a T, dns: &'a D) -> Self {
             Self {
                 url,
                 client: Arc::new(Mutex::new(HttpClient::new(tcp, dns))),
@@ -187,7 +176,7 @@ mod _no_std {
                 Ok(client) => {
                     if let Err(_error) = client
                         .body(request_buf)
-                        .content_type(ContentType::TextPlain)
+                        .content_type(ContentType::ApplicationJson)
                         .send(&mut rx_buffer)
                         .await
                     {
@@ -209,9 +198,52 @@ mod _no_std {
             self.url.clone()
         }
     }
+
+    impl<'a, const BUF: usize, T, D, M> XRPLFaucet for AsyncJsonRpcClient<'a, BUF, T, D, M>
+    where
+        M: RawMutex,
+        T: TcpConnect + 'a,
+        D: Dns + 'a,
+    {
+        async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()> {
+            let faucet_url = self.get_faucet_url(url)?;
+            let request_json_rpc = serde_json::to_value(&request).unwrap();
+            let request_string = request_json_rpc.to_string();
+            let request_buf = request_string.as_bytes();
+            let mut rx_buffer = [0; BUF];
+            let mut client = self.client.lock().await;
+            let response = match client.request(Method::POST, faucet_url.as_str()).await {
+                Ok(client) => {
+                    if let Err(_error) = client
+                        .body(request_buf)
+                        .content_type(ContentType::ApplicationJson)
+                        .send(&mut rx_buffer)
+                        .await
+                    {
+                        Err!(XRPLJsonRpcException::ReqwlessError)
+                    } else {
+                        if let Ok(response) = serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)
+                        {
+                            if response.is_success() {
+                                Ok(())
+                            } else {
+                                todo!()
+                                // Err!(XRPLJsonRpcException::RequestError())
+                            }
+                        } else {
+                            Err!(XRPLJsonRpcException::ReqwlessError)
+                        }
+                    }
+                }
+                Err(_error) => Err!(XRPLJsonRpcException::ReqwlessError),
+            };
+
+            response
+        }
+    }
 }
 
-#[cfg(all(feature = "json-rpc", not(feature = "json-rpc-std")))]
+#[cfg(all(feature = "json-rpc", not(feature = "std")))]
 pub use _no_std::AsyncJsonRpcClient;
-#[cfg(all(feature = "json-rpc-std", not(feature = "json-rpc")))]
+#[cfg(all(feature = "json-rpc", feature = "std"))]
 pub use _std::AsyncJsonRpcClient;

@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    models::{ledger::AccountRoot, results::exceptions::XRPLResultException},
+    models::{ledger::objects::AccountRoot, results::exceptions::XRPLResultException},
     Err,
 };
 

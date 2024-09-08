@@ -5,7 +5,7 @@ use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::requests::XRPLLedgerEntryException;
+use crate::models::requests::exceptions::XRPLLedgerEntryException;
 use crate::models::{requests::RequestMethod, Model};
 
 use super::{CommonFields, Request};
@@ -215,7 +215,7 @@ pub trait LedgerEntryError {
 #[cfg(test)]
 mod test_ledger_entry_errors {
     use super::Offer;
-    use crate::models::requests::XRPLLedgerEntryException;
+    use crate::models::requests::exceptions::XRPLLedgerEntryException;
     use crate::models::Model;
     use alloc::string::ToString;
 

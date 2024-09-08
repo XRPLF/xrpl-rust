@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 use crate::models::{
     currency::Currency,
     default_false,
-    requests::{RequestMethod, StreamParameter},
+    requests::{subscribe::StreamParameter, RequestMethod},
     Model,
 };
 

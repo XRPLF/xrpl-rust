@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{CommonFields, XRPLEscrowCreateException};
+use crate::models::transactions::{exceptions::XRPLEscrowCreateException, CommonFields};
 use crate::models::NoFlags;
 use crate::models::{
-    model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 
 /// Creates an Escrow, which requests XRP until the escrow process either finishes or is canceled.

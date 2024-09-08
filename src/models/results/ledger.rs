@@ -41,7 +41,7 @@ impl<'a> TryFrom<XRPLResult<'a>> for Ledger<'a> {
         match result {
             XRPLResult::Ledger(ledger) => Ok(ledger),
             res => Err!(XRPLResultException::UnexpectedResultType(
-                "Ledger".to_string(),
+                "ledger-models".to_string(),
                 res.get_name()
             )),
         }

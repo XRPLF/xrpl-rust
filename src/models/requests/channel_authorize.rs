@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::requests::XRPLChannelAuthorizeException;
+use crate::models::requests::exceptions::XRPLChannelAuthorizeException;
 use crate::{
     constants::CryptoAlgorithm,
     models::{requests::RequestMethod, Model},

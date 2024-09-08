@@ -7,8 +7,8 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::NoFlags;
 use crate::models::{
-    model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 
 use super::CommonFields;

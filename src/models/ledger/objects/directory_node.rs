@@ -1,6 +1,6 @@
 use crate::models::FlagCollection;
 use crate::models::Model;
-use crate::models::{ledger::LedgerEntryType, NoFlags};
+use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};

@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{CommonFields, XRPLCheckCashException};
+use crate::models::transactions::{exceptions::XRPLCheckCashException, CommonFields};
 use crate::models::NoFlags;
 use crate::models::{
     amount::Amount,
-    model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 
 /// Cancels an unredeemed Check, removing it from the ledger without

@@ -1,4 +1,4 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::ledger::objects::LedgerEntryType;
 
 use crate::models::FlagCollection;
 use crate::models::{Model, NoFlags};
@@ -80,7 +80,7 @@ impl<'a> Amendments<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::ledger::{Amendments, Majority};
+    use crate::models::ledger::objects::{Amendments, Majority};
     use alloc::borrow::Cow;
     use alloc::string::ToString;
     use alloc::vec;

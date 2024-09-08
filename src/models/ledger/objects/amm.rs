@@ -1,4 +1,4 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::FlagCollection;
 use crate::models::NoFlags;
 use crate::models::{amount::Amount, Currency, Model};
@@ -132,7 +132,7 @@ impl<'a> AMM<'a> {
 mod test_serde {
     use crate::models::amount::{Amount, IssuedCurrencyAmount};
     use crate::models::currency::{Currency, IssuedCurrency, XRP};
-    use crate::models::ledger::amm::{AuctionSlot, AuthAccount, VoteEntry, AMM};
+    use crate::models::ledger::objects::amm::{AuctionSlot, AuthAccount, VoteEntry, AMM};
     use alloc::borrow::Cow;
     use alloc::string::ToString;
     use alloc::vec;

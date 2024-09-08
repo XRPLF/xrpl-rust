@@ -8,13 +8,12 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     amount::Amount,
-    model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    PathStep,
+    Model, PathStep,
 };
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::XRPLPaymentException;
+use crate::models::transactions::exceptions::XRPLPaymentException;
 use crate::Err;
 
 use super::{CommonFields, FlagCollection};

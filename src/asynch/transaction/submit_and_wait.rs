@@ -27,7 +27,7 @@ pub async fn submit_and_wait<'a: 'b, 'b, T, F, C>(
     wallet: Option<&Wallet>,
     check_fee: Option<bool>,
     autofill: Option<bool>,
-) -> Result<results::Tx<'b>>
+) -> Result<results::tx::Tx<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -40,7 +40,7 @@ where
 async fn send_reliable_submission<'a: 'b, 'b, T, F, C>(
     transaction: &'b mut T,
     client: &C,
-) -> Result<results::Tx<'b>>
+) -> Result<results::tx::Tx<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -72,18 +72,28 @@ async fn wait_for_final_transaction_result<'a: 'b, 'b, C>(
     tx_hash: Cow<'a, str>,
     client: &C,
     last_ledger_sequence: u32,
-) -> Result<results::Tx<'b>>
+) -> Result<results::tx::Tx<'b>>
 where
     C: AsyncClient,
 {
     let mut validated_ledger_sequence = 0;
+    let mut c = 0;
     while validated_ledger_sequence < last_ledger_sequence {
+        c += 1;
+        if c > 20 {
+            panic!()
+        }
         validated_ledger_sequence = get_latest_validated_ledger_sequence(client).await?;
         // sleep for 1 second
-        // embassy_time::Timer::after_secs(1).await;
+        #[cfg(feature = "embassy-rt")]
+        embassy_time::Timer::after_secs(1).await;
+        #[cfg(any(
+            feature = "tokio-rt",
+            all(feature = "embassy-rt", feature = "tokio-rt")
+        ))]
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let response = client
-            .request(requests::Tx::new(None, None, None, None, Some(tx_hash.clone())).into())
+            .request(requests::tx::Tx::new(None, None, None, None, Some(tx_hash.clone())).into())
             .await?;
         if response.is_success() {
             if let Some(error) = response.error {
@@ -96,7 +106,7 @@ where
                     ));
                 }
             } else {
-                let opt_result = response.try_into_opt_result::<results::Tx>()?;
+                let opt_result = response.try_into_opt_result::<results::tx::Tx>()?;
                 let validated = opt_result.try_get_typed("validated")?;
                 if validated {
                     let result = opt_result.try_into_result()?;
@@ -161,23 +171,25 @@ where
 }
 
 #[cfg(all(
-    feature = "websocket-std",
-    not(feature = "websocket"),
-    feature = "transactions",
-    feature = "wallet"
+    feature = "std",
+    feature = "json-rpc",
+    feature = "wallet-helpers",
+    feature = "tokio-rt"
 ))]
 #[cfg(test)]
 mod test_submit_and_wait {
     use super::*;
     use crate::{
-        asynch::clients::{AsyncWebsocketClient, SingleExecutorMutex},
-        models::transactions::AccountSet,
-        wallet::Wallet,
+        asynch::{clients::AsyncJsonRpcClient, wallet::generate_faucet_wallet},
+        models::transactions::account_set::AccountSet,
     };
 
     #[tokio::test]
     async fn test_submit_and_wait() {
-        let wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
+        let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
+        let wallet = generate_faucet_wallet(&client, None, None, None, None)
+            .await
+            .unwrap();
         let mut tx = AccountSet::new(
             Cow::from(wallet.classic_address.clone()),
             None,
@@ -198,11 +210,6 @@ mod test_submit_and_wait {
             None,
             None,
         );
-        let client = AsyncWebsocketClient::<SingleExecutorMutex, _>::open(
-            "wss://testnet.xrpl-labs.com/".parse().unwrap(),
-        )
-        .await
-        .unwrap();
         submit_and_wait(&mut tx, &client, Some(&wallet), Some(true), Some(true))
             .await
             .unwrap();

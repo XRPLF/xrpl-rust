@@ -1,4 +1,4 @@
-use crate::models::transactions::{AccountSetFlag, PaymentFlag};
+use crate::models::transactions::{account_set::AccountSetFlag, payment::PaymentFlag};
 use alloc::borrow::Cow;
 use core::fmt::Debug;
 use strum_macros::Display;

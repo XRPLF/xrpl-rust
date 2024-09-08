@@ -1,22 +1,40 @@
 pub mod async_client;
 pub mod client;
-#[cfg(any(feature = "json-rpc-std", feature = "json-rpc"))]
-pub mod json_rpc;
-#[cfg(any(feature = "websocket-std", feature = "websocket"))]
-pub mod websocket;
+#[cfg(feature = "json-rpc")]
+mod json_rpc;
+#[cfg(feature = "websocket")]
+mod websocket;
 
 use alloc::borrow::Cow;
+use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
-pub type MultiExecutorMutex = CriticalSectionRawMutex;
-pub type SingleExecutorMutex = NoopRawMutex;
+use serde::{Deserialize, Serialize};
+use url::Url;
 
 pub use async_client::*;
 pub use client::*;
-#[cfg(any(feature = "json-rpc-std", feature = "json-rpc"))]
+#[cfg(feature = "json-rpc")]
 pub use json_rpc::*;
-use serde::{Deserialize, Serialize};
-#[cfg(any(feature = "websocket-std", feature = "websocket"))]
+#[cfg(feature = "websocket")]
 pub use websocket::*;
+
+pub type MultiExecutorMutex = CriticalSectionRawMutex;
+pub type SingleExecutorMutex = NoopRawMutex;
+
+#[cfg(feature = "wallet-helpers")]
+use crate::{asynch::wallet::get_faucet_url, models::requests::FundFaucet};
+#[allow(async_fn_in_trait)]
+#[cfg(feature = "wallet-helpers")]
+pub trait XRPLFaucet: Client {
+    fn get_faucet_url(&self, url: Option<Url>) -> Result<Url>
+    where
+        Self: Sized + Client,
+    {
+        get_faucet_url(self, url)
+    }
+
+    async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()>;
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommonFields<'a> {

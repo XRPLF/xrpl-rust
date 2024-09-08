@@ -7,12 +7,12 @@ use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::transactions::XRPLSignerListSetException;
+use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
-    model::Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 use crate::{serde_with_tag, Err};
 

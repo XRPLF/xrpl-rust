@@ -4,10 +4,9 @@ use anyhow::Result;
 use crate::{
     core::addresscodec::{is_valid_xaddress, xaddress_to_classic_address},
     models::{
-        amount::XRPAmount,
-        ledger::AccountRoot,
-        requests::{AccountInfo, AccountTx},
-        results,
+        ledger::objects::AccountRoot,
+        requests::{account_info::AccountInfo, account_tx::AccountTx},
+        results, XRPAmount,
     },
     Err,
 };
@@ -82,14 +81,14 @@ where
     let account_info = client.request(request).await?;
 
     Ok(account_info
-        .try_into_result::<results::AccountInfo<'_>>()?
+        .try_into_result::<results::account_info::AccountInfo<'_>>()?
         .account_data)
 }
 
 pub async fn get_latest_transaction<'a: 'b, 'b, C>(
     mut address: Cow<'a, str>,
     client: &C,
-) -> Result<results::AccountTx<'b>>
+) -> Result<results::account_tx::AccountTx<'b>>
 where
     C: AsyncClient,
 {
@@ -112,5 +111,5 @@ where
         None,
     );
     let response = client.request(account_tx.into()).await?;
-    response.try_into_result::<results::AccountTx<'_>>()
+    response.try_into_result::<results::account_tx::AccountTx<'_>>()
 }

@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
-    model::Model,
+    Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
 };
 

@@ -21,7 +21,7 @@ use super::{CommonFields, Request};
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::models::requests::AccountChannels;
+/// use xrpl::models::requests::account_channels::AccountChannels;
 ///
 /// let json = r#"{"command":"account_channels","account":"rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr","marker":12345678}"#.to_string();
 /// let model: AccountChannels = serde_json::from_str(&json).expect("");

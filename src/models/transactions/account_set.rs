@@ -7,15 +7,15 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{CommonFields, XRPLAccountSetException};
+use crate::models::transactions::{exceptions::XRPLAccountSetException, CommonFields};
 use crate::{
     constants::{
         DISABLE_TICK_SIZE, MAX_DOMAIN_LENGTH, MAX_TICK_SIZE, MAX_TRANSFER_RATE, MIN_TICK_SIZE,
         MIN_TRANSFER_RATE, SPECIAL_CASE_TRANFER_RATE,
     },
     models::{
-        model::Model,
         transactions::{Memo, Signer, Transaction, TransactionType},
+        Model,
     },
     Err,
 };

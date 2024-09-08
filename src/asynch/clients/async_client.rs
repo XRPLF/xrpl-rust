@@ -1,7 +1,7 @@
 use super::{client::Client, CommonFields};
 use crate::models::{
-    requests::{ServerState, XRPLRequest},
-    results::{ServerState as ServerStateResult, XRPLResponse},
+    requests::{server_state::ServerState, XRPLRequest},
+    results::{server_state::ServerState as ServerStateResult, XRPLResponse},
 };
 use anyhow::Result;
 

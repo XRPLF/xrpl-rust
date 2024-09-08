@@ -298,7 +298,6 @@ impl STObject {
     /// assert_eq!(hex, buffer);
     /// ```
     pub fn try_from_value(value: Value, signing_only: bool) -> Result<Self> {
-        // dbg!(&value);
         let object = match value {
             Value::Object(map) => map,
             _ => return Err!(exceptions::XRPLSerializeMapException::ExpectedObject),
@@ -382,7 +381,6 @@ impl STObject {
             }
         }
 
-        // dbg!(&value_xaddress_handled);
         let mut sorted_keys: Vec<FieldInstance> = Vec::new();
         for (field, _) in &value_xaddress_handled {
             let field_instance = get_field_instance(&field);
@@ -413,7 +411,6 @@ impl STObject {
                 associated_value.to_owned(),
             )?;
             let associated_value: SerializedType = associated_value.into();
-            // dbg!(&field_instance, &associated_value.to_string(),);
             if field_instance.name == "TransactionType"
                 && associated_value.to_string() == UNL_MODIFY_TX_TYPE
             {

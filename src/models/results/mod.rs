@@ -1,16 +1,3 @@
-use core::convert::{TryFrom, TryInto};
-
-use alloc::{
-    borrow::{Cow, ToOwned},
-    format,
-    string::{String, ToString},
-    vec::Vec,
-};
-use anyhow::Result;
-use exceptions::XRPLResultException;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::{value::Index, Map, Value};
-
 pub mod account_info;
 pub mod account_tx;
 pub mod exceptions;
@@ -20,17 +7,19 @@ pub mod server_state;
 pub mod submit;
 pub mod tx;
 
-pub use account_info::*;
-pub use account_tx::*;
-pub use fee::*;
-pub use ledger::*;
-pub use server_state::*;
-pub use submit::*;
-pub use tx::*;
-
-use crate::Err;
-
 use super::requests::XRPLRequest;
+use crate::Err;
+use alloc::{
+    borrow::{Cow, ToOwned},
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use anyhow::Result;
+use core::convert::{TryFrom, TryInto};
+use exceptions::XRPLResultException;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_json::{value::Index, Map, Value};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum XRPLOptionalResult<T> {
@@ -131,54 +120,54 @@ impl XRPLOtherResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
-    AccountInfo(AccountInfo<'a>),
-    AccountTx(AccountTx<'a>),
-    Fee(Fee<'a>),
-    Ledger(Ledger<'a>),
-    ServerState(ServerState<'a>),
-    Submit(Submit<'a>),
-    Tx(Tx<'a>),
+    AccountInfo(account_info::AccountInfo<'a>),
+    AccountTx(account_tx::AccountTx<'a>),
+    Fee(fee::Fee<'a>),
+    Ledger(ledger::Ledger<'a>),
+    ServerState(server_state::ServerState<'a>),
+    Submit(submit::Submit<'a>),
+    Tx(tx::Tx<'a>),
     Other(XRPLOtherResult),
 }
 
-impl<'a> From<AccountInfo<'a>> for XRPLResult<'a> {
-    fn from(account_info: AccountInfo<'a>) -> Self {
+impl<'a> From<account_info::AccountInfo<'a>> for XRPLResult<'a> {
+    fn from(account_info: account_info::AccountInfo<'a>) -> Self {
         XRPLResult::AccountInfo(account_info)
     }
 }
 
-impl<'a> From<AccountTx<'a>> for XRPLResult<'a> {
-    fn from(account_tx: AccountTx<'a>) -> Self {
+impl<'a> From<account_tx::AccountTx<'a>> for XRPLResult<'a> {
+    fn from(account_tx: account_tx::AccountTx<'a>) -> Self {
         XRPLResult::AccountTx(account_tx)
     }
 }
 
-impl<'a> From<Fee<'a>> for XRPLResult<'a> {
-    fn from(fee: Fee<'a>) -> Self {
+impl<'a> From<fee::Fee<'a>> for XRPLResult<'a> {
+    fn from(fee: fee::Fee<'a>) -> Self {
         XRPLResult::Fee(fee)
     }
 }
 
-impl<'a> From<Ledger<'a>> for XRPLResult<'a> {
-    fn from(ledger: Ledger<'a>) -> Self {
+impl<'a> From<ledger::Ledger<'a>> for XRPLResult<'a> {
+    fn from(ledger: ledger::Ledger<'a>) -> Self {
         XRPLResult::Ledger(ledger)
     }
 }
 
-impl<'a> From<ServerState<'a>> for XRPLResult<'a> {
-    fn from(server_state: ServerState<'a>) -> Self {
+impl<'a> From<server_state::ServerState<'a>> for XRPLResult<'a> {
+    fn from(server_state: server_state::ServerState<'a>) -> Self {
         XRPLResult::ServerState(server_state)
     }
 }
 
-impl<'a> From<Submit<'a>> for XRPLResult<'a> {
-    fn from(submit: Submit<'a>) -> Self {
+impl<'a> From<submit::Submit<'a>> for XRPLResult<'a> {
+    fn from(submit: submit::Submit<'a>) -> Self {
         XRPLResult::Submit(submit)
     }
 }
 
-impl<'a> From<Tx<'a>> for XRPLResult<'a> {
-    fn from(tx: Tx<'a>) -> Self {
+impl<'a> From<tx::Tx<'a>> for XRPLResult<'a> {
+    fn from(tx: tx::Tx<'a>) -> Self {
         XRPLResult::Tx(tx)
     }
 }
@@ -215,7 +204,7 @@ impl XRPLResult<'_> {
             XRPLResult::AccountInfo(_) => "AccountInfo".to_string(),
             XRPLResult::AccountTx(_) => "AccountTx".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
-            XRPLResult::Ledger(_) => "Ledger".to_string(),
+            XRPLResult::Ledger(_) => "ledger-models".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
@@ -339,7 +328,21 @@ impl TryInto<Value> for XRPLResponse<'_> {
 
 impl<'a> XRPLResponse<'a> {
     pub fn is_success(&self) -> bool {
-        self.status == Some(ResponseStatus::Success)
+        if let Some(status) = &self.status {
+            status == &ResponseStatus::Success
+        } else {
+            if let Some(result) = &self.result {
+                match serde_json::to_value(result) {
+                    Ok(value) => match value.get("status") {
+                        Some(Value::String(status)) => status == "success",
+                        _ => false,
+                    },
+                    _ => false,
+                }
+            } else {
+                false
+            }
+        }
     }
 
     pub fn try_into_opt_result<T>(self) -> Result<XRPLOptionalResult<T>>

@@ -2,11 +2,19 @@ use crate::models::{
     requests::{Request, XRPLRequest},
     results::XRPLResponse,
 };
-#[cfg(feature = "std")]
-use crate::utils::get_random_id;
-use alloc::borrow::{Cow, ToOwned};
+use alloc::{
+    borrow::ToOwned,
+    string::{String, ToString},
+};
 use anyhow::Result;
+use rand::Rng;
 use url::Url;
+
+/// Generate a random id.
+pub fn get_random_id<T: rand::RngCore>(rng: &mut T) -> String {
+    let id: u32 = rng.gen();
+    id.to_string()
+}
 
 #[allow(async_fn_in_trait)]
 pub trait Client {
@@ -21,6 +29,7 @@ pub trait Client {
             None => {
                 #[cfg(feature = "std")]
                 {
+                    use alloc::borrow::Cow;
                     let mut rng = rand::thread_rng();
                     Some(Cow::Owned(get_random_id(&mut rng)))
                 }

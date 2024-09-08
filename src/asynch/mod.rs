@@ -1,15 +1,22 @@
-#[cfg(feature = "account-helpers")]
-pub mod account;
-#[cfg(any(
-    feature = "websocket-std",
-    feature = "websocket",
-    feature = "json-rpc-std",
-    feature = "json-rpc"
+#[cfg(all(
+    feature = "account-helpers",
+    any(feature = "websocket", feature = "json-rpc")
 ))]
+pub mod account;
+#[cfg(any(feature = "websocket", feature = "json-rpc"))]
 pub mod clients;
-#[cfg(feature = "ledger-helpers")]
+#[cfg(all(
+    feature = "ledger-helpers",
+    any(feature = "websocket", feature = "json-rpc")
+))]
 pub mod ledger;
-#[cfg(feature = "transaction-helpers")]
+#[cfg(all(
+    feature = "transaction-helpers",
+    any(feature = "websocket", feature = "json-rpc")
+))]
 pub mod transaction;
-#[cfg(all(feature = "wallet-helpers", feature = "json-rpc-std"))]
+#[cfg(all(
+    feature = "wallet-helpers",
+    any(feature = "websocket", feature = "json-rpc")
+))]
 pub mod wallet;

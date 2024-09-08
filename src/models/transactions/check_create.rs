@@ -9,8 +9,8 @@ use crate::models::transactions::CommonFields;
 use crate::models::NoFlags;
 use crate::models::{
     amount::Amount,
-    model::Model,
     transactions::{Transaction, TransactionType},
+    Model,
 };
 
 use super::{Memo, Signer};
