@@ -8,7 +8,7 @@ use crate::{models::results::XRPLResponse, Err};
 mod exceptions;
 pub use exceptions::XRPLJsonRpcException;
 
-use super::client::Client;
+use super::client::XRPLClient;
 
 /// Renames the requests field `command` to `method` for JSON-RPC.
 fn request_to_json_rpc(request: &impl Serialize) -> Result<Value> {
@@ -53,7 +53,7 @@ mod _std {
         }
     }
 
-    impl Client for AsyncJsonRpcClient {
+    impl XRPLClient for AsyncJsonRpcClient {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
@@ -149,7 +149,7 @@ mod _no_std {
             }
         }
 
-        pub fn new_with_tls(url: Url, tcp: &'a T, dns: &'a D, tls: TlsConfig<'a>) -> Self {
+        pub fn connect_with_tls(url: Url, tcp: &'a T, dns: &'a D, tls: TlsConfig<'a>) -> Self {
             Self {
                 url,
                 client: Arc::new(Mutex::new(HttpClient::new_with_tls(tcp, dns, tls))),
@@ -157,7 +157,7 @@ mod _no_std {
         }
     }
 
-    impl<const BUF: usize, T, D, M> Client for AsyncJsonRpcClient<'_, BUF, T, D, M>
+    impl<const BUF: usize, T, D, M> XRPLClient for AsyncJsonRpcClient<'_, BUF, T, D, M>
     where
         M: RawMutex,
         T: TcpConnect,

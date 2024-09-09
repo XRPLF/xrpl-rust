@@ -5,8 +5,6 @@
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::types::*;
-use alloc::string::String;
-use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
@@ -51,10 +49,10 @@ impl TryFrom<&str> for Blob {
     }
 }
 
-impl ToString for Blob {
+impl Display for Blob {
     /// Get the hex representation of the Blob bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.as_ref())
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        Display::fmt(&hex::encode_upper(self.as_ref()), f)
     }
 }
 

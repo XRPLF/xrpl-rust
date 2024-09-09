@@ -33,14 +33,14 @@ pub struct WebSocketOpen;
 pub struct WebSocketClosed;
 
 #[allow(async_fn_in_trait)]
-pub trait XRPLWebsocketIO {
+pub trait XRPLAsyncWebsocketIO {
     async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()>;
 
     async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>>;
 }
 
 #[cfg(not(feature = "std"))]
-impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLWebsocketIO for T
+impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLAsyncWebsocketIO for T
 where
     <T as ErrorType>::Error: Display,
 {
@@ -85,7 +85,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<T: ?Sized> XRPLWebsocketIO for T
+impl<T: ?Sized> XRPLAsyncWebsocketIO for T
 where
     T: Stream<Item = Result<String>> + Sink<String, Error = anyhow::Error> + MessageHandler + Unpin,
 {

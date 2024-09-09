@@ -1,12 +1,9 @@
-pub mod exceptions;
-
 use alloc::borrow::Cow;
 use anyhow::Result;
-use exceptions::XRPLFaucetException;
 use url::Url;
 
 use crate::{
-    asynch::account::get_next_valid_seq_number,
+    asynch::{account::get_next_valid_seq_number, wait_seconds, XRPLFaucetException},
     models::{requests::FundFaucet, XRPAmount},
     wallet::Wallet,
     Err,
@@ -14,11 +11,8 @@ use crate::{
 
 use super::{
     account::get_xrp_balance,
-    clients::{Client, XRPLFaucet},
+    clients::{XRPLClient, XRPLFaucet},
 };
-
-const TEST_FAUCET_URL: &str = "https://faucet.altnet.rippletest.net/accounts";
-const DEV_FAUCET_URL: &str = "https://faucet.devnet.rippletest.net/accounts";
 
 const TIMEOUT_SECS: u8 = 40;
 
@@ -30,7 +24,7 @@ pub async fn generate_faucet_wallet<'a, C>(
     user_agent: Option<Cow<'a, str>>,
 ) -> Result<Wallet>
 where
-    C: XRPLFaucet + Client,
+    C: XRPLFaucet + XRPLClient,
 {
     let faucet_url = get_faucet_url(client, faucet_host)?;
     let wallet = match wallet {
@@ -54,12 +48,7 @@ where
     let mut is_funded = false;
     for _ in 0..TIMEOUT_SECS {
         // wait 1 second
-        #[cfg(all(feature = "embassy-rt", not(feature = "tokio-rt")))]
-        embassy_time::Timer::after_secs(1).await;
-        #[cfg(any(
-            feature = "tokio-rt",
-            all(feature = "embassy-rt", feature = "tokio-rt")
-        ))]
+        wait_seconds(1).await;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         if !is_funded {
             let balance = check_balance(client, address.into()).await;
@@ -82,34 +71,14 @@ where
 
 pub fn get_faucet_url<C>(client: &C, url: Option<Url>) -> Result<Url>
 where
-    C: Client,
+    C: XRPLFaucet + XRPLClient,
 {
-    if let Some(url) = url {
-        Ok(url)
-    } else {
-        let host = client.get_host();
-        let host_str = host.host_str().unwrap();
-        if host_str.contains("altnet") || host_str.contains("testnet") {
-            match Url::parse(TEST_FAUCET_URL) {
-                Ok(url) => Ok(url),
-                Err(error) => Err!(error),
-            }
-        } else if host_str.contains("devnet") {
-            match Url::parse(DEV_FAUCET_URL) {
-                Ok(url) => Ok(url),
-                Err(error) => Err!(error),
-            }
-        } else if host_str.contains("sidechain-net2") {
-            Err!(XRPLFaucetException::CannotFundSidechainAccount)
-        } else {
-            Err!(XRPLFaucetException::CannotDeriveFaucetUrl)
-        }
-    }
+    client.get_faucet_url(url)
 }
 
 async fn check_balance<'a: 'b, 'b, C>(client: &C, address: Cow<'a, str>) -> XRPAmount<'b>
 where
-    C: Client,
+    C: XRPLClient,
 {
     get_xrp_balance(address, client, None)
         .await
@@ -124,7 +93,7 @@ async fn fund_wallet<'a: 'b, 'b, C>(
     user_agent: Option<Cow<'a, str>>,
 ) -> Result<()>
 where
-    C: XRPLFaucet + Client,
+    C: XRPLFaucet + XRPLClient,
 {
     let request = FundFaucet {
         destination: address,

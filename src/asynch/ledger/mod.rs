@@ -9,9 +9,9 @@ use crate::models::{
     XRPAmount,
 };
 
-use super::clients::AsyncClient;
+use super::clients::XRPLAsyncClient;
 
-pub async fn get_latest_validated_ledger_sequence(client: &impl AsyncClient) -> Result<u32> {
+pub async fn get_latest_validated_ledger_sequence(client: &impl XRPLAsyncClient) -> Result<u32> {
     let ledger_response = client
         .request(
             Ledger::new(
@@ -35,7 +35,7 @@ pub async fn get_latest_validated_ledger_sequence(client: &impl AsyncClient) -> 
         .ledger_index)
 }
 
-pub async fn get_latest_open_ledger_sequence(client: &impl AsyncClient) -> Result<u32> {
+pub async fn get_latest_open_ledger_sequence(client: &impl XRPLAsyncClient) -> Result<u32> {
     let ledger_response = client
         .request(
             Ledger::new(
@@ -66,7 +66,7 @@ pub enum FeeType {
 }
 
 pub async fn get_fee(
-    client: &impl AsyncClient,
+    client: &impl XRPLAsyncClient,
     max_fee: Option<u32>,
     fee_type: Option<FeeType>,
 ) -> Result<XRPAmount<'_>> {

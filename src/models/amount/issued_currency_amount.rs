@@ -38,7 +38,7 @@ impl<'a> TryInto<Decimal> for IssuedCurrencyAmount<'a> {
 
 impl<'a> PartialOrd for IssuedCurrencyAmount<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.value.partial_cmp(&other.value)
+        Some(self.cmp(other))
     }
 }
 

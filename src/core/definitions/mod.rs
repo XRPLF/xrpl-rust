@@ -3,10 +3,11 @@
 
 pub mod types;
 
+use core::fmt::Display;
+
 pub use self::types::*;
 
 use crate::utils::ToBytes;
-use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
@@ -132,10 +133,10 @@ impl FieldInstance {
     }
 }
 
-impl ToString for FieldHeader {
+impl Display for FieldHeader {
     /// Convert the FieldHeader to a String.
-    fn to_string(&self) -> String {
-        format!("{}_{}", self.type_code, self.field_code)
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}_{}", self.type_code, self.field_code)
     }
 }
 

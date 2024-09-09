@@ -1,6 +1,6 @@
 use super::exceptions::XRPLWebsocketException;
 use super::{WebSocketClosed, WebSocketOpen};
-use crate::asynch::clients::client::Client;
+use crate::asynch::clients::client::XRPLClient;
 use crate::asynch::clients::websocket::websocket_base::{MessageHandler, WebsocketBase};
 use crate::asynch::clients::SingleExecutorMutex;
 use crate::models::requests::{Request, XRPLRequest};
@@ -197,7 +197,7 @@ where
     }
 }
 
-impl<M> Client for AsyncWebSocketClient<M, WebSocketOpen>
+impl<M> XRPLClient for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {

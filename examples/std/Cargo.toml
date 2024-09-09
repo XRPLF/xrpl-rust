@@ -9,7 +9,6 @@ edition = "2021"
 xrpl-rust = { path = "../.." }
 tokio = { version = "1.0", features = ["full"] }
 rand = "0.8.5"
-tokio-util = { version = "0.7.11", features = ["codec"] }
 
 [[bin]]
 name = "wallet_from_seed"
@@ -22,13 +21,24 @@ path = "src/bin/wallet/generate_wallet.rs"
 required-features = []
 
 [[bin]]
-name = "websocket-std"
-path = "src/bin/tokio/net/tungstenite.rs"
-required-features = ["tokio"]
+name = "async_websocket"
+path = "src/bin/asynch/clients/websocket.rs"
+required-features = []
+
+[[bin]]
+name = "async_json_rpc"
+path = "src/bin/asynch/clients/json_rpc.rs"
+required-features = []
 
 [[bin]]
 name = "websocket"
-path = "src/bin/tokio/net/websocket.rs"
+path = "src/bin/clients/websocket.rs"
+required-features = []
+
+[[bin]]
+name = "json_rpc"
+path = "src/bin/clients/json_rpc.rs"
+required-features = []
 
 [[bin]]
 name = "sign_request"

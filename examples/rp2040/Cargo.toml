@@ -1,0 +1,17 @@
+[package]
+name = "rp2040"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+xrpl-rust = { path = "../..", default-features = false, features = ["websocket", "json-rpc"] }
+# embassy-executor = { version = "0.6.0", features = ["task-arena-size-98304", "arch-cortex-m", "executor-thread", "executor-interrupt", "defmt", "integrated-timers"] }
+# embassy-rp = { version = "0.2.0", features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
+
+[[bin]]
+name = "async_websocket"
+path = "src/bin/asynch/websocket.rs"
+
+[[bin]]
+name = "async_json_rpc"
+path = "src/bin/asynch/json_rpc.rs"

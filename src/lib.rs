@@ -25,11 +25,17 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std as alloc;
 
+#[cfg(feature = "account-helpers")]
+pub mod account;
 #[cfg(all(feature = "request-models", feature = "result-models"))]
 pub mod asynch;
+#[cfg(any(feature = "json-rpc", feature = "websocket"))]
+pub mod clients;
 pub mod constants;
 #[cfg(feature = "core")]
 pub mod core;
+#[cfg(feature = "ledger-helpers")]
+pub mod ledger;
 pub mod macros;
 #[cfg(any(
     feature = "ledger-models",
@@ -56,10 +62,15 @@ mod _anyhow;
 ))]
 mod _serde;
 
-#[cfg(all(feature = "embassy-rt", feature = "tokio-rt"))]
-compile_error!("Cannot enable both `embassy-rt` and `tokio-rt` features at the same time.");
 #[cfg(all(
     any(feature = "transaction-helpers", feature = "wallet-helpers"),
-    not(any(feature = "embassy-rt", feature = "tokio-rt"))
+    not(any(
+        feature = "tokio-rt",
+        feature = "embassy-rt",
+        feature = "actix-rt",
+        feature = "async-std-rt",
+        feature = "futures-rt",
+        feature = "smol-rt"
+    ))
 ))]
-compile_error!("Cannot enable `transaction-helpers` or `wallet-helpers` without enabling either `embassy-rt` or `tokio-rt`.");
+compile_error!("Cannot enable `transaction-helpers` or `wallet-helpers` without enabling a runtime feature (\"*-rt\"). This is required for sleeping between retries internally.");

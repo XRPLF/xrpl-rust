@@ -8,8 +8,6 @@ use crate::core::types::exceptions::XRPLHashException;
 use crate::core::types::*;
 use crate::core::BinaryParser;
 use crate::utils::is_hex_address;
-use alloc::string::String;
-use alloc::string::ToString;
 use core::convert::TryFrom;
 use serde::ser::Error;
 use serde::Serializer;
@@ -86,10 +84,14 @@ impl TryFrom<&str> for AccountId {
     }
 }
 
-impl ToString for AccountId {
-    /// Get the classic address of the AccountId bytes.
-    fn to_string(&self) -> String {
-        encode_classic_address(self.as_ref()).expect("to_string")
+impl Display for AccountId {
+    /// Return the classic address of the AccountId bytes.
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(
+            f,
+            "{}",
+            encode_classic_address(self.as_ref()).expect("Could not encode address to string")
+        )
     }
 }
 

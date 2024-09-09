@@ -343,10 +343,9 @@ impl TryFrom<serde_json::Value> for IssuedCurrency {
     }
 }
 
-impl ToString for Amount {
-    /// Get the hex representation of the Amount bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.as_ref())
+impl Display for Amount {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(&hex::encode_upper(self.as_ref()), f)
     }
 }
 

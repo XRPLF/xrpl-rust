@@ -8,8 +8,6 @@ use crate::core::types::utils::*;
 use crate::core::types::*;
 use crate::core::BinaryParser;
 use crate::core::Parser;
-use alloc::string::String;
-use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use serde::Deserialize;
@@ -280,24 +278,24 @@ impl TryFrom<&str> for Hash256 {
     }
 }
 
-impl ToString for Hash128 {
+impl Display for Hash128 {
     /// Get the hex representation of the Hash128 bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.as_ref())
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", hex::encode_upper(self.as_ref()))
     }
 }
 
-impl ToString for Hash160 {
+impl Display for Hash160 {
     /// Get the hex representation of the Hash160 bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.as_ref())
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", hex::encode_upper(self.as_ref()))
     }
 }
 
-impl ToString for Hash256 {
+impl Display for Hash256 {
     /// Get the hex representation of the Hash256 bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.as_ref())
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", hex::encode_upper(self.as_ref()))
     }
 }
 

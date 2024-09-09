@@ -1,4 +1,4 @@
-use super::{client::Client, CommonFields};
+use super::{client::XRPLClient, CommonFields};
 use crate::models::{
     requests::{server_state::ServerState, XRPLRequest},
     results::{server_state::ServerState as ServerStateResult, XRPLResponse},
@@ -6,7 +6,7 @@ use crate::models::{
 use anyhow::Result;
 
 #[allow(async_fn_in_trait)]
-pub trait AsyncClient: Client {
+pub trait XRPLAsyncClient: XRPLClient {
     async fn request<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> Result<XRPLResponse<'b>> {
         self.request_impl(request).await
     }
@@ -25,4 +25,4 @@ pub trait AsyncClient: Client {
     }
 }
 
-impl<T: Client> AsyncClient for T {}
+impl<T: XRPLClient> XRPLAsyncClient for T {}

@@ -6,9 +6,9 @@ use crate::Err;
 
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use anyhow::Result;
-use core::{convert::TryFrom, fmt::Debug};
+use core::convert::TryFrom;
 use hex::ToHex;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 
 pub mod binary_wrappers;
 pub mod exceptions;
@@ -20,16 +20,16 @@ pub use binary_wrappers::*;
 const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
 const TRANSACTION_MULTISIG_PREFIX: i32 = 0x534D5400;
 
-pub fn encode<'a, T>(signed_transaction: &T) -> Result<String>
+pub fn encode<T>(signed_transaction: &T) -> Result<String>
 where
-    T: Serialize + DeserializeOwned + Clone + Debug,
+    T: Serialize,
 {
     serialize_json(signed_transaction, None, None, false)
 }
 
-pub fn encode_for_signing<'a, T>(prepared_transaction: &T) -> Result<String>
+pub fn encode_for_signing<T>(prepared_transaction: &T) -> Result<String>
 where
-    T: Serialize + DeserializeOwned + Clone + Debug,
+    T: Serialize,
 {
     serialize_json(
         prepared_transaction,
@@ -44,7 +44,7 @@ pub fn encode_for_multisigning<T>(
     signing_account: Cow<'_, str>,
 ) -> Result<String>
 where
-    T: Serialize + DeserializeOwned + Clone + Debug,
+    T: Serialize,
 {
     let signing_account_id = AccountId::try_from(signing_account.as_ref()).unwrap();
 
@@ -56,14 +56,14 @@ where
     )
 }
 
-fn serialize_json<'a, T>(
+fn serialize_json<T>(
     prepared_transaction: &T,
     prefix: Option<&[u8]>,
     suffix: Option<&[u8]>,
     signing_only: bool,
 ) -> Result<String>
 where
-    T: Serialize + DeserializeOwned + Clone + Debug,
+    T: Serialize,
 {
     let mut buffer = Vec::new();
     if let Some(p) = prefix {

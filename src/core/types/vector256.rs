@@ -5,8 +5,6 @@ use crate::core::types::exceptions::XRPLVectorException;
 use crate::core::types::hash::Hash256;
 use crate::core::types::*;
 use crate::core::BinaryParser;
-use alloc::string::String;
-use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
@@ -96,10 +94,10 @@ impl TryFrom<Vec<&str>> for Vector256 {
     }
 }
 
-impl ToString for Vector256 {
+impl Display for Vector256 {
     /// Get the hex representation of the Vector256 bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.as_ref())
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        Display::fmt(&hex::encode_upper(self.as_ref()), f)
     }
 }
 

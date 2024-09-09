@@ -8,13 +8,14 @@ use strum::IntoEnumIterator;
 
 use crate::{
     asynch::{
-        clients::AsyncClient,
+        clients::XRPLAsyncClient,
         ledger::get_latest_validated_ledger_sequence,
         transaction::{
             autofill, check_txn_fee,
             exceptions::{XRPLSignTransactionException, XRPLSubmitAndWaitException},
             sign, submit,
         },
+        wait_seconds,
     },
     models::{requests, results, transactions::Transaction, Model},
     wallet::Wallet,
@@ -31,7 +32,7 @@ pub async fn submit_and_wait<'a: 'b, 'b, T, F, C>(
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     get_signed_transaction(transaction, client, wallet, check_fee, autofill).await?;
     send_reliable_submission(transaction, client).await
@@ -44,7 +45,7 @@ async fn send_reliable_submission<'a: 'b, 'b, T, F, C>(
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let tx_hash = transaction.get_hash()?;
     let submit_response = submit(transaction, client).await?;
@@ -74,7 +75,7 @@ async fn wait_for_final_transaction_result<'a: 'b, 'b, C>(
     last_ledger_sequence: u32,
 ) -> Result<results::tx::Tx<'b>>
 where
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let mut validated_ledger_sequence = 0;
     let mut c = 0;
@@ -85,13 +86,7 @@ where
         }
         validated_ledger_sequence = get_latest_validated_ledger_sequence(client).await?;
         // sleep for 1 second
-        #[cfg(feature = "embassy-rt")]
-        embassy_time::Timer::after_secs(1).await;
-        #[cfg(any(
-            feature = "tokio-rt",
-            all(feature = "embassy-rt", feature = "tokio-rt")
-        ))]
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        wait_seconds(1).await;
         let response = client
             .request(requests::tx::Tx::new(None, None, None, None, Some(tx_hash.clone())).into())
             .await?;
@@ -144,7 +139,7 @@ async fn get_signed_transaction<'a, T, F, C>(
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     if transaction.get_common_fields().is_signed() {
         return Ok(());

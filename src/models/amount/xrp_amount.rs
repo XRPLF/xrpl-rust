@@ -127,9 +127,7 @@ impl<'a> TryInto<Cow<'a, str>> for XRPAmount<'a> {
 
 impl<'a> PartialOrd for XRPAmount<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        let self_decimal: Decimal = self.clone().try_into().unwrap();
-        let other_decimal: Decimal = other.clone().try_into().unwrap();
-        Some(self_decimal.cmp(&other_decimal))
+        Some(self.cmp(other))
     }
 }
 

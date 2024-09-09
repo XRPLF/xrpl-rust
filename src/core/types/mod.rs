@@ -456,13 +456,13 @@ fn handle_xaddress(field: Cow<str>, xaddress: Cow<str>) -> Result<Map<String, Va
         Err(e) => return Err!(e),
     };
     if let Some(tag) = tag {
-        if &field == DESTINATION {
+        if field == DESTINATION {
             let tag_name = DESTINATION_TAG;
             Ok(Map::from_iter(vec![
                 (field.to_string(), Value::String(classic_address)),
                 (tag_name.to_string(), Value::Number(tag.into())),
             ]))
-        } else if &field == ACCOUNT {
+        } else if field == ACCOUNT {
             let tag_name = SOURCE_TAG;
             Ok(Map::from_iter(vec![
                 (field.to_string(), Value::String(classic_address)),
@@ -548,10 +548,10 @@ pub trait TryFromParser {
         Self: Sized;
 }
 
-impl ToString for SerializedType {
+impl Display for SerializedType {
     /// Get the hex representation of the SerializedType bytes.
-    fn to_string(&self) -> String {
-        hex::encode_upper(self.0.as_slice())
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", hex::encode_upper(self.0.as_slice()))
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
     Err,
 };
 
-use super::clients::AsyncClient;
+use super::clients::XRPLAsyncClient;
 
 pub async fn does_account_exist<C>(
     address: Cow<'_, str>,
@@ -19,7 +19,7 @@ pub async fn does_account_exist<C>(
     ledger_index: Option<Cow<'_, str>>,
 ) -> Result<bool>
 where
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     match get_account_root(address, client, ledger_index.unwrap_or("validated".into())).await {
         Ok(_) => Ok(true),
@@ -29,7 +29,7 @@ where
 
 pub async fn get_next_valid_seq_number(
     address: Cow<'_, str>,
-    client: &impl AsyncClient,
+    client: &impl XRPLAsyncClient,
     ledger_index: Option<Cow<'_, str>>,
 ) -> Result<u32> {
     let account_info =
@@ -43,7 +43,7 @@ pub async fn get_xrp_balance<'a: 'b, 'b, C>(
     ledger_index: Option<Cow<'a, str>>,
 ) -> Result<XRPAmount<'b>>
 where
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let account_info =
         get_account_root(address, client, ledger_index.unwrap_or("validated".into())).await?;
@@ -59,7 +59,7 @@ pub async fn get_account_root<'a: 'b, 'b, C>(
     ledger_index: Cow<'a, str>,
 ) -> Result<AccountRoot<'b>>
 where
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let mut classic_address = address;
     if is_valid_xaddress(&classic_address) {
@@ -90,7 +90,7 @@ pub async fn get_latest_transaction<'a: 'b, 'b, C>(
     client: &C,
 ) -> Result<results::account_tx::AccountTx<'b>>
 where
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     if is_valid_xaddress(&address) {
         address = match xaddress_to_classic_address(&address) {

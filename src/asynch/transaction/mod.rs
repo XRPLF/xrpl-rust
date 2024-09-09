@@ -6,7 +6,7 @@ pub use submit_and_wait::*;
 use crate::{
     asynch::{
         account::get_next_valid_seq_number,
-        clients::{AsyncClient, CommonFields},
+        clients::{CommonFields, XRPLAsyncClient},
         ledger::{get_fee, get_latest_validated_ledger_sequence},
         transaction::exceptions::XRPLSignTransactionException,
     },
@@ -99,7 +99,7 @@ pub async fn sign_and_submit<'a, 'b, T, F, C>(
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     if autofill {
         autofill_and_sign(transaction, client, wallet, check_fee).await?;
@@ -120,7 +120,7 @@ pub async fn autofill<'a, 'b, F, T, C>(
 where
     T: Transaction<'a, F> + Model + Clone,
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let txn = transaction.clone();
     let txn_common_fields = transaction.get_mut_common_fields();
@@ -153,7 +153,7 @@ pub async fn autofill_and_sign<'a, 'b, T, F, C>(
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     if check_fee {
         check_txn_fee(transaction, client).await?;
@@ -168,7 +168,7 @@ pub async fn submit<'a, T, F, C>(transaction: &T, client: &C) -> Result<SubmitRe
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let txn_blob = encode(transaction)?;
     let req = Submit::new(None, txn_blob.into(), None);
@@ -190,7 +190,7 @@ pub async fn calculate_fee_per_transaction_type<'a, 'b, 'c, T, F, C>(
 where
     T: Transaction<'a, F>,
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     let mut net_fee = XRPAmount::from("10");
     let base_fee;
@@ -230,7 +230,7 @@ where
     Ok(base_fee_decimal.ceil().into())
 }
 
-async fn get_owner_reserve_from_response(client: &impl AsyncClient) -> Result<XRPAmount<'_>> {
+async fn get_owner_reserve_from_response(client: &impl XRPLAsyncClient) -> Result<XRPAmount<'_>> {
     let owner_reserve_response = client.request(ServerState::new(None).into()).await?;
     match owner_reserve_response
         .try_into_result::<ServerStateResult<'_>>()?
@@ -348,9 +348,9 @@ fn is_not_later_rippled_version<'a>(
                 )? {
                     Ok(source_patch[1] < target_patch[1])
                 } else if source_patch[1].starts_with('b') {
-                    Ok(&source_patch[1][1..] < &target_patch[1][1..])
+                    Ok(source_patch[1][1..] < target_patch[1][1..])
                 } else {
-                    Ok(&source_patch[1][2..] < &target_patch[1][2..])
+                    Ok(source_patch[1][2..] < target_patch[1][2..])
                 }
             } else {
                 Ok(false)
@@ -369,7 +369,7 @@ async fn check_txn_fee<'a, 'b, T, F, C>(transaction: &mut T, client: &'b C) -> R
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone,
-    C: AsyncClient,
+    C: XRPLAsyncClient,
 {
     // max of xrp_to_drops(0.1) and calculate_fee_per_transaction_type
     let expected_fee = XRPAmount::from("100000")
@@ -536,12 +536,13 @@ mod test_autofill {
 #[cfg(all(feature = "websocket", feature = "std"))]
 #[cfg(test)]
 mod test_sign {
-    use alloc::borrow::Cow;
+    use alloc::{borrow::Cow, dbg};
 
     use crate::{
         asynch::{
-            clients::{AsyncWebSocketClient, SingleExecutorMutex},
+            clients::AsyncJsonRpcClient,
             transaction::{autofill_and_sign, sign},
+            wallet::generate_faucet_wallet,
         },
         models::transactions::{account_set::AccountSet, Transaction},
         wallet::Wallet,
@@ -581,7 +582,11 @@ mod test_sign {
 
     #[tokio::test]
     async fn test_autofill_and_sign() {
-        let wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
+        let client = AsyncJsonRpcClient::connect("wss://testnet.xrpl-labs.com/".parse().unwrap());
+        let wallet = generate_faucet_wallet(&client, None, None, None, None)
+            .await
+            .unwrap();
+        dbg!(&wallet);
         let mut tx = AccountSet::new(
             Cow::from(wallet.classic_address.clone()),
             None,
@@ -602,11 +607,6 @@ mod test_sign {
             None,
             None,
         );
-        let client = AsyncWebSocketClient::<SingleExecutorMutex, _>::open(
-            "wss://testnet.xrpl-labs.com/".parse().unwrap(),
-        )
-        .await
-        .unwrap();
         autofill_and_sign(&mut tx, &client, &wallet, true)
             .await
             .unwrap();

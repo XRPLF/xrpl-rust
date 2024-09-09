@@ -58,7 +58,7 @@ serde_repr = "0.1"
 zeroize = "1.5.7"
 hashbrown = { version = "0.14.5", features = ["serde"] }
 fnv = { version = "1.0.7", default-features = false }
-derive-new = { version = "0.6.0", default-features = false }
+derive-new = { version = "0.7.0", default-features = false }
 thiserror-no-std = "2.0.2"
 anyhow = { version = "1.0.69", default-features = false }
 embassy-sync = "0.6.0"
@@ -79,6 +79,11 @@ tokio-tungstenite = { version = "0.23.1", optional = true, features = [
 ] }
 embassy-futures = { version = "0.1.1", optional = true }
 embedded-nal-async = { version = "0.7.1", optional = true }
+actix-rt = { version = "2.10.0", optional = true }
+async-std = { version = "1.13.0", optional = true }
+futures-executor = { version = "0.3.30", optional = true }
+futures-timer = { version = "3.0.3", optional = true }
+smol = { version = "2.0.2", optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -160,4 +165,8 @@ std = [
 ]
 # runtimes
 tokio-rt = ["tokio"]
-embassy-rt = ["embassy-time"]
+embassy-rt = ["dep:embassy-time"]
+actix-rt = ["dep:actix-rt"]
+async-std-rt = ["dep:async-std"]
+futures-rt = ["dep:futures-timer"]
+smol-rt = ["dep:smol"]

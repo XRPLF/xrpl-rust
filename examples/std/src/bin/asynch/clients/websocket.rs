@@ -1,17 +1,18 @@
-use tokio_tungstenite::connect_async;
 use xrpl::asynch::clients::{
-    AsyncWebsocketClient, SingleExecutorMutex, WebsocketOpen, XRPLWebsocketIO,
+    AsyncWebSocketClient, SingleExecutorMutex, WebSocketOpen, XRPLAsyncWebsocketIO,
 };
-use xrpl::models::requests::{StreamParameter, Subscribe};
+use xrpl::models::requests::subscribe::{StreamParameter, Subscribe};
 
 #[tokio::main]
 async fn main() {
-    let mut websocket: AsyncWebsocketClient<SingleExecutorMutex, _> =
-        AsyncWebsocketClient::open("wss://xrplcluster.com/".parse().unwrap())
+    // open a websocket connection to a XRP Ledger node
+    let mut websocket: AsyncWebSocketClient<SingleExecutorMutex, _> =
+        AsyncWebSocketClient::open("wss://xrplcluster.com/".parse().unwrap())
             .await
             .unwrap();
+    // subscribe to the ledger stream
     let subscribe = Subscribe::new(
-        Some("my_id".into()),
+        None,
         None,
         None,
         None,
@@ -21,9 +22,9 @@ async fn main() {
         None,
     );
     websocket.xrpl_send(subscribe.into()).await.unwrap();
+    // listen for messages
     loop {
         let account_info_echo = websocket.xrpl_receive().await.unwrap().unwrap();
         println!("subscription message: {:?}", account_info_echo);
-        // break;
     }
 }

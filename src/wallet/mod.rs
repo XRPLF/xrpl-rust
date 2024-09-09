@@ -1,6 +1,6 @@
 //! Methods for working with XRPL wallets.
 
-use core::fmt::Display;
+mod faucet_generation;
 
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::classic_address_to_xaddress;
@@ -10,7 +10,10 @@ use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::generate_seed;
 use alloc::string::String;
+use core::fmt::Display;
 use zeroize::Zeroize;
+
+pub use faucet_generation::*;
 
 /// The cryptographic keys needed to control an
 /// XRP Ledger account.

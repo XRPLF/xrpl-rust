@@ -209,6 +209,7 @@ impl<'a> LedgerEntry<'a> {
 }
 
 pub trait LedgerEntryError {
+    #[allow(clippy::result_large_err)]
     fn _get_field_error(&self) -> Result<(), XRPLLedgerEntryException>;
 }
 

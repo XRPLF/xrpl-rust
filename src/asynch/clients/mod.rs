@@ -21,16 +21,37 @@ pub use websocket::*;
 pub type MultiExecutorMutex = CriticalSectionRawMutex;
 pub type SingleExecutorMutex = NoopRawMutex;
 
-#[cfg(feature = "wallet-helpers")]
-use crate::{asynch::wallet::get_faucet_url, models::requests::FundFaucet};
+const TEST_FAUCET_URL: &str = "https://faucet.altnet.rippletest.net/accounts";
+const DEV_FAUCET_URL: &str = "https://faucet.devnet.rippletest.net/accounts";
+
+use crate::{asynch::XRPLFaucetException, models::requests::FundFaucet, Err};
 #[allow(async_fn_in_trait)]
-#[cfg(feature = "wallet-helpers")]
-pub trait XRPLFaucet: Client {
+pub trait XRPLFaucet: XRPLClient {
     fn get_faucet_url(&self, url: Option<Url>) -> Result<Url>
     where
-        Self: Sized + Client,
+        Self: Sized + XRPLClient,
     {
-        get_faucet_url(self, url)
+        if let Some(url) = url {
+            Ok(url)
+        } else {
+            let host = self.get_host();
+            let host_str = host.host_str().unwrap();
+            if host_str.contains("altnet") || host_str.contains("testnet") {
+                match Url::parse(TEST_FAUCET_URL) {
+                    Ok(url) => Ok(url),
+                    Err(error) => Err!(error),
+                }
+            } else if host_str.contains("devnet") {
+                match Url::parse(DEV_FAUCET_URL) {
+                    Ok(url) => Ok(url),
+                    Err(error) => Err!(error),
+                }
+            } else if host_str.contains("sidechain-net2") {
+                Err!(XRPLFaucetException::CannotFundSidechainAccount)
+            } else {
+                Err!(XRPLFaucetException::CannotDeriveFaucetUrl)
+            }
+        }
     }
 
     async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()>;

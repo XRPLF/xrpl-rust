@@ -22,7 +22,7 @@ use crate::{
 };
 use crate::{
     asynch::clients::{
-        client::Client as ClientTrait,
+        client::XRPLClient as ClientTrait,
         websocket::websocket_base::{MessageHandler, WebsocketBase},
     },
     models::results::XRPLResponse,
@@ -218,11 +218,12 @@ where
     }
 }
 
-impl<const BUF: usize, M, Tcp, Rng: RngCore> ClientTrait
+impl<const BUF: usize, M, Tcp, Rng> ClientTrait
     for AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
 where
     M: RawMutex,
     Tcp: Read + Write + Unpin,
+    Rng: RngCore,
 {
     fn get_host(&self) -> Url {
         self.uri.clone()
