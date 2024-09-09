@@ -1,5 +1,6 @@
 //! Methods for working with XRPL wallets.
 
+#[cfg(feature = "wallet-helpers")]
 mod faucet_generation;
 
 use crate::constants::CryptoAlgorithm;
@@ -13,6 +14,7 @@ use alloc::string::String;
 use core::fmt::Display;
 use zeroize::Zeroize;
 
+#[cfg(feature = "wallet-helpers")]
 pub use faucet_generation::*;
 
 /// The cryptographic keys needed to control an
