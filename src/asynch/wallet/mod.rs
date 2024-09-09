@@ -49,7 +49,6 @@ where
     for _ in 0..TIMEOUT_SECS {
         // wait 1 second
         wait_seconds(1).await;
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         if !is_funded {
             let balance = check_balance(client, address.into()).await;
             if balance > starting_balance {
