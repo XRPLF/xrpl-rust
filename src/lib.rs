@@ -27,7 +27,14 @@ extern crate std as alloc;
 
 #[cfg(feature = "account-helpers")]
 pub mod account;
-#[cfg(all(feature = "request-models", feature = "result-models"))]
+#[cfg(any(
+    feature = "json-rpc",
+    feature = "websocket",
+    feature = "account-helpers",
+    feature = "ledger-helpers",
+    feature = "transaction-helpers",
+    feature = "wallet-helpers"
+))]
 pub mod asynch;
 #[cfg(any(feature = "json-rpc", feature = "websocket"))]
 pub mod clients;

@@ -52,7 +52,7 @@ jobs:
         name: Build only helpers
         with:
           command: build
-          args: --release --no-default-features --features helpers,tokio-rt
+          args: --release --no-default-features --features websocket,json-rpc,helpers,tokio-rt
       - uses: actions-rs/cargo@v1
         name: Build only websocket
         with:
