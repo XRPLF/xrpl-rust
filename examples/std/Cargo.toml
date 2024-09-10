@@ -41,6 +41,11 @@ path = "src/bin/clients/json_rpc.rs"
 required-features = []
 
 [[bin]]
-name = "sign_request"
+name = "sign_transaction"
 path = "src/bin/transaction/sign_transaction.rs"
+required-features = []
+
+[[bin]]
+name = "sign_and_submit"
+path = "src/bin/asynch/transaction/sign_and_submit.rs"
 required-features = []
