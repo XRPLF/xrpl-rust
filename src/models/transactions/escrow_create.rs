@@ -7,11 +7,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{exceptions::XRPLEscrowCreateException, CommonFields};
-use crate::models::NoFlags;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 /// Creates an Escrow, which requests XRP until the escrow process either finishes or is canceled.
 ///
@@ -123,7 +123,7 @@ impl<'a> EscrowCreate<'a> {
                 transaction_type: TransactionType::EscrowCreate,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -211,7 +211,7 @@ mod tests {
             Some(23480),
             Some(533171558),
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowCreate","SourceTag":11747,"Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","DestinationTag":23480,"CancelAfter":533257958,"FinishAfter":533171558,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowCreate","Flags":0,"SourceTag":11747,"Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","DestinationTag":23480,"CancelAfter":533257958,"FinishAfter":533171558,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

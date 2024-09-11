@@ -9,12 +9,12 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLNFTokenAcceptOfferException;
-use crate::models::NoFlags;
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::CommonFields;
 
@@ -136,7 +136,7 @@ impl<'a> NFTokenAcceptOffer<'a> {
                 transaction_type: TransactionType::NFTokenAcceptOffer,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -248,7 +248,7 @@ mod tests {
             None,
             None,
         );
-        let default_json_str = r#"{"Account":"r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG","TransactionType":"NFTokenAcceptOffer","Fee":"12","LastLedgerSequence":75447550,"Memos":[{"Memo":{"MemoData":"61356534373538372D633134322D346663382D616466362D393666383562356435386437","MemoFormat":null,"MemoType":null}}],"Sequence":68549302,"NFTokenSellOffer":"68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77"}"#;
+        let default_json_str = r#"{"Account":"r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG","TransactionType":"NFTokenAcceptOffer","Fee":"12","Flags":0,"LastLedgerSequence":75447550,"Memos":[{"Memo":{"MemoData":"61356534373538372D633134322D346663382D616466362D393666383562356435386437","MemoFormat":null,"MemoType":null}}],"Sequence":68549302,"NFTokenSellOffer":"68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

@@ -8,6 +8,7 @@ use serde::{ser::SerializeMap, Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::transactions::exceptions::XRPLSignerListSetException;
+use crate::models::FlagCollection;
 use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
@@ -193,7 +194,7 @@ impl<'a> SignerListSet<'a> {
                 transaction_type: TransactionType::SignerListSet,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -398,7 +399,7 @@ mod tests {
                 SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1),
             ]),
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"SignerListSet","Fee":"12","SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"SignerListSet","Fee":"12","Flags":0,"SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

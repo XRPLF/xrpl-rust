@@ -195,7 +195,7 @@ impl<'a> NFTokenCreateOffer<'a> {
                 transaction_type: TransactionType::NFTokenCreateOffer,
                 account_txn_id,
                 fee,
-                flags,
+                flags: flags.unwrap_or_default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -309,14 +309,14 @@ mod test_nftoken_create_offer_error {
             Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into()),
         );
         let sell_flag = vec![NFTokenCreateOfferFlag::TfSellOffer];
-        nftoken_create_offer.common_fields.flags = Some(sell_flag.into());
+        nftoken_create_offer.common_fields.flags = sell_flag.into();
 
         assert_eq!(
             nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
             "The optional field `owner` is not allowed to be defined for NFToken sell offers. For more information see: "
         );
 
-        nftoken_create_offer.common_fields.flags = None;
+        nftoken_create_offer.common_fields.flags = FlagCollection::default();
         nftoken_create_offer.owner = None;
 
         assert_eq!(

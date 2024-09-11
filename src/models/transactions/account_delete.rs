@@ -5,11 +5,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
-use crate::models::NoFlags;
 use crate::models::{
     transactions::{Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::{Memo, Signer};
 
@@ -80,7 +80,7 @@ impl<'a> AccountDelete<'a> {
                 transaction_type: TransactionType::AccountDelete,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -116,7 +116,7 @@ mod test_serde {
             "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
             Some(13),
         );
-        let default_json_str = r#"{"Account":"rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm","TransactionType":"AccountDelete","Fee":"2000000","Sequence":2470665,"Destination":"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe","DestinationTag":13}"#;
+        let default_json_str = r#"{"Account":"rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm","TransactionType":"AccountDelete","Fee":"2000000","Flags":0,"Sequence":2470665,"Destination":"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe","DestinationTag":13}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

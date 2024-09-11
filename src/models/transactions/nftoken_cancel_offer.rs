@@ -7,11 +7,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLNFTokenCancelOfferException;
-use crate::models::NoFlags;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::CommonFields;
 
@@ -103,7 +103,7 @@ impl<'a> NFTokenCancelOffer<'a> {
                 transaction_type: TransactionType::NFTokenCancelOffer,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -174,7 +174,7 @@ mod tests {
             None,
             vec!["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into()],
         );
-        let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"NFTokenCancelOffer","NFTokenOffers":["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D"]}"#;
+        let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"NFTokenCancelOffer","Flags":0,"NFTokenOffers":["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D"]}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

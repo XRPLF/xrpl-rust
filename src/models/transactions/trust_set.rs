@@ -112,7 +112,7 @@ impl<'a> TrustSet<'a> {
                 transaction_type: TransactionType::TrustSet,
                 account_txn_id,
                 fee,
-                flags,
+                flags: flags.unwrap_or_default(),
                 last_ledger_sequence,
                 memos,
                 sequence,

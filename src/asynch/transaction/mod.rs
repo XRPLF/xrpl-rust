@@ -573,8 +573,8 @@ mod test_sign {
         );
         sign(&mut tx, &wallet, false).unwrap();
         let expected_signature: Cow<str> =
-            "B310792432B0242C2542C2B46CA234C87F4AE3FFC33226797AF72A92D9295ED20BD05A85D0\
-            C13760B653AE9B8C0D74B9BBD310B09524F63B41D1776E7F2BB609"
+            "C3F435CFBFAE996FE297F3A71BEAB68FF5322CBF039E41A9615BC48A59FB4EC\
+            5A55F8D4EC0225D47056E02ECCCDF7E8FF5F8B7FAA1EBBCBF7D0491FCB2D98807"
                 .into();
         let actual_signature = tx.get_common_fields().txn_signature.as_ref().unwrap();
         assert_eq!(expected_signature, *actual_signature);
@@ -582,7 +582,7 @@ mod test_sign {
 
     #[tokio::test]
     async fn test_autofill_and_sign() {
-        let client = AsyncJsonRpcClient::connect("wss://testnet.xrpl-labs.com/".parse().unwrap());
+        let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
         let wallet = generate_faucet_wallet(&client, None, None, None, None)
             .await
             .unwrap();

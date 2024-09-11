@@ -7,12 +7,12 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{exceptions::XRPLCheckCashException, CommonFields};
-use crate::models::NoFlags;
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 /// Cancels an unredeemed Check, removing it from the ledger without
 /// sending any money. The source or the destination of the check can
@@ -107,7 +107,7 @@ impl<'a> CheckCash<'a> {
                 transaction_type: TransactionType::CheckCash,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -180,7 +180,7 @@ mod tests {
             Some("100000000".into()),
             None,
         );
-        let default_json_str = r#"{"Account":"rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy","TransactionType":"CheckCash","Fee":"12","CheckID":"838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334","Amount":"100000000"}"#;
+        let default_json_str = r#"{"Account":"rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy","TransactionType":"CheckCash","Fee":"12","Flags":0,"CheckID":"838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334","Amount":"100000000"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

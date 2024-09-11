@@ -37,6 +37,7 @@ use alloc::vec::Vec;
 use anyhow::Result;
 use core::fmt::Debug;
 use derive_new::new;
+use exceptions::XRPLTransactionException;
 use serde::de::DeserializeOwned;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize};
@@ -132,8 +133,8 @@ where
     pub fee: Option<XRPAmount<'a>>,
     /// Set of bit-flags for this transaction.
     #[serde(with = "txn_flags")]
-    #[serde(default = "optional_flag_collection_default")]
-    pub flags: Option<FlagCollection<F>>,
+    #[serde(default = "flag_collection_default")]
+    pub flags: FlagCollection<F>,
     /// Highest ledger index this transaction can appear in.
     /// Specifying this field places a strict upper limit on how long
     /// the transaction can wait to be validated or rejected.
@@ -198,7 +199,7 @@ where
             transaction_type,
             account_txn_id,
             fee,
-            flags,
+            flags: flags.unwrap_or_default(),
             last_ledger_sequence,
             memos,
             network_id,
@@ -232,10 +233,7 @@ where
     T: IntoEnumIterator + Serialize + PartialEq + core::fmt::Debug,
 {
     fn has_flag(&self, flag: &T) -> bool {
-        match &self.flags {
-            Some(flag_collection) => flag_collection.0.contains(flag),
-            None => false,
-        }
+        self.flags.0.contains(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
@@ -251,11 +249,11 @@ where
     }
 }
 
-fn optional_flag_collection_default<T>() -> Option<FlagCollection<T>>
+fn flag_collection_default<T>() -> FlagCollection<T>
 where
     T: IntoEnumIterator + Serialize + core::fmt::Debug,
 {
-    None
+    FlagCollection::<T>::default()
 }
 
 serde_with_tag! {
@@ -315,24 +313,31 @@ where
         }
     }
 
+    fn is_signed(&self) -> bool {
+        self.get_common_fields().txn_signature.is_some()
+            && self.get_common_fields().signing_pub_key.is_some()
+    }
+
     /// Hashes the Transaction object as the ledger does. Only valid for signed
     /// Transaction objects.
     fn get_hash(&self) -> Result<Cow<str>>
     where
         Self: Serialize + DeserializeOwned + Debug + Clone,
     {
-        // if !self.is_signed() {
-        //     return Err!(XRPLTransactionException::TxMustBeSigned);
-        // }
+        if self.get_common_fields().txn_signature.is_none()
+            && self.get_common_fields().signers.is_none()
+        {
+            return Err!(XRPLTransactionException::TxMustBeSigned);
+        }
         let prefix = format!("{:X}", TRANSACTION_HASH_PREFIX);
-        let encoded_tx = encode(self)?;
-        let encoded = prefix + &encoded_tx;
-        let encoded_bytes = match hex::decode(&encoded) {
+        let tx_hex = encode(self)?;
+        let tx_hex = prefix + &tx_hex;
+        let tx_bytes = match hex::decode(&tx_hex) {
             Ok(bytes) => bytes,
             Err(e) => return Err!(e),
         };
         let mut hasher = Sha512::new();
-        hasher.update(&encoded_bytes);
+        hasher.update(&tx_bytes);
         let hash = hasher.finalize();
         let hex_string = hex::encode_upper(hash);
         let result = hex_string[..64].to_string();
@@ -363,39 +368,50 @@ pub enum Flag {
 #[cfg(test)]
 mod test_tx_common_fields {
     use super::*;
-    use crate::{
-        asynch::transaction::sign,
-        models::{amount::IssuedCurrencyAmount, transactions::offer_create::OfferCreate},
-        wallet::Wallet,
-    };
+    use account_set::AccountSet;
+    use alloc::dbg;
+    use offer_create::OfferCreate;
 
     #[tokio::test]
     async fn test_get_hash() {
-        let mut wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
-        let mut txn = OfferCreate::new(
-            "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
-            None,
-            Some("10".into()),
-            Some(FlagCollection::default()),
-            Some(16409087),
-            None,
-            Some(16409064),
-            None,
-            None,
-            None,
-            "13100000".into(),
-            IssuedCurrencyAmount::new(
-                "USD".into(),
-                "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
-                "10".into(),
-            )
-            .into(),
-            None,
-            None,
-        );
-        sign(&mut txn, &mut wallet, false).unwrap();
-        let expected_hash = "39530980D3D6F848E619BF05A57988D42A62075289B99C5728CBDE0D1710284B";
+        let txn_json = r#"{
+            "Account": "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3",
+            "Fee": "10",
+            "Flags": 0,
+            "LastLedgerSequence": 16409087,
+            "Sequence": 16409064,
+            "SigningPubKey": "ED93BFA583E83331E9DC498DE4558CE4861ACFAB9385EBBC43BC56A0D9845A1DF2",
+            "TakerGets": "13100000",
+            "TakerPays": {
+                "currency": "USD",
+                "issuer": "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3",
+                "value": "10"
+            },
+            "TransactionType": "OfferCreate",
+            "TxnSignature": "71135999783658A0CB4EBCF02E59ACD94C4D06D5BF909E05E6B97588155482BBA598535AD4728ACA1F90C4DE73FFC741B0A6AB87141BDA8BCC2F2DF9CD8C3703"
+        }"#;
+        let expected_hash = "66F3D6158CAB6E53405F8C264DB39F07D8D0454433A63DDFB98218ED1BC99B60";
+        let txn: OfferCreate = serde_json::from_str(txn_json).unwrap();
 
         assert_eq!(&txn.get_hash().unwrap(), expected_hash);
+    }
+
+    #[test]
+    fn test_txn_hash() {
+        let tx_json_str = r#"{
+            "Account": "rEbY5Tr5B6AjyjuVRhajpnvCWLGkYk5z6",
+            "Domain": "6578616d706c652e636f6d",
+            "Fee": "10",
+            "Flags": 0,
+            "LastLedgerSequence": 596447,
+            "Sequence": 596427,
+            "SigningPubKey": "EDAF73A0E6745EA9C17A2F4EB7043134A055213116CFF6F7888BBFF557B002874F",
+            "TransactionType": "AccountSet",
+            "TxnSignature": "8666A7E6AF0D6A4B4F19F25D315FA1C31D132FB2E974686C415D5499D43710384FF851C75CCC4E57972DE5C5354289F574B2F604B6AF15E2DADA6BB9F1330A07"
+        }"#;
+        let expected_hash = "5B765D6C6058CF54F5DBF6230A7F51E23295004FCC043660A77D73AA8537737B";
+        let tx: AccountSet = serde_json::from_str(tx_json_str).unwrap();
+        dbg!(&tx);
+        assert_eq!(tx.get_hash().unwrap(), expected_hash);
     }
 }

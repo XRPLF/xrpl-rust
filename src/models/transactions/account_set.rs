@@ -314,7 +314,7 @@ impl<'a> AccountSet<'a> {
                 transaction_type: TransactionType::AccountSet,
                 account_txn_id,
                 fee,
-                flags,
+                flags: flags.unwrap_or_default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -573,7 +573,7 @@ mod tests {
             None,
             None,
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"AccountSet","Fee":"12","Sequence":5,"Domain":"6578616D706C652E636F6D","MessageKey":"03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB","SetFlag":5}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"AccountSet","Fee":"12","Flags":0,"Sequence":5,"Domain":"6578616D706C652E636F6D","MessageKey":"03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB","SetFlag":5}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

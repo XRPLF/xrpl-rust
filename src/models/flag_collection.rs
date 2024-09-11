@@ -83,6 +83,20 @@ where
     }
 }
 
+impl<T> core::fmt::Display for FlagCollection<T>
+where
+    T: IntoEnumIterator + Serialize,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut flags = 0;
+        for flag in &self.0 {
+            let flag_as_u32 = flag_to_u32(flag).unwrap();
+            flags |= flag_as_u32;
+        }
+        write!(f, "{}", flags)
+    }
+}
+
 fn flag_to_u32<T>(flag: &T) -> Result<u32>
 where
     T: Serialize,

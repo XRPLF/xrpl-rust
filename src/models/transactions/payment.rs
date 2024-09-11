@@ -220,7 +220,7 @@ impl<'a> Payment<'a> {
                 transaction_type: TransactionType::Payment,
                 account_txn_id,
                 fee,
-                flags,
+                flags: flags.unwrap_or_default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -331,14 +331,14 @@ mod test_payment_error {
             None,
             None,
         );
-        payment.common_fields.flags = Some(vec![PaymentFlag::TfPartialPayment].into());
+        payment.common_fields.flags = vec![PaymentFlag::TfPartialPayment].into();
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
             "For the flag `TfPartialPayment` to be set it is required to define the field `send_max`. For more information see: "
         );
 
-        payment.common_fields.flags = None;
+        payment.common_fields.flags = FlagCollection::default();
         payment.deliver_min = Some(Amount::XRPAmount("99999".into()));
 
         assert_eq!(

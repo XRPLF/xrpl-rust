@@ -198,7 +198,7 @@ impl<'a> NFTokenMint<'a> {
                 transaction_type: TransactionType::NFTokenMint,
                 account_txn_id,
                 fee,
-                flags,
+                flags: flags.unwrap_or_default(),
                 last_ledger_sequence,
                 memos,
                 sequence,

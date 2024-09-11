@@ -7,11 +7,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{exceptions::XRPLDepositPreauthException, CommonFields};
-use crate::models::NoFlags;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 /// A DepositPreauth transaction gives another account pre-approval
 /// to deliver payments to the sender of this transaction.
@@ -97,7 +97,7 @@ impl<'a> DepositPreauth<'a> {
                 transaction_type: TransactionType::DepositPreauth,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -168,7 +168,7 @@ mod tests {
             Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
             None,
         );
-        let default_json_str = r#"{"Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","TransactionType":"DepositPreauth","Fee":"10","Sequence":2,"Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
+        let default_json_str = r#"{"Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","TransactionType":"DepositPreauth","Fee":"10","Flags":0,"Sequence":2,"Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::NoFlags;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::CommonFields;
 
@@ -74,7 +74,7 @@ impl<'a> TicketCreate<'a> {
                 transaction_type: TransactionType::TicketCreate,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -108,7 +108,7 @@ mod tests {
             None,
             10,
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"TicketCreate","Fee":"10","Sequence":381,"TicketCount":10}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"TicketCreate","Fee":"10","Flags":0,"Sequence":381,"TicketCount":10}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

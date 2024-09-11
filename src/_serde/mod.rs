@@ -62,19 +62,19 @@ pub(crate) mod txn_flags {
     use crate::models::FlagCollection;
     use strum::IntoEnumIterator;
 
-    pub fn serialize<F, S>(flags: &Option<FlagCollection<F>>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<F, S>(flags: &FlagCollection<F>, s: S) -> Result<S::Ok, S::Error>
     where
-        F: Serialize + IntoEnumIterator,
+        F: Serialize + IntoEnumIterator + Debug,
         S: Serializer,
     {
-        if let Some(f) = flags {
-            serialize_flag(f, s)
-        } else {
+        if flags.0.is_empty() {
             s.serialize_u32(0)
+        } else {
+            serialize_flag(flags, s)
         }
     }
 
-    pub fn deserialize<'de, F, D>(d: D) -> Result<Option<FlagCollection<F>>, D::Error>
+    pub fn deserialize<'de, F, D>(d: D) -> Result<FlagCollection<F>, D::Error>
     where
         F: Serialize + IntoEnumIterator + Debug,
         D: Deserializer<'de>,
@@ -83,9 +83,9 @@ pub(crate) mod txn_flags {
         match flags_vec_result {
             Ok(flags_vec) => {
                 if flags_vec.0.is_empty() {
-                    Ok(None)
+                    Ok(FlagCollection::<F>::default())
                 } else {
-                    Ok(Some(flags_vec))
+                    Ok(flags_vec)
                 }
             }
             Err(error) => Err(error),

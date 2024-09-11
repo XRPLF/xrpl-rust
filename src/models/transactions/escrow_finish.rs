@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::transactions::exceptions::XRPLEscrowFinishException;
-use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::CommonFields;
 
@@ -108,7 +108,7 @@ impl<'a> EscrowFinish<'a> {
                 transaction_type: TransactionType::EscrowFinish,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
@@ -193,7 +193,7 @@ mod tests {
             ),
             Some("A0028000".into()),
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowFinish","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowFinish","Flags":0,"Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
         // Serialize
         let default_json_value: Value = serde_json::from_str(default_json_str).unwrap();
         // let serialized_string = serde_json::to_string(&default_txn).unwrap();

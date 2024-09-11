@@ -7,12 +7,12 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::transactions::{CommonFields, Memo, Signer};
-use crate::models::NoFlags;
 use crate::models::{
     amount::XRPAmount,
     transactions::{Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
@@ -85,7 +85,7 @@ impl<'a> UNLModify<'a> {
                 transaction_type: TransactionType::UNLModify,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,

@@ -6,11 +6,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{CommonFields, Memo, Signer};
-use crate::models::NoFlags;
 use crate::models::{
     transactions::{Transaction, TransactionType},
     Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 /// See SetFee:
 /// `<https://xrpl.org/setfee.html>`
@@ -78,7 +78,7 @@ impl<'a> SetFee<'a> {
                 transaction_type: TransactionType::SetFee,
                 account_txn_id,
                 fee,
-                flags: None,
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
                 sequence,
