@@ -8,7 +8,7 @@ use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::mutex::Mutex;
 use embedded_io_async::{ErrorType, Read, Write};
-use embedded_websocket::{
+use embedded_websocket_embedded_io::{
     framer_async::{Framer, ReadResult},
     Client, WebSocketClient, WebSocketOptions, WebSocketSendMessageType,
 };
@@ -103,7 +103,7 @@ where
             .await
         {
             match error {
-                // FramerError::WebSocket(embedded_websocket::Error::HttpResponseCodeInvalid(
+                // FramerError::WebSocket(embedded_websocket_embedded_io::Error::HttpResponseCodeInvalid(
                 //     Some(308),
                 // )) => (),
                 error => return Err!(XRPLWebsocketException::from(error)),

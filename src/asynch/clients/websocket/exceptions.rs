@@ -3,7 +3,7 @@ use core::str::Utf8Error;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_io_async::{Error as EmbeddedIoError, ErrorKind};
 #[cfg(all(feature = "websocket", not(feature = "std")))]
-use embedded_websocket::framer_async::FramerError;
+use embedded_websocket_embedded_io::framer_async::FramerError;
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
@@ -19,7 +19,7 @@ pub enum XRPLWebsocketException<E: Debug> {
     HttpHeader,
     #[cfg(all(feature = "websocket", not(feature = "std")))]
     #[error("Websocket error: {0:?}")]
-    WebSocket(embedded_websocket::Error),
+    WebSocket(embedded_websocket_embedded_io::Error),
     #[error("Disconnected")]
     Disconnected,
     #[error("Read buffer is too small (size: {0:?})")]
