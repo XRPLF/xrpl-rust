@@ -1,12 +1,15 @@
 [package]
 name = "xrpl-rust"
-version = "0.2.0"
-edition = "2018"
-authors = ["Tanveer Wahid <tan@wahid.email>"]
+version = "0.3.0"
+edition = "2021"
+authors = [
+    "Tanveer Wahid <tan@wahid.email>",
+    "Steffen Konermann <contact@limpidcrypto.com>",
+]
 description = "A 100% Rust library to interact with the XRPL"
 readme = "README.md"
 license = "ISC"
-repository = "https://github.com/589labs/xrpl-rust"
+repository = "https://github.com/sephynox/xrpl-rust"
 
 keywords = ["xrpl", "no_std"]
 categories = ["no-std"]
