@@ -84,7 +84,7 @@ where
 pub fn submit<'a, T, F, C>(transaction: &T, client: &C) -> Result<Submit<'a>>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
+    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
     C: XRPLAsyncClient,
 {
     block_on(async_submit(transaction, client))

@@ -167,9 +167,10 @@ where
 pub async fn submit<'a, T, F, C>(transaction: &T, client: &C) -> Result<SubmitResult<'a>>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
+    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
     C: XRPLAsyncClient,
 {
+    transaction.validate()?;
     let txn_blob = encode(transaction)?;
     let req = Submit::new(None, txn_blob.into(), None);
     let res = client.request(req.into()).await?;
