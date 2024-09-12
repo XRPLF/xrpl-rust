@@ -166,7 +166,7 @@ std = [
     "futures/std",
 ]
 # runtimes
-tokio-rt = ["tokio"]
+tokio-rt = ["tokio/time"]
 embassy-rt = ["dep:embassy-time"]
 actix-rt = ["dep:actix-rt"]
 async-std-rt = ["dep:async-std"]
