@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
+## [[v0.2.0-beta.1]]
+
 - Examples
   - Wallet from seed
   - New wallet generation
