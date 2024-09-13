@@ -11,6 +11,8 @@ readme = "README.md"
 license = "ISC"
 repository = "https://github.com/sephynox/xrpl-rust"
 
+include = ["src/**/*", "Cargo.toml"]
+
 keywords = ["xrpl", "no_std"]
 categories = ["no-std"]
 
