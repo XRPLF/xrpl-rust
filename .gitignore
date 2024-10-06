@@ -18,3 +18,7 @@ Cargo.lock
 
 # Additional
 src/main.rs
+
+**/.DS_Store
+
+rustc-ice*

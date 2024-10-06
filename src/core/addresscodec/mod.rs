@@ -201,7 +201,7 @@ pub fn classic_address_to_xaddress(
         Err(XRPLAddressCodecException::InvalidCAddressIdLength {
             length: CLASSIC_ADDRESS_ID_LENGTH,
         })
-    } else if tag.is_some() && tag > Some(u32::max_value().into()) {
+    } else if tag.is_some() && tag > Some(u32::MAX.into()) {
         Err(XRPLAddressCodecException::InvalidCAddressTag)
     } else {
         if let Some(tval) = tag {

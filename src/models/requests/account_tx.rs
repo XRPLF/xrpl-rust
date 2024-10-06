@@ -1,7 +1,10 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// This request retrieves from the ledger a list of
 /// transactions that involved the specified account.
@@ -11,15 +14,16 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountTx<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's address.
-    pub account: &'a str,
-    /// The unique request id.
-    pub id: Option<&'a str>,
+    pub account: Cow<'a, str>,
     /// Use to look for transactions from a single ledger only.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// Use to look for transactions from a single ledger only.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Defaults to false. If set to true, returns transactions
     /// as hex strings instead of JSON.
     pub binary: Option<bool>,
@@ -45,37 +49,26 @@ pub struct AccountTx<'a> {
     /// if there is a change in the server's range of available
     /// ledgers.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_tx")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountTx<'a> {
-    fn default() -> Self {
-        AccountTx {
-            account: "",
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            binary: None,
-            forward: None,
-            ledger_index_min: None,
-            ledger_index_max: None,
-            limit: None,
-            marker: None,
-            command: RequestMethod::AccountTx,
-        }
-    }
 }
 
 impl<'a> Model for AccountTx<'a> {}
 
+impl<'a> Request<'a> for AccountTx<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> AccountTx<'a> {
-    fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         binary: Option<bool>,
         forward: Option<bool>,
         ledger_index_min: Option<u32>,
@@ -84,8 +77,11 @@ impl<'a> AccountTx<'a> {
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountTx,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             binary,
@@ -94,7 +90,6 @@ impl<'a> AccountTx<'a> {
             ledger_index_max,
             limit,
             marker,
-            command: RequestMethod::AccountTx,
         }
     }
 }

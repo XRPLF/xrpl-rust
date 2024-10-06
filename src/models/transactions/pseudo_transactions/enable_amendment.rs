@@ -1,14 +1,16 @@
-use crate::_serde::txn_flags;
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
+use crate::models::transactions::{CommonFields, FlagCollection, Memo, Signer};
 use crate::models::{
-    model::Model,
-    transactions::{Flag, Transaction, TransactionType},
+    transactions::{Transaction, TransactionType},
+    Model,
 };
 
 #[derive(
@@ -38,91 +40,68 @@ pub struct EnableAmendment<'a> {
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
     /// The type of transaction.
-    #[serde(default = "TransactionType::enable_amendment")]
-    transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
-    /// Set of bit-flags for this transaction.
-    #[serde(default)]
-    #[serde(with = "txn_flags")]
-    pub flags: Option<Vec<EnableAmendmentFlag>>,
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, EnableAmendmentFlag>,
     /// The custom fields for the EnableAmendment model.
     ///
     /// See EnableAmendment fields:
     /// `<https://xrpl.org/enableamendment.html#enableamendment-fields>`
-    pub amendment: &'a str,
+    pub amendment: Cow<'a, str>,
     pub ledger_sequence: u32,
 }
 
 impl<'a> Model for EnableAmendment<'a> {}
 
-impl<'a> Transaction for EnableAmendment<'a> {
-    fn has_flag(&self, flag: &Flag) -> bool {
-        match flag {
-            Flag::EnableAmendment(enable_amendment_flag) => match enable_amendment_flag {
-                EnableAmendmentFlag::TfGotMajority => self
-                    .flags
-                    .as_ref()
-                    .unwrap()
-                    .contains(&EnableAmendmentFlag::TfGotMajority),
-                EnableAmendmentFlag::TfLostMajority => self
-                    .flags
-                    .as_ref()
-                    .unwrap()
-                    .contains(&EnableAmendmentFlag::TfLostMajority),
-            },
-            _ => false,
-        }
+impl<'a> Transaction<'a, EnableAmendmentFlag> for EnableAmendment<'a> {
+    fn has_flag(&self, flag: &EnableAmendmentFlag) -> bool {
+        self.common_fields.has_flag(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, EnableAmendmentFlag> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, EnableAmendmentFlag> {
+        self.common_fields.get_mut_common_fields()
     }
 }
 
 impl<'a> EnableAmendment<'a> {
-    fn new(
-        account: &'a str,
-        amendment: &'a str,
-        ledger_sequence: u32,
+    pub fn new(
+        account: Cow<'a, str>,
+        account_txn_id: Option<Cow<'a, str>>,
         fee: Option<XRPAmount<'a>>,
+        flags: Option<FlagCollection<EnableAmendmentFlag>>,
+        last_ledger_sequence: Option<u32>,
+        memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signing_pub_key: Option<&'a str>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
-        txn_signature: Option<&'a str>,
-        flags: Option<Vec<EnableAmendmentFlag>>,
+        ticket_sequence: Option<u32>,
+        amendment: Cow<'a, str>,
+        ledger_sequence: u32,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::EnableAmendment,
-            account,
-            fee,
-            sequence,
-            signing_pub_key,
-            source_tag,
-            txn_signature,
-            flags,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::EnableAmendment,
+                account_txn_id,
+                fee,
+                flags: flags.unwrap_or_default(),
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
+            },
             amendment,
             ledger_sequence,
         }

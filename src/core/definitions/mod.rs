@@ -3,10 +3,11 @@
 
 pub mod types;
 
+use core::fmt::Display;
+
 pub use self::types::*;
 
 use crate::utils::ToBytes;
-use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
@@ -65,7 +66,7 @@ pub struct FieldHeader {
 /// let field_instance: FieldInstance =
 ///     FieldInstance::new(&field_info, "Generic", field_header);
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FieldInstance {
     pub nth: i16,
     pub is_vl_encoded: bool,
@@ -132,10 +133,10 @@ impl FieldInstance {
     }
 }
 
-impl ToString for FieldHeader {
+impl Display for FieldHeader {
     /// Convert the FieldHeader to a String.
-    fn to_string(&self) -> String {
-        format!("{}_{}", self.type_code, self.field_code)
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}_{}", self.type_code, self.field_code)
     }
 }
 
@@ -146,21 +147,21 @@ impl ToBytes for FieldHeader {
 
         if self.type_code < 16 {
             if self.field_code < 16 {
-                let shift = self.type_code << 4 | self.field_code;
+                let shift = (self.type_code << 4 | self.field_code) as u8;
                 header_bytes.extend_from_slice(&shift.to_be_bytes());
             } else {
-                let shift = self.type_code << 4;
+                let shift = (self.type_code << 4) as u8;
 
                 header_bytes.extend_from_slice(&shift.to_be_bytes());
-                header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+                header_bytes.extend_from_slice(&(self.field_code as u8).to_be_bytes());
             }
         } else if self.field_code < 16 {
-            header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
-            header_bytes.extend_from_slice(&self.type_code.to_be_bytes());
+            header_bytes.extend_from_slice(&(self.field_code as u8).to_be_bytes());
+            header_bytes.extend_from_slice(&(self.type_code as u8).to_be_bytes());
         } else {
             header_bytes.extend_from_slice(&[0]);
-            header_bytes.extend_from_slice(&self.type_code.to_be_bytes());
-            header_bytes.extend_from_slice(&self.field_code.to_be_bytes());
+            header_bytes.extend_from_slice(&(self.type_code as u8).to_be_bytes());
+            header_bytes.extend_from_slice(&(self.field_code as u8).to_be_bytes());
         }
 
         header_bytes

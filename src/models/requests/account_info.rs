@@ -1,7 +1,10 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// This request retrieves information about an account, its
 /// activity, and its XRP balance. All information retrieved
@@ -12,16 +15,17 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountInfo<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's Address.
-    pub account: &'a str,
-    /// The unique request id.
-    pub id: Option<&'a str>,
+    pub account: Cow<'a, str>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// If true, then the account field only accepts a public
     /// key or XRP Ledger address. Otherwise, account can be
     /// a secret or passphrase (not recommended).
@@ -36,47 +40,41 @@ pub struct AccountInfo<'a> {
     /// If true, and the MultiSign amendment is enabled, also
     /// returns any SignerList objects associated with this account.
     pub signer_lists: Option<bool>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_info")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountInfo<'a> {
-    fn default() -> Self {
-        AccountInfo {
-            account: "",
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            strict: None,
-            queue: None,
-            signer_lists: None,
-            command: RequestMethod::AccountInfo,
-        }
-    }
 }
 
 impl<'a> Model for AccountInfo<'a> {}
 
+impl<'a> Request<'a> for AccountInfo<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> AccountInfo<'a> {
-    fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         strict: Option<bool>,
         queue: Option<bool>,
         signer_lists: Option<bool>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountInfo,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             strict,
             queue,
             signer_lists,
-            command: RequestMethod::AccountInfo,
         }
     }
 }

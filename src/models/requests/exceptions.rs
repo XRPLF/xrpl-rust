@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use strum_macros::Display;
 use thiserror_no_std::Error;
 
@@ -18,11 +19,11 @@ pub enum XRPLChannelAuthorizeException<'a> {
     /// A field cannot be defined with other fields.
     #[error("The field `{field1:?}` can not be defined with `{field2:?}`, `{field3:?}`, `{field4:?}`. Define exactly one of them. For more information see: {resource:?}")]
     DefineExactlyOneOf {
-        field1: &'a str,
-        field2: &'a str,
-        field3: &'a str,
-        field4: &'a str,
-        resource: &'a str,
+        field1: Cow<'a, str>,
+        field2: Cow<'a, str>,
+        field3: Cow<'a, str>,
+        field4: Cow<'a, str>,
+        resource: Cow<'a, str>,
     },
 }
 
@@ -40,17 +41,17 @@ pub enum XRPLLedgerEntryException<'a> {
     /// A field cannot be defined with other fields.
     #[error("Define one of: `{field1:?}`, `{field2:?}`, `{field3:?}`, `{field4:?}`, `{field5:?}`, `{field6:?}`, `{field7:?}`, `{field8:?}`, `{field9:?}`, `{field10:?}`. Define exactly one of them. For more information see: {resource:?}")]
     DefineExactlyOneOf {
-        field1: &'a str,
-        field2: &'a str,
-        field3: &'a str,
-        field4: &'a str,
-        field5: &'a str,
-        field6: &'a str,
-        field7: &'a str,
-        field8: &'a str,
-        field9: &'a str,
-        field10: &'a str,
-        resource: &'a str,
+        field1: Cow<'a, str>,
+        field2: Cow<'a, str>,
+        field3: Cow<'a, str>,
+        field4: Cow<'a, str>,
+        field5: Cow<'a, str>,
+        field6: Cow<'a, str>,
+        field7: Cow<'a, str>,
+        field8: Cow<'a, str>,
+        field9: Cow<'a, str>,
+        field10: Cow<'a, str>,
+        resource: Cow<'a, str>,
     },
 }
 

@@ -18,7 +18,9 @@ use core::convert::TryInto;
 use core::str::FromStr;
 use crypto_bigint::Encoding;
 use crypto_bigint::U256;
+use ed25519_dalek::ed25519::signature::SignerMut;
 use ed25519_dalek::Verifier;
+use ed25519_dalek::SECRET_KEY_LENGTH;
 use secp256k1::ecdsa;
 use secp256k1::Scalar;
 
@@ -58,8 +60,8 @@ impl Secp256k1 {
     }
 
     /// Hash the message to prevent insecure signing.
-    fn _get_message(message: &[u8]) -> Result<secp256k1::Message, secp256k1::Error> {
-        secp256k1::Message::from_slice(&sha512_first_half(message))
+    fn _get_message(message: &[u8]) -> secp256k1::Message {
+        secp256k1::Message::from_digest(sha512_first_half(message))
     }
 
     /// Determing if the provided secret key is valid.
@@ -143,7 +145,7 @@ impl Ed25519 {
     }
 
     /// Hex encode the public key.
-    fn _public_key_to_str(key: ed25519_dalek::PublicKey) -> String {
+    fn _public_key_to_str(key: ed25519_dalek::VerifyingKey) -> String {
         hex::encode(key.as_ref())
     }
 
@@ -155,7 +157,7 @@ impl Ed25519 {
 
     /// Format the public and private keys.
     fn _format_keys(
-        public: ed25519_dalek::PublicKey,
+        public: ed25519_dalek::VerifyingKey,
         private: ed25519_dalek::SecretKey,
     ) -> (String, String) {
         (
@@ -265,7 +267,7 @@ impl CryptoImplementation for Secp256k1 {
         private_key: &str,
     ) -> Result<Vec<u8>, XRPLKeypairsException> {
         let secp = secp256k1::Secp256k1::<secp256k1::SignOnly>::signing_only();
-        let message = Self::_get_message(message_bytes)?;
+        let message = Self::_get_message(message_bytes);
         let trimmed_key = private_key.trim_start_matches(SECP256K1_PREFIX);
         let private = secp256k1::SecretKey::from_str(trimmed_key)?;
         let signature = secp.sign_ecdsa(&message, &private);
@@ -307,8 +309,8 @@ impl CryptoImplementation for Secp256k1 {
             let sig = ecdsa::Signature::from_der(&value);
             let public = secp256k1::PublicKey::from_str(public_key);
 
-            if let (&Ok(m), &Ok(s), &Ok(p)) = (&msg.as_ref(), &sig.as_ref(), &public.as_ref()) {
-                secp.verify_ecdsa(m, s, p).is_ok()
+            if let (&Ok(s), &Ok(p)) = (&sig.as_ref(), &public.as_ref()) {
+                secp.verify_ecdsa(&msg, s, p).is_ok()
             } else {
                 false
             }
@@ -367,8 +369,9 @@ impl CryptoImplementation for Ed25519 {
             })
         } else {
             let raw_private = sha512_first_half(decoded_seed);
-            let private = ed25519_dalek::SecretKey::from_bytes(&raw_private)?;
-            let public = ed25519_dalek::PublicKey::from(&private);
+            let private: [u8; SECRET_KEY_LENGTH] = ed25519_dalek::SecretKey::from(raw_private);
+            let signing_key: ed25519_dalek::SigningKey = private.into();
+            let public = (&signing_key).into();
 
             Ok(Ed25519::_format_keys(public, private))
         }
@@ -398,25 +401,22 @@ impl CryptoImplementation for Ed25519 {
     ///     182, 130, 224, 208, 104, 247, 55,73, 117, 14,
     /// ];
     ///
-    /// let signing: Option<Vec<u8>> = match Ed25519.sign(
+    /// let signing: Option<Vec<u8>> = Some(Ed25519.sign(
     ///     message,
     ///     private_key,
-    /// ) {
-    ///     Ok(signature) => Some(signature),
-    ///     Err(e) => match e {
-    ///         XRPLKeypairsException::ED25519Error => None,
-    ///         _ => None,
-    ///     },
-    /// };
+    /// ).unwrap());
     ///
     /// assert_eq!(Some(signature), signing);
     /// ```
     fn sign(&self, message: &[u8], private_key: &str) -> Result<Vec<u8>, XRPLKeypairsException> {
         let raw_private = hex::decode(&private_key[ED25519_PREFIX.len()..])?;
-        let private = ed25519_dalek::SecretKey::from_bytes(&raw_private)?;
-        let expanded_private = ed25519_dalek::ExpandedSecretKey::from(&private);
-        let public = ed25519_dalek::PublicKey::from(&private);
-        let signature: ed25519_dalek::Signature = expanded_private.sign(message, &public);
+        let raw_private_slice: &[u8; SECRET_KEY_LENGTH] = raw_private
+            .as_slice()
+            .try_into()
+            .map_err(|_| XRPLKeypairsException::InvalidSecret)?;
+        let private: ed25519_dalek::SecretKey = *raw_private_slice;
+        let mut signing_key: ed25519_dalek::SigningKey = private.into();
+        let signature = signing_key.sign(message);
 
         Ok(signature.to_bytes().to_vec())
     }
@@ -455,7 +455,8 @@ impl CryptoImplementation for Ed25519 {
         };
 
         if let (Ok(rpub), Ok(dsig)) = (raw_public, decoded_sig) {
-            let public = ed25519_dalek::PublicKey::from_bytes(&rpub);
+            let rpub = rpub.as_slice().try_into().unwrap();
+            let public = ed25519_dalek::VerifyingKey::from_bytes(rpub);
 
             if dsig.len() != ED25519_SIGNATURE_LENGTH {
                 return false;

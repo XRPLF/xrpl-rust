@@ -1,4 +1,6 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -6,12 +8,13 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     amount::Amount,
-    model::Model,
-    transactions::{Flag, Memo, Signer, Transaction, TransactionType},
+    transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 
-use crate::_serde::txn_flags;
 use crate::models::amount::XRPAmount;
+
+use super::{CommonFields, FlagCollection};
 
 /// Transactions of the OfferCreate type support additional values
 /// in the Flags field. This enum represents those options.
@@ -60,152 +63,76 @@ pub struct OfferCreate<'a> {
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
     /// The type of transaction.
-    #[serde(default = "TransactionType::offer_create")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Highest ledger index this transaction can appear in.
-    /// Specifying this field places a strict upper limit on how long
-    /// the transaction can wait to be validated or rejected.
-    /// See Reliable Transaction Submission for more details.
-    pub last_ledger_sequence: Option<u32>,
-    /// Hash value identifying another transaction. If provided, this
-    /// transaction is only valid if the sending account's
-    /// previously-sent transaction matches the provided hash.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The sequence number of the ticket to use in place
-    /// of a Sequence number. If this is provided, Sequence must
-    /// be 0. Cannot be used with AccountTxnID.
-    pub ticket_sequence: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
-    /// Set of bit-flags for this transaction.
-    #[serde(default)]
-    #[serde(with = "txn_flags")]
-    pub flags: Option<Vec<OfferCreateFlag>>,
-    /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction is
-    /// made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
-    /// The custom fields for the OfferCreate model.
-    ///
-    /// See OfferCreate fields:
-    /// `<https://xrpl.org/offercreate.html#offercreate-fields>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, OfferCreateFlag>,
+    // The custom fields for the OfferCreate model.
+    //
+    // See OfferCreate fields:
+    // `<https://xrpl.org/offercreate.html#offercreate-fields>`
+    /// The amount and type of currency being sold.
     pub taker_gets: Amount<'a>,
+    /// The amount and type of currency being bought.
     pub taker_pays: Amount<'a>,
+    /// Time after which the Offer is no longer active, in seconds since the Ripple Epoch.
     pub expiration: Option<u32>,
+    /// An Offer to delete first, specified in the same way as OfferCancel.
     pub offer_sequence: Option<u32>,
-}
-
-impl<'a> Default for OfferCreate<'a> {
-    fn default() -> Self {
-        Self {
-            transaction_type: TransactionType::OfferCreate,
-            account: Default::default(),
-            fee: Default::default(),
-            sequence: Default::default(),
-            last_ledger_sequence: Default::default(),
-            account_txn_id: Default::default(),
-            signing_pub_key: Default::default(),
-            source_tag: Default::default(),
-            ticket_sequence: Default::default(),
-            txn_signature: Default::default(),
-            flags: Default::default(),
-            memos: Default::default(),
-            signers: Default::default(),
-            taker_gets: Default::default(),
-            taker_pays: Default::default(),
-            expiration: Default::default(),
-            offer_sequence: Default::default(),
-        }
-    }
 }
 
 impl<'a> Model for OfferCreate<'a> {}
 
-impl<'a> Transaction for OfferCreate<'a> {
-    fn has_flag(&self, flag: &Flag) -> bool {
-        let mut flags = &Vec::new();
-
-        if let Some(flag_set) = self.flags.as_ref() {
-            flags = flag_set;
-        }
-
-        match flag {
-            Flag::OfferCreate(offer_create_flag) => match offer_create_flag {
-                OfferCreateFlag::TfFillOrKill => flags.contains(&OfferCreateFlag::TfFillOrKill),
-                OfferCreateFlag::TfImmediateOrCancel => {
-                    flags.contains(&OfferCreateFlag::TfImmediateOrCancel)
-                }
-                OfferCreateFlag::TfPassive => flags.contains(&OfferCreateFlag::TfPassive),
-                OfferCreateFlag::TfSell => flags.contains(&OfferCreateFlag::TfSell),
-            },
-            _ => false,
-        }
+impl<'a> Transaction<'a, OfferCreateFlag> for OfferCreate<'a> {
+    fn has_flag(&self, flag: &OfferCreateFlag) -> bool {
+        self.common_fields.has_flag(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, OfferCreateFlag> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, OfferCreateFlag> {
+        self.common_fields.get_mut_common_fields()
     }
 }
 
 impl<'a> OfferCreate<'a> {
-    fn new(
-        account: &'a str,
-        taker_gets: Amount<'a>,
-        taker_pays: Amount<'a>,
+    pub fn new(
+        account: Cow<'a, str>,
+        account_txn_id: Option<Cow<'a, str>>,
         fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
+        flags: Option<FlagCollection<OfferCreateFlag>>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
-        flags: Option<Vec<OfferCreateFlag>>,
-        memos: Option<Vec<Memo<'a>>>,
-        signers: Option<Vec<Signer<'a>>>,
+        taker_gets: Amount<'a>,
+        taker_pays: Amount<'a>,
         expiration: Option<u32>,
         offer_sequence: Option<u32>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::OfferCreate,
-            account,
-            fee,
-            sequence,
-            last_ledger_sequence,
-            account_txn_id,
-            signing_pub_key,
-            source_tag,
-            ticket_sequence,
-            txn_signature,
-            flags,
-            memos,
-            signers,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::OfferCreate,
+                account_txn_id,
+                fee,
+                flags: flags.unwrap_or_default(),
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
+            },
             taker_gets,
             taker_pays,
             expiration,
@@ -223,58 +150,52 @@ mod test {
 
     #[test]
     fn test_has_flag() {
-        let txn: OfferCreate = OfferCreate {
-            transaction_type: TransactionType::OfferCreate,
-            account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe",
-            fee: Some("10".into()),
-            sequence: Some(1),
-            last_ledger_sequence: Some(72779837),
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: Some(vec![OfferCreateFlag::TfImmediateOrCancel]),
-            memos: None,
-            signers: None,
-            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
-            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let txn: OfferCreate = OfferCreate::new(
+            "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
+            None,
+            Some("10".into()),
+            Some(vec![OfferCreateFlag::TfImmediateOrCancel].into()),
+            Some(72779837),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            Amount::XRPAmount(XRPAmount::from("1000000")),
+            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
                 "0.3".into(),
             )),
-            expiration: None,
-            offer_sequence: None,
-        };
-        assert!(txn.has_flag(&Flag::OfferCreate(OfferCreateFlag::TfImmediateOrCancel)));
-        assert!(!txn.has_flag(&Flag::OfferCreate(OfferCreateFlag::TfPassive)));
+            None,
+            None,
+        );
+        assert!(txn.has_flag(&OfferCreateFlag::TfImmediateOrCancel));
+        assert!(!txn.has_flag(&OfferCreateFlag::TfPassive));
     }
 
     #[test]
     fn test_get_transaction_type() {
-        let txn: OfferCreate = OfferCreate {
-            transaction_type: TransactionType::OfferCreate,
-            account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe",
-            fee: Some("10".into()),
-            sequence: Some(1),
-            last_ledger_sequence: Some(72779837),
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: Some(vec![OfferCreateFlag::TfImmediateOrCancel]),
-            memos: None,
-            signers: None,
-            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
-            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let txn: OfferCreate = OfferCreate::new(
+            "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
+            None,
+            Some("10".into()),
+            Some(vec![OfferCreateFlag::TfImmediateOrCancel].into()),
+            Some(72779837),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            Amount::XRPAmount(XRPAmount::from("1000000")),
+            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
                 "0.3".into(),
             )),
-            expiration: None,
-            offer_sequence: None,
-        };
+            None,
+            None,
+        );
         let actual = txn.get_transaction_type();
         let expect = TransactionType::OfferCreate;
         assert_eq!(actual, expect)
@@ -282,71 +203,42 @@ mod test {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
 
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let default_txn = OfferCreate::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+            None,
+            Some("12".into()),
+            None,
+            Some(7108682),
+            None,
+            Some(8),
+            None,
+            None,
+            None,
             Amount::XRPAmount(XRPAmount::from("6000000")),
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "GKO".into(),
                 "ruazs5h1qEsqpke88pcqnaseXdm6od2xc".into(),
                 "2".into(),
             )),
-            Some("12".into()),
-            Some(8),
-            Some(7108682),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
             None,
             None,
         );
-        let default_json = r#"{"TransactionType":"OfferCreate","Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","Fee":"12","Sequence":8,"LastLedgerSequence":7108682,"TakerGets":"6000000","TakerPays":{"currency":"GKO","issuer":"ruazs5h1qEsqpke88pcqnaseXdm6od2xc","value":"2"}}"#;
+        let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"OfferCreate","Fee":"12","Flags":0,"LastLedgerSequence":7108682,"Sequence":8,"TakerGets":"6000000","TakerPays":{"currency":"GKO","issuer":"ruazs5h1qEsqpke88pcqnaseXdm6od2xc","value":"2"}}"#;
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
 
-        let txn_as_string = serde_json::to_string(&default_txn).unwrap();
-        let txn_json = txn_as_string.as_str();
-
-        assert_eq!(txn_json, default_json);
-    }
-
-    #[test]
-    fn test_deserialize() {
-        let default_txn = OfferCreate::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
-            Amount::XRPAmount(XRPAmount::from("6000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                "GKO".into(),
-                "ruazs5h1qEsqpke88pcqnaseXdm6od2xc".into(),
-                "2".into(),
-            )),
-            Some("12".into()),
-            Some(8),
-            Some(7108682),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        let default_json = r#"{"TransactionType":"OfferCreate","Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","Fee":"12","Sequence":8,"LastLedgerSequence":7108682,"TakerGets":"6000000","TakerPays":{"value":"2","currency":"GKO","issuer":"ruazs5h1qEsqpke88pcqnaseXdm6od2xc"}}"#;
-
-        let txn_as_obj: OfferCreate = serde_json::from_str(default_json).unwrap();
-
-        assert_eq!(txn_as_obj, default_txn);
+        // Deserialize
+        let deserialized: OfferCreate = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
     }
 }

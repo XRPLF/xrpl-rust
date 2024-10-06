@@ -1,0 +1,51 @@
+[package]
+name = "std"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+xrpl-rust = { path = "../.." }
+tokio = { version = "1.0", features = ["full"] }
+rand = "0.8.5"
+
+[[bin]]
+name = "wallet_from_seed"
+path = "src/bin/wallet/wallet_from_seed.rs"
+required-features = []
+
+[[bin]]
+name = "generate_wallet"
+path = "src/bin/wallet/generate_wallet.rs"
+required-features = []
+
+[[bin]]
+name = "async_websocket"
+path = "src/bin/asynch/clients/websocket.rs"
+required-features = []
+
+[[bin]]
+name = "async_json_rpc"
+path = "src/bin/asynch/clients/json_rpc.rs"
+required-features = []
+
+[[bin]]
+name = "websocket"
+path = "src/bin/clients/websocket.rs"
+required-features = []
+
+[[bin]]
+name = "json_rpc"
+path = "src/bin/clients/json_rpc.rs"
+required-features = []
+
+[[bin]]
+name = "sign_transaction"
+path = "src/bin/transaction/sign_transaction.rs"
+required-features = []
+
+[[bin]]
+name = "sign_and_submit"
+path = "src/bin/asynch/transaction/sign_and_submit.rs"
+required-features = []

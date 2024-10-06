@@ -2,6 +2,8 @@
 
 pub mod exceptions;
 pub mod time_conversion;
+#[cfg(feature = "transaction-models")]
+pub(crate) mod transactions;
 pub mod xrpl_conversion;
 
 pub use self::time_conversion::*;

@@ -1,8 +1,8 @@
-use crate::_serde::lgr_obj_flags;
-use crate::models::ledger::LedgerEntryType;
+use crate::models::ledger::objects::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::Model;
 use alloc::borrow::Cow;
-
+use alloc::string::String;
 use alloc::vec::Vec;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
@@ -11,6 +11,8 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::serde_with_tag;
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
@@ -26,14 +28,14 @@ serde_with_tag! {
     ///
     /// `<https://xrpl.org/signerlist.html#signer-entry-object>`
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct SignerEntry<'a>{
+    pub struct SignerEntry {
         /// An XRP Ledger address whose signature contributes to the multi-signature.
-        pub account: Cow<'a, str>,
+        pub account: String,
         /// The weight of a signature from this signer.
         pub signer_weight: u16,
         /// Arbitrary hexadecimal data. This can be used to identify the signer or for
         /// other, related purposes.
-        pub wallet_locator: Option<Cow<'a, str>>,
+        pub wallet_locator: Option<String>,
     }
 }
 
@@ -45,16 +47,16 @@ serde_with_tag! {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct SignerList<'a> {
-    /// The value 0x0053, mapped to the string SignerList, indicates that this object is a
-    /// SignerList object.
-    ledger_entry_type: LedgerEntryType,
-    /// A bit-map of Boolean flags enabled for this signer list.
-    #[serde(with = "lgr_obj_flags")]
-    flags: Vec<SignerListFlag>,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, SignerListFlag>,
+    // The custom fields for the SignerList model.
+    //
+    // See SignerList fields:
+    // `<https://xrpl.org/signerlist.html#signerlist-fields>`
     /// A hint indicating which page of the owner directory links to this object, in case
     /// the directory consists of multiple pages.
     pub owner_node: Cow<'a, str>,
@@ -66,8 +68,7 @@ pub struct SignerList<'a> {
     pub previous_txn_lgr_seq: u32,
     /// An array of Signer Entry objects representing the parties who are part of this
     /// signer list.
-    #[serde(borrow = "'a")]
-    pub signer_entries: Vec<SignerEntry<'a>>,
+    pub signer_entries: Vec<SignerEntry>,
     /// An ID for this signer list. Currently always set to 0.
     #[serde(rename = "SignerListID")]
     pub signer_list_id: u32,
@@ -77,39 +78,33 @@ pub struct SignerList<'a> {
     pub signer_quorum: u32,
 }
 
-impl<'a> Default for SignerList<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::SignerList,
-            flags: Default::default(),
-            index: Default::default(),
-            owner_node: Default::default(),
-            previous_txn_id: Default::default(),
-            previous_txn_lgr_seq: Default::default(),
-            signer_entries: Default::default(),
-            signer_list_id: Default::default(),
-            signer_quorum: Default::default(),
-        }
+impl<'a> Model for SignerList<'a> {}
+
+impl<'a> LedgerObject<SignerListFlag> for SignerList<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for SignerList<'a> {}
-
 impl<'a> SignerList<'a> {
     pub fn new(
-        flags: Vec<SignerListFlag>,
-        index: Cow<'a, str>,
+        flags: FlagCollection<SignerListFlag>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
-        signer_entries: Vec<SignerEntry<'a>>,
+        signer_entries: Vec<SignerEntry>,
         signer_list_id: u32,
         signer_quorum: u32,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::SignerList,
-            flags,
-            index,
+            common_fields: CommonFields {
+                flags,
+                ledger_entry_type: LedgerEntryType::SignerList,
+                index,
+                ledger_index,
+            },
             owner_node,
             previous_txn_id,
             previous_txn_lgr_seq,
@@ -121,32 +116,34 @@ impl<'a> SignerList<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
+    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let signer_list = SignerList::new(
-            vec![],
-            Cow::from("A9C28A28B85CD533217F5C0A0C7767666B093FA58A0F2D80026FCC4CD932DDC7"),
+            vec![].into(),
+            Some(Cow::from(
+                "A9C28A28B85CD533217F5C0A0C7767666B093FA58A0F2D80026FCC4CD932DDC7",
+            )),
+            None,
             Cow::from("0000000000000000"),
             Cow::from("5904C0DC72C58A83AEFED2FFC5386356AA83FCA6A88C89D00646E51E687CDBE4"),
             16061435,
             vec![
-                SignerEntry::new(Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"), 2, None),
-                SignerEntry::new(Cow::from("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n"), 1, None),
-                SignerEntry::new(Cow::from("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v"), 1, None),
+                SignerEntry::new("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2, None),
+                SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1, None),
+                SignerEntry::new("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1, None),
             ],
             0,
             3,
         );
-        let signer_list_json = serde_json::to_string(&signer_list).unwrap();
-        let actual = signer_list_json.as_str();
-        let expected = r#"{"LedgerEntryType":"SignerList","Flags":0,"index":"A9C28A28B85CD533217F5C0A0C7767666B093FA58A0F2D80026FCC4CD932DDC7","OwnerNode":"0000000000000000","PreviousTxnID":"5904C0DC72C58A83AEFED2FFC5386356AA83FCA6A88C89D00646E51E687CDBE4","PreviousTxnLgrSeq":16061435,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2,"WalletLocator":null}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1,"WalletLocator":null}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1,"WalletLocator":null}}],"SignerListID":0,"SignerQuorum":3}"#;
+        let serialized = serde_json::to_string(&signer_list).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: SignerList = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(signer_list, deserialized);
     }
-
-    // TODO: test_deserialize
 }

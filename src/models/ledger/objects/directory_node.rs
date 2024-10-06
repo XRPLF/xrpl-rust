@@ -1,10 +1,13 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::Model;
+use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 /// The `DirectoryNode` object type provides a list of links to other objects in the ledger's state
 /// tree. A single conceptual Directory　takes the form of a doubly linked list, with one or more
@@ -23,20 +26,22 @@ use serde_with::skip_serializing_none;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct DirectoryNode<'a> {
-    /// The value 0x0064, mapped to the string `DirectoryNode`, indicates that this object is part
-    /// of a Directory.
-    pub ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean flags enabled for this object. Currently, the protocol defines no flags
-    /// for `DirectoryNode` objects. The value is always 0.
-    pub flags: u32,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the DirectoryNode model.
+    //
+    // See DirectoryNode fields:
+    // `<https://xrpl.org/directorynode.html#directorynode-fields>`
     /// (`Offer` Directories only) DEPRECATED. Do not use.
     pub exchange_rate: Option<Cow<'a, str>>,
     /// The contents of this `Directory`: an array of IDs of other objects.
     pub indexes: Vec<Cow<'a, str>>,
+    /// The ID of root object for this directory.
+    pub root_index: Cow<'a, str>,
     /// If this `Directory` consists of multiple pages, this ID links to the next object in the chain,
     /// wrapping around at the end.
     pub index_next: Option<u64>,
@@ -45,15 +50,13 @@ pub struct DirectoryNode<'a> {
     pub index_previous: Option<u64>,
     /// (Owner Directories only) The address of the account that owns the objects in this directory.
     pub owner: Option<Cow<'a, str>>,
-    /// The ID of root object for this directory.
-    pub root_index: Cow<'a, str>,
     /// (`Offer` `Directories` only) The currency code of the `TakerGets` amount from the offers in this
     /// directory.
     pub taker_gets_currency: Option<Cow<'a, str>>,
+    /// (`Offer` `Directories` only) The currency code of the `TakerPays` amount from the offers in this
     /// (`Offer` `Directories` only) The issuer of the `TakerGets` amount from the offers in this
     /// directory.
     pub taker_gets_issuer: Option<Cow<'a, str>>,
-    /// (`Offer` `Directories` only) The currency code of the `TakerPays` amount from the offers in this
     /// directory.
     pub taker_pays_currency: Option<Cow<'a, str>>,
     /// (`Offer` `Directories` only) The issuer of the `TakerPays` amount from the offers in this
@@ -61,31 +64,18 @@ pub struct DirectoryNode<'a> {
     pub taker_pays_issuer: Option<Cow<'a, str>>,
 }
 
-impl<'a> Default for DirectoryNode<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::DirectoryNode,
-            flags: Default::default(),
-            index: Default::default(),
-            exchange_rate: Default::default(),
-            indexes: Default::default(),
-            index_next: Default::default(),
-            index_previous: Default::default(),
-            owner: Default::default(),
-            root_index: Default::default(),
-            taker_gets_currency: Default::default(),
-            taker_gets_issuer: Default::default(),
-            taker_pays_currency: Default::default(),
-            taker_pays_issuer: Default::default(),
-        }
+impl<'a> Model for DirectoryNode<'a> {}
+
+impl<'a> LedgerObject<NoFlags> for DirectoryNode<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for DirectoryNode<'a> {}
-
 impl<'a> DirectoryNode<'a> {
     pub fn new(
-        index: Cow<'a, str>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         indexes: Vec<Cow<'a, str>>,
         root_index: Cow<'a, str>,
         exchange_rate: Option<Cow<'a, str>>,
@@ -98,15 +88,18 @@ impl<'a> DirectoryNode<'a> {
         taker_pays_issuer: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::DirectoryNode,
-            flags: 0,
-            index,
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DirectoryNode,
+                index,
+                ledger_index,
+            },
             exchange_rate,
             indexes,
+            root_index,
             index_next,
             index_previous,
             owner,
-            root_index,
             taker_gets_currency,
             taker_gets_issuer,
             taker_pays_currency,
@@ -116,14 +109,17 @@ impl<'a> DirectoryNode<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
     use alloc::vec;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let directory_node = DirectoryNode::new(
-            Cow::from("1BBEF97EDE88D40CEE2ADE6FEF121166AFE80D99EBADB01A4F069BA8FF484000"),
+            Some(Cow::from(
+                "1BBEF97EDE88D40CEE2ADE6FEF121166AFE80D99EBADB01A4F069BA8FF484000",
+            )),
+            None,
             vec![Cow::from(
                 "AD7EAE148287EF12D213A251015F86E6D4BD34B3C4A0A1ED9A17198373F908AD",
             )],
@@ -137,12 +133,10 @@ mod test_serde {
             Some(Cow::from("0000000000000000000000004A50590000000000")),
             Some(Cow::from("5BBC0F22F61D9224A110650CFE21CC0C4BE13098")),
         );
-        let directory_node_json = serde_json::to_string(&directory_node).unwrap();
-        let actual = directory_node_json.as_str();
-        let expected = r#"{"LedgerEntryType":"DirectoryNode","Flags":0,"index":"1BBEF97EDE88D40CEE2ADE6FEF121166AFE80D99EBADB01A4F069BA8FF484000","ExchangeRate":"4F069BA8FF484000","Indexes":["AD7EAE148287EF12D213A251015F86E6D4BD34B3C4A0A1ED9A17198373F908AD"],"RootIndex":"1BBEF97EDE88D40CEE2ADE6FEF121166AFE80D99EBADB01A4F069BA8FF484000","TakerGetsCurrency":"0000000000000000000000000000000000000000","TakerGetsIssuer":"0000000000000000000000000000000000000000","TakerPaysCurrency":"0000000000000000000000004A50590000000000","TakerPaysIssuer":"5BBC0F22F61D9224A110650CFE21CC0C4BE13098"}"#;
+        let serialized = serde_json::to_string(&directory_node).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: DirectoryNode = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(directory_node, deserialized);
     }
-
-    // TODO: test_deserialize
 }

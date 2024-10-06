@@ -1,10 +1,13 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::FlagCollection;
 use crate::models::Model;
+use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 /// The `LedgerHashes` object type contains a history of prior ledgers that led up to this
 /// ledger version, in the form of their hashes. Objects of this ledger type are modified
@@ -23,14 +26,16 @@ use serde_with::skip_serializing_none;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct LedgerHashes<'a> {
-    /// The value `0x0068`, mapped to the string `LedgerHashes`, indicates that this object is a
-    /// list of ledger hashes.
-    pub ledger_entry_type: LedgerEntryType,
-    pub flags: u32,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the LedgerHashes model.
+    //
+    // See LedgerHashes fields:
+    // `<https://xrpl.org/ledgerhashes.html#ledgerhashes-fields>`
     /// **DEPRECATED** Do not use.
     pub first_ledger_sequence: u32,
     /// An array of up to 256 ledger hashes. The contents depend on which sub-type of `LedgerHashes`
@@ -40,32 +45,29 @@ pub struct LedgerHashes<'a> {
     pub last_ledger_sequence: u32,
 }
 
-impl<'a> Default for LedgerHashes<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::LedgerHashes,
-            flags: Default::default(),
-            index: Default::default(),
-            first_ledger_sequence: Default::default(),
-            hashes: Default::default(),
-            last_ledger_sequence: Default::default(),
-        }
+impl<'a> Model for LedgerHashes<'a> {}
+
+impl<'a> LedgerObject<NoFlags> for LedgerHashes<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for LedgerHashes<'a> {}
-
 impl<'a> LedgerHashes<'a> {
     pub fn new(
-        index: Cow<'a, str>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         first_ledger_sequence: u32,
         hashes: Vec<Cow<'a, str>>,
         last_ledger_sequence: u32,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::LedgerHashes,
-            flags: 0,
-            index,
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::LedgerHashes,
+                index,
+                ledger_index,
+            },
             first_ledger_sequence,
             hashes,
             last_ledger_sequence,
@@ -74,14 +76,17 @@ impl<'a> LedgerHashes<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
     use alloc::vec;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let ledger_hashes = LedgerHashes::new(
-            Cow::from("B4979A36CDC7F3D3D5C31A4EAE2AC7D7209DDA877588B9AFC66799692AB0D66B"),
+            Some(Cow::from(
+                "B4979A36CDC7F3D3D5C31A4EAE2AC7D7209DDA877588B9AFC66799692AB0D66B",
+            )),
+            None,
             2,
             vec![
                 Cow::from("D638208ADBD04CBB10DE7B645D3AB4BA31489379411A3A347151702B6401AA78"),
@@ -92,12 +97,10 @@ mod test_serde {
             ],
             33872029,
         );
-        let ledger_hashes_json = serde_json::to_string(&ledger_hashes).unwrap();
-        let actual = ledger_hashes_json.as_str();
-        let expected = r#"{"LedgerEntryType":"LedgerHashes","Flags":0,"index":"B4979A36CDC7F3D3D5C31A4EAE2AC7D7209DDA877588B9AFC66799692AB0D66B","FirstLedgerSequence":2,"Hashes":["D638208ADBD04CBB10DE7B645D3AB4BA31489379411A3A347151702B6401AA78","254D690864E418DDD9BCAC93F41B1F53B1AE693FC5FE667CE40205C322D1BE3B","A2B31D28905E2DEF926362822BC412B12ABF6942B73B72A32D46ED2ABB7ACCFA","AB4014846DF818A4B43D6B1686D0DE0644FE711577C5AB6F0B2A21CCEE280140","3383784E82A8BA45F4DD5EF4EE90A1B2D3B4571317DBAC37B859836ADDE644C1"],"LastLedgerSequence":33872029}"#;
+        let serialized = serde_json::to_string(&ledger_hashes).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: LedgerHashes = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(ledger_hashes, deserialized);
     }
-
-    // TODO: test_deserialize
 }

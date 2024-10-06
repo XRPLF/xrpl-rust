@@ -1,5 +1,8 @@
 //! Methods for working with XRPL wallets.
 
+#[cfg(feature = "wallet-helpers")]
+mod faucet_generation;
+
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::classic_address_to_xaddress;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
@@ -7,18 +10,20 @@ use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::generate_seed;
-use alloc::format;
 use alloc::string::String;
-use alloc::string::ToString;
-use alloc::vec;
+use core::fmt::Display;
 use zeroize::Zeroize;
+
+#[cfg(feature = "wallet-helpers")]
+pub use faucet_generation::*;
 
 /// The cryptographic keys needed to control an
 /// XRP Ledger account.
 ///
 /// See Cryptographic Keys:
 /// `<https://xrpl.org/cryptographic-keys.html>`
-struct Wallet {
+#[derive(Debug)]
+pub struct Wallet {
     /// The seed from which the public and private keys
     /// are derived.
     pub seed: String,
@@ -84,15 +89,13 @@ impl Wallet {
     }
 }
 
-impl ToString for Wallet {
+impl Display for Wallet {
     /// Returns a string representation of a Wallet.
-    fn to_string(&self) -> String {
-        let string_list = vec![
-            format!("public_key: {}", self.public_key),
-            format!("private_key: {}", "-HIDDEN-"),
-            format!("classic_address: {}", self.classic_address),
-        ];
-
-        string_list.join("-")
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(
+            f,
+            "Wallet {{ public_key: {}, private_key: -HIDDEN-, classic_address: {} }}",
+            self.public_key, self.classic_address
+        )
     }
 }

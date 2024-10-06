@@ -6,6 +6,7 @@ use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::JSONParseException;
 use crate::utils::exceptions::XRPRangeException;
 use strum_macros::Display;
+use thiserror_no_std::Error;
 
 #[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
@@ -17,6 +18,33 @@ pub enum XRPLTypeException {
     XRPLRangeError(XRPRangeException),
     DecimalError(rust_decimal::Error),
     JSONParseError(JSONParseException),
+    UnknownXRPLType,
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum XRPLSerializeArrayException {
+    #[error("Expected `Value` to be an array.")]
+    ExpectedArray,
+    #[error("Expected `Value` to be an array of objects.")]
+    ExpectedObjectArray,
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum XRPLSerializeMapException<'a> {
+    #[error("Expected `Value` to be an object.")]
+    ExpectedObject,
+    #[error("Field `{field}` is not allowed to have an associated tag.")]
+    DisallowedTag { field: &'a str },
+    #[error("Cannot have mismatched Account X-Address and SourceTag")]
+    AccountMismatchingTags,
+    #[error("Cannot have mismatched Destination X-Address and DestinationTag")]
+    DestinationMismatchingTags,
+    #[error("Unknown transaction type: {0}")]
+    UnknownTransactionType(&'a str),
+    #[error("Unknown transaction result: {0}")]
+    UnknownTransactionResult(&'a str),
+    #[error("Unknown ledger entry type: {0}")]
+    UnknownLedgerEntryType(&'a str),
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]

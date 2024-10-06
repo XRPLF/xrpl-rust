@@ -1,10 +1,11 @@
 on:
   push:
     branches:
-      - develop
+      - dev
   pull_request:
     branches:
       - main
+      - dev
 
 name: Unit
 
@@ -18,18 +19,57 @@ jobs:
         with:
           toolchain: stable
       - uses: actions-rs/cargo@v1
+        name: Build with default features
         with:
           command: build
-          args: --release --all-features
+          args: --release
       - uses: actions-rs/cargo@v1
+        name: Build with no default features
         with:
           command: build
-          args: --release --no-default-features --features core,models
+          args: --release --no-default-features
       - uses: actions-rs/cargo@v1
+        name: Build for no_std
+        with:
+          command: build
+          args: --release --no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc
+      - uses: actions-rs/cargo@v1
+        name: Build only core
+        with:
+          command: build
+          args: --release --no-default-features --features core
+      - uses: actions-rs/cargo@v1
+        name: Build only wallet
+        with:
+          command: build
+          args: --release --no-default-features --features wallet
+      - uses: actions-rs/cargo@v1
+        name: Build only models
+        with:
+          command: build
+          args: --release --no-default-features --features models
+      - uses: actions-rs/cargo@v1
+        name: Build only helpers
+        with:
+          command: build
+          args: --release --no-default-features --features websocket,json-rpc,helpers,tokio-rt
+      - uses: actions-rs/cargo@v1
+        name: Build only websocket
+        with:
+          command: build
+          args: --release --no-default-features --features websocket
+      - uses: actions-rs/cargo@v1
+        name: Build only core
+        with:
+          command: build
+          args: --release --no-default-features --features json-rpc
+      - uses: actions-rs/cargo@v1
+        name: Test with default features
         with:
           command: test
-          args: --all-features
+          args: --release
       - uses: actions-rs/cargo@v1
+        name: Test for no_std
         with:
           command: test
-          args: --no-default-features --features core,models
+          args: --release --no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc

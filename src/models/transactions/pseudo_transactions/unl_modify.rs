@@ -1,13 +1,18 @@
+use alloc::borrow::Cow;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
+use crate::models::transactions::{CommonFields, Memo, Signer};
 use crate::models::{
     amount::XRPAmount,
-    model::Model,
     transactions::{Transaction, TransactionType},
+    Model,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
@@ -32,72 +37,65 @@ pub struct UNLModify<'a> {
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
     /// The type of transaction.
-    #[serde(default = "TransactionType::unl_modify")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
-    /// Set of bit-flags for this transaction.
-    pub flags: Option<u32>,
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
     /// The custom fields for the UNLModify model.
     ///
     /// See UNLModify fields:
     /// `<https://xrpl.org/unlmodify.html#unlmodify-fields>`
     pub ledger_sequence: u32,
     pub unlmodify_disabling: UNLModifyDisabling,
-    pub unlmodify_validator: &'a str,
+    pub unlmodify_validator: Cow<'a, str>,
 }
 
 impl<'a> Model for UNLModify<'a> {}
 
-impl<'a> Transaction for UNLModify<'a> {
+impl<'a> Transaction<'a, NoFlags> for UNLModify<'a> {
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        self.common_fields.get_mut_common_fields()
     }
 }
 
 impl<'a> UNLModify<'a> {
-    fn new(
-        account: &'a str,
+    pub fn new(
+        account: Cow<'a, str>,
+        account_txn_id: Option<Cow<'a, str>>,
+        fee: Option<XRPAmount<'a>>,
+        last_ledger_sequence: Option<u32>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
+        source_tag: Option<u32>,
+        ticket_sequence: Option<u32>,
         ledger_sequence: u32,
         unlmodify_disabling: UNLModifyDisabling,
-        unlmodify_validator: &'a str,
-        fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
-        signing_pub_key: Option<&'a str>,
-        source_tag: Option<u32>,
-        txn_signature: Option<&'a str>,
+        unlmodify_validator: Cow<'a, str>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::UNLModify,
-            account,
-            fee,
-            sequence,
-            signing_pub_key,
-            source_tag,
-            txn_signature,
-            flags: None,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::UNLModify,
+                account_txn_id,
+                fee,
+                flags: FlagCollection::default(),
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
+            },
             ledger_sequence,
             unlmodify_disabling,
             unlmodify_validator,

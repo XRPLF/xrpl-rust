@@ -1,10 +1,14 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::ledger::objects::LedgerEntryType;
+use crate::models::FlagCollection;
+use crate::models::NoFlags;
 use crate::models::{amount::Amount, Model};
 use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
+
+use super::{CommonFields, LedgerObject};
 
 /// The `PayChannel` object type represents a payment channel. Payment channels enable small,
 /// rapid off-ledger payments of XRP that can be later reconciled with the consensus ledger.
@@ -14,16 +18,16 @@ use serde_with::skip_serializing_none;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct PayChannel<'a> {
-    /// The value `0x0078`, mapped to the string `PayChannel`, indicates that this object is a
-    /// payment channel object.
-    ledger_entry_type: LedgerEntryType,
-    /// A bit-map of boolean flags enabled for this object. Currently, the protocol defines
-    /// no flags for PayChannel objects. The value is always 0.
-    flags: u32,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the PayChannel model.
+    //
+    // See PayChannel fields:
+    // `<https://xrpl.org/paychannel.html#paychannel-fields>`
     /// The source address that owns this payment channel.
     pub account: Cow<'a, str>,
     /// Total XRP, in drops, that has been allocated to this channel. This includes XRP
@@ -66,35 +70,18 @@ pub struct PayChannel<'a> {
     pub source_tag: Option<u32>,
 }
 
-impl<'a> Default for PayChannel<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::PayChannel,
-            flags: Default::default(),
-            index: Default::default(),
-            account: Default::default(),
-            amount: Default::default(),
-            balance: Default::default(),
-            destination: Default::default(),
-            owner_node: Default::default(),
-            previous_txn_id: Default::default(),
-            previous_txn_lgr_seq: Default::default(),
-            public_key: Default::default(),
-            settle_delay: Default::default(),
-            cancel_after: Default::default(),
-            destination_tag: Default::default(),
-            destination_node: Default::default(),
-            expiration: Default::default(),
-            source_tag: Default::default(),
-        }
+impl<'a> Model for PayChannel<'a> {}
+
+impl<'a> LedgerObject<NoFlags> for PayChannel<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
     }
 }
 
-impl<'a> Model for PayChannel<'a> {}
-
 impl<'a> PayChannel<'a> {
     pub fn new(
-        index: Cow<'a, str>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         amount: Amount<'a>,
         balance: Amount<'a>,
@@ -111,9 +98,12 @@ impl<'a> PayChannel<'a> {
         source_tag: Option<u32>,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::PayChannel,
-            flags: 0,
-            index,
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::PayChannel,
+                index,
+                ledger_index,
+            },
             account,
             amount,
             balance,
@@ -133,14 +123,17 @@ impl<'a> PayChannel<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
     use alloc::borrow::Cow;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let pay_channel = PayChannel::new(
-            Cow::from("96F76F27D8A327FC48753167EC04A46AA0E382E6F57F32FD12274144D00F1797"),
+            Some(Cow::from(
+                "96F76F27D8A327FC48753167EC04A46AA0E382E6F57F32FD12274144D00F1797",
+            )),
+            None,
             Cow::from("rBqb89MRQJnMPq8wTwEbtz4kvxrEDfcYvt"),
             Amount::XRPAmount("4325800".into()),
             Amount::XRPAmount("2323423".into()),
@@ -156,12 +149,10 @@ mod test_serde {
             Some(536027313),
             Some(0),
         );
-        let pay_channel_json = serde_json::to_string(&pay_channel).unwrap();
-        let actual = pay_channel_json.as_str();
-        let expected = r#"{"LedgerEntryType":"PayChannel","Flags":0,"index":"96F76F27D8A327FC48753167EC04A46AA0E382E6F57F32FD12274144D00F1797","Account":"rBqb89MRQJnMPq8wTwEbtz4kvxrEDfcYvt","Amount":"4325800","Balance":"2323423","Destination":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OwnerNode":"0000000000000000","PreviousTxnID":"F0AB71E777B2DA54B86231E19B82554EF1F8211F92ECA473121C655BFC5329BF","PreviousTxnLgrSeq":14524914,"PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A","SettleDelay":3600,"CancelAfter":536891313,"DestinationTag":1002341,"DestinationNode":"0000000000000000","Expiration":536027313,"SourceTag":0}"#;
+        let serialized = serde_json::to_string(&pay_channel).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: PayChannel = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(pay_channel, deserialized);
     }
-
-    // TODO: test_deserialize
 }

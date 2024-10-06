@@ -1,17 +1,13 @@
 //! General XRPL Model Exception.
 
-use crate::models::requests::XRPLRequestException;
-use crate::models::transactions::XRPLTransactionException;
 use alloc::string::String;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
+use thiserror_no_std::Error;
 
-#[derive(Debug, PartialEq, Display)]
-#[non_exhaustive]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub enum XRPLModelException<'a> {
-    InvalidICCannotBeXRP,
-    XRPLTransactionError(XRPLTransactionException<'a>),
-    XRPLRequestError(XRPLRequestException<'a>),
+    #[error("Missing Field: {0}")]
+    MissingField(&'a str),
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -22,3 +18,12 @@ pub struct JSONRPCException {
 
 #[cfg(feature = "std")]
 impl<'a> alloc::error::Error for XRPLModelException<'a> {}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Error)]
+pub enum XRPLFlagsException {
+    #[error("Cannot convert flag to u32")]
+    CannotConvertFlagToU32,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLFlagsException {}

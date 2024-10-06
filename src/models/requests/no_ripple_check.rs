@@ -1,8 +1,11 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// Enum representing the options for the address role in
 /// a NoRippleCheckRequest.
@@ -27,70 +30,65 @@ pub enum NoRippleCheckRole {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct NoRippleCheck<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// A unique identifier for the account, most commonly the
     /// account's address.
-    pub account: &'a str,
+    pub account: Cow<'a, str>,
     /// Whether the address refers to a gateway or user.
     /// Recommendations depend on the role of the account.
     /// Issuers must have Default Ripple enabled and must disable
     /// No Ripple on all trust lines. Users should have Default Ripple
     /// disabled, and should enable No Ripple on all trust lines.
     pub role: NoRippleCheckRole,
-    /// The unique request id.
-    pub id: Option<&'a str>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut string
     /// to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
+    /// The maximum number of trust line problems to include in the
+    /// results. Defaults to 300.
+    pub limit: Option<u16>,
     /// If true, include an array of suggested transactions, as JSON
     /// objects, that you can sign and submit to fix the problems.
     /// Defaults to false.
     pub transactions: Option<bool>,
-    /// The maximum number of trust line problems to include in the
-    /// results. Defaults to 300.
-    pub limit: Option<u16>,
-    /// The request method.
-    #[serde(default = "RequestMethod::no_ripple_check")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for NoRippleCheck<'a> {
-    fn default() -> Self {
-        NoRippleCheck {
-            account: "",
-            role: Default::default(),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            transactions: None,
-            limit: None,
-            command: RequestMethod::NoRippleCheck,
-        }
-    }
 }
 
 impl<'a> Model for NoRippleCheck<'a> {}
 
+impl<'a> Request<'a> for NoRippleCheck<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> NoRippleCheck<'a> {
-    fn new(
-        account: &'a str,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
         role: NoRippleCheckRole,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
-        transactions: Option<bool>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
+        transactions: Option<bool>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::NoRippleCheck,
+                id,
+            },
             account,
             role,
-            id,
             ledger_hash,
             ledger_index,
             transactions,
             limit,
-            command: RequestMethod::NoRippleCheck,
         }
     }
 }

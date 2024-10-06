@@ -1,6 +1,9 @@
-use crate::models::ledger::LedgerEntryType;
+use crate::models::ledger::objects::LedgerEntryType;
+use crate::models::FlagCollection;
+use crate::models::NoFlags;
 use crate::models::{amount::Amount, Currency, Model};
 use alloc::borrow::Cow;
+use alloc::string::String;
 use alloc::vec::Vec;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
@@ -8,10 +11,12 @@ use serde::{ser::SerializeMap, Deserialize, Serialize};
 use crate::serde_with_tag;
 use serde_with::skip_serializing_none;
 
+use super::{CommonFields, LedgerObject};
+
 serde_with_tag! {
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct AuthAccount<'a> {
-        pub account: Cow<'a, str>,
+    pub struct AuthAccount {
+        pub account: String,
     }
 }
 
@@ -31,14 +36,13 @@ pub struct AuctionSlot<'a> {
     pub price: Amount<'a>,
     /// A list of at most 4 additional accounts that are authorized to trade at the discounted fee
     /// for this AMM instance.
-    #[serde(borrow = "'a")]
-    pub auth_accounts: Option<Vec<AuthAccount<'a>>>,
+    pub auth_accounts: Option<Vec<AuthAccount>>,
 }
 
 serde_with_tag! {
     #[derive(Debug, PartialEq, Eq, Clone, new, Default)]
-    pub struct VoteEntry<'a> {
-        pub account: Cow<'a, str>,
+    pub struct VoteEntry {
+        pub account: String,
         pub trading_fee: u16,
         pub vote_weight: u32,
     }
@@ -51,14 +55,16 @@ serde_with_tag! {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMM<'a> {
-    /// The value `0x0079`, mapped to the string `AMM`, indicates that this is an `AMM` object.
-    pub ledger_entry_type: LedgerEntryType,
-    /// Currently there are no flags for the AMM ledger object
-    pub flags: u32,
-    /// The object ID of a single object to retrieve from the ledger, as a
-    /// 64-character (256-bit) hexadecimal string.
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
+    /// The base fields for all ledger object models.
+    ///
+    /// See Ledger Object Common Fields:
+    /// `<https://xrpl.org/ledger-entry-common-fields.html>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, NoFlags>,
+    // The custom fields for the AMM model.
+    //
+    // See AMM fields:
+    // `<https://xrpl.org/amm.html#amm-fields>`
     /// The address of the special account that holds this `AMM's` assets.
     #[serde(rename = "AMMAccount")]
     pub amm_account: Cow<'a, str>,
@@ -81,43 +87,36 @@ pub struct AMM<'a> {
     #[serde(borrow = "'a")]
     pub auction_slot: Option<AuctionSlot<'a>>,
     /// A list of vote objects, representing votes on the pool's trading fee.
-    pub vote_slots: Option<Vec<VoteEntry<'a>>>,
-}
-
-impl<'a> Default for AMM<'a> {
-    fn default() -> Self {
-        Self {
-            ledger_entry_type: LedgerEntryType::AMM,
-            flags: Default::default(),
-            index: Default::default(),
-            amm_account: Default::default(),
-            asset: Default::default(),
-            asset2: Default::default(),
-            lptoken_balance: Default::default(),
-            trading_fee: Default::default(),
-            auction_slot: Default::default(),
-            vote_slots: Default::default(),
-        }
-    }
+    pub vote_slots: Option<Vec<VoteEntry>>,
 }
 
 impl<'a> Model for AMM<'a> {}
 
+impl<'a> LedgerObject<NoFlags> for AMM<'a> {
+    fn get_ledger_entry_type(&self) -> LedgerEntryType {
+        self.common_fields.get_ledger_entry_type()
+    }
+}
+
 impl<'a> AMM<'a> {
     pub fn new(
-        index: Cow<'a, str>,
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         amm_account: Cow<'a, str>,
         asset: Currency<'a>,
         asset2: Currency<'a>,
         lptoken_balance: Amount<'a>,
         trading_fee: u16,
         auction_slot: Option<AuctionSlot<'a>>,
-        vote_slots: Option<Vec<VoteEntry<'a>>>,
+        vote_slots: Option<Vec<VoteEntry>>,
     ) -> Self {
         Self {
-            ledger_entry_type: LedgerEntryType::AMM,
-            flags: 0,
-            index,
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::AMM,
+                index,
+                ledger_index,
+            },
             amm_account,
             asset,
             asset2,
@@ -133,14 +132,16 @@ impl<'a> AMM<'a> {
 mod test_serde {
     use crate::models::amount::{Amount, IssuedCurrencyAmount};
     use crate::models::currency::{Currency, IssuedCurrency, XRP};
-    use crate::models::ledger::amm::{AuctionSlot, AuthAccount, VoteEntry, AMM};
+    use crate::models::ledger::objects::amm::{AuctionSlot, AuthAccount, VoteEntry, AMM};
     use alloc::borrow::Cow;
+    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]
     fn test_serialize() {
         let amm = AMM::new(
-            Cow::from("ForTest"),
+            Some(Cow::from("ForTest")),
+            None,
             Cow::from("rE54zDvgnghAoPopCgvtiqWNq3dU5y836S"),
             Currency::XRP(XRP::new()),
             Currency::IssuedCurrency(IssuedCurrency::new(
@@ -163,21 +164,21 @@ mod test_serde {
                     "0.8696263565463045".into(),
                 )),
                 Some(vec![
-                    AuthAccount::new(Cow::from("rMKXGCbJ5d8LbrqthdG46q3f969MVK2Qeg")),
-                    AuthAccount::new(Cow::from("rBepJuTLFJt3WmtLXYAxSjtBWAeQxVbncv")),
+                    AuthAccount::new("rMKXGCbJ5d8LbrqthdG46q3f969MVK2Qeg".to_string()),
+                    AuthAccount::new("rBepJuTLFJt3WmtLXYAxSjtBWAeQxVbncv".to_string()),
                 ]),
             )),
             Some(vec![VoteEntry::new(
-                Cow::from("rJVUeRqDFNs2xqA7ncVE6ZoAhPUoaJJSQm"),
+                "rJVUeRqDFNs2xqA7ncVE6ZoAhPUoaJJSQm".to_string(),
                 600,
                 100000,
             )]),
         );
-        let amm_json = serde_json::to_string(&amm).unwrap();
-        let actual = amm_json.as_str();
-        let expected = r#"{"LedgerEntryType":"AMM","Flags":0,"index":"ForTest","AMMAccount":"rE54zDvgnghAoPopCgvtiqWNq3dU5y836S","Asset":{"currency":"XRP"},"Asset2":{"currency":"TST","issuer":"rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd"},"LPTokenBalance":{"currency":"039C99CD9AB0B70B32ECDA51EAAE471625608EA2","issuer":"rE54zDvgnghAoPopCgvtiqWNq3dU5y836S","value":"71150.53584131501"},"TradingFee":600,"AuctionSlot":{"Account":"rJVUeRqDFNs2xqA7ncVE6ZoAhPUoaJJSQm","DiscountedFee":0,"Expiration":721870180,"Price":{"currency":"039C99CD9AB0B70B32ECDA51EAAE471625608EA2","issuer":"rE54zDvgnghAoPopCgvtiqWNq3dU5y836S","value":"0.8696263565463045"},"AuthAccounts":[{"AuthAccount":{"Account":"rMKXGCbJ5d8LbrqthdG46q3f969MVK2Qeg"}},{"AuthAccount":{"Account":"rBepJuTLFJt3WmtLXYAxSjtBWAeQxVbncv"}}]},"VoteSlots":[{"VoteEntry":{"Account":"rJVUeRqDFNs2xqA7ncVE6ZoAhPUoaJJSQm","TradingFee":600,"VoteWeight":100000}}]}"#;
+        let serialized = serde_json::to_string(&amm).unwrap();
 
-        assert_eq!(expected, actual);
+        let deserialized: AMM = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(amm, deserialized);
     }
 
     // TODO: test_deserialize

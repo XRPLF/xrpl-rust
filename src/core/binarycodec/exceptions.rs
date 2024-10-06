@@ -26,6 +26,9 @@ pub enum XRPLBinaryCodecException {
     SerdeJsonError(serde_json::error::Category),
     DecimalError(rust_decimal::Error),
     ISOCodeError(ISOCodeException),
+    FieldHasNoAssiciatedTag,
+    XAddressTagMismatch,
+    FieldIsNotAccountOrDestination,
 }
 
 impl From<XRPRangeException> for XRPLBinaryCodecException {

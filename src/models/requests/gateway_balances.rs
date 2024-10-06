@@ -1,8 +1,11 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// This request calculates the total balances issued by a
 /// given account, optionally excluding amounts held by
@@ -13,59 +16,55 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct GatewayBalances<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The Address to check. This should be the issuing address.
-    pub account: &'a str,
-    /// The unique request id.
-    pub id: Option<&'a str>,
+    pub account: Cow<'a, str>,
+    /// An operational address to exclude from the balances
+    /// issued, or an array of such addresses.
+    pub hotwallet: Option<Vec<Cow<'a, str>>>,
+    /// A 20-byte hex string for the ledger version to use.
+    pub ledger_hash: Option<Cow<'a, str>>,
+    /// The ledger index of the ledger version to use, or a
+    /// shortcut string to choose a ledger automatically.
+    pub ledger_index: Option<Cow<'a, str>>,
     /// If true, only accept an address or public key for the
     /// account parameter. Defaults to false.
     pub strict: Option<bool>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
-    /// The ledger index of the ledger version to use, or a
-    /// shortcut string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
-    /// An operational address to exclude from the balances
-    /// issued, or an array of such addresses.
-    pub hotwallet: Option<Vec<&'a str>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::deposit_authorization")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for GatewayBalances<'a> {
-    fn default() -> Self {
-        GatewayBalances {
-            account: "",
-            id: None,
-            strict: None,
-            ledger_hash: None,
-            ledger_index: None,
-            hotwallet: None,
-            command: RequestMethod::GatewayBalances,
-        }
-    }
 }
 
 impl<'a> Model for GatewayBalances<'a> {}
 
+impl<'a> Request<'a> for GatewayBalances<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> GatewayBalances<'a> {
-    fn new(
-        account: &'a str,
-        id: Option<&'a str>,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
+        hotwallet: Option<Vec<Cow<'a, str>>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         strict: Option<bool>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
-        hotwallet: Option<Vec<&'a str>>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::GatewayBalances,
+                id,
+            },
             account,
-            id,
             strict,
             ledger_hash,
             ledger_index,
             hotwallet,
-            command: RequestMethod::GatewayBalances,
         }
     }
 }

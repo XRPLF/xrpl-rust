@@ -1,7 +1,10 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// The ping command returns an acknowledgement, so that
 /// clients can test the connection status and latency.
@@ -11,29 +14,30 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Ping<'a> {
-    /// The unique request id.
-    pub id: Option<&'a str>,
-    /// The request method.
-    #[serde(default = "RequestMethod::ping")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for Ping<'a> {
-    fn default() -> Self {
-        Ping {
-            id: None,
-            command: RequestMethod::Ping,
-        }
-    }
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
 }
 
 impl<'a> Model for Ping<'a> {}
 
+impl<'a> Request<'a> for Ping<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> Ping<'a> {
-    fn new(id: Option<&'a str>) -> Self {
+    pub fn new(id: Option<Cow<'a, str>>) -> Self {
         Self {
-            id,
-            command: RequestMethod::Ping,
+            common_fields: CommonFields {
+                command: RequestMethod::Ping,
+                id,
+            },
         }
     }
 }

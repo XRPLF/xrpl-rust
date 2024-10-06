@@ -2,6 +2,8 @@
 #[macro_export]
 macro_rules! Err {
     ($err:expr $(,)?) => {{
+        use alloc::string::ToString;
+
         let error = $err.to_string().replace("\"", "");
         let boxed_error = ::alloc::boxed::Box::new(error);
         let leaked_error: &'static str = ::alloc::boxed::Box::leak(boxed_error);

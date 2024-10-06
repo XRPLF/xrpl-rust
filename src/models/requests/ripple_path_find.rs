@@ -1,9 +1,11 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::currency::XRP;
 use crate::models::{currency::Currency, requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// The ripple_path_find method is a simpl<'a>ified version of
 /// the path_find method that provides a single response with
@@ -24,12 +26,12 @@ use crate::models::{currency::Currency, requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct RipplePathFind<'a> {
-    /// Unique address of the account that would send funds
-    /// in a transaction.
-    pub source_account: &'a str,
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Unique address of the account that would receive funds
     /// in a transaction.
-    pub destination_account: &'a str,
+    pub destination_account: Cow<'a, str>,
     /// Currency Amount that the destination account would
     /// receive in a transaction. Special case: New in: rippled 0.30.0
     /// You can specify "-1" (for XRP) or provide -1 as the contents
@@ -37,13 +39,14 @@ pub struct RipplePathFind<'a> {
     /// path to deliver as much as possible, while spending no more
     /// than the amount specified in send_max (if provided).
     pub destination_amount: Currency<'a>,
-    /// The unique request id.
-    pub id: Option<&'a str>,
+    /// Unique address of the account that would send funds
+    /// in a transaction.
+    pub source_account: Cow<'a, str>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Currency Amount that would be spent in the transaction.
     /// Cannot be used with source_currencies.
     pub send_max: Option<Currency<'a>>,
@@ -55,50 +58,43 @@ pub struct RipplePathFind<'a> {
     /// currencies available up to a maximum of 88 different
     /// currency/issuer pairs.
     pub source_currencies: Option<Vec<Currency<'a>>>,
-    /// The request method.
-    #[serde(default = "RequestMethod::ripple_path_find")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for RipplePathFind<'a> {
-    fn default() -> Self {
-        RipplePathFind {
-            source_account: "",
-            destination_account: "",
-            destination_amount: Currency::XRP(XRP::new()),
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            send_max: None,
-            source_currencies: None,
-            command: RequestMethod::RipplePathFind,
-        }
-    }
 }
 
 impl<'a> Model for RipplePathFind<'a> {}
 
+impl<'a> Request<'a> for RipplePathFind<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> RipplePathFind<'a> {
-    fn new(
-        source_account: &'a str,
-        destination_account: &'a str,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        destination_account: Cow<'a, str>,
         destination_amount: Currency<'a>,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+        source_account: Cow<'a, str>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         send_max: Option<Currency<'a>>,
         source_currencies: Option<Vec<Currency<'a>>>,
     ) -> Self {
         Self {
-            source_account,
+            common_fields: CommonFields {
+                command: RequestMethod::RipplePathFind,
+                id,
+            },
             destination_account,
             destination_amount,
-            id,
+            source_account,
             ledger_hash,
             ledger_index,
             send_max,
             source_currencies,
-            command: RequestMethod::RipplePathFind,
         }
     }
 }

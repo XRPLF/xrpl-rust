@@ -1,7 +1,10 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// This request returns information about an account's Payment
 /// Channels. This includes only channels where the specified
@@ -18,9 +21,9 @@ use crate::models::{requests::RequestMethod, Model};
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::models::requests::AccountChannels;
+/// use xrpl::models::requests::account_channels::AccountChannels;
 ///
-/// let json = r#"{"account":"rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr","marker":12345678,"command":"account_channels"}"#.to_string();
+/// let json = r#"{"command":"account_channels","account":"rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr","marker":12345678}"#.to_string();
 /// let model: AccountChannels = serde_json::from_str(&json).expect("");
 /// let revert: Option<String> = match serde_json::to_string(&model) {
 ///     Ok(model) => Some(model),
@@ -32,68 +35,63 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AccountChannels<'a> {
+    /// Common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The unique identifier of an account, typically the
     /// account's Address. The request returns channels where
     /// this account is the channel's owner/source.
-    pub account: &'a str,
-    /// The unique request id.
-    pub id: Option<&'a str>,
+    pub account: Cow<'a, str>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
+    pub ledger_index: Option<Cow<'a, str>>,
     /// Limit the number of transactions to retrieve. Cannot
     /// be less than 10 or more than 400. The default is 200.
     pub limit: Option<u16>,
     /// The unique identifier of an account, typically the
     /// account's Address. If provided, filter results to
     /// payment channels whose destination is this account.
-    pub destination_account: Option<&'a str>,
+    pub destination_account: Option<Cow<'a, str>>,
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
     pub marker: Option<u32>,
-    /// The request method.
-    #[serde(default = "RequestMethod::account_channels")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for AccountChannels<'a> {
-    fn default() -> Self {
-        AccountChannels {
-            account: "",
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            limit: None,
-            destination_account: None,
-            marker: None,
-            command: RequestMethod::AccountChannels,
-        }
-    }
 }
 
 impl<'a> Model for AccountChannels<'a> {}
 
 impl<'a> AccountChannels<'a> {
-    fn new(
-        account: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
+        destination_account: Option<Cow<'a, str>>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
         limit: Option<u16>,
-        destination_account: Option<&'a str>,
         marker: Option<u32>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountChannels,
+                id,
+            },
             account,
-            id,
             ledger_hash,
             ledger_index,
             limit,
             destination_account,
             marker,
-            command: RequestMethod::AccountChannels,
         }
+    }
+}
+
+impl<'a> Request<'a> for AccountChannels<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
     }
 }

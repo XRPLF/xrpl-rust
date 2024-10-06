@@ -115,20 +115,24 @@ impl TryFrom<&str> for Currency {
     }
 }
 
-impl ToString for Currency {
+impl Display for Currency {
     /// Get the ISO or hex representation of the Currency bytes.
-    fn to_string(&self) -> String {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         let buffer = self.0.as_ref();
 
         if hex::encode_upper(buffer) == NATIVE_HEX_CODE {
-            NATIVE_CODE.to_string()
+            write!(f, "{}", NATIVE_CODE)
         } else {
             let iso = _iso_code_from_hex(buffer);
 
             if let Ok(code) = iso {
-                code.or_else(|| Some(hex::encode_upper(buffer))).unwrap()
+                write!(
+                    f,
+                    "{}",
+                    code.or_else(|| Some(hex::encode_upper(buffer))).unwrap()
+                )
             } else {
-                hex::encode_upper(buffer)
+                write!(f, "{}", hex::encode_upper(buffer))
             }
         }
     }

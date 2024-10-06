@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -7,16 +8,15 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     amount::Amount,
-    model::Model,
-    transactions::{Flag, Memo, Signer, Transaction, TransactionType},
-    PathStep,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, PathStep,
 };
-use alloc::string::ToString;
 
-use crate::Err;
-use crate::_serde::txn_flags;
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::XRPLPaymentException;
+use crate::models::transactions::exceptions::XRPLPaymentException;
+use crate::Err;
+
+use super::{CommonFields, FlagCollection};
 
 /// Transactions of the Payment type support additional values
 /// in the Flags field. This enum represents those options.
@@ -58,95 +58,35 @@ pub struct Payment<'a> {
     // See Transaction Common Fields:
     // `<https://xrpl.org/transaction-common-fields.html>`
     /// The type of transaction.
-    #[serde(default = "TransactionType::payment")]
-    pub transaction_type: TransactionType,
-    /// The unique address of the account that initiated the transaction.
-    pub account: &'a str,
-    /// Integer amount of XRP, in drops, to be destroyed as a cost
-    /// for distributing this transaction to the network. Some
-    /// transaction types have different minimum requirements.
-    /// See Transaction Cost for details.
-    pub fee: Option<XRPAmount<'a>>,
-    /// The sequence number of the account sending the transaction.
-    /// A transaction is only valid if the Sequence number is exactly
-    /// 1 greater than the previous transaction from the same account.
-    /// The special case 0 means the transaction is using a Ticket instead.
-    pub sequence: Option<u32>,
-    /// Highest ledger index this transaction can appear in.
-    /// Specifying this field places a strict upper limit on how long
-    /// the transaction can wait to be validated or rejected.
-    /// See Reliable Transaction Submission for more details.
-    pub last_ledger_sequence: Option<u32>,
-    /// Hash value identifying another transaction. If provided, this
-    /// transaction is only valid if the sending account's
-    /// previously-sent transaction matches the provided hash.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<&'a str>,
-    /// Hex representation of the public key that corresponds to the
-    /// private key used to sign this transaction. If an empty string,
-    /// indicates a multi-signature is present in the Signers field instead.
-    pub signing_pub_key: Option<&'a str>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction
-    /// is made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub source_tag: Option<u32>,
-    /// The sequence number of the ticket to use in place
-    /// of a Sequence number. If this is provided, Sequence must
-    /// be 0. Cannot be used with AccountTxnID.
-    pub ticket_sequence: Option<u32>,
-    /// The signature that verifies this transaction as originating
-    /// from the account it says it is from.
-    pub txn_signature: Option<&'a str>,
-    /// Set of bit-flags for this transaction.
-    #[serde(default)]
-    #[serde(with = "txn_flags")]
-    pub flags: Option<Vec<PaymentFlag>>,
-    /// Additional arbitrary information used to identify this transaction.
-    pub memos: Option<Vec<Memo<'a>>>,
-    /// Arbitrary integer used to identify the reason for this
-    /// payment, or a sender on whose behalf this transaction is
-    /// made. Conventionally, a refund should specify the initial
-    /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
-    /// The custom fields for the Payment model.
-    ///
-    /// See Payment fields:
-    /// `<https://xrpl.org/payment.html#payment-fields>`
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a, PaymentFlag>,
+    // The custom fields for the Payment model.
+    //
+    // See Payment fields:
+    // `<https://xrpl.org/payment.html#payment-fields>`
+    /// The amount of currency to deliver. For non-XRP amounts, the nested field names
+    /// MUST be lower-case. If the tfPartialPayment flag is set, deliver up to this
+    /// amount instead.
     pub amount: Amount<'a>,
-    pub destination: &'a str,
+    /// The unique address of the account receiving the payment.
+    pub destination: Cow<'a, str>,
+    /// Arbitrary tag that identifies the reason for the payment to the destination,
+    /// or a hosted recipient to pay.
     pub destination_tag: Option<u32>,
+    /// Arbitrary 256-bit hash representing a specific reason or identifier for this payment.
     pub invoice_id: Option<u32>,
+    /// Array of payment paths to be used for this transaction. Must be omitted for
+    /// XRP-to-XRP transactions.
     pub paths: Option<Vec<Vec<PathStep<'a>>>>,
+    /// Highest amount of source currency this transaction is allowed to cost, including
+    /// transfer fees, exchange rates, and slippage . Does not include the XRP destroyed
+    /// as a cost for submitting the transaction. For non-XRP amounts, the nested field
+    /// names MUST be lower-case. Must be supplied for cross-currency/cross-issue payments.
+    /// Must be omitted for XRP-to-XRP payments.
     pub send_max: Option<Amount<'a>>,
+    /// Minimum amount of destination currency this transaction should deliver. Only valid
+    /// if this is a partial payment. For non-XRP amounts, the nested field names are lower-case.
     pub deliver_min: Option<Amount<'a>>,
-}
-
-impl<'a> Default for Payment<'a> {
-    fn default() -> Self {
-        Self {
-            transaction_type: TransactionType::Payment,
-            account: Default::default(),
-            fee: Default::default(),
-            sequence: Default::default(),
-            last_ledger_sequence: Default::default(),
-            account_txn_id: Default::default(),
-            signing_pub_key: Default::default(),
-            source_tag: Default::default(),
-            ticket_sequence: Default::default(),
-            txn_signature: Default::default(),
-            flags: Default::default(),
-            memos: Default::default(),
-            signers: Default::default(),
-            amount: Default::default(),
-            destination: Default::default(),
-            destination_tag: Default::default(),
-            invoice_id: Default::default(),
-            paths: Default::default(),
-            send_max: Default::default(),
-            deliver_min: Default::default(),
-        }
-    }
 }
 
 impl<'a: 'static> Model for Payment<'a> {
@@ -164,26 +104,21 @@ impl<'a: 'static> Model for Payment<'a> {
     }
 }
 
-impl<'a> Transaction for Payment<'a> {
-    fn has_flag(&self, flag: &Flag) -> bool {
-        let mut flags = &Vec::new();
-
-        if let Some(flag_set) = self.flags.as_ref() {
-            flags = flag_set;
-        }
-
-        match flag {
-            Flag::Payment(payment_flag) => match payment_flag {
-                PaymentFlag::TfLimitQuality => flags.contains(&PaymentFlag::TfLimitQuality),
-                PaymentFlag::TfNoDirectRipple => flags.contains(&PaymentFlag::TfNoDirectRipple),
-                PaymentFlag::TfPartialPayment => flags.contains(&PaymentFlag::TfPartialPayment),
-            },
-            _ => false,
-        }
+impl<'a> Transaction<'a, PaymentFlag> for Payment<'a> {
+    fn has_flag(&self, flag: &PaymentFlag) -> bool {
+        self.common_fields.has_flag(flag)
     }
 
     fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+        self.common_fields.get_transaction_type()
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, PaymentFlag> {
+        self.common_fields.get_common_fields()
+    }
+
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, PaymentFlag> {
+        &mut self.common_fields
     }
 }
 
@@ -192,16 +127,16 @@ impl<'a> PaymentError for Payment<'a> {
         if self.amount.is_xrp() && self.send_max.is_none() {
             if self.paths.is_some() {
                 Err(XRPLPaymentException::IllegalOption {
-                    field: "paths",
-                    context: "XRP to XRP payments",
-                    resource: "",
+                    field: "paths".into(),
+                    context: "XRP to XRP payments".into(),
+                    resource: "".into(),
                 })
-            } else if self.account == self.destination {
+            } else if self.common_fields.account == self.destination {
                 Err(XRPLPaymentException::ValueEqualsValueInContext {
-                    field1: "account",
-                    field2: "destination",
-                    context: "XRP to XRP Payments",
-                    resource: "",
+                    field1: "account".into(),
+                    field2: "destination".into(),
+                    context: "XRP to XRP Payments".into(),
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -213,30 +148,30 @@ impl<'a> PaymentError for Payment<'a> {
 
     fn _get_partial_payment_error(&self) -> Result<(), XRPLPaymentException> {
         if let Some(send_max) = &self.send_max {
-            if !self.has_flag(&Flag::Payment(PaymentFlag::TfPartialPayment))
+            if !self.has_flag(&PaymentFlag::TfPartialPayment)
                 && send_max.is_xrp()
                 && self.amount.is_xrp()
             {
                 Err(XRPLPaymentException::IllegalOption {
-                    field: "send_max",
-                    context: "XRP to XRP non-partial payments",
-                    resource: "",
+                    field: "send_max".into(),
+                    context: "XRP to XRP non-partial payments".into(),
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
             }
-        } else if self.has_flag(&Flag::Payment(PaymentFlag::TfPartialPayment)) {
+        } else if self.has_flag(&PaymentFlag::TfPartialPayment) {
             Err(XRPLPaymentException::FlagRequiresField {
                 flag: PaymentFlag::TfPartialPayment,
-                field: "send_max",
-                resource: "",
+                field: "send_max".into(),
+                resource: "".into(),
             })
-        } else if !self.has_flag(&Flag::Payment(PaymentFlag::TfPartialPayment)) {
+        } else if !self.has_flag(&PaymentFlag::TfPartialPayment) {
             if let Some(_deliver_min) = &self.deliver_min {
                 Err(XRPLPaymentException::IllegalOption {
-                    field: "deliver_min",
-                    context: "XRP to XRP non-partial payments",
-                    resource: "",
+                    field: "deliver_min".into(),
+                    context: "XRP to XRP non-partial payments".into(),
+                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -247,11 +182,11 @@ impl<'a> PaymentError for Payment<'a> {
     }
 
     fn _get_exchange_error(&self) -> Result<(), XRPLPaymentException> {
-        if self.account == self.destination && self.send_max.is_none() {
+        if self.common_fields.account == self.destination && self.send_max.is_none() {
             return Err(XRPLPaymentException::OptionRequired {
-                field: "send_max",
-                context: "exchanges",
-                resource: "",
+                field: "send_max".into(),
+                context: "exchanges".into(),
+                resource: "".into(),
             });
         }
 
@@ -260,41 +195,42 @@ impl<'a> PaymentError for Payment<'a> {
 }
 
 impl<'a> Payment<'a> {
-    fn new(
-        account: &'a str,
-        amount: Amount<'a>,
-        destination: &'a str,
+    pub fn new(
+        account: Cow<'a, str>,
+        account_txn_id: Option<Cow<'a, str>>,
         fee: Option<XRPAmount<'a>>,
-        sequence: Option<u32>,
+        flags: Option<FlagCollection<PaymentFlag>>,
         last_ledger_sequence: Option<u32>,
-        account_txn_id: Option<&'a str>,
-        signing_pub_key: Option<&'a str>,
+        memos: Option<Vec<Memo>>,
+        sequence: Option<u32>,
+        signers: Option<Vec<Signer<'a>>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        txn_signature: Option<&'a str>,
-        flags: Option<Vec<PaymentFlag>>,
-        memos: Option<Vec<Memo<'a>>>,
-        signers: Option<Vec<Signer<'a>>>,
+        amount: Amount<'a>,
+        destination: Cow<'a, str>,
+        deliver_min: Option<Amount<'a>>,
         destination_tag: Option<u32>,
         invoice_id: Option<u32>,
         paths: Option<Vec<Vec<PathStep<'a>>>>,
         send_max: Option<Amount<'a>>,
-        deliver_min: Option<Amount<'a>>,
     ) -> Self {
         Self {
-            transaction_type: TransactionType::Payment,
-            account,
-            fee,
-            sequence,
-            last_ledger_sequence,
-            account_txn_id,
-            signing_pub_key,
-            source_tag,
-            ticket_sequence,
-            txn_signature,
-            flags,
-            memos,
-            signers,
+            common_fields: CommonFields {
+                account,
+                transaction_type: TransactionType::Payment,
+                account_txn_id,
+                fee,
+                flags: flags.unwrap_or_default(),
+                last_ledger_sequence,
+                memos,
+                sequence,
+                signers,
+                source_tag,
+                ticket_sequence,
+                network_id: None,
+                signing_pub_key: None,
+                txn_signature: None,
+            },
             amount,
             destination,
             destination_tag,
@@ -326,34 +262,31 @@ mod test_payment_error {
 
     #[test]
     fn test_xrp_to_xrp_error() {
-        let mut payment = Payment {
-            transaction_type: TransactionType::Payment,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
-            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK",
-            destination_tag: None,
-            invoice_id: None,
-            paths: Some(vec![vec![PathStep {
-                account: Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"),
+        let mut payment = Payment::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Amount::XRPAmount(XRPAmount::from("1000000")),
+            "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            None,
+            None,
+            None,
+            Some(vec![vec![PathStep {
+                account: Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
                 currency: None,
                 issuer: None,
                 r#type: None,
                 type_hex: None,
             }]]),
-            send_max: None,
-            deliver_min: None,
-        };
+            None,
+        );
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
@@ -369,7 +302,7 @@ mod test_payment_error {
         );
 
         payment.send_max = None;
-        payment.destination = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb";
+        payment.destination = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into();
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
@@ -379,36 +312,33 @@ mod test_payment_error {
 
     #[test]
     fn test_partial_payments_eror() {
-        let mut payment = Payment {
-            transaction_type: TransactionType::Payment,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            amount: Amount::XRPAmount("1000000".into()),
-            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK",
-            destination_tag: None,
-            invoice_id: None,
-            paths: None,
-            send_max: None,
-            deliver_min: None,
-        };
-        payment.flags = Some(vec![PaymentFlag::TfPartialPayment]);
+        let mut payment = Payment::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Amount::XRPAmount("1000000".into()),
+            "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        payment.common_fields.flags = vec![PaymentFlag::TfPartialPayment].into();
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
             "For the flag `TfPartialPayment` to be set it is required to define the field `send_max`. For more information see: "
         );
 
-        payment.flags = None;
+        payment.common_fields.flags = FlagCollection::default();
         payment.deliver_min = Some(Amount::XRPAmount("99999".into()));
 
         assert_eq!(
@@ -419,32 +349,29 @@ mod test_payment_error {
 
     #[test]
     fn test_exchange_error() {
-        let payment = Payment {
-            transaction_type: TransactionType::Payment,
-            account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
-            fee: None,
-            sequence: None,
-            last_ledger_sequence: None,
-            account_txn_id: None,
-            signing_pub_key: None,
-            source_tag: None,
-            ticket_sequence: None,
-            txn_signature: None,
-            flags: None,
-            memos: None,
-            signers: None,
-            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let payment = Payment::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
                 "10".into(),
             )),
-            destination: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
-            destination_tag: None,
-            invoice_id: None,
-            paths: None,
-            send_max: None,
-            deliver_min: None,
-        };
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
@@ -454,7 +381,7 @@ mod test_payment_error {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use alloc::vec;
 
     use crate::models::amount::{Amount, IssuedCurrencyAmount};
@@ -462,71 +389,39 @@ mod test_serde {
     use super::*;
 
     #[test]
-    fn test_serialize() {
+    fn test_serde() {
         let default_txn = Payment::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            Some("12".into()),
+            Some(vec![PaymentFlag::TfPartialPayment].into()),
+            None,
+            None,
+            Some(2),
+            None,
+            None,
+            None,
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 "1".into(),
             )),
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
-            Some("12".into()),
-            Some(2),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(vec![PaymentFlag::TfPartialPayment]),
-            None,
-            None,
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
             None,
             None,
             None,
             None,
             None,
         );
-        let default_json = r#"{"TransactionType":"Payment","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Fee":"12","Sequence":2,"Flags":131072,"Amount":{"currency":"USD","issuer":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","value":"1"},"Destination":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"Payment","Fee":"12","Flags":131072,"Sequence":2,"Amount":{"currency":"USD","issuer":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","value":"1"},"Destination":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"}"#;
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
 
-        let txn_as_string = serde_json::to_string(&default_txn).unwrap();
-        let txn_json = txn_as_string.as_str();
-
-        assert_eq!(txn_json, default_json);
-    }
-
-    #[test]
-    fn test_deserialize() {
-        let default_txn = Payment::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                "USD".into(),
-                "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-                "1".into(),
-            )),
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX",
-            Some("12".into()),
-            Some(2),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(vec![PaymentFlag::TfPartialPayment]),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        let default_json = r#"{"TransactionType":"Payment","Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","Destination":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","Amount":{"currency":"USD","value":"1","issuer":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"},"Fee":"12","Flags":131072,"Sequence":2}"#;
-
-        let txn_as_obj: Payment = serde_json::from_str(default_json).unwrap();
-
-        assert_eq!(txn_as_obj, default_txn);
+        // Deserialize
+        let deserialized: Payment = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
     }
 }

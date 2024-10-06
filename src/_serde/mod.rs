@@ -1,9 +1,10 @@
 //! Serde functionalities
 
-use alloc::string::String;
+use crate::models::FlagCollection;
+use alloc::format;
 use alloc::vec::Vec;
-use core::fmt::Debug;
 use core::hash::BuildHasherDefault;
+use core::{convert::TryFrom, fmt::Debug};
 use fnv::FnvHasher;
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
@@ -11,9 +12,9 @@ use strum::IntoEnumIterator;
 
 pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<FnvHasher>>;
 
-fn serialize_flag<F, S>(flags: &Vec<F>, s: S) -> Result<S::Ok, S::Error>
+fn serialize_flag<F, S>(flags: &FlagCollection<F>, s: S) -> Result<S::Ok, S::Error>
 where
-    F: Serialize,
+    F: Serialize + IntoEnumIterator,
     S: Serializer,
 {
     let flags_value_result: Result<Value, serde_json::Error> = serde_json::to_value(flags);
@@ -35,40 +36,18 @@ where
     }
 }
 
-fn deserialize_flags<'de, D, F>(d: D) -> Result<Vec<F>, D::Error>
+fn deserialize_flags<'de, D, F>(d: D) -> Result<FlagCollection<F>, D::Error>
 where
     F: Serialize + IntoEnumIterator + Debug,
     D: Deserializer<'de>,
 {
     let flags_u32 = u32::deserialize(d)?;
-
-    let mut flags_vec = Vec::new();
-    for flag in F::iter() {
-        let check_flag_string_result: Result<String, serde_json::Error> =
-            serde_json::to_string(&flag);
-        match check_flag_string_result {
-            Ok(check_flag_string) => {
-                let check_flag_u32_result = check_flag_string.parse::<u32>();
-                match check_flag_u32_result {
-                    Ok(check_flag) => {
-                        if check_flag & flags_u32 == check_flag {
-                            flags_vec.push(flag);
-                        } else {
-                            continue;
-                        }
-                    }
-                    Err(_) => {
-                        return Err(de::Error::custom("SerdeIntermediateStepError: Failed to turn flag into `u32` during deserialization"));
-                    }
-                };
-            }
-            Err(_) => {
-                return Err(de::Error::custom("SerdeIntermediateStepError: Failed to turn flag into `String` during deserialization"));
-            }
-        };
-    }
-
-    Ok(flags_vec)
+    FlagCollection::<F>::try_from(flags_u32).map_err(|_e| {
+        de::Error::custom(format!(
+            "SerdeIntermediateStepError: Failed to turn `u32` into `FlagCollection<{}>` during deserialization",
+            core::any::type_name::<F>()
+        ))
+    })
 }
 
 /// A `mod` to be used on transaction `flags` fields. It serializes the `Vec<Flag>` into a `u32`,
@@ -77,36 +56,36 @@ pub(crate) mod txn_flags {
     use core::fmt::Debug;
 
     use crate::_serde::{deserialize_flags, serialize_flag};
-    use alloc::vec::Vec;
 
     use serde::{Deserializer, Serialize, Serializer};
 
+    use crate::models::FlagCollection;
     use strum::IntoEnumIterator;
 
-    pub fn serialize<F, S>(flags: &Option<Vec<F>>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<F, S>(flags: &FlagCollection<F>, s: S) -> Result<S::Ok, S::Error>
     where
-        F: Serialize,
+        F: Serialize + IntoEnumIterator + Debug,
         S: Serializer,
     {
-        if let Some(f) = flags {
-            serialize_flag(f, s)
-        } else {
+        if flags.0.is_empty() {
             s.serialize_u32(0)
+        } else {
+            serialize_flag(flags, s)
         }
     }
 
-    pub fn deserialize<'de, F, D>(d: D) -> Result<Option<Vec<F>>, D::Error>
+    pub fn deserialize<'de, F, D>(d: D) -> Result<FlagCollection<F>, D::Error>
     where
         F: Serialize + IntoEnumIterator + Debug,
         D: Deserializer<'de>,
     {
-        let flags_vec_result: Result<Vec<F>, D::Error> = deserialize_flags(d);
+        let flags_vec_result: Result<FlagCollection<F>, D::Error> = deserialize_flags(d);
         match flags_vec_result {
             Ok(flags_vec) => {
-                if flags_vec.is_empty() {
-                    Ok(None)
+                if flags_vec.0.is_empty() {
+                    Ok(FlagCollection::<F>::default())
                 } else {
-                    Ok(Some(flags_vec))
+                    Ok(flags_vec)
                 }
             }
             Err(error) => Err(error),
@@ -118,23 +97,23 @@ pub(crate) mod lgr_obj_flags {
     use core::fmt::Debug;
 
     use crate::_serde::{deserialize_flags, serialize_flag};
-    use alloc::vec::Vec;
+    use crate::models::FlagCollection;
     use serde::{Deserializer, Serialize, Serializer};
     use strum::IntoEnumIterator;
 
-    pub fn serialize<F, S>(flags: &Vec<F>, s: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<F, S>(flags: &FlagCollection<F>, s: S) -> Result<S::Ok, S::Error>
     where
-        F: Serialize,
+        F: Serialize + IntoEnumIterator,
         S: Serializer,
     {
-        if !flags.is_empty() {
+        if !flags.0.is_empty() {
             serialize_flag(flags, s)
         } else {
             s.serialize_u32(0)
         }
     }
 
-    pub fn deserialize<'de, F, D>(d: D) -> Result<Vec<F>, D::Error>
+    pub fn deserialize<'de, F, D>(d: D) -> Result<FlagCollection<F>, D::Error>
     where
         F: Serialize + IntoEnumIterator + Debug,
         D: Deserializer<'de>,

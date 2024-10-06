@@ -9,7 +9,7 @@
     "Hash256": 5,
     "UInt8": 16,
     "Vector256": 19,
-    "SerializedDict": 14,
+    "STObject": 14,
     "Unknown": -2,
     "Transaction": 10001,
     "Hash160": 17,
@@ -19,7 +19,7 @@
     "NotPresent": 0,
     "UInt64": 3,
     "UInt32": 2,
-    "SerializedList": 15
+    "STArray": 15
   },
   "LEDGER_ENTRY_TYPES": {
     "Any": -3,
@@ -1141,7 +1141,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1151,7 +1151,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1161,7 +1161,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1171,7 +1171,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1181,7 +1181,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1191,7 +1191,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1201,7 +1201,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1211,7 +1211,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1221,7 +1221,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1231,7 +1231,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1241,7 +1241,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1251,7 +1251,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1261,7 +1261,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1271,7 +1271,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedDict"
+        "type": "STObject"
       }
     ],
     [
@@ -1281,7 +1281,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1291,7 +1291,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": false,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1301,7 +1301,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1311,7 +1311,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1321,7 +1321,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1331,7 +1331,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1341,7 +1341,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1351,7 +1351,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1361,7 +1361,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1371,7 +1371,7 @@
         "isVLEncoded": false,
         "isSerialized": true,
         "isSigningField": true,
-        "type": "SerializedList"
+        "type": "STArray"
       }
     ],
     [
@@ -1619,7 +1619,6 @@
     "telCAN_NOT_QUEUE_BLOCKED": -389,
     "telCAN_NOT_QUEUE_FEE": -388,
     "telCAN_NOT_QUEUE_FULL": -387,
-
     "temMALFORMED": -299,
     "temBAD_AMOUNT": -298,
     "temBAD_CURRENCY": -297,
@@ -1655,7 +1654,6 @@
     "temCANNOT_PREAUTH_SELF": -267,
     "temUNCERTAIN": -266,
     "temUNKNOWN": -265,
-
     "tefFAILURE": -199,
     "tefALREADY": -198,
     "tefBAD_ADD_AUTH": -197,
@@ -1675,7 +1673,6 @@
     "tefBAD_AUTH_MASTER": -183,
     "tefINVARIANT_FAILED": -182,
     "tefTOO_BIG": -181,
-
     "terRETRY": -99,
     "terFUNDS_SPENT": -98,
     "terINSUF_FEE_B": -97,
@@ -1687,9 +1684,7 @@
     "terLAST": -91,
     "terNO_RIPPLE": -90,
     "terQUEUED": -89,
-
     "tesSUCCESS": 0,
-
     "tecCLAIM": 100,
     "tecPATH_PARTIAL": 101,
     "tecUNFUNDED_ADD": 102,
@@ -1731,7 +1726,6 @@
   },
   "TRANSACTION_TYPES": {
     "Invalid": -1,
-
     "Payment": 0,
     "EscrowCreate": 1,
     "EscrowFinish": 2,
@@ -1754,7 +1748,6 @@
     "DepositPreauth": 19,
     "TrustSet": 20,
     "AccountDelete": 21,
-
     "EnableAmendment": 100,
     "SetFee": 101,
     "UNLModify": 102

@@ -1,7 +1,10 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// The manifest method reports the current "manifest"
 /// information for a given validator public key. The
@@ -13,35 +16,35 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Manifest<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// The base58-encoded public key of the validator
     /// to look up. This can be the master public key or
     /// ephemeral public key.
-    pub public_key: &'a str,
-    /// The unique request id.
-    pub id: Option<&'a str>,
-    /// The request method.
-    #[serde(default = "RequestMethod::manifest")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for Manifest<'a> {
-    fn default() -> Self {
-        Manifest {
-            public_key: "",
-            id: None,
-            command: RequestMethod::Manifest,
-        }
-    }
+    pub public_key: Cow<'a, str>,
 }
 
 impl<'a> Model for Manifest<'a> {}
 
+impl<'a> Request<'a> for Manifest<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> Manifest<'a> {
-    fn new(public_key: &'a str, id: Option<&'a str>) -> Self {
+    pub fn new(id: Option<Cow<'a, str>>, public_key: Cow<'a, str>) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::Manifest,
+                id,
+            },
             public_key,
-            id,
-            command: RequestMethod::Manifest,
         }
     }
 }

@@ -1,7 +1,10 @@
+use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
+
+use super::{CommonFields, Request};
 
 /// The transaction_entry method retrieves information on a
 /// single transaction from a specific ledger version.
@@ -14,47 +17,45 @@ use crate::models::{requests::RequestMethod, Model};
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TransactionEntry<'a> {
+    /// The common fields shared by all requests.
+    #[serde(flatten)]
+    pub common_fields: CommonFields<'a>,
     /// Unique hash of the transaction you are looking up.
-    pub tx_hash: &'a str,
-    /// The unique request id.
-    pub id: Option<&'a str>,
+    pub tx_hash: Cow<'a, str>,
     /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<&'a str>,
+    pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger to use, or a shortcut
     /// string to choose a ledger automatically.
-    pub ledger_index: Option<&'a str>,
-    /// The request method.
-    #[serde(default = "RequestMethod::transaction_entry")]
-    pub command: RequestMethod,
-}
-
-impl<'a> Default for TransactionEntry<'a> {
-    fn default() -> Self {
-        TransactionEntry {
-            tx_hash: "",
-            id: None,
-            ledger_hash: None,
-            ledger_index: None,
-            command: RequestMethod::TransactionEntry,
-        }
-    }
+    pub ledger_index: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for TransactionEntry<'a> {}
 
+impl<'a> Request<'a> for TransactionEntry<'a> {
+    fn get_common_fields(&self) -> &CommonFields<'a> {
+        &self.common_fields
+    }
+
+    fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a> {
+        &mut self.common_fields
+    }
+}
+
 impl<'a> TransactionEntry<'a> {
-    fn new(
-        tx_hash: &'a str,
-        id: Option<&'a str>,
-        ledger_hash: Option<&'a str>,
-        ledger_index: Option<&'a str>,
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        tx_hash: Cow<'a, str>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
+            common_fields: CommonFields {
+                command: RequestMethod::TransactionEntry,
+                id,
+            },
             tx_hash,
-            id,
             ledger_hash,
             ledger_index,
-            command: RequestMethod::TransactionEntry,
         }
     }
 }
