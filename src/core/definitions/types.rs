@@ -49,6 +49,11 @@ pub struct Types {
     pub u_int_32: i16,
     #[serde(rename = "STArray")]
     pub st_array: i16,
+    pub metadata: i16,
+    pub currency: i16,
+    pub issue: i16,
+    #[serde(rename = "XChainBridge")]
+    pub xchain_bridge: i16,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -476,7 +481,6 @@ impl DefinitionMaker for DefinitionMap {
     ) -> (FieldInfoMap, FieldHeaderNameMap) {
         let mut field_info_map = FieldInfoMap::default();
         let mut field_header_name_map = FieldHeaderNameMap::default();
-
         for field in fields {
             let field_name: &str = &(field.0);
             let field_info: FieldInfo = (field.1).to_owned();

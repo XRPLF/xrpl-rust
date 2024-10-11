@@ -47,6 +47,15 @@ pub struct PathStep<'a> {
     type_hex: Option<Cow<'a, str>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct XChainBridge<'a> {
+    pub issuing_chain_door: Cow<'a, str>,
+    pub issuing_chain_issue: Currency<'a>,
+    pub locking_chain_door: Cow<'a, str>,
+    pub locking_chain_issue: Currency<'a>,
+}
+
 /// For use with serde defaults.
 fn default_false() -> Option<bool> {
     Some(false)

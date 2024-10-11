@@ -24,6 +24,14 @@ pub mod set_regular_key;
 pub mod signer_list_set;
 pub mod ticket_create;
 pub mod trust_set;
+pub mod xchain_account_create_commit;
+pub mod xchain_add_account_create_attestation;
+pub mod xchain_add_claim_attestation;
+pub mod xchain_claim;
+pub mod xchain_commit;
+pub mod xchain_create_bridge;
+pub mod xchain_create_claim_id;
+pub mod xchain_modify_bridge;
 
 use super::FlagCollection;
 use crate::core::binarycodec::encode;
@@ -75,7 +83,14 @@ pub enum TransactionType {
     SignerListSet,
     TicketCreate,
     TrustSet,
-
+    XChainAccountCreateCommit,
+    XChainAddAccountCreateAttestation,
+    XChainAddClaimAttestation,
+    XChainClaim,
+    XChainCommit,
+    XChainCreateBridge,
+    XChainCreateClaimID,
+    XChainModifyBridge,
     // Psuedo-Transaction types,
     EnableAmendment,
     SetFee,

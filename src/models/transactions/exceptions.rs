@@ -345,3 +345,52 @@ pub enum XRPLSignerListSetException<'a> {
 
 #[cfg(feature = "std")]
 impl<'a> alloc::error::Error for XRPLSignerListSetException<'a> {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLXChainClaimException {
+    #[error("`amount` must match either `locking_chain_issue` or `issuing_chain_issue`")]
+    AmountMismatch,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLXChainClaimException {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLXChainCreateBridgeException {
+    #[error("Cannot have the same door accounts on the locking and issuing chain")]
+    SameDoorAccounts,
+    #[error(
+        "The `account` field must either match the `locking_chain_door` or `issuing_chain_door`"
+    )]
+    AccountDoorMismatch,
+    #[error("Bridge must be XRP-XRP or IOU-IOU")]
+    CrossCurrencyBridgeNotAllowed,
+    #[error("Cannot have MinAccountCreateAmount if bridge is IOU-IOU")]
+    MinAccountCreateAmountForIOU,
+    #[error("`signature_reward` must be numeric")]
+    SignatureRewartMustBeNumberic,
+    #[error("`min_account_create_amount` must be numeric")]
+    MinAccountCreateAmountMustBeNumberic,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLXChainCreateBridgeException {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLXChainCreateClaimIDException {
+    #[error("`other_chain_source` must be a valid XRPL address")]
+    OtherChainSourceIsInvalid,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLXChainCreateClaimIDException {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLXChainModifyBridgeException {
+    #[error("Must either change `signature_reward`, change `min_account_create_amount`, or clear `min_account_create_amount`")]
+    MustChangeOrClear,
+    #[error("`account` must be either `locking_chain_door` or `issuing_chain_door`")]
+    AccountDoorMismatch,
+    #[error("Cannot have MinAccountCreateAmount if bridge is IOU-IOU")]
+    CannotHaveMinAccountCreateAmount,
+}

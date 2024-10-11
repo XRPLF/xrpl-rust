@@ -120,7 +120,7 @@ pub struct AccountSet<'a> {
     pub tick_size: Option<u32>,
 }
 
-impl<'a: 'static> Model for AccountSet<'a> {
+impl<'a> Model for AccountSet<'a> {
     fn get_errors(&self) -> Result<()> {
         match self._get_tick_size_error() {
             Err(error) => Err!(error),

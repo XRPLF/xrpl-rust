@@ -11,9 +11,6 @@ pub trait Model {
 
     /// Simply forwards the error from `get_errors` if there was one.
     fn validate(&self) -> Result<()> {
-        match self.get_errors() {
-            Ok(_no_error) => Ok(()),
-            Err(error) => Err(error),
-        }
+        self.get_errors()
     }
 }
