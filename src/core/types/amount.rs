@@ -3,7 +3,6 @@
 //! See Amount Fields:
 //! `<https://xrpl.org/serialization.html#amount-fields>`
 
-use crate::_serde::serialize_bigdecimal;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::types::exceptions::XRPLTypeException;
 use crate::core::types::*;
@@ -34,6 +33,13 @@ const _POS_SIGN_BIT_MASK: i64 = 0x4000000000000000;
 const _ZERO_CURRENCY_AMOUNT_HEX: u64 = 0x8000000000000000;
 const _NATIVE_AMOUNT_BYTE_LENGTH: u8 = 8;
 const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
+
+/// Normally when using bigdecimal "serde_json" feature a `1` will be serialized as `1.000000000000000`.
+/// This function normalizes a `BigDecimal` before serializing to a string.
+pub fn serialize_bigdecimal<S: Serializer>(value: &BigDecimal, s: S) -> Result<S::Ok, S::Error> {
+    let trimmed_str = value.normalized().to_string();
+    s.serialize_str(&trimmed_str)
+}
 
 /// An Issued Currency object.
 #[derive(Debug, Serialize, Deserialize, Clone)]

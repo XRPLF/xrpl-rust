@@ -290,10 +290,3 @@ macro_rules! serde_with_tag {
         }
     };
 }
-
-/// Normally when using bigdecimal "serde_json" feature a `1` will be serialized as `1.000000000000000`.
-/// This function serializes a `BigDecimal` to a string without the trailing zeros.
-pub fn serialize_bigdecimal<S: Serializer>(value: &BigDecimal, s: S) -> Result<S::Ok, S::Error> {
-    let trimmed_str = value.normalized().to_string();
-    s.serialize_str(&trimmed_str)
-}
