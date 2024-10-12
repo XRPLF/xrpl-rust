@@ -3,6 +3,7 @@
 //! See Amount Fields:
 //! `<https://xrpl.org/serialization.html#amount-fields>`
 
+use crate::_serde::serialize_bigdecimal;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::types::exceptions::XRPLTypeException;
 use crate::core::types::*;
@@ -20,7 +21,6 @@ use core::convert::TryFrom;
 use core::convert::TryInto;
 use core::str::FromStr;
 use rust_decimal::prelude::ToPrimitive;
-// use rust_decimal::Decimal;
 use serde::ser::Error;
 use serde::ser::SerializeMap;
 use serde::Serializer;
@@ -38,6 +38,7 @@ const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
 /// An Issued Currency object.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct IssuedCurrency {
+    #[serde(serialize_with = "serialize_bigdecimal")]
     pub value: BigDecimal,
     pub currency: Currency,
     pub issuer: AccountId,
@@ -270,7 +271,7 @@ impl Serialize for Amount {
             if let Ok(ic) = IssuedCurrency::from_parser(&mut parser, None) {
                 let mut builder = serializer.serialize_map(Some(3))?;
 
-                builder.serialize_entry("value", &ic.value)?;
+                builder.serialize_entry("value", &ic.value.normalized())?;
                 builder.serialize_entry("currency", &ic.currency)?;
                 builder.serialize_entry("issuer", &ic.issuer)?;
                 builder.end()
