@@ -17,6 +17,7 @@ pub enum XRPLTypeException {
     XRPLHashError(XRPLHashException),
     XRPLRangeError(XRPRangeException),
     DecimalError(rust_decimal::Error),
+    BigDecimalError(bigdecimal::ParseBigDecimalError),
     JSONParseError(JSONParseException),
     UnknownXRPLType,
 }
@@ -99,6 +100,12 @@ impl From<rust_decimal::Error> for XRPLTypeException {
 impl From<hex::FromHexError> for XRPLTypeException {
     fn from(_: hex::FromHexError) -> Self {
         XRPLTypeException::FromHexError
+    }
+}
+
+impl From<bigdecimal::ParseBigDecimalError> for XRPLTypeException {
+    fn from(err: bigdecimal::ParseBigDecimalError) -> Self {
+        XRPLTypeException::BigDecimalError(err)
     }
 }
 

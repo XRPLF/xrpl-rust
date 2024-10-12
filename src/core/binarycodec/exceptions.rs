@@ -25,6 +25,7 @@ pub enum XRPLBinaryCodecException {
     XRPRangeError(XRPRangeException),
     SerdeJsonError(serde_json::error::Category),
     DecimalError(rust_decimal::Error),
+    BigDecimalError(bigdecimal::ParseBigDecimalError),
     ISOCodeError(ISOCodeException),
     FieldHasNoAssiciatedTag,
     XAddressTagMismatch,
@@ -82,6 +83,12 @@ impl From<core::num::ParseIntError> for XRPLBinaryCodecException {
 impl From<alloc::string::FromUtf8Error> for XRPLBinaryCodecException {
     fn from(_: alloc::string::FromUtf8Error) -> Self {
         XRPLBinaryCodecException::FromUtf8Error
+    }
+}
+
+impl From<bigdecimal::ParseBigDecimalError> for XRPLBinaryCodecException {
+    fn from(err: bigdecimal::ParseBigDecimalError) -> Self {
+        XRPLBinaryCodecException::BigDecimalError(err)
     }
 }
 

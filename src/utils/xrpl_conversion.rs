@@ -4,6 +4,7 @@ use crate::utils::exceptions::XRPRangeException;
 use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
+use bigdecimal::BigDecimal;
 use regex::Regex;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
@@ -26,19 +27,62 @@ pub const MAX_IOU_EXPONENT: i32 = 80;
 /// Maximum IC precision
 pub const MAX_IOU_PRECISION: u8 = 16;
 
+/// Checked remainder. Computes self % other, returning None if overflow occurred.
+fn checked_rem(first: &BigDecimal, second: &BigDecimal) -> Option<BigDecimal> {
+    // If second is zero, return None to avoid division by zero
+    if second.is_zero() {
+        return None;
+    }
+
+    // Perform the division and handle the case where there's no overflow
+    match checked_div(first, second) {
+        Some(div) => {
+            // Get the integer part of the division
+            let int_part = div.with_scale(0); // Truncate to integer
+
+            // Calculate remainder: remainder = first - (int_part * second)
+            let rem = first - &(int_part * second);
+
+            Some(rem)
+        }
+        None => None, // If the division fails, return None (overflow case)
+    }
+}
+
+/// Checked division. Computes self / other, returning None if overflow occurred.
+fn checked_div(first: &BigDecimal, second: &BigDecimal) -> Option<BigDecimal> {
+    // If second is zero, return None to avoid division by zero
+    if second.is_zero() {
+        return None;
+    }
+
+    // Perform the division and return Some(result) if successful
+    Some(first / second)
+}
+
+/// Checked multiplication. Computes self * other, returning None if overflow occurred.
+fn checked_mul(first: &BigDecimal, second: &BigDecimal) -> Option<BigDecimal> {
+    // Perform the multiplication
+    let result = first * second;
+
+    // Since BigDecimal supports arbitrary precision, we don't need to check for overflow.
+    // Simply return the result wrapped in Some.
+    Some(result)
+}
+
 /// TODO Make less bootleg
 /// Get the precision of a number.
 fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
-    let decimal = Decimal::from_str(value)?.normalize();
+    let decimal = BigDecimal::from_str(value)?.normalized();
     let regex = Regex::new("[^1-9]").expect("_calculate_precision");
 
-    if decimal.checked_rem(Decimal::ONE).is_some() {
+    if checked_rem(&decimal, &BigDecimal::one()).is_some() {
         let stripped = regex
             .replace(&decimal.to_string(), "")
             .replace(['.', '0'], "");
         Ok(stripped.len())
     } else {
-        let quantized = decimal.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
+        let quantized = decimal.with_scale(2);
         let stripped = regex
             .replace(&quantized.to_string(), "")
             .replace(['.', '0'], "");
@@ -48,16 +92,18 @@ fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
 
 /// Ensure that the value after being multiplied by the
 /// exponent does not contain a decimal.
-fn _verify_no_decimal(decimal: Decimal) -> Result<(), XRPRangeException> {
-    let decimal = Decimal::from_u32(decimal.scale()).expect("_verify_no_decimal");
+fn _verify_no_decimal(decimal: BigDecimal) -> Result<(), XRPRangeException> {
+    let (mantissa, scale) = decimal.as_bigint_and_exponent();
+    let decimal = BigDecimal::from_i64(scale).expect("_verify_no_decimal");
 
-    let value: String = if decimal == Decimal::ZERO {
-        decimal.mantissa().to_string()
+    let value: String = if decimal == BigDecimal::zero() {
+        mantissa.to_string()
     } else {
-        decimal
-            .checked_mul(decimal)
-            .unwrap_or(Decimal::ZERO)
-            .to_string()
+        (&decimal * &decimal).to_string()
+        // decimal
+        //     .checked_mul(decimal)
+        //     .unwrap_or(Decimal::ZERO)
+        //     .to_string()
     };
 
     if value.contains('.') {
@@ -211,8 +257,8 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> 
 /// assert!(valid);
 /// ```
 pub fn verify_valid_ic_value(ic_value: &str) -> Result<(), XRPRangeException> {
-    let decimal = Decimal::from_str(ic_value)?.normalize();
-    let scale = -(decimal.scale() as i32);
+    let decimal = BigDecimal::from_str(ic_value)?.normalized();
+    let scale = -(decimal.fractional_digit_count() as i32);
     let prec = _calculate_precision(ic_value)?;
 
     match decimal {

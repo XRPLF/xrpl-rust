@@ -25,6 +25,7 @@ pub enum XRPRangeException {
     UnexpectedICAmountOverflow { max: usize, found: usize },
     FromHexError,
     DecimalError(rust_decimal::Error),
+    BigDecimalError(bigdecimal::ParseBigDecimalError),
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]
@@ -58,6 +59,12 @@ pub enum JSONParseException {
 impl From<rust_decimal::Error> for XRPRangeException {
     fn from(err: rust_decimal::Error) -> Self {
         XRPRangeException::DecimalError(err)
+    }
+}
+
+impl From<bigdecimal::ParseBigDecimalError> for XRPRangeException {
+    fn from(err: bigdecimal::ParseBigDecimalError) -> Self {
+        XRPRangeException::BigDecimalError(err)
     }
 }
 
