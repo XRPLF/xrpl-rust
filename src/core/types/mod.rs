@@ -6,10 +6,12 @@ pub mod blob;
 pub mod currency;
 pub mod exceptions;
 pub mod hash;
+pub mod issue;
 pub mod paths;
 pub(crate) mod test_cases;
 pub mod utils;
 pub mod vector256;
+pub mod xchain_bridge;
 
 use core::convert::TryFrom;
 use core::convert::TryInto;
@@ -25,10 +27,12 @@ pub use self::hash::Hash;
 pub use self::hash::Hash128;
 pub use self::hash::Hash160;
 pub use self::hash::Hash256;
+pub use self::issue::Issue;
 pub use self::paths::Path;
 pub use self::paths::PathSet;
 pub use self::paths::PathStep;
 pub use self::vector256::Vector256;
+pub use self::xchain_bridge::XChainBridge;
 
 use crate::core::binarycodec::binary_wrappers::Serialization;
 use crate::core::definitions::get_field_instance;
@@ -45,6 +49,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use amount::IssuedCurrency;
 use anyhow::Result;
+use serde::Deserialize;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -80,6 +85,7 @@ pub enum XRPLTypes {
     UInt16(u16),
     UInt32(u32),
     UInt64(u64),
+    XChainBridge(XChainBridge),
     Unknown,
 }
 
@@ -171,13 +177,14 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::UInt16(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::UInt32(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::UInt64(value) => SerializedType(value.to_be_bytes().to_vec()),
+            XRPLTypes::XChainBridge(x_chain_bridge) => SerializedType::from(x_chain_bridge),
             XRPLTypes::Unknown => SerializedType(vec![]),
         }
     }
 }
 
 /// Contains a serialized buffer of a Serializer type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct SerializedType(Vec<u8>);
 
 /// Class for serializing and deserializing Lists of objects.
