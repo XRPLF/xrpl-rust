@@ -16,10 +16,13 @@ pub enum XRPLTypeException {
     XRPLBinaryCodecError(XRPLBinaryCodecException),
     XRPLHashError(XRPLHashException),
     XRPLRangeError(XRPRangeException),
+    XRPLXChainBridgeError(XRPLXChainBridgeException),
     DecimalError(rust_decimal::Error),
     BigDecimalError(bigdecimal::ParseBigDecimalError),
     JSONParseError(JSONParseException),
     UnknownXRPLType,
+    MissingField(&'static str),
+    UnexpectedJSONType,
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -46,6 +49,12 @@ pub enum XRPLSerializeMapException<'a> {
     UnknownTransactionResult(&'a str),
     #[error("Unknown ledger entry type: {0}")]
     UnknownLedgerEntryType(&'a str),
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+pub enum XRPLXChainBridgeException {
+    #[error("Invalid XChainBridge type")]
+    InvalidXChainBridgeType,
 }
 
 #[derive(Debug, Clone, PartialEq, Display)]
@@ -106,6 +115,12 @@ impl From<hex::FromHexError> for XRPLTypeException {
 impl From<bigdecimal::ParseBigDecimalError> for XRPLTypeException {
     fn from(err: bigdecimal::ParseBigDecimalError) -> Self {
         XRPLTypeException::BigDecimalError(err)
+    }
+}
+
+impl From<XRPLXChainBridgeException> for XRPLTypeException {
+    fn from(err: XRPLXChainBridgeException) -> Self {
+        XRPLTypeException::XRPLXChainBridgeError(err)
     }
 }
 

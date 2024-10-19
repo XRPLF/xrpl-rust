@@ -13,7 +13,7 @@ use crate::{
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 #[skip_serializing_none]
 pub struct XChainClaim<'a> {
@@ -112,5 +112,46 @@ impl<'a> XChainClaim<'a> {
                 }
             }
         }
+    }
+}
+
+mod test_sign {
+    use alloc::dbg;
+
+    use crate::{
+        models::{XRPAmount, XRP},
+        transaction::sign,
+        wallet::Wallet,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_sign_xchain_claim() {
+        let wallet = Wallet::new("sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd".into(), 0).unwrap();
+        let mut txn = XChainClaim::new(
+            "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+            None,
+            Some("10".into()),
+            None,
+            None,
+            Some(19048),
+            None,
+            None,
+            None,
+            "123456789".into(),
+            "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN".into(),
+            XChainBridge::new(
+                "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+                XRP::new().into(),
+                "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                XRP::new().into(),
+            ),
+            "3".into(),
+            None,
+        );
+        sign(&mut txn, &wallet, false).unwrap();
+
+        dbg!(txn);
     }
 }

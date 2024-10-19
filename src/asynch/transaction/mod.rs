@@ -30,10 +30,10 @@ use crate::{
     Err,
 };
 
-use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use alloc::{borrow::Cow, vec};
+use alloc::{dbg, string::String};
 use anyhow::Result;
 use core::convert::TryInto;
 use core::fmt::Debug;
@@ -75,6 +75,7 @@ where
     } else {
         prepare_transaction(transaction, wallet)?;
         let serialized_for_signing = encode_for_signing(transaction)?;
+        dbg!(&serialized_for_signing);
         let serialized_bytes = match hex::decode(serialized_for_signing) {
             Ok(bytes) => bytes,
             Err(e) => return Err!(e),

@@ -80,6 +80,10 @@ pub struct LedgerEntryTypes {
     pub generator_map: i16,
     #[serde(rename = "NegativeUNL")]
     pub negative_unl: i16,
+    #[serde(rename = "XChainOwnedClaimID")]
+    pub xchain_owned_claim_id: i16,
+    #[serde(rename = "XChainOwnedCreateAccountClaimID")]
+    pub xchain_owned_create_account_claim_id: i16,
 }
 
 /// =(
@@ -353,6 +357,22 @@ pub struct TransactionTypes {
     pub deposit_preauth: i16,
     pub trust_set: i16,
     pub account_delete: i16,
+    #[serde(rename = "XChainAccountCreateCommit")]
+    pub xchain_account_create_commit: i16,
+    #[serde(rename = "XChainAddAccountCreateAttestation")]
+    pub xchain_add_account_create_attestation: i16,
+    #[serde(rename = "XChainAddClaimAttestation")]
+    pub xchain_add_claim_attestation: i16,
+    #[serde(rename = "XChainClaim")]
+    pub xchain_claim: i16,
+    #[serde(rename = "XChainCommit")]
+    pub xchain_commit: i16,
+    #[serde(rename = "XChainCreateBridge")]
+    pub xchain_create_bridge: i16,
+    #[serde(rename = "XChainCreateClaimID")]
+    pub xchain_create_claim_id: i16,
+    #[serde(rename = "XChainModifyBridge")]
+    pub xchain_modify_bridge: i16,
 
     pub enable_amendment: i16,
     pub set_fee: i16,

@@ -145,6 +145,12 @@ impl AsRef<[u8]> for Currency {
     }
 }
 
+impl Currency {
+    pub fn is_xrp(&self) -> bool {
+        self.to_string() == NATIVE_CODE
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

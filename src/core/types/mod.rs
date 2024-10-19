@@ -43,6 +43,7 @@ use crate::core::BinaryParser;
 use crate::Err;
 use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
+use alloc::dbg;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
@@ -91,6 +92,10 @@ pub enum XRPLTypes {
 
 impl XRPLTypes {
     pub fn from_value(name: &str, value: Value) -> Result<XRPLTypes> {
+        let mut value = value;
+        if value.is_null() {
+            value = Value::Number(0.into());
+        }
         if let Some(value) = value.as_str() {
             match name {
                 "AccountID" => Ok(XRPLTypes::AccountID(Self::type_from_str(value)?)),
@@ -100,6 +105,11 @@ impl XRPLTypes {
                 "Hash128" => Ok(XRPLTypes::Hash128(Self::type_from_str(value)?)),
                 "Hash160" => Ok(XRPLTypes::Hash160(Self::type_from_str(value)?)),
                 "Hash256" => Ok(XRPLTypes::Hash256(Self::type_from_str(value)?)),
+                "XChainClaimID" => Ok(XRPLTypes::Hash256(Self::type_from_str(value)?)),
+                "UInt8" => Ok(XRPLTypes::UInt8(value.parse::<u8>()?)),
+                "UInt16" => Ok(XRPLTypes::UInt16(value.parse::<u16>()?)),
+                "UInt32" => Ok(XRPLTypes::UInt32(value.parse::<u32>()?)),
+                "UInt64" => Ok(XRPLTypes::UInt64(value.parse::<u64>()?)),
                 _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else if let Some(value) = value.as_u64() {
@@ -116,6 +126,9 @@ impl XRPLTypes {
                 "STObject" => Ok(XRPLTypes::STObject(STObject::try_from_value(
                     Value::Object(value.to_owned()),
                     false,
+                )?)),
+                "XChainBridge" => Ok(XRPLTypes::XChainBridge(XChainBridge::try_from(
+                    Value::Object(value.to_owned()),
                 )?)),
                 _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
             }
