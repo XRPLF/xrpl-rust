@@ -127,9 +127,10 @@ impl XRPLTypes {
                     Value::Object(value.to_owned()),
                     false,
                 )?)),
-                "XChainBridge" => Ok(XRPLTypes::XChainBridge(XChainBridge::try_from(
-                    Value::Object(value.to_owned()),
-                )?)),
+                "XChainBridge" => Ok(XRPLTypes::XChainBridge(
+                    XChainBridge::try_from(Value::Object(value.to_owned()))
+                        .map_err(|e| anyhow::anyhow!(e))?,
+                )),
                 _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else if let Some(value) = value.as_array() {
