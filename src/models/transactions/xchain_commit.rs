@@ -98,8 +98,7 @@ mod test_serde {
             }
         },
         "Amount": "10000",
-        "XChainClaimID": "13f",
-        "OtherChainDestination": null
+        "XChainClaimID": "13f"
     }"#;
 
     #[test]
