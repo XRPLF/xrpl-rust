@@ -70,20 +70,17 @@ impl TryFrom<Value> for XChainBridge {
         }
         let mut buf = Vec::new();
         for [name, object_type] in TYPE_ORDER {
-            let obj = value
+            let obj_value = value
                 .get(name)
-                .ok_or_else(|| XRPLXChainBridgeException::InvalidXChainBridgeType)?;
-            if object_type == "AccountID" {
-                // skip the `14` byte and add it by hand
-                buf.extend_from_slice(hex::decode("14")?.as_ref());
-            }
+                .ok_or(XRPLXChainBridgeException::InvalidXChainBridgeType)?;
             match object_type {
                 "AccountID" => {
-                    let account_id = AccountId::try_from(obj.as_str().unwrap())?;
+                    buf.extend_from_slice(hex::decode("14")?.as_ref());
+                    let account_id = AccountId::try_from(obj_value.as_str().unwrap())?;
                     buf.extend_from_slice(account_id.as_ref());
                 }
                 "Issue" => {
-                    let issue = Issue::try_from(obj.clone())?;
+                    let issue = Issue::try_from(obj_value.clone())?;
                     buf.extend_from_slice(issue.as_ref());
                 }
                 _ => unreachable!(),

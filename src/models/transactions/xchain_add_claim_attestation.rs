@@ -6,9 +6,9 @@ use crate::models::{Amount, FlagCollection, Model, NoFlags, XChainBridge};
 
 use super::{CommonFields, Transaction, TransactionType};
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainAddClaimAttestation<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,

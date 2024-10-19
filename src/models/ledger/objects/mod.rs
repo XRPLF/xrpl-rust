@@ -71,9 +71,9 @@ pub enum LedgerEntryType {
     XChainOwnedCreateAccountClaimID = 0x0074,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainClaimProofSig<'a> {
     pub amount: Amount<'a>,
     pub attestation_reward_account: Cow<'a, str>,

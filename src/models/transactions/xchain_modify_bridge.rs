@@ -24,9 +24,9 @@ pub enum XChainModifyBridgeFlags {
     TfClearAccountCreateAmount = 0x00010000,
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainModifyBridge<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, XChainModifyBridgeFlags>,

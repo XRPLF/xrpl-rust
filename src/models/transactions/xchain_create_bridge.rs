@@ -13,9 +13,9 @@ use crate::{
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainCreateBridge<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,

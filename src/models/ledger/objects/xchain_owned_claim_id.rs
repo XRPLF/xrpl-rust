@@ -6,9 +6,9 @@ use crate::models::{Amount, Model, NoFlags, XChainBridge};
 
 use super::{CommonFields, LedgerEntryType, LedgerObject, XChainClaimProofSig};
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainOwnedClaimID<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,

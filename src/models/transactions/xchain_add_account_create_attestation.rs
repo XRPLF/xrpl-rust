@@ -6,9 +6,9 @@ use crate::models::{Amount, FlagCollection, Model, NoFlags, XChainBridge, XRPAmo
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainAddAccountCreateAttestation<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
@@ -100,7 +100,7 @@ impl<'a> XChainAddAccountCreateAttestation<'a> {
 
 #[cfg(test)]
 mod test_serde {
-    const EXAMPLE_JSON: &'static str = r#"{
+    const EXAMPLE_JSON: &str = r#"{
         "Account": "rDr5okqGKmMpn44Bbhe5WAfDQx8e9XquEv",
         "Flags": 0,
         "TransactionType": "XChainAddAccountCreateAttestation",

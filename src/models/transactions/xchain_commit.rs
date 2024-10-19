@@ -6,9 +6,9 @@ use crate::models::{Amount, FlagCollection, Model, NoFlags, XChainBridge, XRPAmo
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainCommit<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
@@ -83,7 +83,7 @@ mod test_serde {
 
     use crate::models::transactions::xchain_commit::XChainCommit;
 
-    const EXAMPLE_JSON: &'static str = r#"{
+    const EXAMPLE_JSON: &str = r#"{
         "Account": "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo",
         "Flags": 0,
         "TransactionType": "XChainCommit",

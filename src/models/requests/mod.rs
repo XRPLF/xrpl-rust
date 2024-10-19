@@ -450,13 +450,11 @@ pub trait Request<'a> {
     fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a>;
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
-#[skip_serializing_none]
 pub struct FundFaucet<'a> {
     pub destination: Cow<'a, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_context: Option<Cow<'a, str>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<Cow<'a, str>>,
 }

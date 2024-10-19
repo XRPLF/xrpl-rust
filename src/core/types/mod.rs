@@ -43,7 +43,6 @@ use crate::core::BinaryParser;
 use crate::Err;
 use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
-use alloc::dbg;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
@@ -76,6 +75,7 @@ pub enum XRPLTypes {
     Hash128(Hash128),
     Hash160(Hash160),
     Hash256(Hash256),
+    Issue(Issue),
     Path(Path),
     PathSet(PathSet),
     PathStep(PathStep),
@@ -191,6 +191,7 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::UInt32(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::UInt64(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::XChainBridge(x_chain_bridge) => SerializedType::from(x_chain_bridge),
+            XRPLTypes::Issue(issue) => SerializedType::from(issue),
             XRPLTypes::Unknown => SerializedType(vec![]),
         }
     }

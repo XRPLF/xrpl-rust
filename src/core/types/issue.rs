@@ -6,9 +6,21 @@ use crate::core::{
     BinaryParser, Parser,
 };
 
-use super::{exceptions::XRPLTypeException, SerializedType, TryFromParser};
+use super::{exceptions::XRPLTypeException, SerializedType, TryFromParser, XRPLType};
 
+#[derive(Debug, Clone)]
 pub struct Issue(SerializedType);
+
+impl XRPLType for Issue {
+    type Error = XRPLTypeException;
+
+    fn new(buffer: Option<&[u8]>) -> anyhow::Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        Ok(Issue(SerializedType(buffer.unwrap_or(&[]).to_vec())))
+    }
+}
 
 impl TryFromParser for Issue {
     type Error = XRPLTypeException;

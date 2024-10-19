@@ -6,9 +6,9 @@ use crate::models::{Model, NoFlags, XChainBridge, XRPAmount};
 
 use super::{CommonFields, LedgerEntryType, LedgerObject};
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct Bridge<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,

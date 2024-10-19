@@ -384,7 +384,7 @@ pub enum Flag {
 mod test_tx_common_fields {
     use super::*;
     use account_set::AccountSet;
-    use alloc::dbg;
+    
     use offer_create::OfferCreate;
 
     #[tokio::test]
@@ -426,7 +426,6 @@ mod test_tx_common_fields {
         }"#;
         let expected_hash = "5B765D6C6058CF54F5DBF6230A7F51E23295004FCC043660A77D73AA8537737B";
         let tx: AccountSet = serde_json::from_str(tx_json_str).unwrap();
-        dbg!(&tx);
         assert_eq!(tx.get_hash().unwrap(), expected_hash);
     }
 }

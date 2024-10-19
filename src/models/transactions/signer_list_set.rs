@@ -35,9 +35,9 @@ serde_with_tag! {
 ///
 /// See TicketCreate:
 /// `<https://xrpl.org/signerlistset.html>`
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct SignerListSet<'a> {
     // The base fields for all transaction models.
     //

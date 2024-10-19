@@ -13,9 +13,9 @@ use crate::{
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
+#[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-#[skip_serializing_none]
 pub struct XChainClaim<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
@@ -25,6 +25,7 @@ pub struct XChainClaim<'a> {
     pub xchain_bridge: XChainBridge<'a>,
     #[serde(rename = "XChainClaimID")]
     pub xchain_claim_id: Cow<'a, str>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
     pub destination_tag: Option<u32>,
 }
 
@@ -115,20 +116,21 @@ impl<'a> XChainClaim<'a> {
     }
 }
 
+#[cfg(test)]
+#[cfg(feature = "wallet")]
 mod test_sign {
-    use alloc::dbg;
-
     use crate::{
-        models::{XRPAmount, XRP},
+        models::{
+            transactions::xchain_claim::XChainClaim, IssuedCurrency, IssuedCurrencyAmount,
+            XChainBridge, XRP,
+        },
         transaction::sign,
         wallet::Wallet,
     };
 
-    use super::*;
-
     #[test]
-    fn test_sign_xchain_claim() {
-        let wallet = Wallet::new("sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd".into(), 0).unwrap();
+    fn test_sign_xchain_claim_xrp() {
+        let wallet = Wallet::new("sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd", 0).unwrap();
         let mut txn = XChainClaim::new(
             "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
             None,
@@ -142,16 +144,64 @@ mod test_sign {
             "123456789".into(),
             "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN".into(),
             XChainBridge::new(
-                "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
-                XRP::new().into(),
                 "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                XRP::new().into(),
+                "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
                 XRP::new().into(),
             ),
             "3".into(),
             None,
         );
         sign(&mut txn, &wallet, false).unwrap();
+        assert_eq!(
+            txn.common_fields.txn_signature,
+            Some(
+                "7A079C6360AA6E5BDDFC149175E2E47FC5B561888D149C3097D41449601F9D\
+                C07A1B5BFD69EAF5D16567076B61AADBFF3FCA243B1A8A492828FEA21CA8416E05"
+                    .into()
+            )
+        );
+    }
 
-        dbg!(txn);
+    #[test]
+    fn test_sign_xchain_claim_iou() {
+        let wallet = Wallet::new("sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd", 0).unwrap();
+        let mut txn = XChainClaim::new(
+            "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+            None,
+            Some("10".into()),
+            None,
+            None,
+            Some(19048),
+            None,
+            None,
+            None,
+            IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf".into(),
+                "123".into(),
+            )
+            .into(),
+            "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN".into(),
+            XChainBridge::new(
+                "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo".into(),
+                IssuedCurrency::new("USD".into(), "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo".into())
+                    .into(),
+                "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+                IssuedCurrency::new("USD".into(), "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf".into())
+                    .into(),
+            ),
+            "3".into(),
+            None,
+        );
+        sign(&mut txn, &wallet, false).unwrap();
+        assert_eq!(
+            txn.common_fields.txn_signature,
+            Some(
+                "1A2136A8D8FA7176178596EE341C9FB950D728DFB18C71AECFE9E5426E9481\
+                1C7E40F159FED49721B77137BE272B199ADED3DEF3D68DB7C24F32E39F2AAED40B"
+                    .into()
+            )
+        );
     }
 }
