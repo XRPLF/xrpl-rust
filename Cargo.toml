@@ -65,7 +65,6 @@ hashbrown = { version = "0.14.5", features = ["serde"] }
 fnv = { version = "1.0.7", default-features = false }
 derive-new = { version = "0.7.0", default-features = false }
 thiserror-no-std = "2.0.2"
-anyhow = { version = "1.0.69", default-features = false }
 embassy-sync = "0.6.0"
 
 # networking

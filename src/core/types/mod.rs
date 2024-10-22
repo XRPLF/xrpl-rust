@@ -40,7 +40,6 @@ use crate::core::definitions::get_transaction_result_code;
 use crate::core::definitions::get_transaction_type_code;
 use crate::core::definitions::FieldInstance;
 use crate::core::BinaryParser;
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
@@ -48,7 +47,7 @@ use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
 use amount::IssuedCurrency;
-use anyhow::Result;
+use exceptions::XRPLTypeException;
 use serde::Deserialize;
 use serde_json::Map;
 use serde_json::Value;
@@ -91,7 +90,7 @@ pub enum XRPLTypes {
 }
 
 impl XRPLTypes {
-    pub fn from_value(name: &str, value: Value) -> Result<XRPLTypes> {
+    pub fn from_value(name: &str, value: Value) -> Result<XRPLTypes, XRPLTypeException> {
         let mut value = value;
         if value.is_null() {
             value = Value::Number(0.into());
@@ -110,7 +109,7 @@ impl XRPLTypes {
                 "UInt16" => Ok(XRPLTypes::UInt16(value.parse::<u16>()?)),
                 "UInt32" => Ok(XRPLTypes::UInt32(value.parse::<u32>()?)),
                 "UInt64" => Ok(XRPLTypes::UInt64(value.parse::<u64>()?)),
-                _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else if let Some(value) = value.as_u64() {
             match name {
@@ -118,7 +117,7 @@ impl XRPLTypes {
                 "UInt16" => Ok(XRPLTypes::UInt16(value as u16)),
                 "UInt32" => Ok(XRPLTypes::UInt32(value as u32)),
                 "UInt64" => Ok(XRPLTypes::UInt64(value)),
-                _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else if let Some(value) = value.as_object() {
             match name {
@@ -127,36 +126,32 @@ impl XRPLTypes {
                     Value::Object(value.to_owned()),
                     false,
                 )?)),
-                "XChainBridge" => Ok(XRPLTypes::XChainBridge(
-                    XChainBridge::try_from(Value::Object(value.to_owned()))
-                        .map_err(|e| anyhow::anyhow!(e))?,
-                )),
-                _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
+                "XChainBridge" => Ok(XRPLTypes::XChainBridge(XChainBridge::try_from(
+                    Value::Object(value.to_owned()),
+                )?)),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else if let Some(value) = value.as_array() {
             match name {
                 "STArray" => Ok(XRPLTypes::STArray(STArray::try_from_value(Value::Array(
                     value.to_owned(),
                 ))?)),
-                _ => Err!(exceptions::XRPLTypeException::UnknownXRPLType),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
             }
         } else {
-            Err!(exceptions::XRPLTypeException::UnknownXRPLType)
+            Err(exceptions::XRPLTypeException::UnknownXRPLType)
         }
     }
 
-    fn type_from_str<'a, T>(value: &'a str) -> Result<T>
+    fn type_from_str<'a, T>(value: &'a str) -> Result<T, XRPLTypeException>
     where
         T: TryFrom<&'a str>,
         <T as TryFrom<&'a str>>::Error: Display,
     {
-        match value.try_into() {
-            Ok(value) => Ok(value),
-            Err(error) => Err!(error),
-        }
+        value.try_into()
     }
 
-    fn amount_from_map<T>(value: Map<String, Value>) -> Result<T>
+    fn amount_from_map<T>(value: Map<String, Value>) -> Result<T, XRPLTypeException>
     where
         T: TryFrom<IssuedCurrency>,
         <T as TryFrom<IssuedCurrency>>::Error: Display,
@@ -164,9 +159,9 @@ impl XRPLTypes {
         match IssuedCurrency::try_from(Value::Object(value)) {
             Ok(value) => match value.try_into() {
                 Ok(value) => Ok(value),
-                Err(error) => Err!(error),
+                Err(error) => Err(error),
             },
-            Err(error) => Err!(error),
+            Err(error) => Err(error),
         }
     }
 }
@@ -232,18 +227,18 @@ impl STArray {
     ///
     /// assert_eq!(actual_hex, expected_hex);
     /// ```
-    pub fn try_from_value(value: Value) -> Result<Self> {
+    pub fn try_from_value(value: Value) -> Result<Self, XRPLTypeException> {
         if let Some(array) = value.as_array() {
             if !array.is_empty() && array.iter().filter(|v| v.is_object()).count() != array.len() {
-                Err!(exceptions::XRPLSerializeArrayException::ExpectedObjectArray)
+                Err(exceptions::XRPLSerializeArrayException::ExpectedObjectArray)
             } else {
                 let mut serializer = BinarySerializer::new();
                 for object in array {
                     let obj = match object {
                         Value::Object(map) => map,
                         _ => {
-                            return Err!(
-                                exceptions::XRPLSerializeArrayException::ExpectedObjectArray
+                            return Err(
+                                exceptions::XRPLSerializeArrayException::ExpectedObjectArray,
                             )
                         }
                     };
@@ -254,13 +249,13 @@ impl STArray {
                 Ok(STArray(serializer.into()))
             }
         } else {
-            Err!(exceptions::XRPLSerializeArrayException::ExpectedArray)
+            Err(exceptions::XRPLSerializeArrayException::ExpectedArray)
         }
     }
 }
 
 impl XRPLType for STArray {
-    type Error = anyhow::Error;
+    type Error = XRPLTypeException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         if let Some(data) = buffer {
@@ -319,10 +314,10 @@ impl STObject {
     /// let hex = hex::encode_upper(serialized_map.as_ref());
     /// assert_eq!(hex, buffer);
     /// ```
-    pub fn try_from_value(value: Value, signing_only: bool) -> Result<Self> {
+    pub fn try_from_value(value: Value, signing_only: bool) -> Result<Self, XRPLTypeException> {
         let object = match value {
             Value::Object(map) => map,
-            _ => return Err!(exceptions::XRPLSerializeMapException::ExpectedObject),
+            _ => return Err(exceptions::XRPLSerializeMapException::ExpectedObject),
         };
         let mut serializer = BinarySerializer::new();
         let mut value_xaddress_handled = Map::new();
@@ -333,8 +328,8 @@ impl STObject {
                     if let Some(handled_tag) = handled_xaddress.get(SOURCE_TAG) {
                         if let Some(object_tag) = object.get(SOURCE_TAG) {
                             if handled_tag != object_tag {
-                                return Err!(
-                                    exceptions::XRPLSerializeMapException::AccountMismatchingTags
+                                return Err(
+                                    exceptions::XRPLSerializeMapException::AccountMismatchingTags,
                                 );
                             }
                         }
@@ -342,7 +337,7 @@ impl STObject {
                     if let Some(handled_tag) = handled_xaddress.get(DESTINATION_TAG) {
                         if let Some(object_tag) = object.get(DESTINATION_TAG) {
                             if handled_tag != object_tag {
-                                return Err!(
+                                return Err(
                                     exceptions::XRPLSerializeMapException::DestinationMismatchingTags
                                 );
                             }
@@ -353,10 +348,10 @@ impl STObject {
                     let transaction_type_code = match get_transaction_type_code(value) {
                         Some(code) => code,
                         None => {
-                            return Err!(
+                            return Err(
                                 exceptions::XRPLSerializeMapException::UnknownTransactionType(
-                                    value
-                                )
+                                    value,
+                                ),
                             )
                         }
                     };
@@ -368,10 +363,10 @@ impl STObject {
                     let transaction_result_code = match get_transaction_result_code(value) {
                         Some(code) => code,
                         None => {
-                            return Err!(
+                            return Err(
                                 exceptions::XRPLSerializeMapException::UnknownTransactionResult(
-                                    value
-                                )
+                                    value,
+                                ),
                             )
                         }
                     };
@@ -383,10 +378,10 @@ impl STObject {
                     let ledger_entry_type_code = match get_transaction_type_code(value) {
                         Some(code) => code,
                         None => {
-                            return Err!(
+                            return Err(
                                 exceptions::XRPLSerializeMapException::UnknownLedgerEntryType(
-                                    value
-                                )
+                                    value,
+                                ),
                             )
                         }
                     };
@@ -455,7 +450,7 @@ impl STObject {
 }
 
 impl XRPLType for STObject {
-    type Error = anyhow::Error;
+    type Error = XRPLTypeException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         if let Some(data) = buffer {
@@ -472,11 +467,11 @@ impl AsRef<[u8]> for STObject {
     }
 }
 
-fn handle_xaddress(field: Cow<str>, xaddress: Cow<str>) -> Result<Map<String, Value>> {
-    let (classic_address, tag, _is_test_net) = match xaddress_to_classic_address(&xaddress) {
-        Ok((classic_address, tag, is_test_net)) => (classic_address, tag, is_test_net),
-        Err(e) => return Err!(e),
-    };
+fn handle_xaddress(
+    field: Cow<str>,
+    xaddress: Cow<str>,
+) -> Result<Map<String, Value>, XRPLTypeException> {
+    let (classic_address, tag, _is_test_net) = xaddress_to_classic_address(&xaddress)?;
     if let Some(tag) = tag {
         if field == DESTINATION {
             let tag_name = DESTINATION_TAG;
@@ -491,7 +486,7 @@ fn handle_xaddress(field: Cow<str>, xaddress: Cow<str>) -> Result<Map<String, Va
                 (tag_name.to_string(), Value::Number(tag.into())),
             ]))
         } else {
-            Err!(exceptions::XRPLSerializeMapException::DisallowedTag { field: &field })
+            Err(exceptions::XRPLSerializeMapException::DisallowedTag { field: &field }.into())
         }
     } else {
         Ok(Map::from_iter(vec![(

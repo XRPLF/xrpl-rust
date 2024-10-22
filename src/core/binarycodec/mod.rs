@@ -2,11 +2,10 @@
 //! canonical binary format and decoding them.
 
 use super::types::{AccountId, STObject};
-use crate::Err;
 
 use alloc::{borrow::Cow, string::String, vec::Vec};
-use anyhow::Result;
 use core::convert::TryFrom;
+use exceptions::XRPLBinaryCodecException;
 use hex::ToHex;
 use serde::Serialize;
 
@@ -20,14 +19,14 @@ pub use binary_wrappers::*;
 const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
 const TRANSACTION_MULTISIG_PREFIX: i32 = 0x534D5400;
 
-pub fn encode<T>(signed_transaction: &T) -> Result<String>
+pub fn encode<T>(signed_transaction: &T) -> Result<String, XRPLBinaryCodecException>
 where
     T: Serialize,
 {
     serialize_json(signed_transaction, None, None, false)
 }
 
-pub fn encode_for_signing<T>(prepared_transaction: &T) -> Result<String>
+pub fn encode_for_signing<T>(prepared_transaction: &T) -> Result<String, XRPLBinaryCodecException>
 where
     T: Serialize,
 {
@@ -42,7 +41,7 @@ where
 pub fn encode_for_multisigning<T>(
     prepared_transaction: &T,
     signing_account: Cow<'_, str>,
-) -> Result<String>
+) -> Result<String, XRPLBinaryCodecException>
 where
     T: Serialize,
 {
@@ -61,7 +60,7 @@ fn serialize_json<T>(
     prefix: Option<&[u8]>,
     suffix: Option<&[u8]>,
     signing_only: bool,
-) -> Result<String>
+) -> Result<String, XRPLBinaryCodecException>
 where
     T: Serialize,
 {
@@ -70,12 +69,7 @@ where
         buffer.extend(p);
     }
 
-    let json_value = match serde_json::to_value(prepared_transaction) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err!(e);
-        }
-    };
+    let json_value = serde_json::to_value(prepared_transaction)?;
     let st_object = STObject::try_from_value(json_value, signing_only)?;
     buffer.extend(st_object.as_ref());
 

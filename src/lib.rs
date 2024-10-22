@@ -60,7 +60,6 @@ pub mod wallet;
 
 pub extern crate serde_json;
 
-mod _anyhow;
 #[cfg(any(
     feature = "ledger-models",
     feature = "request-models",

@@ -2,27 +2,44 @@
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::utils::exceptions::ISOCodeException;
-use strum_macros::Display;
+use thiserror_no_std::Error;
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum XRPLAddressCodecException {
+    #[error("Invalid XAddress prefix")]
     InvalidXAddressPrefix,
+    #[error("Invalid XAddress zero tag")]
     InvalidXAddressZeroNoTag,
+    #[error("Invalid XAddress zero remain")]
     InvalidXAddressZeroRemain,
+    #[error("Invalid classic address length (length: {length})")]
     InvalidCAddressIdLength { length: usize },
+    #[error("Invalid classic address tag")]
     InvalidCAddressTag,
+    #[error("Invalid seed prefix encoding type")]
     InvalidSeedPrefixEncodingType,
+    #[error("Invalid encoding prefix length")]
     InvalidEncodingPrefixLength,
+    #[error("Invalid classic address value")]
     InvalidClassicAddressValue,
+    #[error("Unsupported XAddress")]
     UnsupportedXAddress,
+    #[error("Unknown seed encoding")]
     UnknownSeedEncoding,
+    #[error("Unknown payload lenght (expected: {expected}, found: {found})")]
     UnexpectedPayloadLength { expected: usize, found: usize },
+    #[error("From hex error")]
     FromHexError,
+    #[error("Base58 decode error: {0}")]
     Base58DecodeError(bs58::decode::Error),
+    #[error("XRPL binary codec error: {0}")]
     XRPLBinaryCodecError(XRPLBinaryCodecException),
+    #[error("ISO code error: {0}")]
     ISOError(ISOCodeException),
+    #[error("Serde json error")]
     SerdeJsonError(serde_json::error::Category),
+    #[error("Vec resize error")]
     VecResizeError(alloc::vec::Vec<u8>),
 }
 

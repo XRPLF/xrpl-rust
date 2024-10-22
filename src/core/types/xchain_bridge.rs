@@ -22,7 +22,7 @@ pub struct XChainBridge(SerializedType);
 impl XRPLType for XChainBridge {
     type Error = XRPLTypeException;
 
-    fn new(buffer: Option<&[u8]>) -> anyhow::Result<Self, Self::Error>
+    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {

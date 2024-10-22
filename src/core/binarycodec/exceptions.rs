@@ -1,71 +1,59 @@
 //! General XRPL Binary Codec Exceptions.
 
+use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::XRPRangeException;
-use strum_macros::Display;
+use thiserror_no_std::Error;
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, PartialEq, Clone, Error)]
 #[non_exhaustive]
 pub enum XRPLBinaryCodecException {
+    #[error("Unexpected parser skip overflow: max: {max}, found: {found}")]
     UnexpectedParserSkipOverflow { max: usize, found: usize },
+    #[error("Unexpected length prefix range: min: {min}, max: {max}")]
     UnexpectedLengthPrefixRange { min: usize, max: usize },
+    #[error("Unexpected type code range(min: {min}, max: {max})")]
     UnexpectedTypeCodeRange { min: usize, max: usize },
+    #[error("Unexpected field code range(min: {min}, max: {max})")]
     UnexpectedFieldCodeRange { min: usize, max: usize },
+    #[error("Unexpected field id byte range(min: {min}, max: {max})")]
     UnexpectedFieldIdByteRange { min: usize, max: usize },
+    #[error("Unknown field name")]
     UnknownFieldName,
+    #[error("Invalid read from bytes value")]
     InvalidReadFromBytesValue,
+    #[error("Invalid variable length too large: max: {max}")]
     InvalidVariableLengthTooLarge { max: usize },
+    #[error("Invalid hash length (expected: {expected}, found: {found})")]
     InvalidHashLength { expected: usize, found: usize },
+    #[error("Invalid path set from value")]
     InvalidPathSetFromValue,
+    #[error("Try from slice error")]
     TryFromSliceError,
-    TryFromIntError,
-    FromUtf8Error,
-    ParseIntError,
-    FromHexError,
-    XRPRangeError(XRPRangeException),
-    SerdeJsonError(serde_json::error::Category),
-    DecimalError(rust_decimal::Error),
-    BigDecimalError(bigdecimal::ParseBigDecimalError),
-    ISOCodeError(ISOCodeException),
+    #[error("Try from int error: {0}")]
+    TryFromIntError(#[from] core::num::TryFromIntError),
+    #[error("From utf8 error: {0}")]
+    FromUtf8Error(#[from] alloc::string::FromUtf8Error),
+    #[error("Parse int error: {0}")]
+    ParseIntError(#[from] core::num::ParseIntError),
+    #[error("From hex error")]
+    FromHexError(#[from] hex::FromHexError),
+    #[error("XRP range error: {0}")]
+    XRPRangeError(#[from] XRPRangeException),
+    #[error("Serde json error")]
+    SerdeJsonError,
+    #[error("Decimal error: {0}")]
+    DecimalError(#[from] rust_decimal::Error),
+    #[error("Big decimal error: {0}")]
+    BigDecimalError(#[from] bigdecimal::ParseBigDecimalError),
+    #[error("ISO code error: {0}")]
+    ISOCodeError(#[from] ISOCodeException),
+    #[error("Field has no associated tag")]
     FieldHasNoAssiciatedTag,
+    #[error("XAddress tag mismatch")]
     XAddressTagMismatch,
+    #[error("Field is not account or destination")]
     FieldIsNotAccountOrDestination,
-}
-
-impl From<XRPRangeException> for XRPLBinaryCodecException {
-    fn from(err: XRPRangeException) -> Self {
-        XRPLBinaryCodecException::XRPRangeError(err)
-    }
-}
-
-impl From<ISOCodeException> for XRPLBinaryCodecException {
-    fn from(err: ISOCodeException) -> Self {
-        XRPLBinaryCodecException::ISOCodeError(err)
-    }
-}
-
-impl From<rust_decimal::Error> for XRPLBinaryCodecException {
-    fn from(err: rust_decimal::Error) -> Self {
-        XRPLBinaryCodecException::DecimalError(err)
-    }
-}
-
-impl From<hex::FromHexError> for XRPLBinaryCodecException {
-    fn from(_: hex::FromHexError) -> Self {
-        XRPLBinaryCodecException::FromHexError
-    }
-}
-
-impl From<serde_json::Error> for XRPLBinaryCodecException {
-    fn from(err: serde_json::Error) -> Self {
-        XRPLBinaryCodecException::SerdeJsonError(err.classify())
-    }
-}
-
-impl From<core::num::TryFromIntError> for XRPLBinaryCodecException {
-    fn from(_: core::num::TryFromIntError) -> Self {
-        XRPLBinaryCodecException::TryFromIntError
-    }
 }
 
 impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {
@@ -74,21 +62,9 @@ impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {
     }
 }
 
-impl From<core::num::ParseIntError> for XRPLBinaryCodecException {
-    fn from(_: core::num::ParseIntError) -> Self {
-        XRPLBinaryCodecException::ParseIntError
-    }
-}
-
-impl From<alloc::string::FromUtf8Error> for XRPLBinaryCodecException {
-    fn from(_: alloc::string::FromUtf8Error) -> Self {
-        XRPLBinaryCodecException::FromUtf8Error
-    }
-}
-
-impl From<bigdecimal::ParseBigDecimalError> for XRPLBinaryCodecException {
-    fn from(err: bigdecimal::ParseBigDecimalError) -> Self {
-        XRPLBinaryCodecException::BigDecimalError(err)
+impl From<serde_json::Error> for XRPLBinaryCodecException {
+    fn from(_: serde_json::Error) -> Self {
+        XRPLBinaryCodecException::SerdeJsonError
     }
 }
 
