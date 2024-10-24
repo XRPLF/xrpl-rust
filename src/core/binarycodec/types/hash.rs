@@ -3,13 +3,18 @@
 //! See Hash Fields:
 //! `<https://xrpl.org/serialization.html#hash-fields>`
 
-use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::utils::*;
-use crate::core::types::*;
+use super::exceptions::XRPLHashException;
+use super::utils::HASH128_LENGTH;
+use super::utils::HASH160_LENGTH;
+use super::utils::HASH256_LENGTH;
+use super::TryFromParser;
+use super::XRPLType;
+use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::BinaryParser;
 use crate::core::Parser;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
+use core::fmt::Display;
 use serde::Deserialize;
 
 /// Codec for serializing and deserializing a hash field
@@ -167,7 +172,7 @@ impl dyn Hash {
     pub fn parse<T: Hash>(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Vec<u8>, XRPLHashException> {
+    ) -> Result<Vec<u8>, XRPLBinaryCodecException> {
         let read_length = length.or_else(|| Some(T::get_length())).unwrap();
         Ok(parser.read(read_length)?)
     }
@@ -216,7 +221,7 @@ impl XRPLType for Hash256 {
 }
 
 impl TryFromParser for Hash128 {
-    type Error = XRPLHashException;
+    type Error = XRPLBinaryCodecException;
 
     /// Build Hash128 from a BinaryParser.
     fn from_parser(
@@ -228,7 +233,7 @@ impl TryFromParser for Hash128 {
 }
 
 impl TryFromParser for Hash160 {
-    type Error = XRPLHashException;
+    type Error = XRPLBinaryCodecException;
 
     /// Build Hash160 from a BinaryParser.
     fn from_parser(
@@ -240,7 +245,7 @@ impl TryFromParser for Hash160 {
 }
 
 impl TryFromParser for Hash256 {
-    type Error = XRPLHashException;
+    type Error = XRPLBinaryCodecException;
 
     /// Build Hash256 from a BinaryParser.
     fn from_parser(
@@ -322,6 +327,8 @@ impl AsRef<[u8]> for Hash256 {
 
 #[cfg(test)]
 mod test {
+    use alloc::string::ToString;
+
     use super::*;
 
     const HASH128_HEX_TEST: &str = "10000000002000000000300000000012";

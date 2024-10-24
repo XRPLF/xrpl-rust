@@ -3,9 +3,13 @@
 //! See Amount Fields:
 //! `<https://xrpl.org/serialization.html#amount-fields>`
 
+use super::exceptions::XRPLTypeException;
+use super::AccountId;
+use super::Currency;
+use super::TryFromParser;
+use super::XRPLType;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::types::exceptions::XRPLTypeException;
-use crate::core::types::*;
+use crate::core::exceptions::XRPLCoreException;
 use crate::core::BinaryParser;
 use crate::core::Parser;
 use crate::utils::exceptions::JSONParseException;
@@ -18,6 +22,7 @@ use alloc::vec::Vec;
 use bigdecimal::{BigDecimal, Signed, Zero};
 use core::convert::TryFrom;
 use core::convert::TryInto;
+use core::fmt::Display;
 use core::str::FromStr;
 use rust_decimal::prelude::ToPrimitive;
 use serde::ser::Error;
@@ -210,8 +215,8 @@ impl IssuedCurrency {
                 value = -value.abs();
             }
         }
+        verify_valid_ic_value(&value.to_string()).map_err(|e| XRPLBinaryCodecException::from(e))?;
 
-        verify_valid_ic_value(&value.to_string())?;
         Ok(value)
     }
 }
@@ -248,7 +253,7 @@ impl TryFromParser for Amount {
 }
 
 impl TryFromParser for IssuedCurrency {
-    type Error = XRPLTypeException;
+    type Error = XRPLBinaryCodecException;
 
     /// Build IssuedCurrency from a BinaryParser.
     fn from_parser(
@@ -311,27 +316,29 @@ impl TryFrom<IssuedCurrency> for Amount {
 }
 
 impl TryFrom<serde_json::Value> for Amount {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
     /// Construct an Amount object from a Serde JSON Value.
     fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
         if value.is_string() {
-            Self::try_from(value.as_str().ok_or(XRPLTypeException::InvalidNoneValue)?)
+            let xrp_value = value.as_str().ok_or(XRPLTypeException::InvalidNoneValue)?;
+            Self::try_from(xrp_value).map_err(|e| XRPLBinaryCodecException::from(e).into())
         } else if value.is_object() {
             Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
         } else {
-            Err(XRPLTypeException::JSONParseError(
-                JSONParseException::InvalidSerdeValue {
+            Err(
+                XRPLTypeException::JSONParseError(JSONParseException::InvalidSerdeValue {
                     expected: "String/Object".into(),
                     found: value,
-                },
-            ))
+                })
+                .into(),
+            )
         }
     }
 }
 
 impl TryFrom<serde_json::Value> for IssuedCurrency {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
     /// Construct an IssuedCurrency object from a Serde JSON Value.
     fn try_from(json: serde_json::Value) -> Result<Self, Self::Error> {
@@ -339,7 +346,10 @@ impl TryFrom<serde_json::Value> for IssuedCurrency {
             json["value"]
                 .as_str()
                 .ok_or(XRPLTypeException::InvalidNoneValue)?,
-        )?;
+        )
+        .map_err(|e| {
+            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::BigDecimalError(e))
+        })?;
         let currency = Currency::try_from(
             json["currency"]
                 .as_str()
@@ -376,8 +386,8 @@ impl AsRef<[u8]> for Amount {
 mod test {
     use super::*;
     use crate::core::binarycodec::test_cases::load_data_tests;
-    use crate::core::types::test_cases::IOUCase;
-    use crate::core::types::test_cases::TEST_XRP_CASES;
+    use crate::core::binarycodec::types::test_cases::IOUCase;
+    use crate::core::binarycodec::types::test_cases::TEST_XRP_CASES;
     use alloc::format;
 
     const IOU_TEST: &str = include_str!("../test_data/iou-tests.json");

@@ -1,7 +1,10 @@
 //! Functions for encoding objects into the XRP Ledger's
 //! canonical binary format and decoding them.
 
-use super::types::{AccountId, STObject};
+pub mod definitions;
+pub mod types;
+
+use types::{AccountId, STObject};
 
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::convert::TryFrom;

@@ -35,10 +35,10 @@ pub use self::vector256::Vector256;
 pub use self::xchain_bridge::XChainBridge;
 
 use crate::core::binarycodec::binary_wrappers::Serialization;
-use crate::core::definitions::get_field_instance;
-use crate::core::definitions::get_transaction_result_code;
-use crate::core::definitions::get_transaction_type_code;
-use crate::core::definitions::FieldInstance;
+use crate::core::binarycodec::definitions::get_field_instance;
+use crate::core::binarycodec::definitions::get_transaction_result_code;
+use crate::core::binarycodec::definitions::get_transaction_type_code;
+use crate::core::binarycodec::definitions::FieldInstance;
 use crate::core::BinaryParser;
 use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
@@ -52,9 +52,9 @@ use serde::Deserialize;
 use serde_json::Map;
 use serde_json::Value;
 
-use super::addresscodec::is_valid_xaddress;
-use super::addresscodec::xaddress_to_classic_address;
 use super::BinarySerializer;
+use crate::core::addresscodec::is_valid_xaddress;
+use crate::core::addresscodec::xaddress_to_classic_address;
 
 const ACCOUNT: &str = "Account";
 const SOURCE_TAG: &str = "SourceTag";
@@ -148,7 +148,9 @@ impl XRPLTypes {
         T: TryFrom<&'a str>,
         <T as TryFrom<&'a str>>::Error: Display,
     {
-        value.try_into()
+        value
+            .try_into()
+            .map_err(|_| XRPLTypeException::TryFromStrError)
     }
 
     fn amount_from_map<T>(value: Map<String, Value>) -> Result<T, XRPLTypeException>
@@ -157,10 +159,9 @@ impl XRPLTypes {
         <T as TryFrom<IssuedCurrency>>::Error: Display,
     {
         match IssuedCurrency::try_from(Value::Object(value)) {
-            Ok(value) => match value.try_into() {
-                Ok(value) => Ok(value),
-                Err(error) => Err(error),
-            },
+            Ok(value) => value
+                .try_into()
+                .map_err(|_| XRPLTypeException::TryFromIssuedCurrencyError),
             Err(error) => Err(error),
         }
     }
@@ -230,7 +231,7 @@ impl STArray {
     pub fn try_from_value(value: Value) -> Result<Self, XRPLTypeException> {
         if let Some(array) = value.as_array() {
             if !array.is_empty() && array.iter().filter(|v| v.is_object()).count() != array.len() {
-                Err(exceptions::XRPLSerializeArrayException::ExpectedObjectArray)
+                Err(exceptions::XRPLSerializeArrayException::ExpectedObjectArray.into())
             } else {
                 let mut serializer = BinarySerializer::new();
                 for object in array {
@@ -238,7 +239,7 @@ impl STArray {
                         Value::Object(map) => map,
                         _ => {
                             return Err(
-                                exceptions::XRPLSerializeArrayException::ExpectedObjectArray,
+                                exceptions::XRPLSerializeArrayException::ExpectedObjectArray.into(),
                             )
                         }
                     };
@@ -249,7 +250,7 @@ impl STArray {
                 Ok(STArray(serializer.into()))
             }
         } else {
-            Err(exceptions::XRPLSerializeArrayException::ExpectedArray)
+            Err(exceptions::XRPLSerializeArrayException::ExpectedArray.into())
         }
     }
 }
@@ -317,7 +318,7 @@ impl STObject {
     pub fn try_from_value(value: Value, signing_only: bool) -> Result<Self, XRPLTypeException> {
         let object = match value {
             Value::Object(map) => map,
-            _ => return Err(exceptions::XRPLSerializeMapException::ExpectedObject),
+            _ => return Err(exceptions::XRPLSerializeMapException::ExpectedObject.into()),
         };
         let mut serializer = BinarySerializer::new();
         let mut value_xaddress_handled = Map::new();
@@ -329,7 +330,8 @@ impl STObject {
                         if let Some(object_tag) = object.get(SOURCE_TAG) {
                             if handled_tag != object_tag {
                                 return Err(
-                                    exceptions::XRPLSerializeMapException::AccountMismatchingTags,
+                                    exceptions::XRPLSerializeMapException::AccountMismatchingTags
+                                        .into(),
                                 );
                             }
                         }
@@ -338,7 +340,7 @@ impl STObject {
                         if let Some(object_tag) = object.get(DESTINATION_TAG) {
                             if handled_tag != object_tag {
                                 return Err(
-                                    exceptions::XRPLSerializeMapException::DestinationMismatchingTags
+                                    exceptions::XRPLSerializeMapException::DestinationMismatchingTags.into()
                                 );
                             }
                         }
@@ -350,8 +352,9 @@ impl STObject {
                         None => {
                             return Err(
                                 exceptions::XRPLSerializeMapException::UnknownTransactionType(
-                                    value,
-                                ),
+                                    value.to_string(),
+                                )
+                                .into(),
                             )
                         }
                     };
@@ -360,16 +363,16 @@ impl STObject {
                         Value::Number(transaction_type_code.to_owned().into()),
                     );
                 } else if field == "TransactionResult" {
-                    let transaction_result_code = match get_transaction_result_code(value) {
-                        Some(code) => code,
-                        None => {
-                            return Err(
+                    let transaction_result_code =
+                        match get_transaction_result_code(value) {
+                            Some(code) => code,
+                            None => return Err(
                                 exceptions::XRPLSerializeMapException::UnknownTransactionResult(
-                                    value,
-                                ),
-                            )
-                        }
-                    };
+                                    value.to_string(),
+                                )
+                                .into(),
+                            ),
+                        };
                     value_xaddress_handled.insert(
                         field.to_owned(),
                         Value::Number(transaction_result_code.to_owned().into()),
@@ -380,8 +383,9 @@ impl STObject {
                         None => {
                             return Err(
                                 exceptions::XRPLSerializeMapException::UnknownLedgerEntryType(
-                                    value,
-                                ),
+                                    value.to_string(),
+                                )
+                                .into(),
                             )
                         }
                     };
@@ -416,13 +420,9 @@ impl STObject {
         let mut is_unl_modify = false;
 
         for field_instance in &sorted_keys {
-            let associated_value = match value_xaddress_handled.get(&field_instance.name) {
-                Some(value) => value,
-                None => Err(anyhow::anyhow!(
-                    "Error prossessing field: {}",
-                    field_instance.name
-                ))?,
-            };
+            let associated_value = value_xaddress_handled.get(&field_instance.name).ok_or(
+                exceptions::XRPLTypeException::MissingField(field_instance.name.clone()),
+            )?;
             let associated_value = XRPLTypes::from_value(
                 &field_instance.associated_type,
                 associated_value.to_owned(),
@@ -486,7 +486,10 @@ fn handle_xaddress(
                 (tag_name.to_string(), Value::Number(tag.into())),
             ]))
         } else {
-            Err(exceptions::XRPLSerializeMapException::DisallowedTag { field: &field }.into())
+            Err(exceptions::XRPLSerializeMapException::DisallowedTag {
+                field: field.to_string(),
+            }
+            .into())
         }
     } else {
         Ok(Map::from_iter(vec![(

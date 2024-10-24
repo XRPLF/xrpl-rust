@@ -15,8 +15,6 @@ pub enum XRPLTypeException {
     InvalidNoneValue,
     #[error("From hex error")]
     FromHexError,
-    #[error("XRPL Binary Codec error: {0}")]
-    XRPLBinaryCodecError(XRPLBinaryCodecException),
     #[error("XRPL Hash error: {0}")]
     XRPLHashError(XRPLHashException),
     #[error("XRPL Range error: {0}")]
@@ -32,15 +30,19 @@ pub enum XRPLTypeException {
     #[error("Unknown XRPL type")]
     UnknownXRPLType,
     #[error("Missing field: {0}")]
-    MissingField(&'static str),
+    MissingField(String),
     #[error("Unexpected JSON type")]
     UnexpectedJSONType,
-    #[error("XRPL Address codec error: {0}")]
-    XRPLAddressCodecException(#[from] XRPLAddressCodecException),
     #[error("XRPL Serialize Map error: {0}")]
     XRPLSerializeMapException(#[from] XRPLSerializeMapException),
+    #[error("XRPL Serialize Array error: {0}")]
+    XRPLSerializeArrayException(#[from] XRPLSerializeArrayException),
     #[error("Parse int error: {0}")]
     ParseIntError(#[from] core::num::ParseIntError),
+    #[error("Failed to parse type from str")]
+    TryFromStrError,
+    #[error("Failed to parse type from issued currency")]
+    TryFromIssuedCurrencyError,
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -84,10 +86,6 @@ pub enum XRPLHashException {
     FromHexError,
     #[error("ISO code error: {0}")]
     ISOCodeError(ISOCodeException),
-    #[error("XRPL Binary Codec error: {0}")]
-    XRPLBinaryCodecError(XRPLBinaryCodecException),
-    #[error("XRPL Address Codec error: {0}")]
-    XRPLAddressCodecError(XRPLAddressCodecException),
     #[error("Serde JSON error")]
     SerdeJsonError(serde_json::error::Category),
 }
@@ -112,12 +110,6 @@ impl From<XRPLHashException> for XRPLTypeException {
 impl From<XRPRangeException> for XRPLTypeException {
     fn from(err: XRPRangeException) -> Self {
         XRPLTypeException::XRPLRangeError(err)
-    }
-}
-
-impl From<XRPLBinaryCodecException> for XRPLTypeException {
-    fn from(err: XRPLBinaryCodecException) -> Self {
-        XRPLTypeException::XRPLBinaryCodecError(err)
     }
 }
 
@@ -154,18 +146,6 @@ impl From<XRPLXChainBridgeException> for XRPLTypeException {
 impl From<ISOCodeException> for XRPLHashException {
     fn from(err: ISOCodeException) -> Self {
         XRPLHashException::ISOCodeError(err)
-    }
-}
-
-impl From<XRPLBinaryCodecException> for XRPLHashException {
-    fn from(err: XRPLBinaryCodecException) -> Self {
-        XRPLHashException::XRPLBinaryCodecError(err)
-    }
-}
-
-impl From<XRPLAddressCodecException> for XRPLHashException {
-    fn from(err: XRPLAddressCodecException) -> Self {
-        XRPLHashException::XRPLAddressCodecError(err)
     }
 }
 

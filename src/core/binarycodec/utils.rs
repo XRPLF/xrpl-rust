@@ -1,11 +1,11 @@
 //! Utilities for binarycodec crate.
 
+use super::definitions::load_definition_map;
+use super::definitions::DefinitionHandler;
+use super::definitions::FieldHeader;
+use super::definitions::CODE_MAX_VALUE;
+use super::definitions::CODE_MIN_VALUE;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::definitions::load_definition_map;
-use crate::core::definitions::DefinitionHandler;
-use crate::core::definitions::FieldHeader;
-use crate::core::definitions::CODE_MAX_VALUE;
-use crate::core::definitions::CODE_MIN_VALUE;
 use alloc::vec;
 use alloc::vec::Vec;
 

@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use serde_json::Value;
 
 use crate::core::{
-    types::{AccountId, Currency},
+    binarycodec::types::{AccountId, Currency},
     BinaryParser, Parser,
 };
 
@@ -49,11 +49,11 @@ impl TryFrom<Value> for Issue {
         } else if let Some(issued_currency) = value.as_object() {
             let cur = issued_currency["currency"]
                 .as_str()
-                .ok_or(XRPLTypeException::MissingField("currency"))?;
+                .ok_or(XRPLTypeException::MissingField("currency".to_string()))?;
             let currency = Currency::try_from(cur)?;
             let issuer = issued_currency["issuer"]
                 .as_str()
-                .ok_or(XRPLTypeException::MissingField("issuer"))?;
+                .ok_or(XRPLTypeException::MissingField("issuer".to_string()))?;
             let account = AccountId::try_from(issuer)?;
             let mut currency_bytes = currency.as_ref().to_vec();
             currency_bytes.extend_from_slice(account.as_ref());

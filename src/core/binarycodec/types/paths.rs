@@ -5,9 +5,9 @@
 
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::utils::CURRENCY_CODE_LENGTH;
-use crate::core::types::*;
+use crate::core::binarycodec::types::exceptions::XRPLHashException;
+use crate::core::binarycodec::types::utils::CURRENCY_CODE_LENGTH;
+use crate::core::binarycodec::types::*;
 use crate::core::BinaryParser;
 use crate::core::Parser;
 use alloc::borrow::ToOwned;
@@ -471,9 +471,9 @@ impl Iterator for PathStepData {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::core::types::test_cases::TEST_PATH_BUFFER;
-    use crate::core::types::test_cases::TEST_PATH_SET_BUFFER;
-    use crate::core::types::test_cases::TEST_PATH_STEP_BUFFER;
+    use crate::core::binarycodec::types::test_cases::TEST_PATH_BUFFER;
+    use crate::core::binarycodec::types::test_cases::TEST_PATH_SET_BUFFER;
+    use crate::core::binarycodec::types::test_cases::TEST_PATH_STEP_BUFFER;
 
     pub const PATH_SET_TEST: &str = include_str!("../test_data/path-set-test.json");
     pub const PATH_TEST: &str = include_str!("../test_data/path-test.json");

@@ -1,4 +1,4 @@
-use crate::core::types::amount::IssuedCurrency;
+use crate::core::binarycodec::types::amount::IssuedCurrency;
 use alloc::string::String;
 use serde::Deserialize;
 

@@ -1,9 +1,9 @@
 //! Maps and helpers providing serialization-related
 //! information about fields.
 
-use crate::core::definitions::FieldHeader;
-use crate::core::definitions::FieldInfo;
-use crate::core::definitions::FieldInstance;
+use super::FieldHeader;
+use super::FieldInfo;
+use super::FieldInstance;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::string::ToString;

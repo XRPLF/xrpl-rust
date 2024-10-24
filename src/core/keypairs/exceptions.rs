@@ -4,7 +4,7 @@ use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use strum_macros::Display;
 
-#[derive(Debug, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Display)]
 #[non_exhaustive]
 pub enum XRPLKeypairsException {
     InvalidSignature,

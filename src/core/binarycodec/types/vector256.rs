@@ -1,9 +1,9 @@
 //! Codec for serializing and deserializing
 //! vectors of Hash256.
 
-use crate::core::types::exceptions::XRPLVectorException;
-use crate::core::types::hash::Hash256;
-use crate::core::types::*;
+use crate::core::binarycodec::types::exceptions::XRPLVectorException;
+use crate::core::binarycodec::types::hash::Hash256;
+use crate::core::binarycodec::types::*;
 use crate::core::BinaryParser;
 use alloc::vec;
 use alloc::vec::Vec;

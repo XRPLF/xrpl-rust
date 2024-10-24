@@ -47,9 +47,9 @@ pub struct TestDefinitions {
 }
 
 fn _load_tests() -> &'static Option<TestDefinitions> {
-    pub const DATA_DRIVEN_TESTS: &str = include_str!("../test_data/data-driven-tests.json");
-    pub const CODEC_TEST_FIXTURES: &str = include_str!("../test_data/codec-fixtures.json");
-    pub const X_CODEC_TEST_FIXTURES: &str = include_str!("../test_data/x-codec-fixtures.json");
+    pub const DATA_DRIVEN_TESTS: &str = include_str!("./test_data/data-driven-tests.json");
+    pub const CODEC_TEST_FIXTURES: &str = include_str!("./test_data/codec-fixtures.json");
+    pub const X_CODEC_TEST_FIXTURES: &str = include_str!("./test_data/x-codec-fixtures.json");
 
     lazy_static! {
         static ref TEST_CASES: Option<TestDefinitions> =

@@ -1,9 +1,12 @@
 //! Codec for currency property inside an XRPL
 //! issued currency amount json.
 
-use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::utils::CURRENCY_CODE_LENGTH;
-use crate::core::types::*;
+use super::exceptions::XRPLHashException;
+use super::utils::CURRENCY_CODE_LENGTH;
+use super::Hash160;
+use super::TryFromParser;
+use super::XRPLType;
+use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::BinaryParser;
 use crate::utils::exceptions::ISOCodeException;
 use crate::utils::*;
@@ -13,6 +16,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::convert::TryInto;
+use core::fmt::Display;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
@@ -74,7 +78,7 @@ impl XRPLType for Currency {
 }
 
 impl TryFromParser for Currency {
-    type Error = XRPLHashException;
+    type Error = XRPLBinaryCodecException;
 
     /// Build Currency from a BinaryParser.
     fn from_parser(

@@ -20,6 +20,11 @@
 #![no_std]
 #![allow(dead_code)] // Remove eventually
 
+use ::core::fmt::Display;
+
+use alloc::string::{String, ToString};
+use thiserror_no_std::Error;
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(feature = "std")]
@@ -80,3 +85,43 @@ mod _serde;
     ))
 ))]
 compile_error!("Cannot enable `transaction-helpers` or `wallet-helpers` without enabling a runtime feature (\"*-rt\"). This is required for sleeping between retries internally.");
+
+#[derive(Debug, Error)]
+pub enum XRPLSerdeJsonError {
+    SerdeJsonError(serde_json::Error),
+    InvalidNoneError(String),
+    UnexpectedValueType {
+        expected: String,
+        found: serde_json::Value,
+    },
+}
+
+impl Display for XRPLSerdeJsonError {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        match self {
+            XRPLSerdeJsonError::SerdeJsonError(err) => write!(f, "{}", err),
+            XRPLSerdeJsonError::InvalidNoneError(err) => {
+                write!(f, "Invalid None value on field: {}", err)
+            }
+            XRPLSerdeJsonError::UnexpectedValueType { expected, found } => {
+                write!(
+                    f,
+                    "Unexpected value type (expected: {}, found: {})",
+                    expected, found
+                )
+            }
+        }
+    }
+}
+
+impl From<serde_json::Error> for XRPLSerdeJsonError {
+    fn from(err: serde_json::Error) -> Self {
+        XRPLSerdeJsonError::SerdeJsonError(err)
+    }
+}
+
+impl PartialEq for XRPLSerdeJsonError {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
+}

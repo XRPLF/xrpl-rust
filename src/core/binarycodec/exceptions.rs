@@ -1,8 +1,7 @@
 //! General XRPL Binary Codec Exceptions.
 
-use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
-use crate::utils::exceptions::ISOCodeException;
-use crate::utils::exceptions::XRPRangeException;
+use super::types::exceptions::XRPLTypeException;
+use crate::utils::exceptions::{ISOCodeException, XRPRangeException};
 use thiserror_no_std::Error;
 
 #[derive(Debug, PartialEq, Clone, Error)]
@@ -38,10 +37,6 @@ pub enum XRPLBinaryCodecException {
     ParseIntError(#[from] core::num::ParseIntError),
     #[error("From hex error")]
     FromHexError(#[from] hex::FromHexError),
-    #[error("XRP range error: {0}")]
-    XRPRangeError(#[from] XRPRangeException),
-    #[error("Serde json error")]
-    SerdeJsonError,
     #[error("Decimal error: {0}")]
     DecimalError(#[from] rust_decimal::Error),
     #[error("Big decimal error: {0}")]
@@ -54,17 +49,15 @@ pub enum XRPLBinaryCodecException {
     XAddressTagMismatch,
     #[error("Field is not account or destination")]
     FieldIsNotAccountOrDestination,
+    #[error("XRPL type error: {0}")]
+    XRPLTypeError(#[from] XRPLTypeException),
+    #[error("XRPL Range error: {0}")]
+    XRPLRangeError(#[from] XRPRangeException),
 }
 
 impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {
     fn from(_: core::array::TryFromSliceError) -> Self {
         XRPLBinaryCodecException::TryFromSliceError
-    }
-}
-
-impl From<serde_json::Error> for XRPLBinaryCodecException {
-    fn from(_: serde_json::Error) -> Self {
-        XRPLBinaryCodecException::SerdeJsonError
     }
 }
 

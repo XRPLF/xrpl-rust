@@ -4,12 +4,14 @@
 //! `<https://xrpl.org/serialization.html#blob-fields>`
 
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::types::*;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
+use core::fmt::Display;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
+
+use super::XRPLType;
 
 /// Codec for serializing and deserializing blob fields.
 ///
