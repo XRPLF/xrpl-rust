@@ -1,6 +1,10 @@
+use alloc::string::String;
 use thiserror_no_std::Error;
 
-use crate::{utils::exceptions::ISOCodeException, XRPLSerdeJsonError};
+use crate::{
+    utils::exceptions::{ISOCodeException, XRPLUtilsException},
+    XRPLSerdeJsonError,
+};
 
 use super::{
     addresscodec::exceptions::XRPLAddressCodecException,
@@ -27,6 +31,8 @@ pub enum XRPLCoreException {
     XRPLKeypairsError(#[from] XRPLKeypairsException),
     #[error("serde_json error: {0}")]
     SerdeJsonError(#[from] XRPLSerdeJsonError),
+    #[error("XRPL utils error: {0}")]
+    XRPLUtilsError(String), // TODO: find a better way to avoid infinite recursion
     #[error("From hex error: {0}")]
     FromHexError(#[from] hex::FromHexError),
     #[error("ISO code error: {0}")]

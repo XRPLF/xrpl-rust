@@ -1,11 +1,10 @@
 //! Exception for invalid XRP Ledger type data.
 
-use crate::utils::exceptions::JSONParseException;
-use crate::utils::exceptions::XRPRangeException;
+use crate::utils::exceptions::{XRPLUtilsException, XRPRangeException};
 use alloc::string::String;
 use thiserror_no_std::Error;
 
-#[derive(Debug, Clone, PartialEq, Error)]
+#[derive(Debug, PartialEq, Error)]
 #[non_exhaustive]
 pub enum XRPLTypeException {
     #[error("Invalid None value")]
@@ -34,8 +33,6 @@ pub enum XRPLTypeException {
     DecimalError(#[from] rust_decimal::Error),
     #[error("Big Decimal error: {0}")]
     BigDecimalError(#[from] bigdecimal::ParseBigDecimalError),
-    #[error("JSON Parse error: {0}")]
-    JSONParseError(#[from] JSONParseException),
     #[error("Missing field: {0}")]
     MissingField(String),
     #[error("Parse int error: {0}")]

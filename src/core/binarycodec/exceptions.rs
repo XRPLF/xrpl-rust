@@ -5,7 +5,7 @@ use crate::utils::exceptions::XRPRangeException;
 use super::types::exceptions::XRPLTypeException;
 use thiserror_no_std::Error;
 
-#[derive(Debug, PartialEq, Clone, Error)]
+#[derive(Debug, PartialEq, Error)]
 #[non_exhaustive]
 pub enum XRPLBinaryCodecException {
     #[error("Unexpected parser skip overflow: max: {max}, found: {found}")]

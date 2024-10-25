@@ -13,9 +13,9 @@ use crate::core::exceptions::XRPLCoreException;
 use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use crate::core::Parser;
-use crate::utils::exceptions::JSONParseException;
 use crate::utils::exceptions::XRPRangeException;
 use crate::utils::*;
+use crate::XRPLSerdeJsonError;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
@@ -75,10 +75,9 @@ fn _contains_decimal(string: &str) -> bool {
 
 /// Serializes the value field of an issued currency amount
 /// to its bytes representation.
-fn _serialize_issued_currency_value(
-    decimal: BigDecimal,
-) -> XRPLCoreResult<[u8; 8], XRPRangeException> {
-    verify_valid_ic_value(&decimal.to_scientific_notation())?;
+fn _serialize_issued_currency_value(decimal: BigDecimal) -> XRPLCoreResult<[u8; 8]> {
+    verify_valid_ic_value(&decimal.to_scientific_notation())
+        .map_err(|e| XRPLCoreException::XRPLUtilsError(e.to_string()))?;
 
     if decimal.is_zero() {
         return Ok((_ZERO_CURRENCY_AMOUNT_HEX).to_be_bytes());
@@ -96,10 +95,13 @@ fn _serialize_issued_currency_value(
 
     while mantissa > _MAX_MANTISSA {
         if exp >= MAX_IOU_EXPONENT {
-            return Err(XRPRangeException::UnexpectedICAmountOverflow {
-                max: MAX_IOU_EXPONENT as usize,
-                found: exp as usize,
-            });
+            return Err(XRPLBinaryCodecException::from(
+                XRPRangeException::UnexpectedICAmountOverflow {
+                    max: MAX_IOU_EXPONENT as usize,
+                    found: exp as usize,
+                },
+            )
+            .into());
         } else {
             mantissa /= 10;
             exp += 1;
@@ -110,10 +112,13 @@ fn _serialize_issued_currency_value(
         // Round to zero
         Ok((_ZERO_CURRENCY_AMOUNT_HEX).to_be_bytes())
     } else if exp > MAX_IOU_EXPONENT || mantissa > _MAX_MANTISSA {
-        Err(XRPRangeException::UnexpectedICAmountOverflow {
-            max: MAX_IOU_EXPONENT as usize,
-            found: exp as usize,
-        })
+        Err(
+            XRPLBinaryCodecException::from(XRPRangeException::UnexpectedICAmountOverflow {
+                max: MAX_IOU_EXPONENT as usize,
+                found: exp as usize,
+            })
+            .into(),
+        )
     } else {
         // "Not XRP" bit set
         let mut serial: i128 = _ZERO_CURRENCY_AMOUNT_HEX as i128;
@@ -133,24 +138,26 @@ fn _serialize_issued_currency_value(
 }
 
 /// Serializes an XRP amount.
-fn _serialize_xrp_amount(value: &str) -> XRPLCoreResult<[u8; 8], XRPRangeException> {
-    verify_valid_xrp_value(value)?;
+fn _serialize_xrp_amount(value: &str) -> XRPLCoreResult<[u8; 8]> {
+    verify_valid_xrp_value(value).map_err(|e| XRPLCoreException::XRPLUtilsError(e.to_string()))?;
 
-    let decimal = rust_decimal::Decimal::from_str(value)?.normalize();
+    let decimal = bigdecimal::BigDecimal::from_str(value)
+        .map_err(XRPLTypeException::BigDecimalError)?
+        .normalized();
 
     if let Some(result) = decimal.to_i64() {
         let value_with_pos_bit = result | _POS_SIGN_BIT_MASK;
         Ok(value_with_pos_bit.to_be_bytes())
     } else {
         // Safety, should never occur
-        Err(XRPRangeException::InvalidXRPAmount)
+        Err(XRPLCoreException::XRPLUtilsError(
+            XRPRangeException::InvalidXRPAmount.to_string(),
+        ))
     }
 }
 
 /// Serializes an issued currency amount.
-fn _serialize_issued_currency_amount(
-    issused_currency: IssuedCurrency,
-) -> XRPLCoreResult<[u8; 48], XRPRangeException> {
+fn _serialize_issued_currency_amount(issused_currency: IssuedCurrency) -> XRPLCoreResult<[u8; 48]> {
     let mut bytes = vec![];
     let amount_bytes = _serialize_issued_currency_value(issused_currency.value)?;
     let currency_bytes: &[u8] = issused_currency.currency.as_ref();
@@ -161,10 +168,13 @@ fn _serialize_issued_currency_amount(
     bytes.extend_from_slice(issuer_bytes);
 
     if bytes.len() != 48 {
-        Err(XRPRangeException::InvalidICSerializationLength {
-            expected: 48,
-            found: bytes.len(),
-        })
+        Err(
+            XRPLBinaryCodecException::from(XRPRangeException::InvalidICSerializationLength {
+                expected: 48,
+                found: bytes.len(),
+            })
+            .into(),
+        )
     } else {
         Ok(bytes.try_into().expect("_serialize_issued_currency_amount"))
     }
@@ -222,7 +232,8 @@ impl IssuedCurrency {
                 value = -value.abs();
             }
         }
-        verify_valid_ic_value(&value.to_string()).map_err(|e| XRPLBinaryCodecException::from(e))?;
+        verify_valid_ic_value(&value.to_string())
+            .map_err(|e| XRPLCoreException::XRPLUtilsError(e.to_string()))?;
 
         Ok(value)
     }
@@ -307,8 +318,7 @@ impl TryFrom<&str> for Amount {
 
     /// Construct an Amount object from a hex string.
     fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
-        let serialized =
-            _serialize_xrp_amount(value).map_err(XRPLBinaryCodecException::XRPRangeError)?;
+        let serialized = _serialize_xrp_amount(value)?;
         Ok(Amount::new(Some(&serialized))?)
     }
 }
@@ -318,8 +328,7 @@ impl TryFrom<IssuedCurrency> for Amount {
 
     /// Construct an Amount object from an IssuedCurrency.
     fn try_from(value: IssuedCurrency) -> XRPLCoreResult<Self, Self::Error> {
-        let serialized = _serialize_issued_currency_amount(value)
-            .map_err(XRPLBinaryCodecException::XRPRangeError)?;
+        let serialized = _serialize_issued_currency_amount(value)?;
         Ok(Amount::new(Some(&serialized))?)
     }
 }
@@ -336,7 +345,7 @@ impl TryFrom<serde_json::Value> for Amount {
             Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
         } else {
             Err(
-                XRPLTypeException::JSONParseError(JSONParseException::InvalidSerdeValue {
+                XRPLCoreException::SerdeJsonError(XRPLSerdeJsonError::UnexpectedValueType {
                     expected: "String/Object".into(),
                     found: value,
                 })
