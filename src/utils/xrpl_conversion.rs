@@ -9,6 +9,8 @@ use regex::Regex;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 
+use super::exceptions::XRPLUtilsResult;
+
 /// Indivisible unit of XRP
 pub(crate) const _ONE_DROP: Decimal = Decimal::from_parts(1, 0, 0, false, 6);
 
@@ -72,7 +74,7 @@ fn checked_mul(first: &BigDecimal, second: &BigDecimal) -> Option<BigDecimal> {
 
 /// TODO Make less bootleg
 /// Get the precision of a number.
-fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
+fn _calculate_precision(value: &str) -> XRPLUtilsResult<usize> {
     let decimal = BigDecimal::from_str(value)?.normalized();
     let regex = Regex::new("[^1-9]").expect("_calculate_precision");
 
@@ -92,7 +94,7 @@ fn _calculate_precision(value: &str) -> Result<usize, XRPRangeException> {
 
 /// Ensure that the value after being multiplied by the
 /// exponent does not contain a decimal.
-fn _verify_no_decimal(decimal: BigDecimal) -> Result<(), XRPRangeException> {
+fn _verify_no_decimal(decimal: BigDecimal) -> XRPLUtilsResult<()> {
     let (mantissa, scale) = decimal.as_bigint_and_exponent();
     let decimal = BigDecimal::from_i64(scale).expect("_verify_no_decimal");
 
@@ -107,7 +109,7 @@ fn _verify_no_decimal(decimal: BigDecimal) -> Result<(), XRPRangeException> {
     };
 
     if value.contains('.') {
-        Err(XRPRangeException::InvalidValueContainsDecimal)
+        Err(XRPRangeException::InvalidValueContainsDecimal.into())
     } else {
         Ok(())
     }
@@ -138,19 +140,21 @@ fn _verify_no_decimal(decimal: BigDecimal) -> Result<(), XRPRangeException> {
 ///
 /// assert_eq!(Some(drops), conversion);
 /// ```
-pub fn xrp_to_drops(xrp: &str) -> Result<String, XRPRangeException> {
+pub fn xrp_to_drops(xrp: &str) -> XRPLUtilsResult<String> {
     let xrp_d = Decimal::from_str(xrp)?;
 
     if xrp_d < _ONE_DROP && xrp_d != Decimal::ZERO {
         Err(XRPRangeException::InvalidXRPAmountTooSmall {
             min: ONE_DROP.to_string(),
             found: xrp.to_string(),
-        })
+        }
+        .into())
     } else if xrp_d.gt(&Decimal::new(MAX_XRP as i64, 0)) {
         Err(XRPRangeException::InvalidXRPAmountTooLarge {
             max: MAX_XRP,
             found: xrp.into(),
-        })
+        }
+        .into())
     } else {
         Ok(format!("{}", (xrp_d / _ONE_DROP).trunc()))
     }
@@ -180,7 +184,7 @@ pub fn xrp_to_drops(xrp: &str) -> Result<String, XRPRangeException> {
 ///
 /// assert_eq!(Some(xrp), conversion);
 /// ```
-pub fn drops_to_xrp(drops: &str) -> Result<String, XRPRangeException> {
+pub fn drops_to_xrp(drops: &str) -> XRPLUtilsResult<String> {
     let drops_d = Decimal::from_str(drops)?;
     let xrp = drops_d * _ONE_DROP;
 
@@ -188,7 +192,8 @@ pub fn drops_to_xrp(drops: &str) -> Result<String, XRPRangeException> {
         Err(XRPRangeException::InvalidDropsAmountTooLarge {
             max: MAX_XRP.to_string(),
             found: drops.to_string(),
-        })
+        }
+        .into())
     } else {
         Ok(xrp.normalize().to_string())
     }
@@ -215,7 +220,7 @@ pub fn drops_to_xrp(drops: &str) -> Result<String, XRPRangeException> {
 ///
 /// assert!(valid);
 /// ```
-pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> {
+pub fn verify_valid_xrp_value(xrp_value: &str) -> XRPLUtilsResult<()> {
     let decimal = Decimal::from_str(xrp_value)?;
     let max = Decimal::new(MAX_DROPS as i64, 0);
 
@@ -225,13 +230,15 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> 
         xrp if xrp.lt(&_ONE_DROP) => Err(XRPRangeException::InvalidXRPAmountTooSmall {
             min: ONE_DROP.to_string(),
             found: xrp.to_string(),
-        }),
+        }
+        .into()),
         xrp if xrp.gt(&max) => Err(XRPRangeException::InvalidDropsAmountTooLarge {
             max: MAX_XRP.to_string(),
             found: xrp.to_string(),
-        }),
+        }
+        .into()),
         // Should never occur
-        _ => Err(XRPRangeException::InvalidXRPAmount),
+        _ => Err(XRPRangeException::InvalidXRPAmount.into()),
     }
 }
 
@@ -256,7 +263,7 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> Result<(), XRPRangeException> 
 ///
 /// assert!(valid);
 /// ```
-pub fn verify_valid_ic_value(ic_value: &str) -> Result<(), XRPRangeException> {
+pub fn verify_valid_ic_value(ic_value: &str) -> XRPLUtilsResult<()> {
     let decimal = BigDecimal::from_str(ic_value)?.normalized();
     let scale = -(decimal.fractional_digit_count() as i32);
     let prec = _calculate_precision(ic_value)?;
@@ -267,13 +274,15 @@ pub fn verify_valid_ic_value(ic_value: &str) -> Result<(), XRPRangeException> {
             Err(XRPRangeException::InvalidICPrecisionTooLarge {
                 max: MAX_IOU_EXPONENT,
                 found: scale,
-            })
+            }
+            .into())
         }
         _ if prec > MAX_IOU_PRECISION as usize || scale < MIN_IOU_EXPONENT => {
             Err(XRPRangeException::InvalidICPrecisionTooSmall {
                 min: MIN_IOU_EXPONENT,
                 found: scale,
-            })
+            }
+            .into())
         }
         _ => _verify_no_decimal(decimal),
     }

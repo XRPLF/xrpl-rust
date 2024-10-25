@@ -1,10 +1,9 @@
-use super::Wallet;
+use super::{exceptions::XRPLWalletResult, Wallet};
 use crate::asynch::{
     clients::{XRPLAsyncClient, XRPLFaucet},
     wallet::generate_faucet_wallet as async_generate_faucet_wallet,
 };
 use alloc::borrow::Cow;
-use anyhow::Result;
 use embassy_futures::block_on;
 use url::Url;
 
@@ -16,7 +15,7 @@ pub fn generate_faucet_wallet<'a, C>(
     faucet_host: Option<Url>,
     usage_context: Option<Cow<'a, str>>,
     user_agent: Option<Cow<'a, str>>,
-) -> Result<Wallet>
+) -> XRPLWalletResult<Wallet>
 where
     C: XRPLFaucet + XRPLAsyncClient,
 {

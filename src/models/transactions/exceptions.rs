@@ -1,5 +1,5 @@
 use crate::models::transactions::{account_set::AccountSetFlag, payment::PaymentFlag};
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::String};
 use core::fmt::Debug;
 use strum_macros::Display;
 use thiserror_no_std::Error;
@@ -24,13 +24,11 @@ pub enum XRPLTransactionException<'a> {
 impl<'a> alloc::error::Error for XRPLTransactionException<'a> {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum XRPLTransactionFieldException<'a> {
-    #[error("Transaction is missing common field `{0:?}`")]
-    FieldMissing(&'a str),
+pub enum XRPLTransactionFieldException {
     #[error("There is no transaction common field `{0:?}`")]
-    InvalidCommonField(&'a str),
+    InvalidCommonField(String),
     #[error("There is no account field named `{0:?}`")]
-    UnknownAccountField(&'a str),
+    UnknownAccountField(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
