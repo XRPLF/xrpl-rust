@@ -2,6 +2,8 @@ use super::definitions::*;
 use super::types::TryFromParser;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::utils::*;
+use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::utils::ToBytes;
 use alloc::borrow::ToOwned;
 use alloc::vec;
@@ -44,14 +46,18 @@ pub struct BinaryParser(Vec<u8>);
 ///
 /// See Length Prefixing:
 /// `<https://xrpl.org/serialization.html#length-prefixing>`
-fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+fn _encode_variable_length_prefix(length: &usize) -> XRPLCoreResult<Vec<u8>> {
     if length <= &MAX_SINGLE_BYTE_LENGTH {
         Ok([*length as u8].to_vec())
     } else if length < &MAX_DOUBLE_BYTE_LENGTH {
         let mut bytes = vec![];
         let b_length = *length - (MAX_SINGLE_BYTE_LENGTH + 1);
-        let val_a: u8 = ((b_length >> 8) + (MAX_SINGLE_BYTE_LENGTH + 1)).try_into()?;
-        let val_b: u8 = (b_length & 0xFF).try_into()?;
+        let val_a: u8 = ((b_length >> 8) + (MAX_SINGLE_BYTE_LENGTH + 1))
+            .try_into()
+            .map_err(XRPLBinaryCodecException::TryFromIntError)?;
+        let val_b: u8 = (b_length & 0xFF)
+            .try_into()
+            .map_err(XRPLBinaryCodecException::TryFromIntError)?;
 
         bytes.extend_from_slice(&[val_a]);
         bytes.extend_from_slice(&[val_b]);
@@ -60,9 +66,15 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryC
     } else if length <= &MAX_LENGTH_VALUE {
         let mut bytes = vec![];
         let b_length = *length - MAX_DOUBLE_BYTE_LENGTH;
-        let val_a: u8 = ((MAX_SECOND_BYTE_VALUE + 1) + (b_length >> 16)).try_into()?;
-        let val_b: u8 = ((b_length >> 8) & 0xFF).try_into()?;
-        let val_c: u8 = (b_length & 0xFF).try_into()?;
+        let val_a: u8 = ((MAX_SECOND_BYTE_VALUE + 1) + (b_length >> 16))
+            .try_into()
+            .map_err(XRPLBinaryCodecException::TryFromIntError)?;
+        let val_b: u8 = ((b_length >> 8) & 0xFF)
+            .try_into()
+            .map_err(XRPLBinaryCodecException::TryFromIntError)?;
+        let val_c: u8 = (b_length & 0xFF)
+            .try_into()
+            .map_err(XRPLBinaryCodecException::TryFromIntError)?;
 
         bytes.extend_from_slice(&[val_a]);
         bytes.extend_from_slice(&[val_b]);
@@ -72,7 +84,8 @@ fn _encode_variable_length_prefix(length: &usize) -> Result<Vec<u8>, XRPLBinaryC
     } else {
         Err(XRPLBinaryCodecException::InvalidVariableLengthTooLarge {
             max: MAX_LENGTH_VALUE,
-        })
+        }
+        .into())
     }
 }
 
@@ -121,7 +134,7 @@ pub trait Parser {
     ///     }
     /// }
     /// ```
-    fn skip_bytes(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException>;
+    fn skip_bytes(&mut self, n: usize) -> XRPLCoreResult<&Self>;
 
     /// Consume and return the first n bytes of the BinaryParser.
     ///
@@ -148,7 +161,7 @@ pub trait Parser {
     ///     }
     /// }
     /// ```
-    fn read(&mut self, n: usize) -> Result<Vec<u8>, XRPLBinaryCodecException>;
+    fn read(&mut self, n: usize) -> XRPLCoreResult<Vec<u8>>;
 
     /// Read 1 byte from parser and return as unsigned int.
     ///
@@ -175,7 +188,7 @@ pub trait Parser {
     ///     }
     /// }
     /// ```
-    fn read_uint8(&mut self) -> Result<u8, XRPLBinaryCodecException>;
+    fn read_uint8(&mut self) -> XRPLCoreResult<u8>;
 
     /// Read 2 bytes from parser and return as unsigned int.
     ///
@@ -202,7 +215,7 @@ pub trait Parser {
     ///     }
     /// }
     /// ```
-    fn read_uint16(&mut self) -> Result<u16, XRPLBinaryCodecException>;
+    fn read_uint16(&mut self) -> XRPLCoreResult<u16>;
 
     /// Read 4 bytes from parser and return as unsigned int.
     ///
@@ -229,7 +242,7 @@ pub trait Parser {
     ///     }
     /// }
     /// ```
-    fn read_uint32(&mut self) -> Result<u32, XRPLBinaryCodecException>;
+    fn read_uint32(&mut self) -> XRPLCoreResult<u32>;
 
     /// Returns whether the binary parser has finished
     /// parsing (e.g. there is nothing left in the buffer
@@ -299,26 +312,29 @@ pub trait Parser {
     ///         _ => assert!(false)
     ///     }
     /// }
-    fn read_length_prefix(&mut self) -> Result<usize, XRPLBinaryCodecException>;
+    fn read_length_prefix(&mut self) -> XRPLCoreResult<usize>;
 
     /// Reads field ID from BinaryParser and returns as
     /// a FieldHeader object.
-    fn read_field_header(&mut self) -> Result<FieldHeader, XRPLBinaryCodecException>;
+    fn read_field_header(&mut self) -> XRPLCoreResult<FieldHeader>;
 
     /// Read the field ordinal at the head of the
     /// BinaryParser and return a FieldInstance object
     /// representing information about the field
     /// containedin the following bytes.
-    fn read_field(&mut self) -> Result<FieldInstance, XRPLBinaryCodecException>;
+    fn read_field(&mut self) -> XRPLCoreResult<FieldInstance>;
 
     /// Read next bytes from BinaryParser as the given type.
-    fn read_type<T: TryFromParser>(&mut self) -> Result<T, T::Error>;
+    fn read_type<T: TryFromParser>(&mut self) -> XRPLCoreResult<T, T::Error>;
 
     /// Read value of the type specified by field from
     /// the BinaryParser.
-    fn read_field_value<T: TryFromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
+    fn read_field_value<T: TryFromParser>(
+        &mut self,
+        field: &FieldInstance,
+    ) -> XRPLCoreResult<T, T::Error>
     where
-        T::Error: From<XRPLBinaryCodecException>;
+        T::Error: From<XRPLCoreException>;
 }
 
 pub trait Serialization {
@@ -451,40 +467,41 @@ impl Parser for BinaryParser {
         }
     }
 
-    fn skip_bytes(&mut self, n: usize) -> Result<&Self, XRPLBinaryCodecException> {
+    fn skip_bytes(&mut self, n: usize) -> XRPLCoreResult<&Self> {
         if n > self.0.len() {
             Err(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
                 max: self.0.len(),
                 found: n,
-            })
+            }
+            .into())
         } else {
             self.0 = self.0[n..].to_vec();
             Ok(self)
         }
     }
 
-    fn read(&mut self, n: usize) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+    fn read(&mut self, n: usize) -> XRPLCoreResult<Vec<u8>> {
         let first_n_bytes = self.0[..n].to_owned();
 
         self.skip_bytes(n)?;
         Ok(first_n_bytes)
     }
 
-    fn read_uint8(&mut self) -> Result<u8, XRPLBinaryCodecException> {
+    fn read_uint8(&mut self) -> XRPLCoreResult<u8> {
         let result = self.read(1)?;
         Ok(u8::from_be_bytes(result.try_into().or(Err(
             XRPLBinaryCodecException::InvalidReadFromBytesValue,
         ))?))
     }
 
-    fn read_uint16(&mut self) -> Result<u16, XRPLBinaryCodecException> {
+    fn read_uint16(&mut self) -> XRPLCoreResult<u16> {
         let result = self.read(2)?;
         Ok(u16::from_be_bytes(result.try_into().or(Err(
             XRPLBinaryCodecException::InvalidReadFromBytesValue,
         ))?))
     }
 
-    fn read_uint32(&mut self) -> Result<u32, XRPLBinaryCodecException> {
+    fn read_uint32(&mut self) -> XRPLCoreResult<u32> {
         let result = self.read(4)?;
         Ok(u32::from_be_bytes(result.try_into().or(Err(
             XRPLBinaryCodecException::InvalidReadFromBytesValue,
@@ -499,7 +516,7 @@ impl Parser for BinaryParser {
         }
     }
 
-    fn read_length_prefix(&mut self) -> Result<usize, XRPLBinaryCodecException> {
+    fn read_length_prefix(&mut self) -> XRPLCoreResult<usize> {
         let byte1: usize = self.read_uint8()? as usize;
 
         match byte1 {
@@ -529,11 +546,13 @@ impl Parser for BinaryParser {
                     + (byte2 * MAX_BYTE_VALUE)
                     + byte3)
             }
-            _ => Err(XRPLBinaryCodecException::UnexpectedLengthPrefixRange { min: 1, max: 3 }),
+            _ => {
+                Err(XRPLBinaryCodecException::UnexpectedLengthPrefixRange { min: 1, max: 3 }.into())
+            }
         }
     }
 
-    fn read_field_header(&mut self) -> Result<FieldHeader, XRPLBinaryCodecException> {
+    fn read_field_header(&mut self) -> XRPLCoreResult<FieldHeader> {
         let mut type_code: i16 = self.read_uint8()? as i16;
         let mut field_code: i16 = type_code & 15;
 
@@ -543,7 +562,9 @@ impl Parser for BinaryParser {
             type_code = self.read_uint8()? as i16;
 
             if type_code == 0 || type_code < 16 {
-                return Err(XRPLBinaryCodecException::UnexpectedTypeCodeRange { min: 1, max: 16 });
+                return Err(
+                    XRPLBinaryCodecException::UnexpectedTypeCodeRange { min: 1, max: 16 }.into(),
+                );
             };
         };
 
@@ -551,7 +572,9 @@ impl Parser for BinaryParser {
             field_code = self.read_uint8()? as i16;
 
             if field_code == 0 || field_code < 16 {
-                return Err(XRPLBinaryCodecException::UnexpectedFieldCodeRange { min: 1, max: 16 });
+                return Err(
+                    XRPLBinaryCodecException::UnexpectedFieldCodeRange { min: 1, max: 16 }.into(),
+                );
             };
         };
 
@@ -561,7 +584,7 @@ impl Parser for BinaryParser {
         })
     }
 
-    fn read_field(&mut self) -> Result<FieldInstance, XRPLBinaryCodecException> {
+    fn read_field(&mut self) -> XRPLCoreResult<FieldInstance> {
         let field_header = self.read_field_header()?;
         let field_name = get_field_name_from_header(&field_header);
 
@@ -571,16 +594,19 @@ impl Parser for BinaryParser {
             };
         };
 
-        Err(XRPLBinaryCodecException::UnknownFieldName)
+        Err(XRPLBinaryCodecException::UnknownFieldName.into())
     }
 
-    fn read_type<T: TryFromParser>(&mut self) -> Result<T, T::Error> {
+    fn read_type<T: TryFromParser>(&mut self) -> XRPLCoreResult<T, T::Error> {
         T::from_parser(self, None)
     }
 
-    fn read_field_value<T: TryFromParser>(&mut self, field: &FieldInstance) -> Result<T, T::Error>
+    fn read_field_value<T: TryFromParser>(
+        &mut self,
+        field: &FieldInstance,
+    ) -> XRPLCoreResult<T, T::Error>
     where
-        T::Error: From<XRPLBinaryCodecException>,
+        T::Error: From<XRPLCoreException>,
     {
         if field.is_vl_encoded {
             let length = self.read_length_prefix()?;
@@ -604,9 +630,9 @@ impl From<Vec<u8>> for BinaryParser {
 }
 
 impl TryFrom<&str> for BinaryParser {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
-    fn try_from(hex_bytes: &str) -> Result<Self, Self::Error> {
+    fn try_from(hex_bytes: &str) -> XRPLCoreResult<Self, Self::Error> {
         Ok(BinaryParser(hex::decode(hex_bytes)?))
     }
 }

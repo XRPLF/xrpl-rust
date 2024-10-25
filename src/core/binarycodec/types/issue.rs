@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::core::{
     binarycodec::types::{AccountId, Currency},
+    exceptions::{XRPLCoreException, XRPLCoreResult},
     BinaryParser, Parser,
 };
 
@@ -12,9 +13,9 @@ use super::{exceptions::XRPLTypeException, SerializedType, TryFromParser, XRPLTy
 pub struct Issue(SerializedType);
 
 impl XRPLType for Issue {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error>
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -23,9 +24,12 @@ impl XRPLType for Issue {
 }
 
 impl TryFromParser for Issue {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn from_parser(parser: &mut BinaryParser, length: Option<usize>) -> Result<Self, Self::Error> {
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> XRPLCoreResult<Self, Self::Error> {
         let currency = Currency::from_parser(parser, length)?;
         let mut currency_bytes = currency.as_ref().to_vec();
         if currency.to_string() == "XRP" {
@@ -40,9 +44,9 @@ impl TryFromParser for Issue {
 }
 
 impl TryFrom<Value> for Issue {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
+    fn try_from(value: Value) -> XRPLCoreResult<Self, Self::Error> {
         if value.get("currency") == Some(&Value::String("XRP".to_string())) {
             let currency = Currency::try_from("XRP")?;
             Ok(Issue(SerializedType::from(currency.as_ref().to_vec())))
@@ -60,7 +64,7 @@ impl TryFrom<Value> for Issue {
 
             Ok(Issue(SerializedType::from(currency_bytes)))
         } else {
-            Err(XRPLTypeException::UnexpectedJSONType)
+            Err(XRPLTypeException::UnexpectedJSONType.into())
         }
     }
 }

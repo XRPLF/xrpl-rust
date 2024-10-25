@@ -1,17 +1,20 @@
 use thiserror_no_std::Error;
 
-use crate::{utils::exceptions::XRPRangeException, XRPLSerdeJsonError};
+use crate::{utils::exceptions::ISOCodeException, XRPLSerdeJsonError};
 
 use super::{
     addresscodec::exceptions::XRPLAddressCodecException,
     binarycodec::{
         exceptions::XRPLBinaryCodecException,
-        types::exceptions::{XRPLHashException, XRPLTypeException},
+        types::exceptions::{
+            XRPLHashException, XRPLSerializeArrayException, XRPLSerializeMapException,
+            XRPLTypeException, XRPLVectorException, XRPLXChainBridgeException,
+        },
     },
     keypairs::exceptions::XRPLKeypairsException,
 };
 
-pub type XRPLCoreResult<T> = core::result::Result<T, XRPLCoreException>;
+pub type XRPLCoreResult<T, E = XRPLCoreException> = core::result::Result<T, E>;
 
 #[derive(Debug, PartialEq, Error)]
 #[non_exhaustive]
@@ -24,18 +27,59 @@ pub enum XRPLCoreException {
     XRPLKeypairsError(#[from] XRPLKeypairsException),
     #[error("serde_json error: {0}")]
     SerdeJsonError(#[from] XRPLSerdeJsonError),
+    #[error("From hex error: {0}")]
+    FromHexError(#[from] hex::FromHexError),
+    #[error("ISO code error: {0}")]
+    ISOCodeError(#[from] ISOCodeException),
+    #[error("Base58 error: {0}")]
+    Bs58Error(#[from] bs58::decode::Error),
 }
 
 impl From<XRPLTypeException> for XRPLCoreException {
-    fn from(err: XRPLTypeException) -> Self {
-        XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(err))
+    fn from(error: XRPLTypeException) -> Self {
+        XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(error))
+    }
+}
+
+impl From<XRPLSerializeArrayException> for XRPLCoreException {
+    fn from(error: XRPLSerializeArrayException) -> Self {
+        XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(
+            XRPLTypeException::XRPLSerializeArrayException(error),
+        ))
+    }
+}
+
+impl From<XRPLSerializeMapException> for XRPLCoreException {
+    fn from(error: XRPLSerializeMapException) -> Self {
+        XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(
+            XRPLTypeException::XRPLSerializeMapException(error),
+        ))
+    }
+}
+
+impl From<XRPLXChainBridgeException> for XRPLCoreException {
+    fn from(error: XRPLXChainBridgeException) -> Self {
+        XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(
+            XRPLTypeException::XRPLXChainBridgeError(error),
+        ))
     }
 }
 
 impl From<XRPLHashException> for XRPLCoreException {
-    fn from(err: XRPLHashException) -> Self {
+    fn from(error: XRPLHashException) -> Self {
         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(
-            XRPLTypeException::XRPLHashError(err),
+            XRPLTypeException::XRPLHashError(error),
         ))
     }
 }
+
+impl From<XRPLVectorException> for XRPLCoreException {
+    fn from(error: XRPLVectorException) -> Self {
+        XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::XRPLTypeError(
+            XRPLTypeException::XRPLVectorError(error),
+        ))
+    }
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLCoreException {}

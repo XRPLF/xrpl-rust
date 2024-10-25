@@ -10,6 +10,7 @@ use super::TryFromParser;
 use super::XRPLType;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use crate::core::Parser;
 use crate::utils::exceptions::JSONParseException;
@@ -41,7 +42,10 @@ const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
 
 /// Normally when using bigdecimal "serde_json" feature a `1` will be serialized as `1.000000000000000`.
 /// This function normalizes a `BigDecimal` before serializing to a string.
-pub fn serialize_bigdecimal<S: Serializer>(value: &BigDecimal, s: S) -> Result<S::Ok, S::Error> {
+pub fn serialize_bigdecimal<S: Serializer>(
+    value: &BigDecimal,
+    s: S,
+) -> XRPLCoreResult<S::Ok, S::Error> {
     let trimmed_str = value.normalized().to_string();
     s.serialize_str(&trimmed_str)
 }
@@ -71,7 +75,9 @@ fn _contains_decimal(string: &str) -> bool {
 
 /// Serializes the value field of an issued currency amount
 /// to its bytes representation.
-fn _serialize_issued_currency_value(decimal: BigDecimal) -> Result<[u8; 8], XRPRangeException> {
+fn _serialize_issued_currency_value(
+    decimal: BigDecimal,
+) -> XRPLCoreResult<[u8; 8], XRPRangeException> {
     verify_valid_ic_value(&decimal.to_scientific_notation())?;
 
     if decimal.is_zero() {
@@ -127,7 +133,7 @@ fn _serialize_issued_currency_value(decimal: BigDecimal) -> Result<[u8; 8], XRPR
 }
 
 /// Serializes an XRP amount.
-fn _serialize_xrp_amount(value: &str) -> Result<[u8; 8], XRPRangeException> {
+fn _serialize_xrp_amount(value: &str) -> XRPLCoreResult<[u8; 8], XRPRangeException> {
     verify_valid_xrp_value(value)?;
 
     let decimal = rust_decimal::Decimal::from_str(value)?.normalize();
@@ -144,7 +150,7 @@ fn _serialize_xrp_amount(value: &str) -> Result<[u8; 8], XRPRangeException> {
 /// Serializes an issued currency amount.
 fn _serialize_issued_currency_amount(
     issused_currency: IssuedCurrency,
-) -> Result<[u8; 48], XRPRangeException> {
+) -> XRPLCoreResult<[u8; 48], XRPRangeException> {
     let mut bytes = vec![];
     let amount_bytes = _serialize_issued_currency_value(issused_currency.value)?;
     let currency_bytes: &[u8] = issused_currency.currency.as_ref();
@@ -189,7 +195,7 @@ impl IssuedCurrency {
     /// Deserialize the issued currency amount.
     fn _deserialize_issued_currency_amount(
         parser: &mut BinaryParser,
-    ) -> Result<BigDecimal, XRPLBinaryCodecException> {
+    ) -> XRPLCoreResult<BigDecimal> {
         let mut value: BigDecimal;
         let bytes = parser.read(8)?;
 
@@ -200,7 +206,8 @@ impl IssuedCurrency {
             value = BigDecimal::from(0);
         } else {
             let hex_mantissa = hex::encode([&[bytes[1] & 0x3F], &bytes[2..]].concat());
-            let int_mantissa = i128::from_str_radix(&hex_mantissa, 16)?;
+            let int_mantissa = i128::from_str_radix(&hex_mantissa, 16)
+                .map_err(XRPLBinaryCodecException::ParseIntError)?;
 
             // Adjust scale using the exponent
             let scale = exp.unsigned_abs();
@@ -225,7 +232,7 @@ impl XRPLType for Amount {
     type Error = hex::FromHexError;
 
     /// Construct an Amount from given bytes.
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(Amount(data.to_vec()))
         } else {
@@ -235,13 +242,13 @@ impl XRPLType for Amount {
 }
 
 impl TryFromParser for Amount {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build Amount from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
-    ) -> Result<Amount, Self::Error> {
+    ) -> XRPLCoreResult<Amount, Self::Error> {
         let parser_first_byte = parser.peek();
         let num_bytes = match parser_first_byte {
             None => _CURRENCY_AMOUNT_BYTE_LENGTH,
@@ -253,13 +260,13 @@ impl TryFromParser for Amount {
 }
 
 impl TryFromParser for IssuedCurrency {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build IssuedCurrency from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
-    ) -> Result<IssuedCurrency, Self::Error> {
+    ) -> XRPLCoreResult<IssuedCurrency, Self::Error> {
         Ok(IssuedCurrency {
             value: IssuedCurrency::_deserialize_issued_currency_amount(parser)?,
             currency: Currency::from_parser(parser, None)?,
@@ -270,7 +277,7 @@ impl TryFromParser for IssuedCurrency {
 
 impl Serialize for Amount {
     /// Construct a JSON object representing this Amount.
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -296,21 +303,23 @@ impl Serialize for Amount {
 }
 
 impl TryFrom<&str> for Amount {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
     /// Construct an Amount object from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let serialized = _serialize_xrp_amount(value)?;
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
+        let serialized =
+            _serialize_xrp_amount(value).map_err(XRPLBinaryCodecException::XRPRangeError)?;
         Ok(Amount::new(Some(&serialized))?)
     }
 }
 
 impl TryFrom<IssuedCurrency> for Amount {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
     /// Construct an Amount object from an IssuedCurrency.
-    fn try_from(value: IssuedCurrency) -> Result<Self, Self::Error> {
-        let serialized = _serialize_issued_currency_amount(value)?;
+    fn try_from(value: IssuedCurrency) -> XRPLCoreResult<Self, Self::Error> {
+        let serialized = _serialize_issued_currency_amount(value)
+            .map_err(XRPLBinaryCodecException::XRPRangeError)?;
         Ok(Amount::new(Some(&serialized))?)
     }
 }
@@ -319,10 +328,10 @@ impl TryFrom<serde_json::Value> for Amount {
     type Error = XRPLCoreException;
 
     /// Construct an Amount object from a Serde JSON Value.
-    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+    fn try_from(value: serde_json::Value) -> XRPLCoreResult<Self, Self::Error> {
         if value.is_string() {
             let xrp_value = value.as_str().ok_or(XRPLTypeException::InvalidNoneValue)?;
-            Self::try_from(xrp_value).map_err(|e| XRPLBinaryCodecException::from(e).into())
+            Self::try_from(xrp_value)
         } else if value.is_object() {
             Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
         } else {
@@ -341,15 +350,13 @@ impl TryFrom<serde_json::Value> for IssuedCurrency {
     type Error = XRPLCoreException;
 
     /// Construct an IssuedCurrency object from a Serde JSON Value.
-    fn try_from(json: serde_json::Value) -> Result<Self, Self::Error> {
+    fn try_from(json: serde_json::Value) -> XRPLCoreResult<Self, Self::Error> {
         let value = BigDecimal::from_str(
             json["value"]
                 .as_str()
                 .ok_or(XRPLTypeException::InvalidNoneValue)?,
         )
-        .map_err(|e| {
-            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::BigDecimalError(e))
-        })?;
+        .map_err(XRPLTypeException::BigDecimalError)?;
         let currency = Currency::try_from(
             json["currency"]
                 .as_str()

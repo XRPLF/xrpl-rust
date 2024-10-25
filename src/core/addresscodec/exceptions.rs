@@ -1,7 +1,5 @@
 //! General XRPL Address Codec Exception.
 
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::utils::exceptions::ISOCodeException;
 use thiserror_no_std::Error;
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -29,54 +27,10 @@ pub enum XRPLAddressCodecException {
     UnknownSeedEncoding,
     #[error("Unknown payload lenght (expected: {expected}, found: {found})")]
     UnexpectedPayloadLength { expected: usize, found: usize },
-    #[error("From hex error")]
-    FromHexError,
     #[error("Base58 decode error: {0}")]
-    Base58DecodeError(bs58::decode::Error),
-    #[error("XRPL binary codec error: {0}")]
-    XRPLBinaryCodecError(XRPLBinaryCodecException),
-    #[error("ISO code error: {0}")]
-    ISOError(ISOCodeException),
-    #[error("Serde json error")]
-    SerdeJsonError(serde_json::error::Category),
+    Base58DecodeError(#[from] bs58::decode::Error),
     #[error("Vec resize error")]
-    VecResizeError(alloc::vec::Vec<u8>),
-}
-
-impl From<ISOCodeException> for XRPLAddressCodecException {
-    fn from(err: ISOCodeException) -> Self {
-        XRPLAddressCodecException::ISOError(err)
-    }
-}
-
-impl From<XRPLBinaryCodecException> for XRPLAddressCodecException {
-    fn from(err: XRPLBinaryCodecException) -> Self {
-        XRPLAddressCodecException::XRPLBinaryCodecError(err)
-    }
-}
-
-impl From<bs58::decode::Error> for XRPLAddressCodecException {
-    fn from(err: bs58::decode::Error) -> Self {
-        XRPLAddressCodecException::Base58DecodeError(err)
-    }
-}
-
-impl From<hex::FromHexError> for XRPLAddressCodecException {
-    fn from(_: hex::FromHexError) -> Self {
-        XRPLAddressCodecException::FromHexError
-    }
-}
-
-impl From<serde_json::Error> for XRPLAddressCodecException {
-    fn from(err: serde_json::Error) -> Self {
-        XRPLAddressCodecException::SerdeJsonError(err.classify())
-    }
-}
-
-impl From<alloc::vec::Vec<u8>> for XRPLAddressCodecException {
-    fn from(err: alloc::vec::Vec<u8>) -> Self {
-        XRPLAddressCodecException::VecResizeError(err)
-    }
+    VecResizeError(#[from] alloc::vec::Vec<u8>),
 }
 
 #[cfg(feature = "std")]

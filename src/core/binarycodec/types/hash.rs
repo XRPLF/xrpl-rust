@@ -9,7 +9,8 @@ use super::utils::HASH160_LENGTH;
 use super::utils::HASH256_LENGTH;
 use super::TryFromParser;
 use super::XRPLType;
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
+use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use crate::core::Parser;
 use alloc::vec::Vec;
@@ -112,7 +113,7 @@ impl dyn Hash {
     ///     Err(e) => handle_hash_error(e),
     /// };
     /// ```
-    pub fn make<T: Hash>(bytes: Option<&[u8]>) -> Result<Vec<u8>, XRPLHashException> {
+    pub fn make<T: Hash>(bytes: Option<&[u8]>) -> XRPLCoreResult<Vec<u8>, XRPLHashException> {
         let byte_value: &[u8] = bytes.unwrap_or(&[]);
         let hash_length: usize = T::get_length();
 
@@ -172,7 +173,7 @@ impl dyn Hash {
     pub fn parse<T: Hash>(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+    ) -> XRPLCoreResult<Vec<u8>> {
         let read_length = length.or_else(|| Some(T::get_length())).unwrap();
         Ok(parser.read(read_length)?)
     }
@@ -197,88 +198,88 @@ impl Hash for Hash256 {
 }
 
 impl XRPLType for Hash128 {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         Ok(Hash128(<dyn Hash>::make::<Hash128>(buffer)?))
     }
 }
 
 impl XRPLType for Hash160 {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         Ok(Hash160(<dyn Hash>::make::<Hash160>(buffer)?))
     }
 }
 
 impl XRPLType for Hash256 {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         Ok(Hash256(<dyn Hash>::make::<Hash256>(buffer)?))
     }
 }
 
 impl TryFromParser for Hash128 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build Hash128 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Hash128, Self::Error> {
+    ) -> XRPLCoreResult<Hash128, Self::Error> {
         Ok(Hash128(<dyn Hash>::parse::<Hash128>(parser, length)?))
     }
 }
 
 impl TryFromParser for Hash160 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build Hash160 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Hash160, Self::Error> {
+    ) -> XRPLCoreResult<Hash160, Self::Error> {
         Ok(Hash160(<dyn Hash>::parse::<Hash160>(parser, length)?))
     }
 }
 
 impl TryFromParser for Hash256 {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build Hash256 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Hash256, Self::Error> {
+    ) -> XRPLCoreResult<Hash256, Self::Error> {
         Ok(Hash256(<dyn Hash>::parse::<Hash256>(parser, length)?))
     }
 }
 
 impl TryFrom<&str> for Hash128 {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a Hash object from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         Hash128::new(Some(&hex::decode(value)?))
     }
 }
 
 impl TryFrom<&str> for Hash160 {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a Hash object from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         Hash160::new(Some(&hex::decode(value)?))
     }
 }
 
 impl TryFrom<&str> for Hash256 {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a Hash object from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         Hash256::new(Some(&hex::decode(value)?))
     }
 }

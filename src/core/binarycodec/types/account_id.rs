@@ -1,16 +1,14 @@
 //! Codec for currency property inside an XRPL
 //! issued currency amount json.
 
-use super::exceptions::XRPLHashException;
-use super::exceptions::XRPLTypeException;
 use super::Hash160;
 use super::TryFromParser;
 use super::XRPLType;
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::*;
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use crate::utils::is_hex_address;
 use core::convert::TryFrom;
@@ -30,7 +28,7 @@ use serde::{Deserialize, Serialize};
 pub struct AccountId(Hash160);
 
 impl XRPLType for AccountId {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct an AccountID from given bytes.
     /// If buffer is not provided, default to 20 zero bytes.
@@ -41,7 +39,7 @@ impl XRPLType for AccountId {
 }
 
 impl TryFromParser for AccountId {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build AccountId from a BinaryParser.
     fn from_parser(
@@ -74,21 +72,14 @@ impl TryFrom<&str> for AccountId {
 
     /// Construct an AccountId from a hex string or
     /// a base58 r-Address.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         if is_hex_address(value) {
-            Self::new(Some(&hex::decode(value).map_err(|_| {
-                XRPLBinaryCodecException::from(XRPLTypeException::FromHexError)
-            })?))
-            .map_err(|e| XRPLBinaryCodecException::from(XRPLTypeException::XRPLHashError(e)).into())
+            Self::new(Some(&hex::decode(value)?))
         } else if is_valid_classic_address(value) {
-            Self::new(Some(&decode_classic_address(value)?)).map_err(|e| {
-                XRPLBinaryCodecException::from(XRPLTypeException::XRPLHashError(e)).into()
-            })
+            Self::new(Some(&decode_classic_address(value)?))
         } else if is_valid_xaddress(value) {
             let (classic_address, _, _) = xaddress_to_classic_address(value)?;
-            Self::new(Some(&decode_classic_address(&classic_address)?)).map_err(|e| {
-                XRPLBinaryCodecException::from(XRPLTypeException::XRPLHashError(e)).into()
-            })
+            Self::new(Some(&decode_classic_address(&classic_address)?))
         } else {
             Err(XRPLCoreException::XRPLAddressCodecError(
                 XRPLAddressCodecException::InvalidClassicAddressValue,

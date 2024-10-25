@@ -10,7 +10,6 @@ pub use self::algorithms::Ed25519;
 pub use self::algorithms::Secp256k1;
 
 use crate::constants::CryptoAlgorithm;
-use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::SEED_LENGTH;
 use crate::core::addresscodec::*;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
@@ -20,6 +19,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use rand::Rng;
 use rand::SeedableRng;
+
+use super::exceptions::XRPLCoreResult;
 
 /// Return the signature length for an algorithm.
 const fn _get_algorithm_sig_length(algo: CryptoAlgorithm) -> usize {
@@ -91,7 +92,7 @@ fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
 pub fn generate_seed(
     entropy: Option<[u8; SEED_LENGTH]>,
     algorithm: Option<CryptoAlgorithm>,
-) -> Result<String, XRPLAddressCodecException> {
+) -> XRPLCoreResult<String> {
     let mut random_bytes: [u8; SEED_LENGTH] = [0u8; SEED_LENGTH];
 
     let algo: CryptoAlgorithm = if let Some(value) = algorithm {
@@ -143,10 +144,7 @@ pub fn generate_seed(
 ///
 /// assert_eq!(Some(tuple), generator);
 /// ```
-pub fn derive_keypair(
-    seed: &str,
-    validator: bool,
-) -> Result<(String, String), XRPLKeypairsException> {
+pub fn derive_keypair(seed: &str, validator: bool) -> XRPLCoreResult<(String, String)> {
     let (decoded_seed, algorithm) = decode_seed(seed)?;
     let module = _get_algorithm_engine(algorithm);
     let (public, private) = module.derive_keypair(&decoded_seed, validator)?;
@@ -155,7 +153,7 @@ pub fn derive_keypair(
     if module.is_valid_message(SIGNATURE_VERIFICATION_MESSAGE, &signature, &public) {
         Ok((public, private))
     } else {
-        Err(XRPLKeypairsException::InvalidSignature)
+        Err(XRPLKeypairsException::InvalidSignature.into())
     }
 }
 
@@ -190,7 +188,7 @@ pub fn derive_keypair(
 ///
 /// assert_eq!(Some(address), derivation);
 /// ```
-pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCodecException> {
+pub fn derive_classic_address(public_key: &str) -> XRPLCoreResult<String> {
     let account_id = get_account_id(&hex::decode(public_key)?);
     encode_classic_address(&account_id)
 }

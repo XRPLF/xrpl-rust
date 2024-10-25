@@ -8,7 +8,6 @@ use types::{AccountId, STObject};
 
 use alloc::{borrow::Cow, string::String, vec::Vec};
 use core::convert::TryFrom;
-use exceptions::XRPLBinaryCodecException;
 use hex::ToHex;
 use serde::Serialize;
 
@@ -19,17 +18,21 @@ pub mod utils;
 
 pub use binary_wrappers::*;
 
+use crate::XRPLSerdeJsonError;
+
+use super::exceptions::XRPLCoreResult;
+
 const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
 const TRANSACTION_MULTISIG_PREFIX: i32 = 0x534D5400;
 
-pub fn encode<T>(signed_transaction: &T) -> Result<String, XRPLBinaryCodecException>
+pub fn encode<T>(signed_transaction: &T) -> XRPLCoreResult<String>
 where
     T: Serialize,
 {
     serialize_json(signed_transaction, None, None, false)
 }
 
-pub fn encode_for_signing<T>(prepared_transaction: &T) -> Result<String, XRPLBinaryCodecException>
+pub fn encode_for_signing<T>(prepared_transaction: &T) -> XRPLCoreResult<String>
 where
     T: Serialize,
 {
@@ -44,7 +47,7 @@ where
 pub fn encode_for_multisigning<T>(
     prepared_transaction: &T,
     signing_account: Cow<'_, str>,
-) -> Result<String, XRPLBinaryCodecException>
+) -> XRPLCoreResult<String>
 where
     T: Serialize,
 {
@@ -63,7 +66,7 @@ fn serialize_json<T>(
     prefix: Option<&[u8]>,
     suffix: Option<&[u8]>,
     signing_only: bool,
-) -> Result<String, XRPLBinaryCodecException>
+) -> XRPLCoreResult<String>
 where
     T: Serialize,
 {
@@ -72,7 +75,8 @@ where
         buffer.extend(p);
     }
 
-    let json_value = serde_json::to_value(prepared_transaction)?;
+    let json_value =
+        serde_json::to_value(prepared_transaction).map_err(XRPLSerdeJsonError::from)?;
     let st_object = STObject::try_from_value(json_value, signing_only)?;
     buffer.extend(st_object.as_ref());
 

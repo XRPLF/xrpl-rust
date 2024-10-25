@@ -1,7 +1,8 @@
 //! General XRPL Binary Codec Exceptions.
 
+use crate::utils::exceptions::XRPRangeException;
+
 use super::types::exceptions::XRPLTypeException;
-use crate::utils::exceptions::{ISOCodeException, XRPRangeException};
 use thiserror_no_std::Error;
 
 #[derive(Debug, PartialEq, Clone, Error)]
@@ -29,30 +30,22 @@ pub enum XRPLBinaryCodecException {
     InvalidPathSetFromValue,
     #[error("Try from slice error")]
     TryFromSliceError,
-    #[error("Try from int error: {0}")]
-    TryFromIntError(#[from] core::num::TryFromIntError),
-    #[error("From utf8 error: {0}")]
-    FromUtf8Error(#[from] alloc::string::FromUtf8Error),
-    #[error("Parse int error: {0}")]
-    ParseIntError(#[from] core::num::ParseIntError),
-    #[error("From hex error")]
-    FromHexError(#[from] hex::FromHexError),
-    #[error("Decimal error: {0}")]
-    DecimalError(#[from] rust_decimal::Error),
-    #[error("Big decimal error: {0}")]
-    BigDecimalError(#[from] bigdecimal::ParseBigDecimalError),
-    #[error("ISO code error: {0}")]
-    ISOCodeError(#[from] ISOCodeException),
     #[error("Field has no associated tag")]
     FieldHasNoAssiciatedTag,
     #[error("XAddress tag mismatch")]
     XAddressTagMismatch,
     #[error("Field is not account or destination")]
     FieldIsNotAccountOrDestination,
-    #[error("XRPL type error: {0}")]
+    #[error("Try from int error: {0}")]
+    TryFromIntError(#[from] core::num::TryFromIntError),
+    #[error("From utf8 error: {0}")]
+    FromUtf8Error(#[from] alloc::string::FromUtf8Error),
+    #[error("Parse int error: {0}")]
+    ParseIntError(#[from] core::num::ParseIntError),
+    #[error("XRPL Type error: {0}")]
     XRPLTypeError(#[from] XRPLTypeException),
-    #[error("XRPL Range error: {0}")]
-    XRPLRangeError(#[from] XRPRangeException),
+    #[error("XRP Range error: {0}")]
+    XRPRangeError(#[from] XRPRangeException),
 }
 
 impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {

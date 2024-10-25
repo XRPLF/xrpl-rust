@@ -39,6 +39,7 @@ use crate::core::binarycodec::definitions::get_field_instance;
 use crate::core::binarycodec::definitions::get_transaction_result_code;
 use crate::core::binarycodec::definitions::get_transaction_type_code;
 use crate::core::binarycodec::definitions::FieldInstance;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
@@ -90,7 +91,7 @@ pub enum XRPLTypes {
 }
 
 impl XRPLTypes {
-    pub fn from_value(name: &str, value: Value) -> Result<XRPLTypes, XRPLTypeException> {
+    pub fn from_value(name: &str, value: Value) -> XRPLCoreResult<XRPLTypes> {
         let mut value = value;
         if value.is_null() {
             value = Value::Number(0.into());
@@ -105,11 +106,27 @@ impl XRPLTypes {
                 "Hash160" => Ok(XRPLTypes::Hash160(Self::type_from_str(value)?)),
                 "Hash256" => Ok(XRPLTypes::Hash256(Self::type_from_str(value)?)),
                 "XChainClaimID" => Ok(XRPLTypes::Hash256(Self::type_from_str(value)?)),
-                "UInt8" => Ok(XRPLTypes::UInt8(value.parse::<u8>()?)),
-                "UInt16" => Ok(XRPLTypes::UInt16(value.parse::<u16>()?)),
-                "UInt32" => Ok(XRPLTypes::UInt32(value.parse::<u32>()?)),
-                "UInt64" => Ok(XRPLTypes::UInt64(value.parse::<u64>()?)),
-                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
+                "UInt8" => Ok(XRPLTypes::UInt8(
+                    value
+                        .parse::<u8>()
+                        .map_err(XRPLTypeException::ParseIntError)?,
+                )),
+                "UInt16" => Ok(XRPLTypes::UInt16(
+                    value
+                        .parse::<u16>()
+                        .map_err(XRPLTypeException::ParseIntError)?,
+                )),
+                "UInt32" => Ok(XRPLTypes::UInt32(
+                    value
+                        .parse::<u32>()
+                        .map_err(XRPLTypeException::ParseIntError)?,
+                )),
+                "UInt64" => Ok(XRPLTypes::UInt64(
+                    value
+                        .parse::<u64>()
+                        .map_err(XRPLTypeException::ParseIntError)?,
+                )),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_u64() {
             match name {
@@ -117,7 +134,7 @@ impl XRPLTypes {
                 "UInt16" => Ok(XRPLTypes::UInt16(value as u16)),
                 "UInt32" => Ok(XRPLTypes::UInt32(value as u32)),
                 "UInt64" => Ok(XRPLTypes::UInt64(value)),
-                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_object() {
             match name {
@@ -129,31 +146,31 @@ impl XRPLTypes {
                 "XChainBridge" => Ok(XRPLTypes::XChainBridge(XChainBridge::try_from(
                     Value::Object(value.to_owned()),
                 )?)),
-                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_array() {
             match name {
                 "STArray" => Ok(XRPLTypes::STArray(STArray::try_from_value(Value::Array(
                     value.to_owned(),
                 ))?)),
-                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType),
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else {
-            Err(exceptions::XRPLTypeException::UnknownXRPLType)
+            Err(exceptions::XRPLTypeException::UnknownXRPLType.into())
         }
     }
 
-    fn type_from_str<'a, T>(value: &'a str) -> Result<T, XRPLTypeException>
+    fn type_from_str<'a, T>(value: &'a str) -> XRPLCoreResult<T>
     where
         T: TryFrom<&'a str>,
         <T as TryFrom<&'a str>>::Error: Display,
     {
         value
             .try_into()
-            .map_err(|_| XRPLTypeException::TryFromStrError)
+            .map_err(|_| XRPLTypeException::TryFromStrError.into())
     }
 
-    fn amount_from_map<T>(value: Map<String, Value>) -> Result<T, XRPLTypeException>
+    fn amount_from_map<T>(value: Map<String, Value>) -> XRPLCoreResult<T>
     where
         T: TryFrom<IssuedCurrency>,
         <T as TryFrom<IssuedCurrency>>::Error: Display,
@@ -161,7 +178,7 @@ impl XRPLTypes {
         match IssuedCurrency::try_from(Value::Object(value)) {
             Ok(value) => value
                 .try_into()
-                .map_err(|_| XRPLTypeException::TryFromIssuedCurrencyError),
+                .map_err(|_| XRPLTypeException::TryFromIssuedCurrencyError.into()),
             Err(error) => Err(error),
         }
     }
@@ -228,7 +245,7 @@ impl STArray {
     ///
     /// assert_eq!(actual_hex, expected_hex);
     /// ```
-    pub fn try_from_value(value: Value) -> Result<Self, XRPLTypeException> {
+    pub fn try_from_value(value: Value) -> XRPLCoreResult<Self> {
         if let Some(array) = value.as_array() {
             if !array.is_empty() && array.iter().filter(|v| v.is_object()).count() != array.len() {
                 Err(exceptions::XRPLSerializeArrayException::ExpectedObjectArray.into())
@@ -258,7 +275,7 @@ impl STArray {
 impl XRPLType for STArray {
     type Error = XRPLTypeException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(STArray(SerializedType(data.to_vec())))
         } else {
@@ -315,7 +332,7 @@ impl STObject {
     /// let hex = hex::encode_upper(serialized_map.as_ref());
     /// assert_eq!(hex, buffer);
     /// ```
-    pub fn try_from_value(value: Value, signing_only: bool) -> Result<Self, XRPLTypeException> {
+    pub fn try_from_value(value: Value, signing_only: bool) -> XRPLCoreResult<Self> {
         let object = match value {
             Value::Object(map) => map,
             _ => return Err(exceptions::XRPLSerializeMapException::ExpectedObject.into()),
@@ -452,7 +469,7 @@ impl STObject {
 impl XRPLType for STObject {
     type Error = XRPLTypeException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(STObject(SerializedType(data.to_vec())))
         } else {
@@ -467,10 +484,7 @@ impl AsRef<[u8]> for STObject {
     }
 }
 
-fn handle_xaddress(
-    field: Cow<str>,
-    xaddress: Cow<str>,
-) -> Result<Map<String, Value>, XRPLTypeException> {
+fn handle_xaddress(field: Cow<str>, xaddress: Cow<str>) -> XRPLCoreResult<Map<String, Value>> {
     let (classic_address, tag, _is_test_net) = xaddress_to_classic_address(&xaddress)?;
     if let Some(tag) = tag {
         if field == DESTINATION {
@@ -514,7 +528,7 @@ fn handle_xaddress(
 /// impl XRPLType for Example {
 ///     type Error = XRPLBinaryCodecException;
 ///
-///     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+///     fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
 ///         if let Some(data) = buffer {
 ///             Ok(Example(data.to_vec()))
 ///         } else {
@@ -528,7 +542,7 @@ pub trait XRPLType {
     type Error;
 
     /// Create a new instance of a type.
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error>
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error>
     where
         Self: Sized;
 }
@@ -553,7 +567,7 @@ pub trait XRPLType {
 ///     fn from_parser(
 ///         parser: &mut BinaryParser,
 ///         _length: Option<usize>,
-///     ) -> Result<Example, Self::Error> {
+///     ) -> XRPLCoreResult<Example, Self::Error> {
 ///         Ok(Example(parser.read(42)?))
 ///     }
 /// }
@@ -563,7 +577,10 @@ pub trait TryFromParser {
     type Error;
 
     /// Construct a type from a BinaryParser.
-    fn from_parser(parser: &mut BinaryParser, length: Option<usize>) -> Result<Self, Self::Error>
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> XRPLCoreResult<Self, Self::Error>
     where
         Self: Sized;
 }

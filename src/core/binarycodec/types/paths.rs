@@ -5,11 +5,13 @@
 
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::binarycodec::types::exceptions::XRPLHashException;
 use crate::core::binarycodec::types::utils::CURRENCY_CODE_LENGTH;
 use crate::core::binarycodec::types::*;
+use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use crate::core::Parser;
+use crate::XRPLSerdeJsonError;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -73,9 +75,9 @@ fn _is_path_set(value: &[Vec<IndexMap<String, String>>]) -> bool {
 }
 
 impl XRPLType for PathStep {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(PathStep(data.to_vec()))
         } else {
@@ -85,9 +87,9 @@ impl XRPLType for PathStep {
 }
 
 impl XRPLType for Path {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(Path(data.to_vec()))
         } else {
@@ -97,9 +99,9 @@ impl XRPLType for Path {
 }
 
 impl XRPLType for PathSet {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(PathSet(data.to_vec()))
         } else {
@@ -121,13 +123,13 @@ impl PathStepData {
 }
 
 impl TryFromParser for PathStep {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build PathStep from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
-    ) -> Result<PathStep, Self::Error> {
+    ) -> XRPLCoreResult<PathStep, Self::Error> {
         let mut value_bytes: Vec<u8> = vec![];
         let mut buffer: Vec<u8> = vec![];
         let data_type = parser.read_uint8()?;
@@ -152,13 +154,13 @@ impl TryFromParser for PathStep {
 }
 
 impl TryFromParser for PathStepData {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Build PathStepData from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
-    ) -> Result<PathStepData, Self::Error> {
+    ) -> XRPLCoreResult<PathStepData, Self::Error> {
         let data_type = parser.read_uint8()?;
 
         let account: Option<String> = if data_type & _TYPE_ACCOUNT != 0 {
@@ -187,10 +189,13 @@ impl TryFromParser for PathStepData {
 }
 
 impl TryFromParser for Path {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build Path from a BinaryParser.
-    fn from_parser(parser: &mut BinaryParser, _length: Option<usize>) -> Result<Path, Self::Error> {
+    fn from_parser(
+        parser: &mut BinaryParser,
+        _length: Option<usize>,
+    ) -> XRPLCoreResult<Path, Self::Error> {
         let mut buffer: Vec<u8> = vec![];
 
         while !parser.is_end(None) {
@@ -209,13 +214,13 @@ impl TryFromParser for Path {
 }
 
 impl TryFromParser for PathSet {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Build PathSet from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         _length: Option<usize>,
-    ) -> Result<PathSet, Self::Error> {
+    ) -> XRPLCoreResult<PathSet, Self::Error> {
         let mut buffer: Vec<u8> = vec![];
 
         while !parser.is_end(None) {
@@ -237,7 +242,7 @@ impl TryFromParser for PathSet {
 
 impl Serialize for PathStep {
     /// Returns the JSON representation of a PathStep.
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -265,7 +270,7 @@ impl Serialize for PathStep {
 
 impl Serialize for Path {
     /// Returns the JSON representation of a Path.
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -288,7 +293,7 @@ impl Serialize for Path {
 
 impl Serialize for PathSet {
     /// Returns the JSON representation of a Path.
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -314,10 +319,10 @@ impl Serialize for PathSet {
 }
 
 impl TryFrom<IndexMap<String, String>> for PathStep {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a PathStep object from a dictionary.
-    fn try_from(value: IndexMap<String, String>) -> Result<Self, Self::Error> {
+    fn try_from(value: IndexMap<String, String>) -> XRPLCoreResult<Self, Self::Error> {
         let mut value_bytes: Vec<u8> = vec![];
         let mut data_type = 0x00;
         let mut buffer = vec![];
@@ -351,10 +356,10 @@ impl TryFrom<IndexMap<String, String>> for PathStep {
 }
 
 impl TryFrom<Vec<IndexMap<String, String>>> for Path {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a Path object from a list.
-    fn try_from(value: Vec<IndexMap<String, String>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<IndexMap<String, String>>) -> XRPLCoreResult<Self, Self::Error> {
         let mut buffer: Vec<u8> = vec![];
 
         for step in value {
@@ -367,10 +372,10 @@ impl TryFrom<Vec<IndexMap<String, String>>> for Path {
 }
 
 impl TryFrom<Vec<Vec<IndexMap<String, String>>>> for PathSet {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Construct a PathSet object from a list.
-    fn try_from(value: Vec<Vec<IndexMap<String, String>>>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<Vec<IndexMap<String, String>>>) -> XRPLCoreResult<Self, Self::Error> {
         if _is_path_set(&value) {
             let mut buffer: Vec<u8> = vec![];
 
@@ -381,7 +386,7 @@ impl TryFrom<Vec<Vec<IndexMap<String, String>>>> for PathSet {
                     buffer.extend_from_slice(path.as_ref());
                     buffer.extend_from_slice(&[_PATH_SEPARATOR_BYTE; 1]);
                 } else {
-                    return Err(XRPLBinaryCodecException::InvalidPathSetFromValue);
+                    return Err(XRPLBinaryCodecException::InvalidPathSetFromValue.into());
                 }
             }
 
@@ -390,37 +395,40 @@ impl TryFrom<Vec<Vec<IndexMap<String, String>>>> for PathSet {
 
             PathSet::new(Some(&buffer))
         } else {
-            Err(XRPLBinaryCodecException::InvalidPathSetFromValue)
+            Err(XRPLBinaryCodecException::InvalidPathSetFromValue.into())
         }
     }
 }
 
 impl TryFrom<&str> for Path {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a Path object from a string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let json: Vec<IndexMap<String, String>> = serde_json::from_str(value)?;
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
+        let json: Vec<IndexMap<String, String>> =
+            serde_json::from_str(value).map_err(XRPLSerdeJsonError::from)?;
         Self::try_from(json)
     }
 }
 
 impl TryFrom<&str> for PathStep {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a PathSet object from a string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let json: IndexMap<String, String> = serde_json::from_str(value)?;
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
+        let json: IndexMap<String, String> =
+            serde_json::from_str(value).map_err(XRPLSerdeJsonError::from)?;
         Self::try_from(json)
     }
 }
 
 impl TryFrom<&str> for PathSet {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Construct a PathSet object from a string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let json: Vec<Vec<IndexMap<String, String>>> = serde_json::from_str(value)?;
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
+        let json: Vec<Vec<IndexMap<String, String>>> =
+            serde_json::from_str(value).map_err(XRPLSerdeJsonError::from)?;
         Self::try_from(json)
     }
 }

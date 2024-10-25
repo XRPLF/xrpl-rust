@@ -14,6 +14,8 @@ use alloc::vec::Vec;
 use core::convert::TryInto;
 use strum::IntoEnumIterator;
 
+use super::exceptions::XRPLCoreResult;
+
 /// Map the algorithm to the prefix.
 fn _algorithm_to_prefix<'a>(algo: &CryptoAlgorithm) -> &'a [u8] {
     match algo {
@@ -23,23 +25,23 @@ fn _algorithm_to_prefix<'a>(algo: &CryptoAlgorithm) -> &'a [u8] {
 }
 
 /// Returns whether a decoded X-Address is a test address.
-fn _is_test_address(prefix: &[u8]) -> Result<bool, XRPLAddressCodecException> {
+fn _is_test_address(prefix: &[u8]) -> XRPLCoreResult<bool> {
     if ADDRESS_PREFIX_BYTES_MAIN == prefix {
         Ok(false)
     } else if ADDRESS_PREFIX_BYTES_TEST == prefix {
         Ok(true)
     } else {
-        Err(XRPLAddressCodecException::InvalidXAddressPrefix)
+        Err(XRPLAddressCodecException::InvalidXAddressPrefix.into())
     }
 }
 
 /// Returns the destination tag extracted from the suffix
 /// of the X-Address.
-fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecException> {
+fn _get_tag_from_buffer(buffer: &[u8]) -> XRPLCoreResult<Option<u64>> {
     let flag = &buffer[0];
 
     if flag >= &2 {
-        Err(XRPLAddressCodecException::UnsupportedXAddress)
+        Err(XRPLAddressCodecException::UnsupportedXAddress.into())
     } else if flag == &1 {
         // Little-endian to big-endian
         Ok(Some(
@@ -50,9 +52,9 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecEx
         ))
         // inverse of what happens in encode
     } else if flag != &0 {
-        Err(XRPLAddressCodecException::InvalidXAddressZeroNoTag)
+        Err(XRPLAddressCodecException::InvalidXAddressZeroNoTag.into())
     } else if hex::decode("0000000000000000")? != buffer[1..9] {
-        Err(XRPLAddressCodecException::InvalidXAddressZeroRemain)
+        Err(XRPLAddressCodecException::InvalidXAddressZeroRemain.into())
     } else {
         Ok(None)
     }
@@ -93,12 +95,12 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> Result<Option<u64>, XRPLAddressCodecEx
 pub fn encode_seed(
     entropy: [u8; SEED_LENGTH],
     encoding_type: CryptoAlgorithm,
-) -> Result<String, XRPLAddressCodecException> {
-    encode_base58(
+) -> XRPLCoreResult<String> {
+    Ok(encode_base58(
         &entropy,
         _algorithm_to_prefix(&encoding_type),
         Some(SEED_LENGTH),
-    )
+    )?)
 }
 
 /// Returns an encoded seed.
@@ -131,10 +133,8 @@ pub fn encode_seed(
 ///
 /// assert_eq!(Some(tuple), decoding);
 /// ```
-pub fn decode_seed(
-    seed: &str,
-) -> Result<([u8; SEED_LENGTH], CryptoAlgorithm), XRPLAddressCodecException> {
-    let mut result: Option<Result<Vec<u8>, XRPLAddressCodecException>> = None;
+pub fn decode_seed(seed: &str) -> XRPLCoreResult<([u8; SEED_LENGTH], CryptoAlgorithm)> {
+    let mut result: Option<XRPLCoreResult<Vec<u8>>> = None;
     let mut algo: Option<CryptoAlgorithm> = None;
 
     for a in CryptoAlgorithm::iter() {
@@ -145,10 +145,12 @@ pub fn decode_seed(
 
     match result {
         Some(Ok(val)) => {
-            let decoded: [u8; SEED_LENGTH] = val.try_into()?;
+            let decoded: [u8; SEED_LENGTH] = val
+                .try_into()
+                .map_err(|err| XRPLAddressCodecException::VecResizeError(err))?;
             Ok((decoded, algo.expect("decode_seed")))
         }
-        Some(Err(_)) | None => Err(XRPLAddressCodecException::UnknownSeedEncoding),
+        Some(Err(_)) | None => Err(XRPLAddressCodecException::UnknownSeedEncoding.into()),
     }
 }
 
@@ -192,7 +194,7 @@ pub fn classic_address_to_xaddress(
     classic_address: &str,
     tag: Option<u64>,
     is_test_network: bool,
-) -> Result<String, XRPLAddressCodecException> {
+) -> XRPLCoreResult<String> {
     let classic_address_bytes = decode_classic_address(classic_address)?;
     let flag: bool = tag.is_some();
     let tag_val: u64;
@@ -200,9 +202,10 @@ pub fn classic_address_to_xaddress(
     if classic_address_bytes.len() != CLASSIC_ADDRESS_ID_LENGTH {
         Err(XRPLAddressCodecException::InvalidCAddressIdLength {
             length: CLASSIC_ADDRESS_ID_LENGTH,
-        })
+        }
+        .into())
     } else if tag.is_some() && tag > Some(u32::MAX.into()) {
-        Err(XRPLAddressCodecException::InvalidCAddressTag)
+        Err(XRPLAddressCodecException::InvalidCAddressTag.into())
     } else {
         if let Some(tval) = tag {
             tag_val = tval;
@@ -275,9 +278,7 @@ pub fn classic_address_to_xaddress(
 ///
 /// assert_eq!(Some(classic), conversion);
 /// ```
-pub fn xaddress_to_classic_address(
-    xaddress: &str,
-) -> Result<(String, Option<u64>, bool), XRPLAddressCodecException> {
+pub fn xaddress_to_classic_address(xaddress: &str) -> XRPLCoreResult<(String, Option<u64>, bool)> {
     // Convert b58 to bytes
     let decoded = bs58::decode(xaddress)
         .with_alphabet(&XRPL_ALPHABET)
@@ -323,12 +324,12 @@ pub fn xaddress_to_classic_address(
 ///
 /// assert_eq!(Some(address), encoding);
 /// ```
-pub fn encode_classic_address(bytestring: &[u8]) -> Result<String, XRPLAddressCodecException> {
-    encode_base58(
+pub fn encode_classic_address(bytestring: &[u8]) -> XRPLCoreResult<String> {
+    Ok(encode_base58(
         bytestring,
         &CLASSIC_ADDRESS_PREFIX,
         Some(CLASSIC_ADDRESS_LENGTH.into()),
-    )
+    )?)
 }
 
 /// Returns the decoded bytes of the classic address.
@@ -359,8 +360,8 @@ pub fn encode_classic_address(bytestring: &[u8]) -> Result<String, XRPLAddressCo
 ///
 /// assert_eq!(Some(bytes), decoding);
 /// ```
-pub fn decode_classic_address(classic_address: &str) -> Result<Vec<u8>, XRPLAddressCodecException> {
-    decode_base58(classic_address, &CLASSIC_ADDRESS_PREFIX)
+pub fn decode_classic_address(classic_address: &str) -> XRPLCoreResult<Vec<u8>> {
+    Ok(decode_base58(classic_address, &CLASSIC_ADDRESS_PREFIX)?)
 }
 
 /// Returns the node public key encoding of these bytes
@@ -394,12 +395,12 @@ pub fn decode_classic_address(classic_address: &str) -> Result<Vec<u8>, XRPLAddr
 ///
 /// assert_eq!(Some(key), encoding);
 /// ```
-pub fn encode_node_public_key(bytestring: &[u8]) -> Result<String, XRPLAddressCodecException> {
-    encode_base58(
+pub fn encode_node_public_key(bytestring: &[u8]) -> XRPLCoreResult<String> {
+    Ok(encode_base58(
         bytestring,
         &NODE_PUBLIC_KEY_PREFIX,
         Some(NODE_PUBLIC_KEY_LENGTH.into()),
-    )
+    )?)
 }
 
 /// Returns the decoded bytes of the node public key.
@@ -431,8 +432,8 @@ pub fn encode_node_public_key(bytestring: &[u8]) -> Result<String, XRPLAddressCo
 ///
 /// assert_eq!(Some(bytes), decoding);
 /// ```
-pub fn decode_node_public_key(node_public_key: &str) -> Result<Vec<u8>, XRPLAddressCodecException> {
-    decode_base58(node_public_key, &NODE_PUBLIC_KEY_PREFIX)
+pub fn decode_node_public_key(node_public_key: &str) -> XRPLCoreResult<Vec<u8>> {
+    Ok(decode_base58(node_public_key, &NODE_PUBLIC_KEY_PREFIX)?)
 }
 
 /// Returns the account public key encoding of these
@@ -466,12 +467,12 @@ pub fn decode_node_public_key(node_public_key: &str) -> Result<Vec<u8>, XRPLAddr
 ///
 /// assert_eq!(Some(key), encoding);
 /// ```
-pub fn encode_account_public_key(bytestring: &[u8]) -> Result<String, XRPLAddressCodecException> {
-    encode_base58(
+pub fn encode_account_public_key(bytestring: &[u8]) -> XRPLCoreResult<String> {
+    Ok(encode_base58(
         bytestring,
         &ACCOUNT_PUBLIC_KEY_PREFIX,
         Some(ACCOUNT_PUBLIC_KEY_LENGTH.into()),
-    )
+    )?)
 }
 
 /// Returns the decoded bytes of the node public key.
@@ -503,10 +504,11 @@ pub fn encode_account_public_key(bytestring: &[u8]) -> Result<String, XRPLAddres
 ///
 /// assert_eq!(Some(bytes), decoding);
 /// ```
-pub fn decode_account_public_key(
-    account_public_key: &str,
-) -> Result<Vec<u8>, XRPLAddressCodecException> {
-    decode_base58(account_public_key, &ACCOUNT_PUBLIC_KEY_PREFIX)
+pub fn decode_account_public_key(account_public_key: &str) -> XRPLCoreResult<Vec<u8>> {
+    Ok(decode_base58(
+        account_public_key,
+        &ACCOUNT_PUBLIC_KEY_PREFIX,
+    )?)
 }
 
 /// Returns whether `classic_address` is a valid classic address.
