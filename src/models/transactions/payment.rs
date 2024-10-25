@@ -1,6 +1,5 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -9,12 +8,11 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, PathStep,
+    Model, PathStep, XRPLModelResult,
 };
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLPaymentException;
-use crate::Err;
 
 use super::{CommonFields, FlagCollection};
 
@@ -90,17 +88,12 @@ pub struct Payment<'a> {
 }
 
 impl<'a: 'static> Model for Payment<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_xrp_transaction_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => match self._get_partial_payment_error() {
-                Err(error) => Err!(error),
-                Ok(_no_error) => match self._get_exchange_error() {
-                    Err(error) => Err!(error),
-                    Ok(_no_error) => Ok(()),
-                },
-            },
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_xrp_transaction_error()?;
+        self._get_partial_payment_error()?;
+        self._get_exchange_error()?;
+
+        Ok(())
     }
 }
 
@@ -123,21 +116,21 @@ impl<'a> Transaction<'a, PaymentFlag> for Payment<'a> {
 }
 
 impl<'a> PaymentError for Payment<'a> {
-    fn _get_xrp_transaction_error(&self) -> Result<(), XRPLPaymentException> {
+    fn _get_xrp_transaction_error(&self) -> XRPLModelResult<()> {
         if self.amount.is_xrp() && self.send_max.is_none() {
             if self.paths.is_some() {
                 Err(XRPLPaymentException::IllegalOption {
                     field: "paths".into(),
                     context: "XRP to XRP payments".into(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else if self.common_fields.account == self.destination {
                 Err(XRPLPaymentException::ValueEqualsValueInContext {
                     field1: "account".into(),
                     field2: "destination".into(),
                     context: "XRP to XRP Payments".into(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -146,7 +139,7 @@ impl<'a> PaymentError for Payment<'a> {
         }
     }
 
-    fn _get_partial_payment_error(&self) -> Result<(), XRPLPaymentException> {
+    fn _get_partial_payment_error(&self) -> XRPLModelResult<()> {
         if let Some(send_max) = &self.send_max {
             if !self.has_flag(&PaymentFlag::TfPartialPayment)
                 && send_max.is_xrp()
@@ -155,8 +148,8 @@ impl<'a> PaymentError for Payment<'a> {
                 Err(XRPLPaymentException::IllegalOption {
                     field: "send_max".into(),
                     context: "XRP to XRP non-partial payments".into(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -164,15 +157,15 @@ impl<'a> PaymentError for Payment<'a> {
             Err(XRPLPaymentException::FlagRequiresField {
                 flag: PaymentFlag::TfPartialPayment,
                 field: "send_max".into(),
-                resource: "".into(),
-            })
+            }
+            .into())
         } else if !self.has_flag(&PaymentFlag::TfPartialPayment) {
             if let Some(_deliver_min) = &self.deliver_min {
                 Err(XRPLPaymentException::IllegalOption {
                     field: "deliver_min".into(),
                     context: "XRP to XRP non-partial payments".into(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -181,13 +174,13 @@ impl<'a> PaymentError for Payment<'a> {
         }
     }
 
-    fn _get_exchange_error(&self) -> Result<(), XRPLPaymentException> {
+    fn _get_exchange_error(&self) -> XRPLModelResult<()> {
         if self.common_fields.account == self.destination && self.send_max.is_none() {
             return Err(XRPLPaymentException::OptionRequired {
                 field: "send_max".into(),
                 context: "exchanges".into(),
-                resource: "".into(),
-            });
+            }
+            .into());
         }
 
         Ok(())
@@ -243,9 +236,9 @@ impl<'a> Payment<'a> {
 }
 
 pub trait PaymentError {
-    fn _get_xrp_transaction_error(&self) -> Result<(), XRPLPaymentException>;
-    fn _get_partial_payment_error(&self) -> Result<(), XRPLPaymentException>;
-    fn _get_exchange_error(&self) -> Result<(), XRPLPaymentException>;
+    fn _get_xrp_transaction_error(&self) -> XRPLModelResult<()>;
+    fn _get_partial_payment_error(&self) -> XRPLModelResult<()>;
+    fn _get_exchange_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

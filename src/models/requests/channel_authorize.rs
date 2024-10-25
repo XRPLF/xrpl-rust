@@ -1,14 +1,12 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::requests::exceptions::XRPLChannelAuthorizeException;
+use crate::models::{XRPLModelException, XRPLModelResult};
 use crate::{
     constants::CryptoAlgorithm,
     models::{requests::RequestMethod, Model},
-    Err,
 };
 
 use super::{CommonFields, Request};
@@ -72,11 +70,8 @@ pub struct ChannelAuthorize<'a> {
 }
 
 impl<'a> Model for ChannelAuthorize<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_field_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => Ok(()),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_field_error()
     }
 }
 
@@ -91,7 +86,7 @@ impl<'a> Request<'a> for ChannelAuthorize<'a> {
 }
 
 impl<'a> ChannelAuthorizeError for ChannelAuthorize<'a> {
-    fn _get_field_error(&self) -> Result<(), XRPLChannelAuthorizeException> {
+    fn _get_field_error(&self) -> XRPLModelResult<()> {
         let mut signing_methods = Vec::new();
         for method in [
             self.secret.clone(),
@@ -104,13 +99,12 @@ impl<'a> ChannelAuthorizeError for ChannelAuthorize<'a> {
             }
         }
         if signing_methods.len() != 1 {
-            Err(XRPLChannelAuthorizeException::DefineExactlyOneOf {
-                field1: "secret".into(),
-                field2: "seed".into(),
-                field3: "seed_hex".into(),
-                field4: "passphrase".into(),
-                resource: "".into(),
-            })
+            Err(XRPLModelException::ExpectedOneOf(&[
+                "secret",
+                "seed",
+                "seed_hex",
+                "passphrase",
+            ]))
         } else {
             Ok(())
         }
@@ -145,7 +139,7 @@ impl<'a> ChannelAuthorize<'a> {
 }
 
 pub trait ChannelAuthorizeError {
-    fn _get_field_error(&self) -> Result<(), XRPLChannelAuthorizeException>;
+    fn _get_field_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

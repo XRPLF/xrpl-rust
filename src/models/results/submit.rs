@@ -1,11 +1,12 @@
 use core::convert::TryFrom;
 
-use alloc::borrow::Cow;
-use anyhow::Result;
+use alloc::{borrow::Cow, string::ToString};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{models::results::exceptions::XRPLResultException, Err};
+use crate::models::{
+    results::exceptions::XRPLResultException, XRPLModelException, XRPLModelResult,
+};
 
 use super::XRPLResult;
 
@@ -28,15 +29,16 @@ pub struct Submit<'a> {
 }
 
 impl<'a> TryFrom<XRPLResult<'a>> for Submit<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(result: XRPLResult<'a>) -> Result<Self> {
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::Submit(server_state) => Ok(server_state),
-            res => Err!(XRPLResultException::UnexpectedResultType(
+            res => Err(XRPLResultException::UnexpectedResultType(
                 "Submit".to_string(),
-                res.get_name()
-            )),
+                res.get_name(),
+            )
+            .into()),
         }
     }
 }

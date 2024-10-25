@@ -1,14 +1,10 @@
 use alloc::{borrow::Cow, vec::Vec};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::{
-    models::{
-        transactions::exceptions::XRPLXChainCreateBridgeException, Amount, FlagCollection, Model,
-        NoFlags, XChainBridge, XRPAmount, XRP,
-    },
-    Err,
+use crate::models::{
+    transactions::exceptions::XRPLXChainCreateBridgeException, Amount, FlagCollection, Model,
+    NoFlags, XChainBridge, XRPAmount, XRPLModelResult, XRP,
 };
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
@@ -26,7 +22,7 @@ pub struct XChainCreateBridge<'a> {
 }
 
 impl Model for XChainCreateBridge<'_> {
-    fn get_errors(&self) -> Result<()> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
         self.get_same_door_error()?;
         self.get_account_door_mismatch_error()?;
         self.get_cross_currency_bridge_not_allowed_error()?;
@@ -86,43 +82,43 @@ impl<'a> XChainCreateBridge<'a> {
         }
     }
 
-    fn get_same_door_error(&self) -> Result<()> {
+    fn get_same_door_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         if bridge.issuing_chain_door == bridge.locking_chain_door {
-            Err!(XRPLXChainCreateBridgeException::SameDoorAccounts)
+            Err(XRPLXChainCreateBridgeException::SameDoorAccounts.into())
         } else {
             Ok(())
         }
     }
 
-    fn get_account_door_mismatch_error(&self) -> Result<()> {
+    fn get_account_door_mismatch_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         if [&bridge.issuing_chain_door, &bridge.locking_chain_door]
             .contains(&&self.common_fields.account)
         {
-            Err!(XRPLXChainCreateBridgeException::AccountDoorMismatch)
+            Err(XRPLXChainCreateBridgeException::AccountDoorMismatch.into())
         } else {
             Ok(())
         }
     }
 
-    fn get_cross_currency_bridge_not_allowed_error(&self) -> Result<()> {
+    fn get_cross_currency_bridge_not_allowed_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         if (bridge.locking_chain_issue == XRP::new().into())
             != (bridge.issuing_chain_issue == XRP::new().into())
         {
-            Err!(XRPLXChainCreateBridgeException::CrossCurrencyBridgeNotAllowed)
+            Err(XRPLXChainCreateBridgeException::CrossCurrencyBridgeNotAllowed.into())
         } else {
             Ok(())
         }
     }
 
-    fn get_min_account_create_amount_for_iou_error(&self) -> Result<()> {
+    fn get_min_account_create_amount_for_iou_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         if self.min_account_create_amount.is_some()
             && bridge.locking_chain_issue != XRP::new().into()
         {
-            Err!(XRPLXChainCreateBridgeException::MinAccountCreateAmountForIOU)
+            Err(XRPLXChainCreateBridgeException::MinAccountCreateAmountForIOU.into())
         } else {
             Ok(())
         }

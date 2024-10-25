@@ -10,7 +10,6 @@ pub mod book_offers;
 pub mod channel_authorize;
 pub mod channel_verify;
 pub mod deposit_authorize;
-pub mod exceptions;
 pub mod fee;
 pub mod gateway_balances;
 pub mod ledger;

@@ -1,17 +1,15 @@
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{exceptions::XRPLEscrowCreateException, CommonFields};
+use crate::models::transactions::CommonFields;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags};
+use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 /// Creates an Escrow, which requests XRP until the escrow process either finishes or is canceled.
 ///
@@ -57,11 +55,10 @@ pub struct EscrowCreate<'a> {
 }
 
 impl<'a: 'static> Model for EscrowCreate<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_finish_after_error() {
-            Ok(_) => Ok(()),
-            Err(error) => Err!(error),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_finish_after_error()?;
+
+        Ok(())
     }
 }
 
@@ -80,15 +77,14 @@ impl<'a> Transaction<'a, NoFlags> for EscrowCreate<'a> {
 }
 
 impl<'a> EscrowCreateError for EscrowCreate<'a> {
-    fn _get_finish_after_error(&self) -> Result<(), XRPLEscrowCreateException> {
+    fn _get_finish_after_error(&self) -> XRPLModelResult<()> {
         if let (Some(finish_after), Some(cancel_after)) = (self.finish_after, self.cancel_after) {
             if finish_after >= cancel_after {
-                Err(XRPLEscrowCreateException::ValueBelowValue {
+                Err(XRPLModelException::ValueBelowValue {
                     field1: "cancel_after".into(),
                     field2: "finish_after".into(),
                     field1_val: cancel_after,
                     field2_val: finish_after,
-                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -145,7 +141,7 @@ impl<'a> EscrowCreate<'a> {
 }
 
 pub trait EscrowCreateError {
-    fn _get_finish_after_error(&self) -> Result<(), XRPLEscrowCreateException>;
+    fn _get_finish_after_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

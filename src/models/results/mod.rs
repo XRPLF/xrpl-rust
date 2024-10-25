@@ -7,16 +7,19 @@ pub mod server_state;
 pub mod submit;
 pub mod tx;
 
-use super::requests::XRPLRequest;
-use crate::Err;
+use crate::XRPLSerdeJsonError;
+
+use super::{requests::XRPLRequest, XRPLModelException, XRPLModelResult};
 use alloc::{
-    borrow::{Cow, ToOwned},
+    borrow::Cow,
     format,
     string::{String, ToString},
     vec::Vec,
 };
-use anyhow::Result;
-use core::convert::{TryFrom, TryInto};
+use core::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 use exceptions::XRPLResultException;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{value::Index, Map, Value};
@@ -38,31 +41,29 @@ impl<T> XRPLOptionalResult<T> {
     }
 
     /// Try to convert the result into an expected XRPL result.
-    pub fn try_into_result(self) -> Result<T> {
+    pub fn try_into_result(self) -> XRPLModelResult<T> {
         match self {
             XRPLOptionalResult::Result(result) => Ok(result),
-            XRPLOptionalResult::Other(other) => Err!(XRPLResultException::ExpectedResult(other)),
+            XRPLOptionalResult::Other(other) => {
+                Err(XRPLResultException::ExpectedResult(other).into())
+            }
         }
     }
 
     /// Get a value from the result by index.
-    pub fn try_get_typed<I, U>(&self, index: I) -> Result<U>
+    pub fn try_get_typed<I, U>(&self, index: I) -> XRPLModelResult<U>
     where
         T: Serialize,
-        I: Index,
+        I: Index + Display,
         U: DeserializeOwned,
     {
         match self {
-            XRPLOptionalResult::Result(result) => match serde_json::to_value(result) {
-                Ok(value) => match value.get(index) {
-                    Some(value) => match serde_json::from_value(value.to_owned()) {
-                        Ok(value) => Ok(value),
-                        Err(e) => Err!(e),
-                    },
-                    None => Err!(XRPLResultException::IndexNotFound),
-                },
-                Err(e) => Err!(e),
-            },
+            XRPLOptionalResult::Result(result) => {
+                let value = serde_json::to_value(result)?
+                    .get(index)
+                    .ok_or(XRPLSerdeJsonError::InvalidNoneError(index.to_string()).into())?;
+                Ok(serde_json::from_value(value.clone())?)
+            }
             XRPLOptionalResult::Other(other) => other.try_get_typed(index),
         }
     }
@@ -72,15 +73,16 @@ impl<T> XRPLOptionalResult<T> {
 pub struct XRPLOtherResult(Value);
 
 impl TryFrom<XRPLResult<'_>> for XRPLOtherResult {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(result: XRPLResult) -> Result<Self> {
+    fn try_from(result: XRPLResult) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::Other(value) => Ok(value),
-            res => Err!(XRPLResultException::UnexpectedResultType(
+            res => Err(XRPLResultException::UnexpectedResultType(
                 "Other".to_string(),
-                res.get_name()
-            )),
+                res.get_name(),
+            )
+            .into()),
         }
     }
 }
@@ -102,18 +104,17 @@ impl XRPLOtherResult {
         self.0.get(index)
     }
 
-    pub fn try_get_typed<I, T>(&self, index: I) -> Result<T>
+    pub fn try_get_typed<I, T>(&self, index: I) -> XRPLModelResult<T>
     where
         I: Index,
         T: DeserializeOwned,
     {
-        match self.0.get(index) {
-            Some(value) => match serde_json::from_value(value.clone()) {
-                Ok(value) => Ok(value),
-                Err(e) => Err!(e),
-            },
-            None => Err!(XRPLResultException::IndexNotFound),
-        }
+        let value = self
+            .0
+            .get(index)
+            .ok_or(XRPLResultException::IndexNotFound)?;
+
+        Ok(serde_json::from_value(value.clone())?)
     }
 }
 
@@ -185,15 +186,12 @@ impl<'a> From<XRPLOtherResult> for XRPLResult<'a> {
 }
 
 impl<'a> TryInto<Value> for XRPLResult<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<Value> {
+    fn try_into(self) -> XRPLModelResult<Value> {
         match self {
             XRPLResult::Other(XRPLOtherResult(value)) => Ok(value),
-            res => match serde_json::to_value(res) {
-                Ok(value) => Ok(value),
-                Err(e) => Err!(e),
-            },
+            res => Ok(serde_json::to_value(res)?),
         }
     }
 }
@@ -248,7 +246,7 @@ fn is_subscription_stream_item(item: &Map<String, Value>) -> bool {
 }
 
 impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
-    fn deserialize<D>(deserializer: D) -> Result<XRPLResponse<'a>, D::Error>
+    fn deserialize<D>(deserializer: D) -> XRPLModelResult<XRPLResponse<'a>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -316,13 +314,10 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
 }
 
 impl TryInto<Value> for XRPLResponse<'_> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<Value> {
-        match serde_json::to_value(self) {
-            Ok(value) => Ok(value),
-            Err(e) => Err!(e),
-        }
+    fn try_into(self) -> XRPLModelResult<Value> {
+        Ok(serde_json::to_value(self)?)
     }
 }
 
@@ -343,9 +338,9 @@ impl<'a> XRPLResponse<'a> {
         }
     }
 
-    pub fn try_into_opt_result<T>(self) -> Result<XRPLOptionalResult<T>>
+    pub fn try_into_opt_result<T>(self) -> XRPLModelResult<XRPLOptionalResult<T>>
     where
-        T: TryFrom<XRPLResult<'a>, Error = anyhow::Error>,
+        T: TryFrom<XRPLResult<'a>, Error = XRPLModelException>,
     {
         match self.result {
             Some(result) => match result.clone().try_into() {
@@ -354,25 +349,28 @@ impl<'a> XRPLResponse<'a> {
             },
             None => {
                 if let Some(error) = self.error {
-                    Err!(XRPLResultException::ResponseError(format!(
+                    Err(XRPLResultException::ResponseError(format!(
                         "{}: {}",
                         error,
                         self.error_message.unwrap_or_default()
-                    )))
+                    ))
+                    .into())
                 } else {
-                    Err!(XRPLResultException::ExpectedResultOrError)
+                    Err(XRPLResultException::ExpectedResultOrError.into())
                 }
             }
         }
     }
 
-    pub fn try_into_result<T>(self) -> Result<T>
+    pub fn try_into_result<T>(self) -> XRPLModelResult<T>
     where
-        T: TryFrom<XRPLResult<'a>, Error = anyhow::Error>,
+        T: TryFrom<XRPLResult<'a>, Error = XRPLModelException>,
     {
         match self.try_into_opt_result()? {
             XRPLOptionalResult::Result(result) => Ok(result),
-            XRPLOptionalResult::Other(other) => Err!(XRPLResultException::ExpectedResult(other)),
+            XRPLOptionalResult::Other(other) => {
+                Err(XRPLResultException::ExpectedResult(other).into())
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
 use alloc::{borrow::Cow, vec::Vec};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -7,9 +6,8 @@ use crate::{
     core::addresscodec::is_valid_classic_address,
     models::{
         transactions::exceptions::XRPLXChainCreateClaimIDException, FlagCollection, Model, NoFlags,
-        XChainBridge, XRPAmount,
+        XChainBridge, XRPAmount, XRPLModelResult,
     },
-    Err,
 };
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
@@ -27,7 +25,7 @@ pub struct XChainCreateClaimID<'a> {
 }
 
 impl Model for XChainCreateClaimID<'_> {
-    fn get_errors(&self) -> Result<()> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
         self.get_other_chain_source_is_invalid_error()
     }
 }
@@ -84,9 +82,9 @@ impl<'a> XChainCreateClaimID<'a> {
         }
     }
 
-    fn get_other_chain_source_is_invalid_error(&self) -> Result<()> {
+    fn get_other_chain_source_is_invalid_error(&self) -> XRPLModelResult<()> {
         if !is_valid_classic_address(self.other_chain_source.as_ref()) {
-            Err!(XRPLXChainCreateClaimIDException::OtherChainSourceIsInvalid)
+            Err(XRPLXChainCreateClaimIDException::OtherChainSourceIsInvalid.into())
         } else {
             Ok(())
         }

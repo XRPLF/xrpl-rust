@@ -1,20 +1,17 @@
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
+use bigdecimal::{BigDecimal, Zero};
 use core::convert::TryInto;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::exceptions::XRPLNFTokenAcceptOfferException;
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags};
+use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 use super::CommonFields;
 
@@ -58,14 +55,11 @@ pub struct NFTokenAcceptOffer<'a> {
 }
 
 impl<'a: 'static> Model for NFTokenAcceptOffer<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_brokered_mode_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => match self._get_nftoken_broker_fee_error() {
-                Err(error) => Err!(error),
-                Ok(_no_error) => Ok(()),
-            },
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_brokered_mode_error()?;
+        self._get_nftoken_broker_fee_error()?;
+
+        Ok(())
     }
 }
 
@@ -84,28 +78,24 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenAcceptOffer<'a> {
 }
 
 impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
-    fn _get_brokered_mode_error(&self) -> Result<(), XRPLNFTokenAcceptOfferException> {
+    fn _get_brokered_mode_error(&self) -> XRPLModelResult<()> {
         if self.nftoken_broker_fee.is_some()
             && self.nftoken_sell_offer.is_none()
             && self.nftoken_buy_offer.is_none()
         {
-            Err(XRPLNFTokenAcceptOfferException::DefineOneOf {
-                field1: "nftoken_sell_offer".into(),
-                field2: "nftoken_buy_offer".into(),
-                resource: "".into(),
-            })
+            Err(XRPLModelException::ExpectedOneOf(&[
+                "nftoken_sell_offer",
+                "nftoken_buy_offer",
+            ]))
         } else {
             Ok(())
         }
     }
-    fn _get_nftoken_broker_fee_error(&self) -> Result<()> {
+    fn _get_nftoken_broker_fee_error(&self) -> XRPLModelResult<()> {
         if let Some(nftoken_broker_fee) = &self.nftoken_broker_fee {
-            let nftoken_broker_fee_decimal: Decimal = nftoken_broker_fee.clone().try_into()?;
+            let nftoken_broker_fee_decimal: BigDecimal = nftoken_broker_fee.clone().try_into()?;
             if nftoken_broker_fee_decimal.is_zero() {
-                Err!(XRPLNFTokenAcceptOfferException::ValueZero {
-                    field: "nftoken_broker_fee".into(),
-                    resource: "".into(),
-                })
+                Err(XRPLModelException::ValueZero("nftoken_broker_fee".into()))
             } else {
                 Ok(())
             }
@@ -155,8 +145,8 @@ impl<'a> NFTokenAcceptOffer<'a> {
 }
 
 pub trait NFTokenAcceptOfferError {
-    fn _get_brokered_mode_error(&self) -> Result<(), XRPLNFTokenAcceptOfferException>;
-    fn _get_nftoken_broker_fee_error(&self) -> Result<()>;
+    fn _get_brokered_mode_error(&self) -> XRPLModelResult<()>;
+    fn _get_nftoken_broker_fee_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
