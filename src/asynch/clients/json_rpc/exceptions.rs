@@ -5,6 +5,6 @@ pub enum XRPLJsonRpcException {
     #[error("Reqwless error")]
     ReqwlessError,
     #[cfg(feature = "std")]
-    #[error("Request error: {0:?}")]
-    RequestError(reqwest::Response),
+    #[error("Reqwest error: {0:?}")]
+    ReqwestError(#[from] reqwest::Error),
 }

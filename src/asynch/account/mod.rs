@@ -104,5 +104,6 @@ where
         None,
     );
     let response = client.request(account_tx.into()).await?;
-    response.try_into_result::<AccountTx<'_>>()
+
+    Ok(response.try_into_result::<results::account_tx::AccountTx<'_>>()?)
 }

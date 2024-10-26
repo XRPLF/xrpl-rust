@@ -1,13 +1,14 @@
 pub mod async_client;
 pub mod client;
+pub mod exceptions;
 #[cfg(feature = "json-rpc")]
 mod json_rpc;
 #[cfg(feature = "websocket")]
 mod websocket;
 
 use alloc::borrow::Cow;
-use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
+use exceptions::XRPLClientResult;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -24,10 +25,10 @@ pub type SingleExecutorMutex = NoopRawMutex;
 const TEST_FAUCET_URL: &str = "https://faucet.altnet.rippletest.net/accounts";
 const DEV_FAUCET_URL: &str = "https://faucet.devnet.rippletest.net/accounts";
 
-use crate::{asynch::XRPLFaucetException, models::requests::FundFaucet, Err};
+use crate::{asynch::wallet::exceptions::XRPLFaucetException, models::requests::FundFaucet};
 #[allow(async_fn_in_trait)]
 pub trait XRPLFaucet: XRPLClient {
-    fn get_faucet_url(&self, url: Option<Url>) -> Result<Url>
+    fn get_faucet_url(&self, url: Option<Url>) -> XRPLClientResult<Url>
     where
         Self: Sized + XRPLClient,
     {
@@ -37,24 +38,22 @@ pub trait XRPLFaucet: XRPLClient {
             let host = self.get_host();
             let host_str = host.host_str().unwrap();
             if host_str.contains("altnet") || host_str.contains("testnet") {
-                match Url::parse(TEST_FAUCET_URL) {
-                    Ok(url) => Ok(url),
-                    Err(error) => Err!(error),
-                }
+                Ok(Url::parse(TEST_FAUCET_URL)?)
             } else if host_str.contains("devnet") {
-                match Url::parse(DEV_FAUCET_URL) {
-                    Ok(url) => Ok(url),
-                    Err(error) => Err!(error),
-                }
+                Ok(Url::parse(DEV_FAUCET_URL)?)
             } else if host_str.contains("sidechain-net2") {
-                Err!(XRPLFaucetException::CannotFundSidechainAccount)
+                Err(XRPLFaucetException::CannotFundSidechainAccount.into())
             } else {
-                Err!(XRPLFaucetException::CannotDeriveFaucetUrl)
+                Err(XRPLFaucetException::CannotDeriveFaucetUrl.into())
             }
         }
     }
 
-    async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()>;
+    async fn request_funding(
+        &self,
+        url: Option<Url>,
+        request: FundFaucet<'_>,
+    ) -> XRPLClientResult<()>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

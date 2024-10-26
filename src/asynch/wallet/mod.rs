@@ -71,7 +71,7 @@ pub fn get_faucet_url<C>(client: &C, url: Option<Url>) -> XRPLHelperResult<Url>
 where
     C: XRPLFaucet + XRPLClient,
 {
-    client.get_faucet_url(url)
+    Ok(client.get_faucet_url(url)?)
 }
 
 async fn check_balance<'a: 'b, 'b, C>(client: &C, address: Cow<'a, str>) -> XRPAmount<'b>

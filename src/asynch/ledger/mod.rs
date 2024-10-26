@@ -74,18 +74,14 @@ pub async fn get_fee(
     fee_type: Option<FeeType>,
 ) -> XRPLHelperResult<XRPAmount<'_>> {
     let fee_request = Fee::new(None);
-    match client.request(fee_request.into()).await {
-        Ok(response) => {
-            let drops = response.try_into_result::<FeeResult<'_>>()?.drops;
-            let fee = match_fee_type(fee_type, drops)?;
+    let response = client.request(fee_request.into()).await?;
+    let drops = response.try_into_result::<FeeResult<'_>>()?.drops;
+    let fee = match_fee_type(fee_type, drops)?;
 
-            if let Some(max_fee) = max_fee {
-                Ok(XRPAmount::from(min(max_fee, fee).to_string()))
-            } else {
-                Ok(XRPAmount::from(fee.to_string()))
-            }
-        }
-        Err(err) => Err(err),
+    if let Some(max_fee) = max_fee {
+        Ok(XRPAmount::from(min(max_fee, fee).to_string()))
+    } else {
+        Ok(XRPAmount::from(fee.to_string()))
     }
 }
 

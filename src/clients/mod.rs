@@ -1,33 +1,30 @@
-use anyhow::Result;
-
 use crate::{
-    asynch::clients::{CommonFields, XRPLClient},
+    asynch::clients::{exceptions::XRPLClientResult, CommonFields, XRPLClient},
     models::{requests::XRPLRequest, results::XRPLResponse},
 };
 
 pub use crate::asynch::clients::{SingleExecutorMutex, XRPLFaucet};
 
 pub trait XRPLSyncClient: XRPLClient {
-    fn request<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> Result<XRPLResponse<'b>>;
+    fn request<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> XRPLClientResult<XRPLResponse<'b>>;
 
-    fn get_common_fields(&self) -> Result<CommonFields<'_>>;
+    fn get_common_fields(&self) -> XRPLClientResult<CommonFields<'_>>;
 }
 
 #[cfg(all(feature = "json-rpc", feature = "std"))]
 pub mod json_rpc {
-    use anyhow::Result;
     use tokio::runtime::Runtime;
     use url::Url;
 
     use crate::{
         asynch::clients::{
-            AsyncJsonRpcClient, CommonFields, XRPLAsyncClient, XRPLClient, XRPLFaucet,
+            exceptions::XRPLClientResult, AsyncJsonRpcClient, CommonFields, XRPLAsyncClient,
+            XRPLClient, XRPLFaucet,
         },
         models::{
             requests::{FundFaucet, XRPLRequest},
             results::XRPLResponse,
         },
-        Err,
     };
 
     use super::XRPLSyncClient;
@@ -43,7 +40,7 @@ pub mod json_rpc {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b>> {
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             self.0.request_impl(request).await
         }
 
@@ -57,23 +54,30 @@ pub mod json_rpc {
     }
 
     impl XRPLSyncClient for JsonRpcClient {
-        fn request<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> Result<XRPLResponse<'b>> {
+        fn request<'a: 'b, 'b>(
+            &self,
+            request: XRPLRequest<'a>,
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             match Runtime::new() {
                 Ok(rt) => rt.block_on(self.0.request_impl(request)),
-                Err(e) => Err!(e),
+                Err(e) => Err(e.into()),
             }
         }
 
-        fn get_common_fields(&self) -> Result<CommonFields<'_>> {
+        fn get_common_fields(&self) -> XRPLClientResult<CommonFields<'_>> {
             match Runtime::new() {
                 Ok(rt) => rt.block_on(self.0.get_common_fields()),
-                Err(e) => Err!(e),
+                Err(e) => Err(e.into()),
             }
         }
     }
 
     impl XRPLFaucet for JsonRpcClient {
-        async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()> {
+        async fn request_funding(
+            &self,
+            url: Option<Url>,
+            request: FundFaucet<'_>,
+        ) -> XRPLClientResult<()> {
             self.0.request_funding(url, request).await
         }
     }
@@ -122,7 +126,7 @@ pub mod json_rpc {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b>> {
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             self.0.request_impl(request).await
         }
 
@@ -137,21 +141,24 @@ pub mod json_rpc {
         T: TcpConnect + 'a,
         D: Dns + 'a,
     {
-        async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()> {
+        async fn request_funding(
+            &self,
+            url: Option<Url>,
+            request: FundFaucet<'_>,
+        ) -> XRPLClientResult<()> {
             self.0.request_funding(url, request).await
         }
     }
 }
 
 pub trait XRPLSyncWebsocketIO {
-    fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()>;
+    fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()>;
 
-    fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>>;
+    fn xrpl_receive(&mut self) -> XRPLClientResult<Option<XRPLResponse<'_>>>;
 }
 
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub mod websocket {
-    use anyhow::Result;
     use embassy_sync::blocking_mutex::raw::RawMutex;
     use tokio::runtime::Runtime;
     use url::Url;
@@ -159,10 +166,10 @@ pub mod websocket {
     use super::{XRPLSyncClient, XRPLSyncWebsocketIO};
     use crate::{
         asynch::clients::{
-            AsyncWebSocketClient, CommonFields, XRPLAsyncClient, XRPLAsyncWebsocketIO, XRPLClient,
+            exceptions::XRPLClientResult, AsyncWebSocketClient, CommonFields, XRPLAsyncClient,
+            XRPLAsyncWebsocketIO, XRPLClient,
         },
         models::{requests::XRPLRequest, results::XRPLResponse},
-        Err,
     };
 
     pub use crate::asynch::clients::{WebSocketClosed, WebSocketOpen};
@@ -173,7 +180,7 @@ pub mod websocket {
     }
 
     impl<M: RawMutex> WebSocketClient<M, WebSocketClosed> {
-        pub fn open(url: Url) -> Result<WebSocketClient<M, WebSocketOpen>> {
+        pub fn open(url: Url) -> XRPLClientResult<WebSocketClient<M, WebSocketOpen>> {
             match Runtime::new() {
                 Ok(rt) => {
                     let client: AsyncWebSocketClient<M, WebSocketOpen> =
@@ -181,7 +188,7 @@ pub mod websocket {
 
                     Ok(WebSocketClient { inner: client, rt })
                 }
-                Err(e) => Err!(e),
+                Err(e) => Err(e.into()),
             }
         }
     }
@@ -197,10 +204,10 @@ pub mod websocket {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b>> {
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             match Runtime::new() {
                 Ok(rt) => rt.block_on(self.inner.request_impl(request)),
-                Err(e) => Err!(e),
+                Err(e) => Err(e.into()),
             }
         }
     }
@@ -209,11 +216,14 @@ pub mod websocket {
     where
         M: RawMutex,
     {
-        fn request<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> Result<XRPLResponse<'b>> {
+        fn request<'a: 'b, 'b>(
+            &self,
+            request: XRPLRequest<'a>,
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             self.rt.block_on(self.inner.request_impl(request))
         }
 
-        fn get_common_fields(&self) -> Result<CommonFields<'_>> {
+        fn get_common_fields(&self) -> XRPLClientResult<CommonFields<'_>> {
             self.rt.block_on(self.inner.get_common_fields())
         }
     }
@@ -222,11 +232,11 @@ pub mod websocket {
     where
         M: RawMutex,
     {
-        fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()> {
+        fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()> {
             self.rt.block_on(self.inner.xrpl_send(message))
         }
 
-        fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>> {
+        fn xrpl_receive(&mut self) -> XRPLClientResult<Option<XRPLResponse<'_>>> {
             self.rt.block_on(self.inner.xrpl_receive())
         }
     }
@@ -268,7 +278,7 @@ pub mod websocket {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b>> {
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             block_on(self.0.request_impl(request))
         }
     }
@@ -280,11 +290,16 @@ pub mod websocket {
         Rng: RngCore,
         M: RawMutex,
     {
-        fn xrpl_send(&mut self, message: crate::models::requests::XRPLRequest<'_>) -> Result<()> {
+        fn xrpl_send(
+            &mut self,
+            message: crate::models::requests::XRPLRequest<'_>,
+        ) -> XRPLClientResult<()> {
             block_on(self.0.xrpl_send(message))
         }
 
-        fn xrpl_receive(&mut self) -> Result<Option<crate::models::results::XRPLResponse<'_>>> {
+        fn xrpl_receive(
+            &mut self,
+        ) -> XRPLClientResult<Option<crate::models::results::XRPLResponse<'_>>> {
             block_on(self.0.xrpl_receive())
         }
     }

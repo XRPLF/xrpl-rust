@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::{
+    clients::exceptions::XRPLClientException,
     transaction::exceptions::{
         XRPLSignTransactionException, XRPLSubmitAndWaitException, XRPLTransactionHelperException,
     },
@@ -18,7 +19,7 @@ use super::{
 
 pub type XRPLHelperResult<T, E = XRPLHelperException> = core::result::Result<T, E>;
 
-#[derive(Debug, PartialEq, Error)]
+#[derive(Debug, Error)]
 pub enum XRPLHelperException {
     #[error("XRPL Wallet error: {0}")]
     XRPLWalletError(#[from] XRPLWalletException),
@@ -36,6 +37,8 @@ pub enum XRPLHelperException {
     XRPLUtilsError(#[from] XRPLUtilsException),
     #[error("XRPL MultiSign error: {0}")]
     XRPLMultiSignError(#[from] XRPLMultisignException),
+    #[error("XRPL Client error: {0}")]
+    XRPLClientError(#[from] XRPLClientException),
     #[error("serde_json error: {0}")]
     XRPLSerdeJsonError(#[from] XRPLSerdeJsonError),
     #[error("From hex error: {0}")]
