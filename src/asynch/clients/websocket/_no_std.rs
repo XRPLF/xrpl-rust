@@ -4,7 +4,6 @@ use alloc::{
     string::{String, ToString},
     sync::Arc,
 };
-use anyhow::Result;
 use embassy_sync::blocking_mutex::raw::RawMutex;
 use embassy_sync::mutex::Mutex;
 use embedded_io_async::{ErrorType, Read, Write};
@@ -17,19 +16,18 @@ use url::Url;
 
 use super::{WebSocketClosed, WebSocketOpen};
 use crate::{
-    asynch::clients::SingleExecutorMutex,
-    models::requests::{Request, XRPLRequest},
-};
-use crate::{
     asynch::clients::{
         client::XRPLClient as ClientTrait,
         websocket::websocket_base::{MessageHandler, WebsocketBase},
     },
     models::results::XRPLResponse,
-    Err,
+};
+use crate::{
+    asynch::clients::{exceptions::XRPLClientResult, SingleExecutorMutex},
+    models::requests::{Request, XRPLRequest},
 };
 
-use super::exceptions::XRPLWebsocketException;
+use super::exceptions::XRPLWebSocketException;
 
 pub struct AsyncWebSocketClient<
     const BUF: usize,
@@ -60,7 +58,7 @@ where
         rng: Rng,
         sub_protocols: Option<&[&str]>,
         additional_headers: Option<&[&str]>,
-    ) -> Result<AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>> {
+    ) -> XRPLClientResult<AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>> {
         // replace the scheme with http or https
         let scheme = match url.scheme() {
             "wss" => "https",
@@ -79,7 +77,7 @@ where
         let path = url.path();
         let host = match url.host_str() {
             Some(host) => host,
-            None => return Err!(XRPLWebsocketException::<anyhow::Error>::Disconnected),
+            None => return Err(XRPLWebSocketException::Disconnected.into()),
         };
         let origin = scheme.to_string() + "://" + host + ":" + &port + path;
         let websocket_options = WebSocketOptions {
@@ -106,7 +104,7 @@ where
                 // FramerError::WebSocket(embedded_websocket_embedded_io::Error::HttpResponseCodeInvalid(
                 //     Some(308),
                 // )) => (),
-                error => return Err!(XRPLWebsocketException::from(error)),
+                error => return Err(XRPLWebSocketException::from(error).into()),
             }
         }
 
@@ -127,7 +125,7 @@ where
     M: RawMutex,
     Tcp: Read + Write + Unpin,
 {
-    type Error = XRPLWebsocketException<<Tcp as ErrorType>::Error>;
+    type Error = XRPLWebSocketException;
 }
 
 impl<const BUF: usize, M, Tcp, Rng: RngCore> AsyncWebSocketClient<BUF, Tcp, Rng, M, WebSocketOpen>
@@ -135,7 +133,7 @@ where
     M: RawMutex,
     Tcp: Read + Write + Unpin,
 {
-    async fn do_write(&self, buf: &[u8]) -> Result<usize, <Self as ErrorType>::Error> {
+    async fn do_write(&self, buf: &[u8]) -> XRPLClientResult<usize, <Self as ErrorType>::Error> {
         let mut inner = self.websocket.lock().await;
         let mut tcp = self.tcp.lock().await;
         let mut buffer = self.tx_buffer;
@@ -150,11 +148,11 @@ where
             .await
         {
             Ok(()) => Ok(buf.len()),
-            Err(error) => Err(XRPLWebsocketException::from(error)),
+            Err(error) => Err(XRPLWebSocketException::from(error)),
         }
     }
 
-    async fn do_read(&self, buf: &mut [u8]) -> Result<usize, <Self as ErrorType>::Error> {
+    async fn do_read(&self, buf: &mut [u8]) -> XRPLClientResult<usize, <Self as ErrorType>::Error> {
         let mut inner = self.websocket.lock().await;
         let mut tcp = self.tcp.lock().await;
         match inner.read(tcp.deref_mut(), buf).await {
@@ -162,9 +160,9 @@ where
             Some(Ok(ReadResult::Binary(b))) => Ok(b.len()),
             Some(Ok(ReadResult::Ping(_))) => Ok(0),
             Some(Ok(ReadResult::Pong(_))) => Ok(0),
-            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebsocketException::Disconnected),
-            Some(Err(error)) => Err(XRPLWebsocketException::from(error)),
-            None => Err(XRPLWebsocketException::Disconnected),
+            Some(Ok(ReadResult::Close(_))) => Err(XRPLWebSocketException::Disconnected.into()),
+            Some(Err(error)) => Err(XRPLWebSocketException::from(error).into()),
+            None => Err(XRPLWebSocketException::Disconnected.into()),
         }
     }
 }
@@ -175,7 +173,7 @@ where
     M: RawMutex,
     Tcp: Read + Write + Unpin,
 {
-    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+    async fn write(&mut self, buf: &[u8]) -> XRPLClientResult<usize, Self::Error> {
         self.do_write(buf).await
     }
 }
@@ -186,7 +184,7 @@ where
     M: RawMutex,
     Tcp: Read + Write + Unpin,
 {
-    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+    async fn read(&mut self, buf: &mut [u8]) -> XRPLClientResult<usize, Self::Error> {
         self.do_read(buf).await
     }
 }
@@ -202,7 +200,7 @@ where
         websocket_base.setup_request_future(id).await;
     }
 
-    async fn handle_message(&mut self, message: String) -> Result<()> {
+    async fn handle_message(&mut self, message: String) -> XRPLClientResult<()> {
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base.handle_message(message).await
     }
@@ -212,7 +210,7 @@ where
         websocket_base.pop_message().await
     }
 
-    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>> {
+    async fn try_recv_request(&mut self, id: String) -> XRPLClientResult<Option<String>> {
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base.try_recv_request(id).await
     }
@@ -232,7 +230,7 @@ where
     async fn request_impl<'a: 'b, 'b>(
         &self,
         mut request: XRPLRequest<'a>,
-    ) -> Result<XRPLResponse<'b>> {
+    ) -> XRPLClientResult<XRPLResponse<'b>> {
         // setup request future
         self.set_request_id(&mut request);
         let request_id = request.get_common_fields().id.as_ref().unwrap();
@@ -241,13 +239,8 @@ where
             .setup_request_future(request_id.to_string())
             .await;
         // send request
-        let request_string = match serde_json::to_string(&request) {
-            Ok(request_string) => request_string,
-            Err(error) => return Err!(error),
-        };
-        if let Err(error) = self.do_write(request_string.as_bytes()).await {
-            return Err!(error);
-        }
+        let request_string = serde_json::to_string(&request)?;
+        self.do_write(request_string.as_bytes()).await?;
         // wait for response
         loop {
             let mut rx_buffer = [0; 1024];
@@ -259,9 +252,7 @@ where
                     }
                     let message_str = match core::str::from_utf8(&rx_buffer[..u_size]) {
                         Ok(response_str) => response_str,
-                        Err(error) => {
-                            return Err!(XRPLWebsocketException::<anyhow::Error>::Utf8(error))
-                        }
+                        Err(error) => return Err(XRPLWebSocketException::Utf8(error).into()),
                     };
                     websocket_base
                         .handle_message(message_str.to_string())
@@ -270,14 +261,11 @@ where
                         .try_recv_request(request_id.to_string())
                         .await?;
                     if let Some(message) = message_opt {
-                        let response = match serde_json::from_str(&message) {
-                            Ok(response) => response,
-                            Err(error) => return Err!(error),
-                        };
+                        let response = serde_json::from_str(&message)?;
                         return Ok(response);
                     }
                 }
-                Err(error) => return Err!(error),
+                Err(error) => return Err(error.into()),
             }
         }
     }

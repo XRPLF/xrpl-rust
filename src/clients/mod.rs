@@ -85,13 +85,14 @@ pub mod json_rpc {
 
 #[cfg(all(feature = "json-rpc", not(feature = "std")))]
 pub mod json_rpc {
-    use anyhow::Result;
     use embassy_sync::blocking_mutex::raw::RawMutex;
     use embedded_nal_async::{Dns, TcpConnect};
     use url::Url;
 
     use crate::{
-        asynch::clients::{AsyncJsonRpcClient, XRPLClient, XRPLFaucet},
+        asynch::clients::{
+            exceptions::XRPLClientResult, AsyncJsonRpcClient, XRPLClient, XRPLFaucet,
+        },
         models::{
             requests::{FundFaucet, XRPLRequest},
             results::XRPLResponse,
@@ -245,7 +246,6 @@ pub mod websocket {
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub mod websocket {
     use super::XRPLSyncWebsocketIO;
-    use anyhow::Result;
     use embassy_futures::block_on;
     use embassy_sync::blocking_mutex::raw::RawMutex;
     use embedded_io_async::{Read, Write};
@@ -253,7 +253,10 @@ pub mod websocket {
     use url::Url;
 
     use crate::{
-        asynch::clients::{AsyncWebSocketClient, WebSocketOpen, XRPLAsyncWebsocketIO, XRPLClient},
+        asynch::clients::{
+            exceptions::XRPLClientResult, AsyncWebSocketClient, WebSocketOpen,
+            XRPLAsyncWebsocketIO, XRPLClient,
+        },
         models::{requests::XRPLRequest, results::XRPLResponse},
     };
 

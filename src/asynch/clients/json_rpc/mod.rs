@@ -183,21 +183,18 @@ mod _no_std {
             let mut client = self.client.lock().await;
             let response = match client.request(Method::POST, self.url.as_str()).await {
                 Ok(client) => {
-                    if let Err(_error) = client
+                    if let Err(error) = client
                         .body(request_buf)
                         .content_type(ContentType::ApplicationJson)
                         .send(&mut rx_buffer)
                         .await
                     {
-                        Err!(XRPLJsonRpcException::ReqwlessError)
+                        Err(error.into())
                     } else {
-                        match serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer) {
-                            Ok(response) => Ok(response),
-                            Err(error) => Err!(error),
-                        }
+                        Ok(serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)?)
                     }
                 }
-                Err(_error) => Err!(XRPLJsonRpcException::ReqwlessError),
+                Err(error) => Err(error.into()),
             };
 
             response
@@ -227,31 +224,27 @@ mod _no_std {
             let mut client = self.client.lock().await;
             let response = match client.request(Method::POST, faucet_url.as_str()).await {
                 Ok(client) => {
-                    if let Err(_error) = client
+                    if let Err(error) = client
                         .body(request_buf)
                         .content_type(ContentType::ApplicationJson)
                         .send(&mut rx_buffer)
                         .await
                     {
-                        Err!(XRPLJsonRpcException::ReqwlessError)
+                        Err(error.into())
                     } else {
-                        if let Ok(response) = serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)
-                        {
-                            if response.is_success() {
-                                Ok(())
-                            } else {
-                                todo!()
-                                // Err!(XRPLJsonRpcException::RequestError())
-                            }
+                        let response = serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)?;
+                        if response.is_success() {
+                            Ok(())
                         } else {
-                            Err!(XRPLJsonRpcException::ReqwlessError)
+                            todo!()
+                            // Err!(XRPLJsonRpcException::RequestError())
                         }
                     }
                 }
-                Err(_error) => Err!(XRPLJsonRpcException::ReqwlessError),
+                Err(error) => Err(XRPLJsonRpcException::ReqwlessError(error)),
             };
 
-            response
+            response.map_err(Into::into)
         }
     }
 }

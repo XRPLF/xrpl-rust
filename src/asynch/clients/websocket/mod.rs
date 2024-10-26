@@ -3,10 +3,9 @@ use crate::models::{requests::XRPLRequest, results::XRPLResponse};
 use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
+use embedded_io_async::Error;
 #[cfg(not(feature = "std"))]
-use core::fmt::Display;
-#[cfg(not(feature = "std"))]
-use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
+use embedded_io_async::{Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
 #[cfg(feature = "std")]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 
@@ -25,7 +24,7 @@ pub use _no_std::*;
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub use _std::*;
 
-use super::exceptions::{XRPLClientException, XRPLClientResult};
+use super::exceptions::XRPLClientResult;
 
 pub struct WebSocketOpen;
 pub struct WebSocketClosed;
@@ -38,20 +37,15 @@ pub trait XRPLAsyncWebsocketIO {
 }
 
 #[cfg(not(feature = "std"))]
-impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLAsyncWebsocketIO for T
-where
-    <T as ErrorType>::Error: Display,
-{
+impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLAsyncWebsocketIO for T {
     async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()> {
-        let message = match serde_json::to_string(&message) {
-            Ok(message) => message,
-            Err(error) => return Err!(error),
-        };
+        let message = serde_json::to_string(&message)?;
         let message_buffer = message.as_bytes();
-        match self.write(message_buffer).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err!(e),
-        }
+        self.write(message_buffer)
+            .await
+            .map_err(|e| XRPLWebSocketException::EmbeddedIoError(e.kind()))?;
+
+        Ok(())
     }
 
     async fn xrpl_receive(&mut self) -> XRPLClientResult<Option<XRPLResponse<'_>>> {
@@ -63,20 +57,16 @@ where
                     if u_size == 0 {
                         continue;
                     }
-                    let response_str = match core::str::from_utf8(&buffer[..u_size]) {
-                        Ok(response_str) => response_str,
-                        Err(error) => {
-                            return Err!(XRPLWebsocketException::<anyhow::Error>::Utf8(error))
-                        }
-                    };
+                    let response_str = core::str::from_utf8(&buffer[..u_size])
+                        .map_err(|e| XRPLWebSocketException::Utf8(e))?;
                     self.handle_message(response_str.to_string()).await?;
                     let message = self.pop_message().await;
-                    match serde_json::from_str(&message) {
-                        Ok(response) => return Ok(response),
-                        Err(error) => return Err!(error),
-                    }
+
+                    return Ok(serde_json::from_str(&message)?);
                 }
-                Err(error) => return Err!(error),
+                Err(error) => {
+                    return Err(XRPLWebSocketException::EmbeddedIoError(error.kind()).into())
+                }
             }
         }
     }

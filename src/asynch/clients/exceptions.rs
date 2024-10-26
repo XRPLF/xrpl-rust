@@ -1,3 +1,4 @@
+use embedded_io_async::{Error as EmbeddedIoError, ErrorKind};
 use thiserror_no_std::Error;
 
 use crate::{
@@ -22,6 +23,7 @@ pub enum XRPLClientException {
     XRPLJsonRpcError(#[from] XRPLJsonRpcException),
     #[error("URL parse error: {0}")]
     UrlParseError(#[from] url::ParseError),
+    #[cfg(feature = "std")]
     #[error("I/O error: {0}")]
     IoError(#[from] alloc::io::Error),
 }
@@ -31,6 +33,20 @@ impl From<serde_json::Error> for XRPLClientException {
         XRPLClientException::XRPLSerdeJsonError(XRPLSerdeJsonError::from(error))
     }
 }
+
+#[cfg(not(feature = "std"))]
+impl From<reqwless::Error> for XRPLClientException {
+    fn from(error: reqwless::Error) -> Self {
+        XRPLClientException::XRPLJsonRpcError(XRPLJsonRpcException::ReqwlessError(error))
+    }
+}
+
+// #[cfg(not(feature = "std"))]
+// impl From<dyn embedded_io_async::Error> for XRPLClientException {
+//     fn from(error: dyn embedded_io_async::Error) -> Self {
+//         XRPLClientException::XRPLWebSocketError(XRPLWebSocketException::EmbeddedIoError(error))
+//     }
+// }
 
 #[cfg(feature = "std")]
 impl From<tokio_tungstenite::tungstenite::Error> for XRPLClientException {
