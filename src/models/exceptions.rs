@@ -65,6 +65,9 @@ pub enum XRPLModelException {
     #[error("If the field `{field1:?}` is defined, the field `{field2:?}` must also be defined")]
     FieldRequiresField { field1: String, field2: String },
 
+    #[error("Expected field `{0}` is missing")]
+    MissingField(String),
+
     #[error("From hex error: {0}")]
     FromHexError(#[from] hex::FromHexError),
     #[error("Parse int error: {0}")]

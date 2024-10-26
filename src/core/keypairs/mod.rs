@@ -224,7 +224,7 @@ pub fn derive_classic_address(public_key: &str) -> XRPLCoreResult<String> {
 ///
 /// assert_eq!(Some(signature), signing);
 /// ```
-pub fn sign(message: &[u8], private_key: &str) -> Result<String, XRPLKeypairsException> {
+pub fn sign(message: &[u8], private_key: &str) -> XRPLCoreResult<String> {
     let module = _get_algorithm_engine_from_key(private_key);
     Ok(hex::encode_upper(module.sign(message, private_key)?))
 }
@@ -266,12 +266,12 @@ pub trait CryptoImplementation {
         &self,
         decoded_seed: &[u8],
         is_validator: bool,
-    ) -> Result<(String, String), XRPLKeypairsException>;
+    ) -> XRPLCoreResult<(String, String)>;
 
     /// Signs a message using a given private key.
     /// * `message` - Text about foo.
     /// * `private_key` - Text about bar.
-    fn sign(&self, message: &[u8], private_key: &str) -> Result<Vec<u8>, XRPLKeypairsException>;
+    fn sign(&self, message: &[u8], private_key: &str) -> XRPLCoreResult<Vec<u8>>;
 
     /// Verifies the signature on a given message.
     fn is_valid_message(&self, message: &[u8], signature: &str, public_key: &str) -> bool;

@@ -20,9 +20,10 @@ where
     T: Transaction<'a, F> + Serialize,
     R: DeserializeOwned,
 {
-    let common_field_value = serde_json::to_value(transaction)?
+    let txn_value = serde_json::to_value(transaction)?;
+    let common_field_value = txn_value
         .get(field_name)
-        .ok_or(XRPLSerdeJsonError::InvalidNoneError(field_name.to_string()).into())?;
+        .ok_or(XRPLSerdeJsonError::InvalidNoneError(field_name.to_string()))?;
 
     Ok(serde_json::from_value::<R>(common_field_value.clone())?)
 }

@@ -1,17 +1,19 @@
+pub mod exceptions;
+
 use alloc::borrow::Cow;
-use anyhow::Result;
+use exceptions::XRPLFaucetException;
 use url::Url;
 
 use crate::{
-    asynch::{account::get_next_valid_seq_number, wait_seconds, XRPLFaucetException},
+    asynch::{account::get_next_valid_seq_number, wait_seconds},
     models::{requests::FundFaucet, XRPAmount},
     wallet::Wallet,
-    Err,
 };
 
 use super::{
     account::get_xrp_balance,
     clients::{XRPLClient, XRPLFaucet},
+    exceptions::XRPLHelperResult,
 };
 
 const TIMEOUT_SECS: u8 = 40;
@@ -22,17 +24,14 @@ pub async fn generate_faucet_wallet<'a, C>(
     faucet_host: Option<Url>,
     usage_context: Option<Cow<'a, str>>,
     user_agent: Option<Cow<'a, str>>,
-) -> Result<Wallet>
+) -> XRPLHelperResult<Wallet>
 where
     C: XRPLFaucet + XRPLClient,
 {
     let faucet_url = get_faucet_url(client, faucet_host)?;
     let wallet = match wallet {
         Some(wallet) => wallet,
-        None => match Wallet::create(None) {
-            Ok(wallet) => wallet,
-            Err(error) => return Err!(error),
-        },
+        None => Wallet::create(None)?,
     };
     let address = &wallet.classic_address;
     let starting_balance = check_balance(client, address.into()).await;
@@ -65,10 +64,10 @@ where
         }
     }
 
-    Err!(XRPLFaucetException::FundingTimeout)
+    Err(XRPLFaucetException::FundingTimeout.into())
 }
 
-pub fn get_faucet_url<C>(client: &C, url: Option<Url>) -> Result<Url>
+pub fn get_faucet_url<C>(client: &C, url: Option<Url>) -> XRPLHelperResult<Url>
 where
     C: XRPLFaucet + XRPLClient,
 {
@@ -90,7 +89,7 @@ async fn fund_wallet<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
     usage_context: Option<Cow<'a, str>>,
     user_agent: Option<Cow<'a, str>>,
-) -> Result<()>
+) -> XRPLHelperResult<()>
 where
     C: XRPLFaucet + XRPLClient,
 {

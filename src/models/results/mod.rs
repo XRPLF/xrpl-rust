@@ -59,9 +59,10 @@ impl<T> XRPLOptionalResult<T> {
     {
         match self {
             XRPLOptionalResult::Result(result) => {
-                let value = serde_json::to_value(result)?
-                    .get(index)
-                    .ok_or(XRPLSerdeJsonError::InvalidNoneError(index.to_string()).into())?;
+                let result_value = serde_json::to_value(result)?;
+                let value = result_value
+                    .get(&index)
+                    .ok_or(XRPLSerdeJsonError::InvalidNoneError(index.to_string()))?;
                 Ok(serde_json::from_value(value.clone())?)
             }
             XRPLOptionalResult::Other(other) => other.try_get_typed(index),

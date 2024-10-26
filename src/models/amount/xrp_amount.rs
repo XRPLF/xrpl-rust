@@ -4,9 +4,11 @@ use alloc::{
     string::{String, ToString},
 };
 use bigdecimal::BigDecimal;
-use core::convert::{TryFrom, TryInto};
 use core::str::FromStr;
-use rust_decimal::Decimal;
+use core::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -19,6 +21,12 @@ impl<'a> Model for XRPAmount<'a> {}
 impl Default for XRPAmount<'_> {
     fn default() -> Self {
         Self("0".into())
+    }
+}
+
+impl Display for XRPAmount<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -51,8 +59,8 @@ impl<'a> From<String> for XRPAmount<'a> {
     }
 }
 
-impl<'a> From<Decimal> for XRPAmount<'a> {
-    fn from(value: Decimal) -> Self {
+impl<'a> From<BigDecimal> for XRPAmount<'a> {
+    fn from(value: BigDecimal) -> Self {
         Self(value.to_string().into())
     }
 }

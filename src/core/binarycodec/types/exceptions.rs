@@ -1,6 +1,6 @@
 //! Exception for invalid XRP Ledger type data.
 
-use crate::utils::exceptions::{XRPLUtilsException, XRPRangeException};
+use crate::utils::exceptions::XRPRangeException;
 use alloc::string::String;
 use thiserror_no_std::Error;
 

@@ -1,10 +1,7 @@
 use alloc::string::String;
 use thiserror_no_std::Error;
 
-use crate::{
-    utils::exceptions::{ISOCodeException, XRPLUtilsException},
-    XRPLSerdeJsonError,
-};
+use crate::{utils::exceptions::ISOCodeException, XRPLSerdeJsonError};
 
 use super::{
     addresscodec::exceptions::XRPLAddressCodecException,

@@ -1,7 +1,6 @@
 use core::fmt::Debug;
 
 use alloc::{borrow::Cow, format};
-use anyhow::{Ok, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
 use strum::IntoEnumIterator;
@@ -9,6 +8,7 @@ use strum::IntoEnumIterator;
 use crate::{
     asynch::{
         clients::XRPLAsyncClient,
+        exceptions::XRPLHelperResult,
         ledger::get_latest_validated_ledger_sequence,
         transaction::{
             autofill, check_txn_fee,
@@ -17,9 +17,8 @@ use crate::{
         },
         wait_seconds,
     },
-    models::{requests, results, transactions::Transaction, Model},
+    models::{requests, results::tx::Tx, transactions::Transaction, Model},
     wallet::Wallet,
-    Err,
 };
 
 pub async fn submit_and_wait<'a: 'b, 'b, T, F, C>(
@@ -28,7 +27,7 @@ pub async fn submit_and_wait<'a: 'b, 'b, T, F, C>(
     wallet: Option<&Wallet>,
     check_fee: Option<bool>,
     autofill: Option<bool>,
-) -> Result<results::tx::Tx<'b>>
+) -> XRPLHelperResult<Tx<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -41,7 +40,7 @@ where
 async fn send_reliable_submission<'a: 'b, 'b, T, F, C>(
     transaction: &'b mut T,
     client: &C,
-) -> Result<results::tx::Tx<'b>>
+) -> XRPLHelperResult<Tx<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -55,7 +54,7 @@ where
             "{}: {}",
             prelim_result, submit_response.engine_result_message
         );
-        Err!(XRPLSubmitAndWaitException::SubmissionFailed(message.into()))
+        Err(XRPLSubmitAndWaitException::SubmissionFailed(message).into())
     } else {
         wait_for_final_transaction_result(
             tx_hash,
@@ -73,7 +72,7 @@ async fn wait_for_final_transaction_result<'a: 'b, 'b, C>(
     tx_hash: Cow<'a, str>,
     client: &C,
     last_ledger_sequence: u32,
-) -> Result<results::tx::Tx<'b>>
+) -> XRPLHelperResult<Tx<'b>>
 where
     C: XRPLAsyncClient,
 {
@@ -95,28 +94,31 @@ where
                 if error == "txnNotFound" {
                     continue;
                 } else {
-                    return Err!(XRPLSubmitAndWaitException::SubmissionFailed(
+                    return Err(XRPLSubmitAndWaitException::SubmissionFailed(
                         format!("{}: {}", error, response.error_message.unwrap_or("".into()))
-                            .into()
-                    ));
+                            .into(),
+                    )
+                    .into());
                 }
             } else {
-                let opt_result = response.try_into_opt_result::<results::tx::Tx>()?;
+                let opt_result = response.try_into_opt_result::<Tx>()?;
                 let validated = opt_result.try_get_typed("validated")?;
                 if validated {
                     let result = opt_result.try_into_result()?;
                     let return_code = match result.meta.get("TransactionResult") {
                         Some(Value::String(s)) => s,
                         _ => {
-                            return Err!(XRPLSubmitAndWaitException::ExpectedFieldInTxMeta(
-                                "TransactionResult".into()
-                            ));
+                            return Err(XRPLSubmitAndWaitException::ExpectedFieldInTxMeta(
+                                "TransactionResult".into(),
+                            )
+                            .into());
                         }
                     };
                     if return_code != "tesSUCCESS" {
-                        return Err!(XRPLSubmitAndWaitException::SubmissionFailed(
-                            return_code.into()
-                        ));
+                        return Err(XRPLSubmitAndWaitException::SubmissionFailed(
+                            return_code.into(),
+                        )
+                        .into());
                     } else {
                         return Ok(result);
                     }
@@ -124,9 +126,10 @@ where
             }
         }
     }
-    Err!(XRPLSubmitAndWaitException::SubmissionFailed(
-        "Transaction not included in ledger".into()
-    ))
+    Err(
+        XRPLSubmitAndWaitException::SubmissionFailed("Transaction not included in ledger".into())
+            .into(),
+    )
 }
 
 async fn get_signed_transaction<'a, T, F, C>(
@@ -135,7 +138,7 @@ async fn get_signed_transaction<'a, T, F, C>(
     wallet: Option<&Wallet>,
     do_check_fee: Option<bool>,
     do_autofill: Option<bool>,
-) -> Result<()>
+) -> XRPLHelperResult<()>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone,
@@ -161,7 +164,7 @@ where
             sign(transaction, wallet, false)
         }
     } else {
-        Err!(XRPLSignTransactionException::WalletRequired)
+        Err(XRPLSignTransactionException::WalletRequired.into())
     }
 }
 
