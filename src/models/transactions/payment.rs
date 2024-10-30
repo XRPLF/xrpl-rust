@@ -283,7 +283,7 @@ mod test_payment_error {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "The optional field `paths` is not allowed to be defined for XRP to XRP payments.For more information see: "
+            "The optional field `\"paths\"` is not allowed to be defined for \"XRP to XRP payments\""
         );
 
         payment.paths = None;
@@ -291,7 +291,7 @@ mod test_payment_error {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "The optional field `send_max` is not allowed to be defined for XRP to XRP non-partial payments.For more information see: "
+            "The optional field `\"send_max\"` is not allowed to be defined for \"XRP to XRP non-partial payments\""
         );
 
         payment.send_max = None;
@@ -299,7 +299,7 @@ mod test_payment_error {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `account` is not allowed to be the same as the value of the field `destination`, for XRP to XRP Payments. For more information see: "
+            "The value of the field `\"account\"` is not allowed to be the same as the value of the field `\"destination\"`, for \"XRP to XRP Payments\""
         );
     }
 
@@ -328,7 +328,7 @@ mod test_payment_error {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "For the flag `TfPartialPayment` to be set it is required to define the field `send_max`. For more information see: "
+            "For the flag `TfPartialPayment` to be set it is required to define the field `\"send_max\"`"
         );
 
         payment.common_fields.flags = FlagCollection::default();
@@ -336,7 +336,7 @@ mod test_payment_error {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "The optional field `deliver_min` is not allowed to be defined for XRP to XRP non-partial payments.For more information see: "
+            "The optional field `\"deliver_min\"` is not allowed to be defined for \"XRP to XRP non-partial payments\""
         );
     }
 
@@ -368,7 +368,7 @@ mod test_payment_error {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "The optional field `send_max` is required to be defined for exchanges. For more information see: "
+            "The optional field `\"send_max\"` is required to be defined for \"exchanges\""
         );
     }
 }

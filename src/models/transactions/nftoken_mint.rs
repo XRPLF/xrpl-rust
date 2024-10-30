@@ -244,7 +244,7 @@ mod test_nftoken_mint_error {
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `issuer` is not allowed to be the same as the value of the field `account`. For more information see: "
+            "The value of the field `\"issuer\"` is not allowed to be the same as the value of the field `\"account\"`"
         );
     }
 
@@ -269,7 +269,7 @@ mod test_nftoken_mint_error {
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
-            "The field `transfer_fee` exceeds its maximum value (max 50000, found 50001). For more information see: "
+            "The value of the field `\"transfer_fee\"` is defined above its maximum (max 50000, found 50001)"
         );
     }
 
@@ -294,7 +294,7 @@ mod test_nftoken_mint_error {
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `uri` exceeds its maximum length of characters (max 512, found 513). For more information see: "
+            "The value of the field `\"uri\"` exceeds its maximum length of characters (max 512, found 513)"
         );
     }
 }

@@ -78,9 +78,9 @@ pub enum XRPLModelException {
     SerdeJsonError(#[from] XRPLSerdeJsonError),
     #[error("BigDecimal error: {0}")]
     BigDecimalError(#[from] bigdecimal::ParseBigDecimalError),
-    #[error("XRPL Result error: {0}")]
+    #[error("{0}")]
     XRPLResultError(#[from] XRPLResultException),
-    #[error("XRPL Transaction error: {0}")]
+    #[error("{0}")]
     XRPLTransactionError(#[from] XRPLTransactionException),
 }
 

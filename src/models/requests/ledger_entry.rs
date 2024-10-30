@@ -249,7 +249,7 @@ mod test_ledger_entry_errors {
         ]);
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Define one of: `index`, `account_root`, `check`, `directory`, `offer`, `ripple_state`, `escrow`, `payment_channel`, `deposit_preauth`, `ticket`. Define exactly one of them. For more information see: "
+            "Expected one of: index, account_root, check, directory, offer, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
         );
     }
 

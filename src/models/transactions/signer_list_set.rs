@@ -243,7 +243,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` can not be defined with the field `signer_quorum` because it would cause the deletion of `signer_entries`. For more information see: "
+            "The value of the field `\"signer_entries\"` can not be defined with the field `\"signer_quorum\"` because it would cause the deletion of `\"signer_entries\"`"
         );
 
         signer_list_set.signer_quorum = 3;
@@ -251,7 +251,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` has the wrong value to be deleted (expected 0, found 3). For more information see: "
+            "The field `\"signer_quorum\"` has the wrong value to be deleted (expected 0, found 3)"
         );
     }
 
@@ -273,7 +273,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` has too few items in it (min 1, found 0). For more information see: "
+            "The value of the field `\"signer_entries\"` has too few items in it (min 1, found 0)"
         );
 
         signer_list_set.signer_entries = Some(vec![
@@ -317,7 +317,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` has too many items in it (max 8, found 9). For more information see: "
+            "The value of the field `\"signer_entries\"` has too many items in it (max 8, found 9)"
         );
 
         signer_list_set.signer_entries = Some(vec![
@@ -337,7 +337,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_entries` contains an invalid value (found rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb). For more information see: "
+            "The field `\"signer_entries\"` contains an invalid value (found \"rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb\")"
         );
 
         signer_list_set.signer_entries = Some(vec![SignerEntry {
@@ -348,7 +348,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`. For more information see: "
+            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`"
         );
 
         signer_list_set.signer_entries = Some(vec![
@@ -365,7 +365,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` has a duplicate in it (found rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW). For more information see: "
+            "The value of the field `\"signer_entries\"` has a duplicate in it (found \"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW\")"
         );
     }
 }

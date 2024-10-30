@@ -247,7 +247,7 @@ mod test_nftoken_create_offer_error {
                 .unwrap_err()
                 .to_string()
                 .as_str(),
-            "The value of the field `amount` is not allowed to be zero. For more information see: "
+            "The value of the field `\"amount\"` is not allowed to be zero"
         );
     }
 
@@ -273,7 +273,7 @@ mod test_nftoken_create_offer_error {
 
         assert_eq!(
             nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `destination` is not allowed to be the same as the value of the field `account`. For more information see: "
+            "The value of the field `\"destination\"` is not allowed to be the same as the value of the field `\"account\"`"
         );
     }
 
@@ -301,22 +301,26 @@ mod test_nftoken_create_offer_error {
 
         assert_eq!(
             nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
-            "The optional field `owner` is not allowed to be defined for NFToken sell offers. For more information see: "
+            "The optional field `\"owner\"` is not allowed to be defined for \"NFToken sell offers\""
         );
 
         nftoken_create_offer.common_fields.flags = FlagCollection::default();
         nftoken_create_offer.owner = None;
 
         assert_eq!(
-            nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
-            "The optional field `owner` is required to be defined for NFToken buy offers. For more information see: "
+            nftoken_create_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "The optional field `\"owner\"` is required to be defined for \"NFToken buy offers\""
         );
 
         nftoken_create_offer.owner = Some("rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into());
 
         assert_eq!(
             nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `owner` is not allowed to be the same as the value of the field `account`. For more information see: "
+            "The value of the field `\"owner\"` is not allowed to be the same as the value of the field `\"account\"`"
         );
     }
 }

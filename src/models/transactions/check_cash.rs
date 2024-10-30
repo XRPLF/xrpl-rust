@@ -151,7 +151,7 @@ mod test_check_cash_error {
 
         assert_eq!(
             check_cash.validate().unwrap_err().to_string().as_str(),
-            "The field `amount` can not be defined with `deliver_min`. Define exactly one of them"
+            "Invalid field combination: amount with [\"deliver_min\"]"
         );
     }
 }

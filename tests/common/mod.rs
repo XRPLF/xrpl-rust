@@ -31,5 +31,5 @@ pub async fn open_websocket(
 pub async fn open_websocket(
     uri: Url,
 ) -> Result<AsyncWebSocketClient<SingleExecutorMutex, WebSocketOpen>> {
-    AsyncWebSocketClient::open(uri).await
+    AsyncWebSocketClient::open(uri).await.map_err(Into::into)
 }

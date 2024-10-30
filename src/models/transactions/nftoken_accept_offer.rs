@@ -179,8 +179,12 @@ mod test_nftoken_accept_offer_error {
         );
 
         assert_eq!(
-            nftoken_accept_offer.validate().unwrap_err().to_string().as_str(),
-            "Define at least one of the fields `nftoken_sell_offer` and `nftoken_buy_offer`. For more information see: "
+            nftoken_accept_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected one of: nftoken_sell_offer, nftoken_buy_offer"
         );
     }
 
@@ -202,8 +206,12 @@ mod test_nftoken_accept_offer_error {
         );
 
         assert_eq!(
-            nftoken_accept_offer.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `nftoken_broker_fee` is not allowed to be zero. For more information see: "
+            nftoken_accept_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "The value of the field `\"nftoken_broker_fee\"` is not allowed to be zero"
         );
     }
 }

@@ -24,7 +24,7 @@ pub use _no_std::*;
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub use _std::*;
 
-use super::exceptions::XRPLClientResult;
+use super::exceptions::{XRPLClientException, XRPLClientResult};
 
 pub struct WebSocketOpen;
 pub struct WebSocketClosed;

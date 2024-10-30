@@ -146,7 +146,7 @@ mod test_nftoken_cancel_offer_error {
 
         assert_eq!(
             nftoken_cancel_offer.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `nftoken_offers` is not allowed to be empty (type `Vec`). If the field is optional, define it to be `None`. For more information see: "
+            "The value of the field `\"nftoken_offers\"` is not allowed to be empty (type `\"Vec\"`). If the field is optional, define it to be `None`"
         );
     }
 }

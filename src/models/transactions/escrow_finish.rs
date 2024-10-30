@@ -157,7 +157,7 @@ mod test_escrow_finish_errors {
 
         assert_eq!(
             escrow_finish.validate().unwrap_err().to_string().as_str(),
-            "For the field `condition` to be defined it is required to also define the field `fulfillment`. For more information see: "
+            "If the field `\"condition\"` is defined, the field `\"fulfillment\"` must also be defined"
         );
     }
 }

@@ -140,7 +140,7 @@ mod test_deposit_preauth_exception {
 
         assert_eq!(
             deposit_preauth.validate().unwrap_err().to_string().as_str(),
-            "The field `authorize` can not be defined with `unauthorize`. Define exactly one of them. For more information see: "
+            "Invalid field combination: authorize with [\"unauthorize\"]"
         );
     }
 }

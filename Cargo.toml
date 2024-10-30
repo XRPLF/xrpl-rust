@@ -94,6 +94,7 @@ bigdecimal = { version = "0.4.5", features = ["serde-json"] }
 criterion = "0.5.1"
 tokio = { version = "1.0", features = ["full"] }
 embedded-io-adapters = { version = "0.6.1", features = ["tokio-1"] }
+anyhow = { version = "1.0.91", no-default-features = true }
 
 [[bench]]
 name = "benchmarks"

@@ -164,8 +164,12 @@ mod test_channel_authorize_errors {
         );
 
         assert_eq!(
-            channel_authorize.validate().unwrap_err().to_string().as_str(),
-            "The field `secret` can not be defined with `seed`, `seed_hex`, `passphrase`. Define exactly one of them. For more information see: "
+            channel_authorize
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
+            "Expected one of: secret, seed, seed_hex, passphrase"
         );
     }
 

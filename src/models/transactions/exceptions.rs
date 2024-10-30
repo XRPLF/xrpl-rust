@@ -7,25 +7,25 @@ use thiserror_no_std::Error;
 
 #[derive(Debug, PartialEq, Error)]
 pub enum XRPLTransactionException {
-    #[error("XRPL Account Set error: {0}")]
+    #[error("{0}")]
     XRPLAccountSetError(#[from] XRPLAccountSetException),
-    #[error("XRPL NFToken Cancel Offer error: {0}")]
+    #[error("{0}")]
     XRPLNFTokenCancelOfferError(#[from] XRPLNFTokenCancelOfferException),
-    #[error("XRPL NFToken Create Offer error: {0}")]
+    #[error("{0}")]
     XRPLNFTokenCreateOfferError(#[from] XRPLNFTokenCreateOfferException),
-    #[error("XRPL Payment error: {0}")]
+    #[error("{0}")]
     XRPLPaymentError(#[from] XRPLPaymentException),
-    #[error("XRPL Signer List Set error: {0}")]
+    #[error("{0}")]
     XRPLSignerListSetError(#[from] XRPLSignerListSetException),
-    #[error("XRPL XChain Claim error: {0}")]
+    #[error("{0}")]
     XRPLXChainClaimError(#[from] XRPLXChainClaimException),
-    #[error("XRPL XChain Create Bridge error: {0}")]
+    #[error("{0}")]
     XRPLXChainCreateBridgeError(#[from] XRPLXChainCreateBridgeException),
-    #[error("XRPL XChain Create Claim ID error: {0}")]
+    #[error("{0}")]
     XRPLXChainCreateClaimIDError(#[from] XRPLXChainCreateClaimIDException),
-    #[error("XRPL XChain Modify Bridge error: {0}")]
+    #[error("{0}")]
     XRPLXChainModifyBridgeError(#[from] XRPLXChainModifyBridgeException),
-    #[error("XRPL Transaction error: {0}")]
+    #[error("{0}")]
     XRPLCoreError(#[from] XRPLCoreException),
     #[error("The transaction must be signed")]
     TxMustBeSigned,

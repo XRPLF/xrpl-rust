@@ -176,7 +176,7 @@ mod test_escrow_create_errors {
 
         assert_eq!(
             escrow_create.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `cancel_after` is not allowed to be below the value of the field `finish_after` (max 14359039, found 13298498). For more information see: "
+            "The value of the field `\"cancel_after\"` is not allowed to be below the value of the field `\"finish_after\"` (max 14359039, found 13298498)"
         );
     }
 }

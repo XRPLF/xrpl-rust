@@ -364,7 +364,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `tick_size` is defined below its minimum (min 3, found 2). For more information see: "
+            "The value of the field `\"tick_size\"` is defined below its minimum (min 3, found 2)"
         );
 
         let tick_size_too_high = Some(16);
@@ -372,7 +372,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `tick_size` is defined above its maximum (max 15, found 16). For more information see: "
+            "The value of the field `\"tick_size\"` is defined above its maximum (max 15, found 16)"
         );
     }
 
@@ -403,7 +403,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `transfer_rate` is defined below its minimum (min 1000000000, found 999999999). For more information see: "
+            "The value of the field `\"transfer_rate\"` is defined below its minimum (min 1000000000, found 999999999)"
         );
 
         let tick_size_too_high = Some(2000000001);
@@ -411,7 +411,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `transfer_rate` is defined above its maximum (max 2000000000, found 2000000001). For more information see: "
+            "The value of the field `\"transfer_rate\"` is defined above its maximum (max 2000000000, found 2000000001)"
         );
     }
 
@@ -442,7 +442,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `domain` does not have the correct format (expected lowercase, found https://Example.com/). For more information see: "
+            "The value of the field `\"domain\"` does not have the correct format (expected \"lowercase\", found \"https://Example.com/\")"
         );
 
         let domain_too_long = Some("https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
@@ -450,7 +450,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `domain` exceeds its maximum length of characters (max 256, found 270). For more information see: "
+            "The value of the field `\"domain\"` exceeds its maximum length of characters (max 256, found 270)"
         );
     }
 
@@ -479,7 +479,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "A flag cannot be set and unset at the same time (found AsfDisallowXRP). For more information see: "
+            "A flag cannot be set and unset at the same time (found AsfDisallowXRP)"
         );
     }
 
@@ -509,7 +509,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "For the field `set_flag` to be defined it is required to set the flag `AsfAuthorizedNFTokenMinter`. For more information see: "
+            "For the field `\"set_flag\"` to be defined it is required to set the flag `AsfAuthorizedNFTokenMinter`"
         );
 
         account_set.nftoken_minter = None;
@@ -517,7 +517,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "For the flag `AsfAuthorizedNFTokenMinter` to be set it is required to define the field `nftoken_minter`. For more information see: "
+            "For the flag `AsfAuthorizedNFTokenMinter` to be set it is required to define the field `\"nftoken_minter\"`"
         );
 
         account_set.set_flag = None;
@@ -526,7 +526,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The field `nftoken_minter` cannot be defined if its required flag `AsfAuthorizedNFTokenMinter` is being unset. For more information see: "
+            "The field `\"nftoken_minter\"` cannot be defined if its required flag `AsfAuthorizedNFTokenMinter` is being unset"
         );
     }
 }
