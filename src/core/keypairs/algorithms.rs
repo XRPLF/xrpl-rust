@@ -185,6 +185,7 @@ impl CryptoImplementation for Secp256k1 {
     /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let decoded_seed: &[u8] = &[
     ///     207, 45, 227, 120, 251, 221, 126, 46,
@@ -202,9 +203,9 @@ impl CryptoImplementation for Secp256k1 {
     /// ) {
     ///     Ok((public, private)) => Some((public, private)),
     ///     Err(e) => match e {
-    ///         XRPLKeypairsException::InvalidSignature => None,
-    ///         XRPLKeypairsException::InvalidSecret => None,
-    ///         XRPLKeypairsException::SECP256K1Error => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSignature) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSecret) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
     ///         _ => None,
     ///     },
     /// };
@@ -241,6 +242,7 @@ impl CryptoImplementation for Secp256k1 {
     /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let message: &[u8] = "test message".as_bytes();
     /// let private_key: &str = "00D78B9735C3F26501C7337B8A5727FD5\
@@ -260,7 +262,7 @@ impl CryptoImplementation for Secp256k1 {
     /// ) {
     ///     Ok(signature) => Some(signature),
     ///     Err(e) => match e {
-    ///         XRPLKeypairsException::SECP256K1Error => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
     ///         _ => None,
     ///     },
     /// };
@@ -335,6 +337,7 @@ impl CryptoImplementation for Ed25519 {
     /// use xrpl::core::keypairs::Ed25519;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let decoded_seed: &[u8] = &[
     ///     207, 45, 227, 120, 251, 221, 126, 46,
@@ -352,9 +355,9 @@ impl CryptoImplementation for Ed25519 {
     /// ) {
     ///     Ok((public, private)) => Some((public, private)),
     ///     Err(e) => match e {
-    ///         XRPLKeypairsException::InvalidSignature => None,
-    ///         XRPLKeypairsException::ED25519Error => None,
-    ///         XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ } => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSignature) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::ED25519Error) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ }) => None,
     ///         _ => None,
     ///     },
     /// };

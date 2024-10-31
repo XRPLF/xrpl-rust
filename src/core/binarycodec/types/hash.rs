@@ -55,7 +55,7 @@ pub struct Hash256(Vec<u8>);
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::types::hash::Hash;
+/// use xrpl::core::binarycodec::types::hash::Hash;
 ///
 /// #[derive(Debug)]
 /// pub struct Hash256(Vec<u8>);
@@ -84,9 +84,9 @@ impl dyn Hash {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::types::exceptions::XRPLHashException;
-    /// use xrpl::core::types::hash::Hash;
-    /// use xrpl::core::types::hash::Hash160;
+    /// use xrpl::core::binarycodec::types::exceptions::XRPLHashException;
+    /// use xrpl::core::binarycodec::types::hash::Hash;
+    /// use xrpl::core::binarycodec::types::hash::Hash160;
     ///
     /// fn handle_success_case(hash: Vec<u8>) {
     ///     assert!(true)
@@ -134,29 +134,30 @@ impl dyn Hash {
     /// ## Basic usage
     ///
     /// ```
-    /// use xrpl::core::types::exceptions::XRPLHashException;
+    /// use xrpl::core::binarycodec::types::exceptions::XRPLHashException;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
     /// use xrpl::core::binarycodec::BinaryParser;
-    /// use xrpl::core::types::TryFromParser;
-    /// use xrpl::core::types::hash::Hash;
-    /// use xrpl::core::types::hash::Hash128;
+    /// use xrpl::core::binarycodec::types::TryFromParser;
+    /// use xrpl::core::binarycodec::types::hash::Hash;
+    /// use xrpl::core::binarycodec::types::hash::Hash128;
+    /// use xrpl::core::exceptions::{XRPLCoreResult, XRPLCoreException};
     ///
     /// fn handle_success_case(hash: Hash128) {
     ///     // Success Conditions
     ///     assert!(true);
     /// }
     ///
-    /// fn handle_parser_error(error: XRPLHashException) {
+    /// fn handle_parser_error(error: XRPLCoreException) {
     ///     // Error Conditions
     ///     match error {
-    ///         XRPLHashException::XRPLBinaryCodecError(_e) => assert!(false),
+    ///         XRPLCoreException::XRPLBinaryCodecError(_e) => assert!(false),
     ///         _ => assert!(false),
     ///     }
     /// }
     ///
     /// fn handle_hash128_from_parser(data: &[u8]) {
     ///     let mut parser: BinaryParser = BinaryParser::from(data);
-    ///     let result: Result<Hash128, XRPLHashException> =
+    ///     let result: XRPLCoreResult<Hash128> =
     ///         Hash128::from_parser(&mut parser, None);
     ///
     ///     match result {

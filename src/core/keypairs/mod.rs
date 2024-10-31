@@ -68,6 +68,7 @@ fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
 /// use xrpl::constants::CryptoAlgorithm;
 /// use xrpl::core::addresscodec::utils::SEED_LENGTH;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let entropy: Option<[u8; SEED_LENGTH]> = Some([
 ///     207, 45, 227, 120, 251, 221, 126, 46,
@@ -82,7 +83,7 @@ fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
 /// ) {
 ///     Ok(seed) => Some(seed),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnknownSeedEncoding => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnknownSeedEncoding) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -120,6 +121,7 @@ pub fn generate_seed(
 /// ```
 /// use xrpl::core::keypairs::derive_keypair;
 /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let seed: &str = "sEdSKaCy2JT7JaM7v95H9SxkhP9wS2r";
 /// let validator: bool = false;
@@ -134,10 +136,10 @@ pub fn generate_seed(
 /// ) {
 ///     Ok(seed) => Some(seed),
 ///     Err(e) => match e {
-///         XRPLKeypairsException::InvalidSignature => None,
-///         XRPLKeypairsException::ED25519Error => None,
-///         XRPLKeypairsException::SECP256K1Error => None,
-///         XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ } => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSignature) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::ED25519Error) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -170,6 +172,7 @@ pub fn derive_keypair(seed: &str, validator: bool) -> XRPLCoreResult<(String, St
 /// ```
 /// use xrpl::core::keypairs::derive_classic_address;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let public_key: &str = "ED01FA53FA5A7E77798F882ECE20B1ABC00\
 ///                         BB358A9E55A202D0D0676BD0CE37A63";
@@ -178,10 +181,10 @@ pub fn derive_keypair(seed: &str, validator: bool) -> XRPLCoreResult<(String, St
 /// let derivation: Option<String> = match derive_classic_address(public_key) {
 ///     Ok(address) => Some(address),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -202,6 +205,7 @@ pub fn derive_classic_address(public_key: &str) -> XRPLCoreResult<String> {
 /// ```
 /// use xrpl::core::keypairs::sign;
 /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let message: &[u8] = "test message".as_bytes();
 /// let private_key: &str = "EDB4C4E046826BD26190D09715FC31F4E\
@@ -216,8 +220,8 @@ pub fn derive_classic_address(public_key: &str) -> XRPLCoreResult<String> {
 /// ) {
 ///     Ok(signature) => Some(signature),
 ///     Err(e) => match e {
-///         XRPLKeypairsException::ED25519Error => None,
-///         XRPLKeypairsException::SECP256K1Error => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::ED25519Error) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
 ///         _ => None,
 ///     }
 /// };

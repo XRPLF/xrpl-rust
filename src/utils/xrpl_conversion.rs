@@ -124,7 +124,7 @@ fn _verify_no_decimal(decimal: BigDecimal) -> XRPLUtilsResult<()> {
 ///
 /// ```
 /// use xrpl::utils::xrp_to_drops;
-/// use xrpl::utils::exceptions::XRPRangeException;
+/// use xrpl::utils::exceptions::{XRPRangeException, XRPLUtilsException};
 ///
 /// let xrp: &str = "100.000001";
 /// let drops: String = "100000001".to_string();
@@ -132,8 +132,8 @@ fn _verify_no_decimal(decimal: BigDecimal) -> XRPLUtilsResult<()> {
 /// let conversion: Option<String> = match xrp_to_drops(xrp) {
 ///     Ok(xrp) => Some(xrp),
 ///     Err(e) => match e {
-///         XRPRangeException::InvalidXRPAmountTooLarge { max: _, found: _ } => None,
-///         XRPRangeException::InvalidXRPAmountTooSmall { min: _, found: _ } => None,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidXRPAmountTooLarge { max: _, found: _ }) => None,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidXRPAmountTooSmall { min: _, found: _ }) => None,
 ///         _ => None,
 ///     },
 /// };
@@ -169,7 +169,7 @@ pub fn xrp_to_drops(xrp: &str) -> XRPLUtilsResult<String> {
 ///
 /// ```
 /// use xrpl::utils::drops_to_xrp;
-/// use xrpl::utils::exceptions::XRPRangeException;
+/// use xrpl::utils::exceptions::{XRPRangeException, XRPLUtilsException};
 ///
 /// let drops: &str = "100000000";
 /// let xrp: String = "100".to_string();
@@ -177,7 +177,7 @@ pub fn xrp_to_drops(xrp: &str) -> XRPLUtilsResult<String> {
 /// let conversion: Option<String> = match drops_to_xrp(drops) {
 ///     Ok(xrp) => Some(xrp),
 ///     Err(e) => match e {
-///         XRPRangeException::InvalidDropsAmountTooLarge { max: _, found: _ } => None,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidDropsAmountTooLarge { max: _, found: _ }) => None,
 ///         _ => None,
 ///     },
 /// };
@@ -207,13 +207,13 @@ pub fn drops_to_xrp(drops: &str) -> XRPLUtilsResult<String> {
 ///
 /// ```
 /// use xrpl::utils::verify_valid_xrp_value;
-/// use xrpl::utils::exceptions::XRPRangeException;
+/// use xrpl::utils::exceptions::{XRPRangeException, XRPLUtilsException};
 ///
 /// let valid: bool = match verify_valid_xrp_value("0.000001") {
 ///     Ok(()) => true,
 ///     Err(e) => match e {
-///         XRPRangeException::InvalidXRPAmountTooSmall { min: _, found: _ } => false,
-///         XRPRangeException::InvalidXRPAmountTooLarge { max: _, found: _ } => false,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidXRPAmountTooSmall { min: _, found: _ }) => false,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidXRPAmountTooLarge { max: _, found: _ }) => false,
 ///         _ => false,
 ///     },
 /// };
@@ -250,13 +250,13 @@ pub fn verify_valid_xrp_value(xrp_value: &str) -> XRPLUtilsResult<()> {
 ///
 /// ```
 /// use xrpl::utils::verify_valid_ic_value;
-/// use xrpl::utils::exceptions::XRPRangeException;
+/// use xrpl::utils::exceptions::{XRPRangeException, XRPLUtilsException};
 ///
 /// let valid: bool = match verify_valid_ic_value("1111111111111111.0") {
 ///     Ok(()) => true,
 ///     Err(e) => match e {
-///         XRPRangeException::InvalidICPrecisionTooSmall { min: _, found: _ } => false,
-///         XRPRangeException::InvalidICPrecisionTooLarge { max: _, found: _ } => false,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidICPrecisionTooSmall { min: _, found: _ }) => false,
+///         XRPLUtilsException::XRPRangeError(XRPRangeException::InvalidICPrecisionTooLarge { max: _, found: _ }) => false,
 ///         _ => false,
 ///     },
 /// };

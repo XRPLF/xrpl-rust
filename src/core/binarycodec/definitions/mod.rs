@@ -25,7 +25,7 @@ pub const CODE_MAX_VALUE: i16 = u8::MAX as i16;
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::definitions::FieldHeader;
+/// use xrpl::core::binarycodec::definitions::FieldHeader;
 ///
 /// let field_header = FieldHeader {
 ///     type_code: -2,
@@ -46,9 +46,9 @@ pub struct FieldHeader {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::definitions::FieldInfo;
-/// use xrpl::core::definitions::FieldHeader;
-/// use xrpl::core::definitions::FieldInstance;
+/// use xrpl::core::binarycodec::definitions::FieldInfo;
+/// use xrpl::core::binarycodec::definitions::FieldHeader;
+/// use xrpl::core::binarycodec::definitions::FieldInstance;
 ///
 /// let field_header: FieldHeader = FieldHeader {
 ///     type_code: -2,
@@ -86,7 +86,7 @@ pub struct FieldInstance {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::definitions::FieldInfo;
+/// use xrpl::core::binarycodec::definitions::FieldInfo;
 ///
 /// let field_info = FieldInfo {
 ///     nth: 0,

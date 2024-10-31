@@ -163,6 +163,7 @@ fn _decode_field_id(field_id: &str) -> XRPLCoreResult<FieldHeader> {
 /// ```
 /// use xrpl::core::binarycodec::utils::encode_field_name;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 /// extern crate alloc;
 /// use alloc::vec;
 ///
@@ -172,7 +173,7 @@ fn _decode_field_id(field_id: &str) -> XRPLCoreResult<FieldHeader> {
 /// let encoding: Option<Vec<u8>> = match encode_field_name(field_name) {
 ///     Ok(bytes) => Some(bytes),
 ///     Err(e) => match e {
-///         XRPLBinaryCodecException::UnknownFieldName => None,
+///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnknownFieldName) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -201,6 +202,7 @@ pub fn encode_field_name(field_name: &str) -> XRPLCoreResult<Vec<u8>> {
 /// ```
 /// use xrpl::core::binarycodec::utils::decode_field_name;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let field_id: &str = "26";
 /// let field_name: &str = "LedgerSequence";
@@ -208,10 +210,10 @@ pub fn encode_field_name(field_name: &str) -> XRPLCoreResult<Vec<u8>> {
 /// let decoding: Option<&str> = match decode_field_name(field_id) {
 ///     Ok(field_name) => Some(field_name),
 ///     Err(e) => match e {
-///         XRPLBinaryCodecException::UnexpectedFieldIdByteRange {
+///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedFieldIdByteRange {
 ///             min: _,
 ///             max: _
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };

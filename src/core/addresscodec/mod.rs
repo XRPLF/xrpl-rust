@@ -71,6 +71,7 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> XRPLCoreResult<Option<u64>> {
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
 /// use xrpl::constants::CryptoAlgorithm;
 /// use xrpl::core::addresscodec::utils::SEED_LENGTH;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let entropy: [u8; SEED_LENGTH] = [
 ///     207, 45, 227, 120, 251, 221, 126, 46, 232,
@@ -85,7 +86,7 @@ fn _get_tag_from_buffer(buffer: &[u8]) -> XRPLCoreResult<Option<u64>> {
 /// ) {
 ///     Ok(seed) => Some(seed),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnknownSeedEncoding => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnknownSeedEncoding) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -114,6 +115,7 @@ pub fn encode_seed(
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
 /// use xrpl::core::addresscodec::utils::SEED_LENGTH;
 /// use xrpl::constants::CryptoAlgorithm;
+/// use xrpl::core::exceptions::XRPLCoreException;
 /// extern crate alloc;
 /// use alloc::vec;
 ///
@@ -126,7 +128,7 @@ pub fn encode_seed(
 /// let decoding: Option<([u8; SEED_LENGTH], CryptoAlgorithm)> = match decode_seed(seed) {
 ///     Ok((bytes, algorithm)) => Some((bytes, algorithm)),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnknownSeedEncoding => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnknownSeedEncoding) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -163,6 +165,7 @@ pub fn decode_seed(seed: &str) -> XRPLCoreResult<([u8; SEED_LENGTH], CryptoAlgor
 /// ```
 /// use xrpl::core::addresscodec::classic_address_to_xaddress;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let classic_address: &str = "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59".into();
 /// let tag: Option<u64> = None;
@@ -176,14 +179,14 @@ pub fn decode_seed(seed: &str) -> XRPLCoreResult<([u8; SEED_LENGTH], CryptoAlgor
 /// ) {
 ///     Ok(address) => Some(address),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::InvalidXAddressPrefix => None,
-///         XRPLAddressCodecException::UnsupportedXAddress => None,
-///         XRPLAddressCodecException::InvalidXAddressZeroNoTag => None,
-///         XRPLAddressCodecException::InvalidXAddressZeroRemain => None,
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidXAddressPrefix) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnsupportedXAddress) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidXAddressZeroNoTag) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidXAddressZeroRemain) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -253,6 +256,7 @@ pub fn classic_address_to_xaddress(
 /// ```
 /// use xrpl::core::addresscodec::xaddress_to_classic_address;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let xaddress: &str = "X7AcgcsBL6XDcUb289X4mJ8djcdyKaB5hJDWMArnXr61cqZ";
 /// let classic: (String, Option<u64>, bool) = (
@@ -264,14 +268,14 @@ pub fn classic_address_to_xaddress(
 /// let conversion: Option<(String, Option<u64>, bool)> = match xaddress_to_classic_address(xaddress) {
 ///     Ok((address, tag, is_test_network)) => Some((address, tag, is_test_network)),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::InvalidXAddressPrefix => None,
-///         XRPLAddressCodecException::UnsupportedXAddress => None,
-///         XRPLAddressCodecException::InvalidXAddressZeroNoTag => None,
-///         XRPLAddressCodecException::InvalidXAddressZeroRemain => None,
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidXAddressPrefix) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnsupportedXAddress) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidXAddressZeroNoTag) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidXAddressZeroRemain) => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -304,6 +308,7 @@ pub fn xaddress_to_classic_address(xaddress: &str) -> XRPLCoreResult<(String, Op
 /// ```
 /// use xrpl::core::addresscodec::encode_classic_address;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let bytes: &[u8] = &[
 ///     94, 123, 17, 37, 35, 246, 141, 47, 94, 135, 157, 180,
@@ -314,10 +319,10 @@ pub fn xaddress_to_classic_address(xaddress: &str) -> XRPLCoreResult<(String, Op
 /// let encoding: Option<String> = match encode_classic_address(bytes) {
 ///     Ok(address) => Some(address),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -341,6 +346,7 @@ pub fn encode_classic_address(bytestring: &[u8]) -> XRPLCoreResult<String> {
 /// ```
 /// use xrpl::core::addresscodec::decode_classic_address;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 /// extern crate alloc;
 /// use alloc::vec;
 ///
@@ -353,7 +359,7 @@ pub fn encode_classic_address(bytestring: &[u8]) -> XRPLCoreResult<String> {
 /// let decoding: Option<Vec<u8>> = match decode_classic_address(key) {
 ///     Ok(bytes) => Some(bytes),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::InvalidEncodingPrefixLength => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidEncodingPrefixLength) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -374,6 +380,7 @@ pub fn decode_classic_address(classic_address: &str) -> XRPLCoreResult<Vec<u8>> 
 /// ```
 /// use xrpl::core::addresscodec::encode_node_public_key;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let bytes: &[u8] = &[
 ///     3, 136, 229, 186, 135, 160, 0, 203, 128, 114, 64, 223,
@@ -385,10 +392,10 @@ pub fn decode_classic_address(classic_address: &str) -> XRPLCoreResult<Vec<u8>> 
 /// let encoding: Option<String> = match encode_node_public_key(bytes) {
 ///     Ok(key) => Some(key),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -412,6 +419,7 @@ pub fn encode_node_public_key(bytestring: &[u8]) -> XRPLCoreResult<String> {
 /// ```
 /// use xrpl::core::addresscodec::decode_node_public_key;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 /// extern crate alloc;
 /// use alloc::vec;
 ///
@@ -425,7 +433,7 @@ pub fn encode_node_public_key(bytestring: &[u8]) -> XRPLCoreResult<String> {
 /// let decoding: Option<Vec<u8>> = match decode_node_public_key(key) {
 ///     Ok(bytes) => Some(bytes),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::InvalidEncodingPrefixLength => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidEncodingPrefixLength) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -446,6 +454,7 @@ pub fn decode_node_public_key(node_public_key: &str) -> XRPLCoreResult<Vec<u8>> 
 /// ```
 /// use xrpl::core::addresscodec::encode_account_public_key;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let bytes: &[u8] = &[
 ///     2, 54, 147, 241, 89, 103, 174, 53, 125, 3, 39, 151,
@@ -457,10 +466,10 @@ pub fn decode_node_public_key(node_public_key: &str) -> XRPLCoreResult<Vec<u8>> 
 /// let encoding: Option<String> = match encode_account_public_key(bytes) {
 ///     Ok(key) => Some(key),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -484,6 +493,7 @@ pub fn encode_account_public_key(bytestring: &[u8]) -> XRPLCoreResult<String> {
 /// ```
 /// use xrpl::core::addresscodec::decode_account_public_key;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 /// extern crate alloc;
 /// use alloc::vec;
 ///
@@ -497,7 +507,7 @@ pub fn encode_account_public_key(bytestring: &[u8]) -> XRPLCoreResult<String> {
 /// let decoding: Option<Vec<u8>> = match decode_account_public_key(key) {
 ///     Ok(bytes) => Some(bytes),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::InvalidEncodingPrefixLength => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::InvalidEncodingPrefixLength) => None,
 ///         _ => None,
 ///     }
 /// };

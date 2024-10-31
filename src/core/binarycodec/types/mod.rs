@@ -226,7 +226,7 @@ impl STArray {
     /// Create a SerializedArray from a serde_json::Value.
     ///
     /// ```
-    /// use xrpl::core::types::STArray;
+    /// use xrpl::core::binarycodec::types::STArray;
     /// use serde_json::Value;
     /// use hex::ToHex;
     ///
@@ -301,7 +301,7 @@ impl STObject {
     /// Create a SerializedMap from a serde_json::Value.
     ///
     /// ```
-    /// use xrpl::core::types::STObject;
+    /// use xrpl::core::binarycodec::types::STObject;
     ///
     /// let expected_json = r#"{
     ///     "Account": "raD5qJMAShLeHZXf9wjUmo6vRK4arj9cF3",
@@ -520,8 +520,9 @@ fn handle_xaddress(field: Cow<str>, xaddress: Cow<str>) -> XRPLCoreResult<Map<St
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::types::XRPLType;
+/// use xrpl::core::binarycodec::types::XRPLType;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// use xrpl::core::exceptions::XRPLCoreResult;
 ///
 /// pub struct Example(Vec<u8>);
 ///
@@ -554,15 +555,15 @@ pub trait XRPLType {
 /// ## Basic usage
 ///
 /// ```
-/// use xrpl::core::types::TryFromParser;
+/// use xrpl::core::binarycodec::types::TryFromParser;
 /// use xrpl::core::binarycodec::BinaryParser;
 /// use xrpl::core::Parser;
-/// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// use xrpl::core::exceptions::{XRPLCoreResult, XRPLCoreException};
 ///
 /// pub struct Example(Vec<u8>);
 ///
 /// impl TryFromParser for Example {
-///     type Error = XRPLBinaryCodecException;
+///     type Error = XRPLCoreException;
 ///
 ///     fn from_parser(
 ///         parser: &mut BinaryParser,

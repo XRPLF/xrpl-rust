@@ -60,13 +60,13 @@ pub(crate) fn datetime_to_ripple_time(dt: DateTime<Utc>) -> XRPLUtilsResult<i64>
 ///
 /// ```
 /// use xrpl::utils::ripple_time_to_posix;
-/// use xrpl::utils::exceptions::XRPLTimeRangeException;
+/// use xrpl::utils::exceptions::{XRPLTimeRangeException, XRPLUtilsException};
 ///
 /// let posix: Option<i64> = match ripple_time_to_posix(946684801) {
 ///     Ok(time) => Some(time),
 ///     Err(e) => match e {
-///         XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _} => None,
-///         XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ } => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _}) => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ }) => None,
 ///         _ => None,
 ///     },
 /// };
@@ -86,13 +86,13 @@ pub fn ripple_time_to_posix(ripple_time: i64) -> XRPLUtilsResult<i64> {
 ///
 /// ```
 /// use xrpl::utils::posix_to_ripple_time;
-/// use xrpl::utils::exceptions::XRPLTimeRangeException;
+/// use xrpl::utils::exceptions::{XRPLTimeRangeException, XRPLUtilsException};
 ///
 /// let timestamp: Option<i64> = match posix_to_ripple_time(946684801) {
 ///     Ok(time) => Some(time),
 ///     Err(e) => match e {
-///         XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _} => None,
-///         XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ } => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _}) => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ }) => None,
 ///         _ => None,
 ///     },
 /// };

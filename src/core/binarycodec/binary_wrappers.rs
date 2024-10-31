@@ -119,6 +119,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
     /// let mut binary_parser: BinaryParser = BinaryParser::from(test_bytes);
@@ -126,10 +127,10 @@ pub trait Parser {
     /// match binary_parser.skip_bytes(4) {
     ///     Ok(parser) => assert_eq!(*parser, test_bytes[4..]),
     ///     Err(e) => match e {
-    ///         XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+    ///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
     ///             max: _,
     ///             found: _,
-    ///         } => assert!(false),
+    ///         }) => assert!(false),
     ///         _ => assert!(false)
     ///     }
     /// }
@@ -146,6 +147,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
     /// let mut binary_parser: BinaryParser = BinaryParser::from(test_bytes);
@@ -153,10 +155,10 @@ pub trait Parser {
     /// match binary_parser.read(5) {
     ///     Ok(data) => assert_eq!(test_bytes[..5], data),
     ///     Err(e) => match e {
-    ///         XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+    ///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
     ///             max: _,
     ///             found: _,
-    ///         } => assert!(false),
+    ///         }) => assert!(false),
     ///         _ => assert!(false)
     ///     }
     /// }
@@ -173,6 +175,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
     /// let mut binary_parser: BinaryParser = BinaryParser::from(test_bytes);
@@ -180,10 +183,10 @@ pub trait Parser {
     /// match binary_parser.read_uint8() {
     ///     Ok(data) => assert_eq!(0, data),
     ///     Err(e) => match e {
-    ///         XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+    ///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
     ///             max: _,
     ///             found: _,
-    ///         } => assert!(false),
+    ///         }) => assert!(false),
     ///         _ => assert!(false)
     ///     }
     /// }
@@ -200,6 +203,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
     /// let mut binary_parser: BinaryParser = BinaryParser::from(test_bytes);
@@ -207,10 +211,10 @@ pub trait Parser {
     /// match binary_parser.read_uint16() {
     ///     Ok(data) => assert_eq!(17, data),
     ///     Err(e) => match e {
-    ///         XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+    ///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
     ///             max: _,
     ///             found: _,
-    ///         } => assert!(false),
+    ///         }) => assert!(false),
     ///         _ => assert!(false)
     ///     }
     /// }
@@ -227,6 +231,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let test_bytes: &[u8] = &[0, 17, 34, 51, 68, 85, 102];
     /// let mut binary_parser: BinaryParser = BinaryParser::from(test_bytes);
@@ -234,10 +239,10 @@ pub trait Parser {
     /// match binary_parser.read_uint32() {
     ///     Ok(data) => assert_eq!(1122867, data),
     ///     Err(e) => match e {
-    ///         XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+    ///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
     ///             max: _,
     ///             found: _,
-    ///         } => assert!(false),
+    ///         }) => assert!(false),
     ///         _ => assert!(false)
     ///     }
     /// }
@@ -256,6 +261,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     /// extern crate alloc;
     /// use alloc::vec;
     ///
@@ -268,10 +274,10 @@ pub trait Parser {
     ///     match binary_parser.read(1) {
     ///         Ok(data) => buffer.extend_from_slice(&data),
     ///         Err(e) => match e {
-    ///             XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+    ///             XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
     ///                 max: _,
     ///                 found: _,
-    ///             } => assert!(false),
+    ///             }) => assert!(false),
     ///             _ => assert!(false)
     ///         }
     ///     }
@@ -299,6 +305,7 @@ pub trait Parser {
     /// use xrpl::core::binarycodec::BinaryParser;
     /// use xrpl::core::Parser;
     /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let test_bytes: &[u8] = &[6, 17, 34, 51, 68, 85, 102];
     /// let mut binary_parser: BinaryParser = BinaryParser::from(test_bytes);
@@ -306,9 +313,9 @@ pub trait Parser {
     /// match binary_parser.read_length_prefix() {
     ///     Ok(data) => assert_eq!(6, data),
     ///     Err(e) => match e {
-    ///         XRPLBinaryCodecException::UnexpectedLengthPrefixRange {
+    ///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedLengthPrefixRange {
     ///             min: _, max: _
-    ///         } => assert!(false),
+    ///         }) => assert!(false),
     ///         _ => assert!(false)
     ///     }
     /// }
@@ -385,9 +392,9 @@ pub trait Serialization {
     /// ```
     /// use xrpl::core::binarycodec::BinarySerializer;
     /// use xrpl::core::binarycodec::Serialization;
-    /// use xrpl::core::definitions::FieldInstance;
-    /// use xrpl::core::definitions::FieldInfo;
-    /// use xrpl::core::definitions::FieldHeader;
+    /// use xrpl::core::binarycodec::definitions::FieldInstance;
+    /// use xrpl::core::binarycodec::definitions::FieldInfo;
+    /// use xrpl::core::binarycodec::definitions::FieldHeader;
     ///
     /// let field_header: FieldHeader = FieldHeader {
     ///     type_code: -2,
