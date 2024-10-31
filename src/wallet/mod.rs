@@ -1,7 +1,7 @@
 //! Methods for working with XRPL wallets.
 
 pub mod exceptions;
-#[cfg(feature = "wallet-helpers")]
+#[cfg(feature = "helpers")]
 pub mod faucet_generation;
 
 use crate::constants::CryptoAlgorithm;

@@ -109,42 +109,15 @@ default = [
     "models",
     "utils",
     "helpers",
-    "websocket",
     "json-rpc",
+    "websocket",
 ]
-models = [
-    "transaction-models",
-    "request-models",
-    "ledger-models",
-    "result-models",
-]
-transaction-models = ["core"]
-request-models = []
-result-models = ["request-models", "ledger-models"]
-ledger-models = []
-helpers = [
-    "account-helpers",
-    "ledger-helpers",
-    "transaction-helpers",
-    "wallet-helpers",
-]
-account-helpers = ["core", "request-models", "result-models"]
-ledger-helpers = ["request-models", "result-models"]
-wallet-helpers = ["wallet", "request-models", "result-models"]
-transaction-helpers = [
-    "wallet",
-    "account-helpers",
-    "ledger-helpers",
-    "request-models",
-    "result-models",
-    "transaction-models",
-    "ledger-models",
-]
+models = ["core"]
+helpers = ["core", "models", "wallet"]
 wallet = ["core"]
-json-rpc = ["request-models", "result-models", "reqwless", "embedded-nal-async"]
+json-rpc = ["models", "reqwless", "embedded-io-async", "embedded-nal-async"]
 websocket = [
-    "request-models",
-    "result-models",
+    "models",
     "futures",
     "embedded-io-async",
     "embedded-websocket-embedded-io",

@@ -1,11 +1,13 @@
-use embedded_io_async::{Error as EmbeddedIoError, ErrorKind};
 use thiserror_no_std::Error;
 
-use crate::{
-    asynch::wallet::exceptions::XRPLFaucetException, models::XRPLModelException, XRPLSerdeJsonError,
-};
+#[cfg(feature = "helpers")]
+use crate::asynch::wallet::exceptions::XRPLFaucetException;
+use crate::{models::XRPLModelException, XRPLSerdeJsonError};
 
-use super::{XRPLJsonRpcException, XRPLWebSocketException};
+#[cfg(feature = "json-rpc")]
+use super::XRPLJsonRpcException;
+#[cfg(feature = "websocket")]
+use super::XRPLWebSocketException;
 
 pub type XRPLClientResult<T, E = XRPLClientException> = core::result::Result<T, E>;
 
@@ -15,10 +17,13 @@ pub enum XRPLClientException {
     XRPLSerdeJsonError(#[from] XRPLSerdeJsonError),
     #[error("XRPL Model error: {0}")]
     XRPLModelError(#[from] XRPLModelException),
+    #[cfg(feature = "helpers")]
     #[error("XRPL Faucet error: {0}")]
     XRPLFaucetError(#[from] XRPLFaucetException),
+    #[cfg(feature = "websocket")]
     #[error("XRPL WebSocket error: {0}")]
     XRPLWebSocketError(#[from] XRPLWebSocketException),
+    #[cfg(feature = "json-rpc")]
     #[error("XRPL JSON-RPC error: {0}")]
     XRPLJsonRpcError(#[from] XRPLJsonRpcException),
     #[error("URL parse error: {0}")]
@@ -34,28 +39,21 @@ impl From<serde_json::Error> for XRPLClientException {
     }
 }
 
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), feature = "json-rpc"))]
 impl From<reqwless::Error> for XRPLClientException {
     fn from(error: reqwless::Error) -> Self {
         XRPLClientException::XRPLJsonRpcError(XRPLJsonRpcException::ReqwlessError(error))
     }
 }
 
-// #[cfg(not(feature = "std"))]
-// impl From<dyn embedded_io_async::Error> for XRPLClientException {
-//     fn from(error: dyn embedded_io_async::Error) -> Self {
-//         XRPLClientException::XRPLWebSocketError(XRPLWebSocketException::EmbeddedIoError(error))
-//     }
-// }
-
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "websocket"))]
 impl From<tokio_tungstenite::tungstenite::Error> for XRPLClientException {
     fn from(error: tokio_tungstenite::tungstenite::Error) -> Self {
         XRPLClientException::XRPLWebSocketError(XRPLWebSocketException::from(error))
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", feature = "json-rpc"))]
 impl From<reqwest::Error> for XRPLClientException {
     fn from(error: reqwest::Error) -> Self {
         XRPLClientException::XRPLJsonRpcError(XRPLJsonRpcException::ReqwestError(error))

@@ -370,8 +370,8 @@ pub enum Flag {
 #[cfg(all(
     feature = "std",
     feature = "websocket",
-    feature = "transaction-models",
-    feature = "transaction-helpers",
+    feature = "models",
+    feature = "helpers",
     feature = "wallet"
 ))]
 #[cfg(test)]

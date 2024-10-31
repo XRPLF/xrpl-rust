@@ -533,7 +533,7 @@ mod test_autofill {
     }
 }
 
-#[cfg(all(feature = "websocket", feature = "std"))]
+#[cfg(all(feature = "json-rpc", feature = "std"))]
 #[cfg(test)]
 mod test_sign {
     use alloc::borrow::Cow;

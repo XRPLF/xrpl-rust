@@ -1,4 +1,4 @@
-use alloc::{format, string::String};
+use alloc::string::String;
 use core::fmt::Debug;
 use core::str::Utf8Error;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
@@ -49,6 +49,8 @@ pub enum XRPLWebSocketException {
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 impl<E: Debug> From<FramerError<E>> for XRPLWebSocketException {
     fn from(value: FramerError<E>) -> Self {
+        use alloc::format;
+
         match value {
             FramerError::Io(e) => XRPLWebSocketException::Io(format!("{:?}", e)),
             FramerError::FrameTooLarge(e) => XRPLWebSocketException::FrameTooLarge(e),

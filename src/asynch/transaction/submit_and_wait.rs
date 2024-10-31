@@ -171,7 +171,8 @@ where
 #[cfg(all(
     feature = "std",
     feature = "json-rpc",
-    feature = "wallet-helpers",
+    feature = "helpers",
+    feature = "models",
     feature = "tokio-rt"
 ))]
 #[cfg(test)]

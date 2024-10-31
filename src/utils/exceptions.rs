@@ -3,20 +3,16 @@
 use alloc::string::String;
 use thiserror_no_std::Error;
 
-use crate::{models::transactions::exceptions::XRPLTransactionFieldException, XRPLSerdeJsonError};
+use crate::XRPLSerdeJsonError;
 
 pub type XRPLUtilsResult<T, E = XRPLUtilsException> = core::result::Result<T, E>;
 
 #[derive(Debug, PartialEq, Error)]
 pub enum XRPLUtilsException {
-    #[error("XRPL Core error: {0}")]
-    XRPLCoreError(#[from] crate::core::exceptions::XRPLCoreException),
     #[error("XRPL Time Range error: {0}")]
     XRPLTimeRangeError(#[from] XRPLTimeRangeException),
     #[error("XRP Range error: {0}")]
     XRPRangeError(#[from] XRPRangeException),
-    #[error("XRPL Transaction Field error: {0}")]
-    XRPLTransactionFieldError(#[from] XRPLTransactionFieldException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]

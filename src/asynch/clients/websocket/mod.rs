@@ -3,6 +3,7 @@ use crate::models::{requests::XRPLRequest, results::XRPLResponse};
 use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
+#[cfg(not(feature = "std"))]
 use embedded_io_async::Error;
 #[cfg(not(feature = "std"))]
 use embedded_io_async::{Read as EmbeddedIoRead, Write as EmbeddedIoWrite};

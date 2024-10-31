@@ -8,8 +8,11 @@ mod websocket;
 
 use alloc::borrow::Cow;
 use embassy_sync::blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex};
-use exceptions::XRPLClientResult;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "helpers")]
+use exceptions::XRPLClientResult;
+#[cfg(feature = "helpers")]
 use url::Url;
 
 pub use async_client::*;
@@ -25,7 +28,10 @@ pub type SingleExecutorMutex = NoopRawMutex;
 const TEST_FAUCET_URL: &str = "https://faucet.altnet.rippletest.net/accounts";
 const DEV_FAUCET_URL: &str = "https://faucet.devnet.rippletest.net/accounts";
 
+#[cfg(feature = "helpers")]
 use crate::{asynch::wallet::exceptions::XRPLFaucetException, models::requests::FundFaucet};
+
+#[cfg(feature = "helpers")]
 #[allow(async_fn_in_trait)]
 pub trait XRPLFaucet: XRPLClient {
     fn get_faucet_url(&self, url: Option<Url>) -> XRPLClientResult<Url>

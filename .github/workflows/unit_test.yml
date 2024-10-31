@@ -72,4 +72,4 @@ jobs:
         name: Test for no_std
         with:
           command: test
-          args: --release --no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc
+          args: --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc

@@ -4,10 +4,7 @@ use alloc::string::ToString;
 use serde::{de::DeserializeOwned, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{
-    models::transactions::{exceptions::XRPLTransactionFieldException, Transaction},
-    XRPLSerdeJsonError,
-};
+use crate::{models::transactions::Transaction, XRPLSerdeJsonError};
 
 use super::exceptions::XRPLUtilsResult;
 
@@ -66,15 +63,4 @@ where
         .ok_or(XRPLSerdeJsonError::InvalidNoneError(field_name.to_string()))?;
 
     Ok(())
-}
-
-pub fn validate_common_fied(common_field_name: &str) -> XRPLUtilsResult<()> {
-    match common_field_name {
-        "Account" | "TransactionType" | "Fee" | "Sequence" | "AccountTxnID" | "Flags"
-        | "LastLedgerSequence" | "Memos" | "NetworkID" | "Signers" | "SourceTag"
-        | "SigningPubKey" | "TicketSequence" | "TxnSignature" => Ok(()),
-        _ => Err(
-            XRPLTransactionFieldException::InvalidCommonField(common_field_name.to_string()).into(),
-        ),
-    }
 }

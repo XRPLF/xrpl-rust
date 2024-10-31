@@ -203,7 +203,7 @@ impl XRPLResult<'_> {
             XRPLResult::AccountInfo(_) => "AccountInfo".to_string(),
             XRPLResult::AccountTx(_) => "AccountTx".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
-            XRPLResult::Ledger(_) => "ledger-models".to_string(),
+            XRPLResult::Ledger(_) => "Ledger".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),

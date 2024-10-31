@@ -3,7 +3,7 @@ use crate::{
     models::{requests::XRPLRequest, results::XRPLResponse},
 };
 
-pub use crate::asynch::clients::{SingleExecutorMutex, XRPLFaucet};
+pub use crate::asynch::clients::SingleExecutorMutex;
 
 pub trait XRPLSyncClient: XRPLClient {
     fn request<'a: 'b, 'b>(&self, request: XRPLRequest<'a>) -> XRPLClientResult<XRPLResponse<'b>>;
@@ -16,15 +16,14 @@ pub mod json_rpc {
     use tokio::runtime::Runtime;
     use url::Url;
 
+    #[cfg(feature = "helpers")]
+    use crate::{asynch::clients::XRPLFaucet, models::requests::FundFaucet};
     use crate::{
         asynch::clients::{
             exceptions::XRPLClientResult, AsyncJsonRpcClient, CommonFields, XRPLAsyncClient,
-            XRPLClient, XRPLFaucet,
+            XRPLClient,
         },
-        models::{
-            requests::{FundFaucet, XRPLRequest},
-            results::XRPLResponse,
-        },
+        models::{requests::XRPLRequest, results::XRPLResponse},
     };
 
     use super::XRPLSyncClient;
@@ -72,6 +71,7 @@ pub mod json_rpc {
         }
     }
 
+    #[cfg(feature = "helpers")]
     impl XRPLFaucet for JsonRpcClient {
         async fn request_funding(
             &self,
@@ -89,14 +89,11 @@ pub mod json_rpc {
     use embedded_nal_async::{Dns, TcpConnect};
     use url::Url;
 
+    #[cfg(feature = "helpers")]
+    use crate::{asynch::clients::XRPLFaucet, models::requests::FundFaucet};
     use crate::{
-        asynch::clients::{
-            exceptions::XRPLClientResult, AsyncJsonRpcClient, XRPLClient, XRPLFaucet,
-        },
-        models::{
-            requests::{FundFaucet, XRPLRequest},
-            results::XRPLResponse,
-        },
+        asynch::clients::{exceptions::XRPLClientResult, AsyncJsonRpcClient, XRPLClient},
+        models::{requests::XRPLRequest, results::XRPLResponse},
     };
 
     pub struct JsonRpcClient<'a, const BUF: usize, T, D, M>(
@@ -136,6 +133,7 @@ pub mod json_rpc {
         }
     }
 
+    #[cfg(feature = "helpers")]
     impl<'a, const BUF: usize, T, D, M> XRPLFaucet for JsonRpcClient<'a, BUF, T, D, M>
     where
         M: RawMutex,

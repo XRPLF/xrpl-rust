@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use xrpl::core::definitions::get_field_type_name;
+use xrpl::core::binarycodec::definitions::get_field_type_name;
 use xrpl::utils::xrp_to_drops;
 
 pub fn bench_xrp_to_drops(c: &mut Criterion) {

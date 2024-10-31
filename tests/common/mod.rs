@@ -15,6 +15,8 @@ pub async fn open_websocket(
 ) -> Result<
     AsyncWebSocketClient<4096, FromTokio<TcpStream>, OsRng, SingleExecutorMutex, WebSocketOpen>,
 > {
+    use anyhow::anyhow;
+
     let port = uri.port().unwrap_or(80);
     let url = format!("{}:{}", uri.host_str().unwrap(), port);
 
@@ -23,7 +25,7 @@ pub async fn open_websocket(
     let rng = OsRng;
     match AsyncWebSocketClient::open(stream, uri, rng, None, None).await {
         Ok(client) => Ok(client),
-        Err(e) => Err(e),
+        Err(e) => Err(anyhow!(e)),
     }
 }
 

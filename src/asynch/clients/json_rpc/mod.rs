@@ -41,13 +41,13 @@ fn request_to_json_rpc(request: &impl Serialize) -> XRPLClientResult<Value> {
 
 #[cfg(all(feature = "json-rpc", feature = "std"))]
 mod _std {
-    use crate::{
-        asynch::clients::XRPLFaucet,
-        models::requests::{FundFaucet, XRPLRequest},
-    };
+    use crate::models::requests::XRPLRequest;
+    #[cfg(feature = "helpers")]
+    use crate::{asynch::clients::XRPLFaucet, models::requests::FundFaucet};
+    #[cfg(feature = "helpers")]
+    use alloc::string::ToString;
 
     use super::*;
-    use alloc::string::ToString;
     use reqwest::Client as HttpClient;
     use url::Url;
 
@@ -89,6 +89,7 @@ mod _std {
         }
     }
 
+    #[cfg(feature = "helpers")]
     impl XRPLFaucet for AsyncJsonRpcClient {
         async fn request_funding(
             &self,
@@ -119,10 +120,9 @@ mod _std {
 
 #[cfg(all(feature = "json-rpc", not(feature = "std")))]
 mod _no_std {
-    use crate::{
-        asynch::clients::{SingleExecutorMutex, XRPLFaucet},
-        models::requests::{FundFaucet, XRPLRequest},
-    };
+    use crate::{asynch::clients::SingleExecutorMutex, models::requests::XRPLRequest};
+    #[cfg(feature = "helpers")]
+    use crate::{asynch::clients::XRPLFaucet, models::requests::FundFaucet};
 
     use super::*;
     use alloc::sync::Arc;
@@ -205,6 +205,7 @@ mod _no_std {
         }
     }
 
+    #[cfg(feature = "helpers")]
     impl<'a, const BUF: usize, T, D, M> XRPLFaucet for AsyncJsonRpcClient<'a, BUF, T, D, M>
     where
         M: RawMutex,
