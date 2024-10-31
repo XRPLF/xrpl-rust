@@ -12,6 +12,7 @@ use super::XRPLWebSocketException;
 pub type XRPLClientResult<T, E = XRPLClientException> = core::result::Result<T, E>;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum XRPLClientException {
     #[error("serde_json error: {0}")]
     XRPLSerdeJsonError(#[from] XRPLSerdeJsonError),

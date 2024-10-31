@@ -8,6 +8,7 @@ use crate::XRPLSerdeJsonError;
 pub type XRPLUtilsResult<T, E = XRPLUtilsException> = core::result::Result<T, E>;
 
 #[derive(Debug, PartialEq, Error)]
+#[non_exhaustive]
 pub enum XRPLUtilsException {
     #[error("XRPL Time Range error: {0}")]
     XRPLTimeRangeError(#[from] XRPLTimeRangeException),
@@ -26,6 +27,7 @@ pub enum XRPLUtilsException {
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 pub enum XRPLTimeRangeException {
     #[error("Invalid time before epoch (min: {min} found: {found})")]
     InvalidTimeBeforeEpoch { min: i64, found: i64 },

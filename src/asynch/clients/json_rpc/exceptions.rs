@@ -1,6 +1,7 @@
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum XRPLJsonRpcException {
     #[error("Reqwless error: {0:?}")]
     ReqwlessError(#[from] reqwless::Error),

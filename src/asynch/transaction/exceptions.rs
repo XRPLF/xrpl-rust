@@ -4,6 +4,7 @@ use alloc::string::String;
 use thiserror_no_std::Error;
 
 #[derive(Error, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum XRPLTransactionHelperException {
     #[error("Fee of {0:?} Drops is much higher than a typical XRP transaction fee. This may be a mistake. If intentional, please use `check_fee = false`")]
     FeeUnusuallyHigh(String),
@@ -18,6 +19,7 @@ pub enum XRPLTransactionHelperException {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLSignTransactionException {
     #[error("{0:?} value does not match X-Address tag")]
     TagFieldMismatch(String),
@@ -28,6 +30,7 @@ pub enum XRPLSignTransactionException {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLSubmitAndWaitException {
     #[error("Transaction submission failed: {0}")]
     SubmissionFailed(String),

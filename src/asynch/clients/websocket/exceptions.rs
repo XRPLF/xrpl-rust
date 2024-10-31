@@ -9,6 +9,7 @@ use futures::channel::oneshot::Canceled;
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum XRPLWebSocketException {
     // FramerError
     #[error("I/O error: {0:?}")]

@@ -110,6 +110,7 @@ pub enum XRPLPaymentException {
 impl alloc::error::Error for XRPLPaymentException {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLSignerListSetException {
     /// A field was defined that another field definition would delete.
     #[error("The value of the field `{field1:?}` can not be defined with the field `{field2:?}` because it would cause the deletion of `{field1:?}`")]
@@ -151,6 +152,7 @@ pub enum XRPLSignerListSetException {
 impl alloc::error::Error for XRPLSignerListSetException {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLXChainClaimException {
     #[error("`amount` must match either `locking_chain_issue` or `issuing_chain_issue`")]
     AmountMismatch,
@@ -160,6 +162,7 @@ pub enum XRPLXChainClaimException {
 impl alloc::error::Error for XRPLXChainClaimException {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLXChainCreateBridgeException {
     #[error("Cannot have the same door accounts on the locking and issuing chain")]
     SameDoorAccounts,
@@ -181,6 +184,7 @@ pub enum XRPLXChainCreateBridgeException {
 impl alloc::error::Error for XRPLXChainCreateBridgeException {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLXChainCreateClaimIDException {
     #[error("`other_chain_source` must be a valid XRPL address")]
     OtherChainSourceIsInvalid,
@@ -190,6 +194,7 @@ pub enum XRPLXChainCreateClaimIDException {
 impl alloc::error::Error for XRPLXChainCreateClaimIDException {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
 pub enum XRPLXChainModifyBridgeException {
     #[error("Must either change `signature_reward`, change `min_account_create_amount`, or clear `min_account_create_amount`")]
     MustChangeOrClear,
