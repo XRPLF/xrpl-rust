@@ -1,21 +1,18 @@
 //! Methods for working with XRPL wallets.
 
-#[cfg(feature = "wallet-helpers")]
-mod faucet_generation;
+pub mod exceptions;
+#[cfg(feature = "helpers")]
+pub mod faucet_generation;
 
 use crate::constants::CryptoAlgorithm;
 use crate::core::addresscodec::classic_address_to_xaddress;
-use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
-use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::generate_seed;
 use alloc::string::String;
 use core::fmt::Display;
+use exceptions::XRPLWalletResult;
 use zeroize::Zeroize;
-
-#[cfg(feature = "wallet-helpers")]
-pub use faucet_generation::*;
 
 /// The cryptographic keys needed to control an
 /// XRP Ledger account.
@@ -59,7 +56,7 @@ impl Drop for Wallet {
 
 impl Wallet {
     /// Generate a new Wallet.
-    pub fn new(seed: &str, sequence: u64) -> Result<Self, XRPLKeypairsException> {
+    pub fn new(seed: &str, sequence: u64) -> XRPLWalletResult<Self> {
         let (public_key, private_key) = derive_keypair(seed, false)?;
         let classic_address = derive_classic_address(&public_key)?;
 
@@ -73,9 +70,7 @@ impl Wallet {
     }
 
     /// Generates a new seed and Wallet.
-    pub fn create(
-        crypto_algorithm: Option<CryptoAlgorithm>,
-    ) -> Result<Self, XRPLKeypairsException> {
+    pub fn create(crypto_algorithm: Option<CryptoAlgorithm>) -> XRPLWalletResult<Self> {
         Self::new(&generate_seed(None, crypto_algorithm)?, 0)
     }
 
@@ -84,8 +79,12 @@ impl Wallet {
         &self,
         tag: Option<u64>,
         is_test_network: bool,
-    ) -> Result<String, XRPLAddressCodecException> {
-        classic_address_to_xaddress(&self.classic_address, tag, is_test_network)
+    ) -> XRPLWalletResult<String> {
+        Ok(classic_address_to_xaddress(
+            &self.classic_address,
+            tag,
+            is_test_network,
+        )?)
     }
 }
 

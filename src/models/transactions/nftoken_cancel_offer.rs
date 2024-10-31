@@ -1,7 +1,5 @@
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -11,7 +9,7 @@ use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags};
+use crate::models::{FlagCollection, NoFlags, XRPLModelResult};
 
 use super::CommonFields;
 
@@ -48,11 +46,10 @@ pub struct NFTokenCancelOffer<'a> {
 }
 
 impl<'a: 'static> Model for NFTokenCancelOffer<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_nftoken_offers_error() {
-            Ok(_) => Ok(()),
-            Err(error) => Err!(error),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_nftoken_offers_error()?;
+
+        Ok(())
     }
 }
 
@@ -71,13 +68,13 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenCancelOffer<'a> {
 }
 
 impl<'a> NFTokenCancelOfferError for NFTokenCancelOffer<'a> {
-    fn _get_nftoken_offers_error(&self) -> Result<(), XRPLNFTokenCancelOfferException> {
+    fn _get_nftoken_offers_error(&self) -> XRPLModelResult<()> {
         if self.nftoken_offers.is_empty() {
             Err(XRPLNFTokenCancelOfferException::CollectionEmpty {
                 field: "nftoken_offers".into(),
                 r#type: stringify!(Vec).into(),
-                resource: "".into(),
-            })
+            }
+            .into())
         } else {
             Ok(())
         }
@@ -120,7 +117,7 @@ impl<'a> NFTokenCancelOffer<'a> {
 }
 
 pub trait NFTokenCancelOfferError {
-    fn _get_nftoken_offers_error(&self) -> Result<(), XRPLNFTokenCancelOfferException>;
+    fn _get_nftoken_offers_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -149,7 +146,7 @@ mod test_nftoken_cancel_offer_error {
 
         assert_eq!(
             nftoken_cancel_offer.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `nftoken_offers` is not allowed to be empty (type `Vec`). If the field is optional, define it to be `None`. For more information see: "
+            "The value of the field `\"nftoken_offers\"` is not allowed to be empty (type `\"Vec\"`). If the field is optional, define it to be `None`"
         );
     }
 }

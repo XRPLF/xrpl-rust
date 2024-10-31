@@ -1,11 +1,12 @@
 //! Utilities for binarycodec crate.
 
+use super::definitions::load_definition_map;
+use super::definitions::DefinitionHandler;
+use super::definitions::FieldHeader;
+use super::definitions::CODE_MAX_VALUE;
+use super::definitions::CODE_MIN_VALUE;
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::definitions::load_definition_map;
-use crate::core::definitions::DefinitionHandler;
-use crate::core::definitions::FieldHeader;
-use crate::core::definitions::CODE_MAX_VALUE;
-use crate::core::definitions::CODE_MIN_VALUE;
+use crate::core::exceptions::XRPLCoreResult;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -29,7 +30,7 @@ pub const MAX_LENGTH_VALUE: usize = 918744;
 pub const MAX_BYTE_VALUE: usize = 256;
 
 /// See: `<https://xrpl.org/serialization.html#field-ids>`
-fn _encode_field_id(field_header: &FieldHeader) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+fn _encode_field_id(field_header: &FieldHeader) -> XRPLCoreResult<Vec<u8>> {
     let type_code = field_header.type_code;
     let field_code = field_header.field_code;
     let range = CODE_MIN_VALUE..CODE_MAX_VALUE;
@@ -38,12 +39,14 @@ fn _encode_field_id(field_header: &FieldHeader) -> Result<Vec<u8>, XRPLBinaryCod
         Err(XRPLBinaryCodecException::UnexpectedFieldCodeRange {
             min: CODE_MIN_VALUE as usize,
             max: CODE_MAX_VALUE as usize,
-        })
+        }
+        .into())
     } else if !range.contains(&type_code) {
         Err(XRPLBinaryCodecException::UnexpectedTypeCodeRange {
             min: CODE_MIN_VALUE as usize,
             max: CODE_MAX_VALUE as usize,
-        })
+        }
+        .into())
     } else if type_code < 16 && field_code < 16 {
         // high 4 bits is the type_code
         // low 4 bits is the field code
@@ -91,7 +94,7 @@ fn _encode_field_id(field_header: &FieldHeader) -> Result<Vec<u8>, XRPLBinaryCod
 }
 
 /// See: `<https://xrpl.org/serialization.html#field-ids>`
-fn _decode_field_id(field_id: &str) -> Result<FieldHeader, XRPLBinaryCodecException> {
+fn _decode_field_id(field_id: &str) -> XRPLCoreResult<FieldHeader> {
     let bytes = hex::decode(field_id)?;
 
     match bytes.len() {
@@ -141,7 +144,7 @@ fn _decode_field_id(field_id: &str) -> Result<FieldHeader, XRPLBinaryCodecExcept
                 field_code,
             })
         }
-        _ => Err(XRPLBinaryCodecException::UnexpectedFieldIdByteRange { min: 1, max: 3 }),
+        _ => Err(XRPLBinaryCodecException::UnexpectedFieldIdByteRange { min: 1, max: 3 }.into()),
     }
 }
 
@@ -160,6 +163,7 @@ fn _decode_field_id(field_id: &str) -> Result<FieldHeader, XRPLBinaryCodecExcept
 /// ```
 /// use xrpl::core::binarycodec::utils::encode_field_name;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 /// extern crate alloc;
 /// use alloc::vec;
 ///
@@ -169,20 +173,20 @@ fn _decode_field_id(field_id: &str) -> Result<FieldHeader, XRPLBinaryCodecExcept
 /// let encoding: Option<Vec<u8>> = match encode_field_name(field_name) {
 ///     Ok(bytes) => Some(bytes),
 ///     Err(e) => match e {
-///         XRPLBinaryCodecException::UnknownFieldName => None,
+///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnknownFieldName) => None,
 ///         _ => None,
 ///     }
 /// };
 ///
 /// assert_eq!(Some(bytes), encoding);
 /// ```
-pub fn encode_field_name(field_name: &str) -> Result<Vec<u8>, XRPLBinaryCodecException> {
+pub fn encode_field_name(field_name: &str) -> XRPLCoreResult<Vec<u8>> {
     let definitions = load_definition_map();
     let field_header = definitions.get_field_header_from_name(field_name);
     if let Some(header) = field_header {
         _encode_field_id(&header)
     } else {
-        Err(XRPLBinaryCodecException::UnknownFieldName)
+        Err(XRPLBinaryCodecException::UnknownFieldName.into())
     }
 }
 
@@ -198,6 +202,7 @@ pub fn encode_field_name(field_name: &str) -> Result<Vec<u8>, XRPLBinaryCodecExc
 /// ```
 /// use xrpl::core::binarycodec::utils::decode_field_name;
 /// use xrpl::core::binarycodec::exceptions::XRPLBinaryCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let field_id: &str = "26";
 /// let field_name: &str = "LedgerSequence";
@@ -205,17 +210,17 @@ pub fn encode_field_name(field_name: &str) -> Result<Vec<u8>, XRPLBinaryCodecExc
 /// let decoding: Option<&str> = match decode_field_name(field_id) {
 ///     Ok(field_name) => Some(field_name),
 ///     Err(e) => match e {
-///         XRPLBinaryCodecException::UnexpectedFieldIdByteRange {
+///         XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::UnexpectedFieldIdByteRange {
 ///             min: _,
 ///             max: _
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
 ///
 /// assert_eq!(Some(field_name), decoding);
 /// ```
-pub fn decode_field_name(field_id: &str) -> Result<&str, XRPLBinaryCodecException> {
+pub fn decode_field_name(field_id: &str) -> XRPLCoreResult<&str> {
     let definitions = load_definition_map();
     let field_header = _decode_field_id(field_id)?;
     let field_name = definitions.get_field_name_from_header(&field_header);
@@ -223,7 +228,7 @@ pub fn decode_field_name(field_id: &str) -> Result<&str, XRPLBinaryCodecExceptio
     if let Some(name) = field_name {
         Ok(name)
     } else {
-        Err(XRPLBinaryCodecException::UnknownFieldName)
+        Err(XRPLBinaryCodecException::UnknownFieldName.into())
     }
 }
 

@@ -1,16 +1,16 @@
-mod exceptions;
 mod issued_currency_amount;
 mod xrp_amount;
 
-pub use exceptions::*;
+use bigdecimal::BigDecimal;
 pub use issued_currency_amount::*;
 pub use xrp_amount::*;
 
 use crate::models::Model;
 use core::convert::TryInto;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
+
+use super::{XRPLModelException, XRPLModelResult};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Display)]
 #[serde(untagged)]
@@ -19,10 +19,10 @@ pub enum Amount<'a> {
     XRPAmount(XRPAmount<'a>),
 }
 
-impl<'a> TryInto<Decimal> for Amount<'a> {
-    type Error = anyhow::Error;
+impl<'a> TryInto<BigDecimal> for Amount<'a> {
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<Decimal, Self::Error> {
+    fn try_into(self) -> XRPLModelResult<BigDecimal, Self::Error> {
         match self {
             Amount::IssuedCurrencyAmount(amount) => amount.try_into(),
             Amount::XRPAmount(amount) => amount.try_into(),

@@ -6,18 +6,21 @@ use chrono::TimeZone;
 use chrono::Utc;
 use chrono::{DateTime, LocalResult};
 
+use super::exceptions::XRPLUtilsResult;
+
 /// The "Ripple Epoch" of 2000-01-01T00:00:00 UTC
 pub const RIPPLE_EPOCH: i64 = 946684800;
 /// The maximum time that can be expressed on the XRPL
 pub const MAX_XRPL_TIME: i64 = i64::pow(2, 32);
 
 /// Ensures time does not exceed max representable on XRPL.
-fn _ripple_check_max<T>(time: i64, ok: T) -> Result<T, XRPLTimeRangeException> {
+fn _ripple_check_max<T>(time: i64, ok: T) -> XRPLUtilsResult<T> {
     if !(0..=MAX_XRPL_TIME).contains(&time) {
         Err(XRPLTimeRangeException::UnexpectedTimeOverflow {
             max: MAX_XRPL_TIME,
             found: time,
-        })
+        }
+        .into())
     } else {
         Ok(ok)
     }
@@ -29,13 +32,11 @@ fn _ripple_check_max<T>(time: i64, ok: T) -> Result<T, XRPLTimeRangeException> {
 ///
 /// [`chrono::DateTime`]: mod@chrono::DateTime
 /// ```
-pub(crate) fn ripple_time_to_datetime(
-    ripple_time: i64,
-) -> Result<DateTime<Utc>, XRPLTimeRangeException> {
+pub(crate) fn ripple_time_to_datetime(ripple_time: i64) -> XRPLUtilsResult<DateTime<Utc>> {
     let datetime = Utc.timestamp_opt(ripple_time + RIPPLE_EPOCH, 0);
     match datetime {
         LocalResult::Single(dt) => _ripple_check_max(ripple_time, dt),
-        _ => Err(XRPLTimeRangeException::InvalidLocalTime),
+        _ => Err(XRPLTimeRangeException::InvalidLocalTime.into()),
     }
 }
 
@@ -45,7 +46,7 @@ pub(crate) fn ripple_time_to_datetime(
 ///
 /// [`chrono::DateTime`]: mod@chrono::DateTime
 /// ```
-pub(crate) fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTimeRangeException> {
+pub(crate) fn datetime_to_ripple_time(dt: DateTime<Utc>) -> XRPLUtilsResult<i64> {
     let ripple_time = dt.timestamp() - RIPPLE_EPOCH;
     _ripple_check_max(ripple_time, ripple_time)
 }
@@ -59,20 +60,20 @@ pub(crate) fn datetime_to_ripple_time(dt: DateTime<Utc>) -> Result<i64, XRPLTime
 ///
 /// ```
 /// use xrpl::utils::ripple_time_to_posix;
-/// use xrpl::utils::exceptions::XRPLTimeRangeException;
+/// use xrpl::utils::exceptions::{XRPLTimeRangeException, XRPLUtilsException};
 ///
 /// let posix: Option<i64> = match ripple_time_to_posix(946684801) {
 ///     Ok(time) => Some(time),
 ///     Err(e) => match e {
-///         XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _} => None,
-///         XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ } => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _}) => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ }) => None,
 ///         _ => None,
 ///     },
 /// };
 ///
 /// assert_eq!(Some(1893369601), posix);
 /// ```
-pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeException> {
+pub fn ripple_time_to_posix(ripple_time: i64) -> XRPLUtilsResult<i64> {
     _ripple_check_max(ripple_time, ripple_time + RIPPLE_EPOCH)
 }
 
@@ -85,28 +86,26 @@ pub fn ripple_time_to_posix(ripple_time: i64) -> Result<i64, XRPLTimeRangeExcept
 ///
 /// ```
 /// use xrpl::utils::posix_to_ripple_time;
-/// use xrpl::utils::exceptions::XRPLTimeRangeException;
+/// use xrpl::utils::exceptions::{XRPLTimeRangeException, XRPLUtilsException};
 ///
 /// let timestamp: Option<i64> = match posix_to_ripple_time(946684801) {
 ///     Ok(time) => Some(time),
 ///     Err(e) => match e {
-///         XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _} => None,
-///         XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ } => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::InvalidTimeBeforeEpoch { min: _, found: _}) => None,
+///         XRPLUtilsException::XRPLTimeRangeError(XRPLTimeRangeException::UnexpectedTimeOverflow { max: _, found: _ }) => None,
 ///         _ => None,
 ///     },
 /// };
 ///
 /// assert_eq!(Some(1), timestamp);
 /// ```
-pub fn posix_to_ripple_time(timestamp: i64) -> Result<i64, XRPLTimeRangeException> {
+pub fn posix_to_ripple_time(timestamp: i64) -> XRPLUtilsResult<i64> {
     let ripple_time = timestamp - RIPPLE_EPOCH;
     _ripple_check_max(ripple_time, ripple_time)
 }
 
 #[cfg(test)]
 mod test {
-    use anyhow::{anyhow, Result};
-
     use super::*;
 
     #[test]
@@ -119,7 +118,7 @@ mod test {
     fn test_datetime_to_ripple_time() {
         let actual = match Utc.timestamp_opt(RIPPLE_EPOCH, 0) {
             LocalResult::Single(dt) => datetime_to_ripple_time(dt),
-            _ => Err(XRPLTimeRangeException::InvalidLocalTime),
+            _ => Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         assert_eq!(Ok(0_i64), actual);
     }
@@ -147,10 +146,10 @@ mod test {
     }
 
     #[test]
-    fn accept_datetime_round_trip() -> Result<()> {
+    fn accept_datetime_round_trip() -> XRPLUtilsResult<()> {
         let current_time: DateTime<Utc> = match Utc.timestamp_opt(Utc::now().timestamp(), 0) {
             LocalResult::Single(dt) => dt,
-            _ => return Err(anyhow!("Invalid local time")),
+            _ => return Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         let ripple_time: i64 = datetime_to_ripple_time(current_time).unwrap();
         let round_trip_time = ripple_time_to_datetime(ripple_time);
@@ -161,10 +160,10 @@ mod test {
     }
 
     #[test]
-    fn accept_ripple_epoch() -> Result<()> {
+    fn accept_ripple_epoch() -> XRPLUtilsResult<()> {
         let expected = match Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0) {
             LocalResult::Single(dt) => dt,
-            _ => return Err(anyhow!("Invalid local time")),
+            _ => return Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         assert_eq!(Ok(expected), ripple_time_to_datetime(0));
 
@@ -173,10 +172,10 @@ mod test {
 
     /// "Ripple Epoch" time starts in the year 2000
     #[test]
-    fn accept_datetime_underflow() -> Result<()> {
+    fn accept_datetime_underflow() -> XRPLUtilsResult<()> {
         let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(1999, 1, 1, 0, 0, 0) {
             LocalResult::Single(dt) => dt,
-            _ => return Err(anyhow!("Invalid local time")),
+            _ => return Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         assert!(datetime_to_ripple_time(datetime).is_err());
 
@@ -185,10 +184,10 @@ mod test {
 
     /// "Ripple Epoch" time starts in the year 2000
     #[test]
-    fn accept_posix_underflow() -> Result<()> {
+    fn accept_posix_underflow() -> XRPLUtilsResult<()> {
         let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(1999, 1, 1, 0, 0, 0) {
             LocalResult::Single(dt) => dt,
-            _ => return Err(anyhow!("Invalid local time")),
+            _ => return Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         assert!(posix_to_ripple_time(datetime.timestamp()).is_err());
 
@@ -201,10 +200,10 @@ mod test {
     /// starting 30 years after UNIX time's signed
     /// 32-bit int.
     #[test]
-    fn accept_datetime_overflow() -> Result<()> {
+    fn accept_datetime_overflow() -> XRPLUtilsResult<()> {
         let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(2137, 1, 1, 0, 0, 0) {
             LocalResult::Single(dt) => dt,
-            _ => return Err(anyhow!("Invalid local time")),
+            _ => return Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         assert!(datetime_to_ripple_time(datetime).is_err());
 
@@ -212,10 +211,10 @@ mod test {
     }
 
     #[test]
-    fn accept_posix_overflow() -> Result<()> {
+    fn accept_posix_overflow() -> XRPLUtilsResult<()> {
         let datetime: DateTime<Utc> = match Utc.with_ymd_and_hms(2137, 1, 1, 0, 0, 0) {
             LocalResult::Single(dt) => dt,
-            _ => return Err(anyhow!("Invalid local time")),
+            _ => return Err(XRPLTimeRangeException::InvalidLocalTime.into()),
         };
         assert!(posix_to_ripple_time(datetime.timestamp()).is_err());
 

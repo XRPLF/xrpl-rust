@@ -3,7 +3,8 @@ use thiserror_no_std::Error;
 
 use super::XRPLOtherResult;
 
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Error)]
+#[non_exhaustive]
 pub enum XRPLResultException {
     #[error("Response error: {0}")]
     ResponseError(String),

@@ -10,7 +10,6 @@ pub use self::algorithms::Ed25519;
 pub use self::algorithms::Secp256k1;
 
 use crate::constants::CryptoAlgorithm;
-use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::utils::SEED_LENGTH;
 use crate::core::addresscodec::*;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
@@ -20,6 +19,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use rand::Rng;
 use rand::SeedableRng;
+
+use super::exceptions::XRPLCoreResult;
 
 /// Return the signature length for an algorithm.
 const fn _get_algorithm_sig_length(algo: CryptoAlgorithm) -> usize {
@@ -67,6 +68,7 @@ fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
 /// use xrpl::constants::CryptoAlgorithm;
 /// use xrpl::core::addresscodec::utils::SEED_LENGTH;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let entropy: Option<[u8; SEED_LENGTH]> = Some([
 ///     207, 45, 227, 120, 251, 221, 126, 46,
@@ -81,7 +83,7 @@ fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
 /// ) {
 ///     Ok(seed) => Some(seed),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnknownSeedEncoding => None,
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnknownSeedEncoding) => None,
 ///         _ => None,
 ///     }
 /// };
@@ -91,7 +93,7 @@ fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
 pub fn generate_seed(
     entropy: Option<[u8; SEED_LENGTH]>,
     algorithm: Option<CryptoAlgorithm>,
-) -> Result<String, XRPLAddressCodecException> {
+) -> XRPLCoreResult<String> {
     let mut random_bytes: [u8; SEED_LENGTH] = [0u8; SEED_LENGTH];
 
     let algo: CryptoAlgorithm = if let Some(value) = algorithm {
@@ -119,6 +121,7 @@ pub fn generate_seed(
 /// ```
 /// use xrpl::core::keypairs::derive_keypair;
 /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let seed: &str = "sEdSKaCy2JT7JaM7v95H9SxkhP9wS2r";
 /// let validator: bool = false;
@@ -133,20 +136,17 @@ pub fn generate_seed(
 /// ) {
 ///     Ok(seed) => Some(seed),
 ///     Err(e) => match e {
-///         XRPLKeypairsException::InvalidSignature => None,
-///         XRPLKeypairsException::ED25519Error => None,
-///         XRPLKeypairsException::SECP256K1Error => None,
-///         XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ } => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSignature) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::ED25519Error) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ }) => None,
 ///         _ => None,
 ///     }
 /// };
 ///
 /// assert_eq!(Some(tuple), generator);
 /// ```
-pub fn derive_keypair(
-    seed: &str,
-    validator: bool,
-) -> Result<(String, String), XRPLKeypairsException> {
+pub fn derive_keypair(seed: &str, validator: bool) -> XRPLCoreResult<(String, String)> {
     let (decoded_seed, algorithm) = decode_seed(seed)?;
     let module = _get_algorithm_engine(algorithm);
     let (public, private) = module.derive_keypair(&decoded_seed, validator)?;
@@ -155,7 +155,7 @@ pub fn derive_keypair(
     if module.is_valid_message(SIGNATURE_VERIFICATION_MESSAGE, &signature, &public) {
         Ok((public, private))
     } else {
-        Err(XRPLKeypairsException::InvalidSignature)
+        Err(XRPLKeypairsException::InvalidSignature.into())
     }
 }
 
@@ -172,6 +172,7 @@ pub fn derive_keypair(
 /// ```
 /// use xrpl::core::keypairs::derive_classic_address;
 /// use xrpl::core::addresscodec::exceptions::XRPLAddressCodecException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let public_key: &str = "ED01FA53FA5A7E77798F882ECE20B1ABC00\
 ///                         BB358A9E55A202D0D0676BD0CE37A63";
@@ -180,17 +181,17 @@ pub fn derive_keypair(
 /// let derivation: Option<String> = match derive_classic_address(public_key) {
 ///     Ok(address) => Some(address),
 ///     Err(e) => match e {
-///         XRPLAddressCodecException::UnexpectedPayloadLength {
+///         XRPLCoreException::XRPLAddressCodecError(XRPLAddressCodecException::UnexpectedPayloadLength {
 ///             expected: _,
 ///             found: _,
-///         } => None,
+///         }) => None,
 ///         _ => None,
 ///     }
 /// };
 ///
 /// assert_eq!(Some(address), derivation);
 /// ```
-pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCodecException> {
+pub fn derive_classic_address(public_key: &str) -> XRPLCoreResult<String> {
     let account_id = get_account_id(&hex::decode(public_key)?);
     encode_classic_address(&account_id)
 }
@@ -204,6 +205,7 @@ pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCod
 /// ```
 /// use xrpl::core::keypairs::sign;
 /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
+/// use xrpl::core::exceptions::XRPLCoreException;
 ///
 /// let message: &[u8] = "test message".as_bytes();
 /// let private_key: &str = "EDB4C4E046826BD26190D09715FC31F4E\
@@ -218,15 +220,15 @@ pub fn derive_classic_address(public_key: &str) -> Result<String, XRPLAddressCod
 /// ) {
 ///     Ok(signature) => Some(signature),
 ///     Err(e) => match e {
-///         XRPLKeypairsException::ED25519Error => None,
-///         XRPLKeypairsException::SECP256K1Error => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::ED25519Error) => None,
+///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
 ///         _ => None,
 ///     }
 /// };
 ///
 /// assert_eq!(Some(signature), signing);
 /// ```
-pub fn sign(message: &[u8], private_key: &str) -> Result<String, XRPLKeypairsException> {
+pub fn sign(message: &[u8], private_key: &str) -> XRPLCoreResult<String> {
     let module = _get_algorithm_engine_from_key(private_key);
     Ok(hex::encode_upper(module.sign(message, private_key)?))
 }
@@ -268,12 +270,12 @@ pub trait CryptoImplementation {
         &self,
         decoded_seed: &[u8],
         is_validator: bool,
-    ) -> Result<(String, String), XRPLKeypairsException>;
+    ) -> XRPLCoreResult<(String, String)>;
 
     /// Signs a message using a given private key.
     /// * `message` - Text about foo.
     /// * `private_key` - Text about bar.
-    fn sign(&self, message: &[u8], private_key: &str) -> Result<Vec<u8>, XRPLKeypairsException>;
+    fn sign(&self, message: &[u8], private_key: &str) -> XRPLCoreResult<Vec<u8>>;
 
     /// Verifies the signature on a given message.
     fn is_valid_message(&self, message: &[u8], signature: &str, public_key: &str) -> bool;

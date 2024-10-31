@@ -1,5 +1,4 @@
 use alloc::borrow::Cow;
-use anyhow::Result;
 use embassy_futures::block_on;
 
 use crate::{
@@ -12,6 +11,7 @@ use crate::{
             get_xrp_balance as async_get_xrp_balance,
         },
         clients::XRPLClient,
+        exceptions::XRPLHelperResult,
     },
     models::{ledger::objects::AccountRoot, results::account_tx::AccountTx, XRPAmount},
 };
@@ -20,7 +20,7 @@ pub fn does_account_exist<C>(
     address: Cow<'_, str>,
     client: &C,
     ledger_index: Option<Cow<'_, str>>,
-) -> Result<bool>
+) -> XRPLHelperResult<bool>
 where
     C: XRPLClient,
 {
@@ -31,7 +31,7 @@ pub fn get_next_valid_seq_number<C>(
     address: Cow<'_, str>,
     client: &C,
     ledger_index: Option<Cow<'_, str>>,
-) -> Result<u32>
+) -> XRPLHelperResult<u32>
 where
     C: XRPLClient,
 {
@@ -46,7 +46,7 @@ pub fn get_xrp_balance<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
     client: &C,
     ledger_index: Option<Cow<'a, str>>,
-) -> Result<XRPAmount<'b>>
+) -> XRPLHelperResult<XRPAmount<'b>>
 where
     C: XRPLClient,
 {
@@ -57,7 +57,7 @@ pub fn get_account_root<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
     client: &C,
     ledger_index: Cow<'a, str>,
-) -> Result<AccountRoot<'b>>
+) -> XRPLHelperResult<AccountRoot<'b>>
 where
     C: XRPLClient,
 {
@@ -67,7 +67,7 @@ where
 pub fn get_latest_transaction<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
     client: &C,
-) -> Result<AccountTx<'b>>
+) -> XRPLHelperResult<AccountTx<'b>>
 where
     C: XRPLClient,
 {

@@ -1,14 +1,10 @@
 use alloc::{borrow::Cow, vec::Vec};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::{
-    models::{
-        transactions::exceptions::XRPLXChainClaimException, Amount, Currency, FlagCollection,
-        Model, NoFlags, XChainBridge,
-    },
-    Err,
+use crate::models::{
+    transactions::exceptions::XRPLXChainClaimException, Amount, Currency, FlagCollection, Model,
+    NoFlags, XChainBridge, XRPLModelResult,
 };
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
@@ -30,7 +26,7 @@ pub struct XChainClaim<'a> {
 }
 
 impl Model for XChainClaim<'_> {
-    fn get_errors(&self) -> Result<()> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
         self.get_amount_mismatch_error()
     }
 }
@@ -91,14 +87,14 @@ impl<'a> XChainClaim<'a> {
         }
     }
 
-    fn get_amount_mismatch_error(&self) -> Result<()> {
+    fn get_amount_mismatch_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         match &self.amount {
             Amount::XRPAmount(amount) => {
                 if Currency::from(amount) != bridge.locking_chain_issue
                     && Currency::from(amount) != bridge.issuing_chain_issue
                 {
-                    Err!(XRPLXChainClaimException::AmountMismatch)
+                    Err(XRPLXChainClaimException::AmountMismatch.into())
                 } else {
                     Ok(())
                 }
@@ -107,7 +103,7 @@ impl<'a> XChainClaim<'a> {
                 if Currency::from(amount) != bridge.locking_chain_issue
                     && Currency::from(amount) != bridge.issuing_chain_issue
                 {
-                    Err!(XRPLXChainClaimException::AmountMismatch)
+                    Err(XRPLXChainClaimException::AmountMismatch.into())
                 } else {
                     Ok(())
                 }

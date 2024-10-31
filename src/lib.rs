@@ -20,38 +20,31 @@
 #![no_std]
 #![allow(dead_code)] // Remove eventually
 
+use ::core::fmt::Display;
+
+use alloc::string::{String, ToString};
+use thiserror_no_std::Error;
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std as alloc;
 
-#[cfg(feature = "account-helpers")]
+#[cfg(feature = "helpers")]
 pub mod account;
-#[cfg(any(
-    feature = "json-rpc",
-    feature = "websocket",
-    feature = "account-helpers",
-    feature = "ledger-helpers",
-    feature = "transaction-helpers",
-    feature = "wallet-helpers"
-))]
+#[cfg(any(feature = "json-rpc", feature = "websocket", feature = "helpers"))]
 pub mod asynch;
 #[cfg(any(feature = "json-rpc", feature = "websocket"))]
 pub mod clients;
 pub mod constants;
 #[cfg(feature = "core")]
 pub mod core;
-#[cfg(feature = "ledger-helpers")]
+#[cfg(feature = "helpers")]
 pub mod ledger;
 pub mod macros;
-#[cfg(any(
-    feature = "ledger-models",
-    feature = "request-models",
-    feature = "result-models",
-    feature = "transaction-models"
-))]
+#[cfg(any(feature = "models"))]
 pub mod models;
-#[cfg(feature = "transaction-helpers")]
+#[cfg(feature = "helpers")]
 pub mod transaction;
 #[cfg(feature = "utils")]
 pub mod utils;
@@ -60,17 +53,11 @@ pub mod wallet;
 
 pub extern crate serde_json;
 
-mod _anyhow;
-#[cfg(any(
-    feature = "ledger-models",
-    feature = "request-models",
-    feature = "result-models",
-    feature = "transaction-models"
-))]
+#[cfg(any(feature = "models"))]
 mod _serde;
 
 #[cfg(all(
-    any(feature = "transaction-helpers", feature = "wallet-helpers"),
+    feature = "helpers",
     not(any(
         feature = "tokio-rt",
         feature = "embassy-rt",
@@ -80,4 +67,49 @@ mod _serde;
         feature = "smol-rt"
     ))
 ))]
-compile_error!("Cannot enable `transaction-helpers` or `wallet-helpers` without enabling a runtime feature (\"*-rt\"). This is required for sleeping between retries internally.");
+compile_error!("Cannot enable `helpers` without enabling a runtime feature (\"*-rt\"). This is required for sleeping between retries internally.");
+#[cfg(all(
+    feature = "helpers",
+    not(any(feature = "json-rpc", feature = "websocket",))
+))]
+compile_error!("Cannot enable `helpers` without enabling a client feature (\"json-rpc\", \"websocket\"). This is required for interacting with the XRP Ledger.");
+
+#[derive(Debug, Error)]
+pub enum XRPLSerdeJsonError {
+    SerdeJsonError(serde_json::Error),
+    InvalidNoneError(String),
+    UnexpectedValueType {
+        expected: String,
+        found: serde_json::Value,
+    },
+}
+
+impl Display for XRPLSerdeJsonError {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+        match self {
+            XRPLSerdeJsonError::SerdeJsonError(err) => write!(f, "{}", err),
+            XRPLSerdeJsonError::InvalidNoneError(err) => {
+                write!(f, "Invalid None value on field: {}", err)
+            }
+            XRPLSerdeJsonError::UnexpectedValueType { expected, found } => {
+                write!(
+                    f,
+                    "Unexpected value type (expected: {}, found: {})",
+                    expected, found
+                )
+            }
+        }
+    }
+}
+
+impl From<serde_json::Error> for XRPLSerdeJsonError {
+    fn from(err: serde_json::Error) -> Self {
+        XRPLSerdeJsonError::SerdeJsonError(err)
+    }
+}
+
+impl PartialEq for XRPLSerdeJsonError {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
+}

@@ -1,12 +1,9 @@
-use crate::Err;
 use alloc::borrow::Cow;
-use anyhow::Result;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::requests::exceptions::XRPLLedgerEntryException;
-use crate::models::{requests::RequestMethod, Model};
+use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, Request};
 
@@ -98,16 +95,13 @@ pub struct LedgerEntry<'a> {
 }
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_field_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => Ok(()),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        Ok(self._get_field_error()?)
     }
 }
 
 impl<'a> LedgerEntryError for LedgerEntry<'a> {
-    fn _get_field_error(&self) -> Result<(), XRPLLedgerEntryException> {
+    fn _get_field_error(&self) -> XRPLModelResult<()> {
         let mut signing_methods: u32 = 0;
         for method in [
             self.index.clone(),
@@ -140,19 +134,18 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
             signing_methods += 1
         }
         if signing_methods != 1 {
-            Err(XRPLLedgerEntryException::DefineExactlyOneOf {
-                field1: "index".into(),
-                field2: "account_root".into(),
-                field3: "check".into(),
-                field4: "directory".into(),
-                field5: "offer".into(),
-                field6: "ripple_state".into(),
-                field7: "escrow".into(),
-                field8: "payment_channel".into(),
-                field9: "deposit_preauth".into(),
-                field10: "ticket".into(),
-                resource: "".into(),
-            })
+            Err(XRPLModelException::ExpectedOneOf(&[
+                "index",
+                "account_root",
+                "check",
+                "directory",
+                "offer",
+                "ripple_state",
+                "escrow",
+                "payment_channel",
+                "deposit_preauth",
+                "ticket",
+            ]))
         } else {
             Ok(())
         }
@@ -210,13 +203,12 @@ impl<'a> LedgerEntry<'a> {
 
 pub trait LedgerEntryError {
     #[allow(clippy::result_large_err)]
-    fn _get_field_error(&self) -> Result<(), XRPLLedgerEntryException>;
+    fn _get_field_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
 mod test_ledger_entry_errors {
     use super::Offer;
-    use crate::models::requests::exceptions::XRPLLedgerEntryException;
     use crate::models::Model;
     use alloc::string::ToString;
 
@@ -243,22 +235,21 @@ mod test_ledger_entry_errors {
             None,
             None,
         );
-        let _expected = XRPLLedgerEntryException::DefineExactlyOneOf {
-            field1: "index".into(),
-            field2: "account_root".into(),
-            field3: "check".into(),
-            field4: "directory".into(),
-            field5: "offer".into(),
-            field6: "ripple_state".into(),
-            field7: "escrow".into(),
-            field8: "payment_channel".into(),
-            field9: "deposit_preauth".into(),
-            field10: "ticket".into(),
-            resource: "".into(),
-        };
+        let _expected = XRPLModelException::ExpectedOneOf(&[
+            "index",
+            "account_root",
+            "check",
+            "directory",
+            "offer",
+            "ripple_state",
+            "escrow",
+            "payment_channel",
+            "deposit_preauth",
+            "ticket",
+        ]);
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Define one of: `index`, `account_root`, `check`, `directory`, `offer`, `ripple_state`, `escrow`, `payment_channel`, `deposit_preauth`, `ticket`. Define exactly one of them. For more information see: "
+            "Expected one of: index, account_root, check, directory, offer, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
         );
     }
 

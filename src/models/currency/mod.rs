@@ -55,11 +55,7 @@ impl<'a> From<XRPAmount<'a>> for Currency<'a> {
 
 impl<'a> From<&IssuedCurrencyAmount<'a>> for Currency<'a> {
     fn from(value: &IssuedCurrencyAmount<'a>) -> Self {
-        IssuedCurrency::new(
-            value.currency.clone(),
-            value.issuer.clone(),
-        )
-        .into()
+        IssuedCurrency::new(value.currency.clone(), value.issuer.clone()).into()
     }
 }
 

@@ -1,16 +1,12 @@
 use alloc::{borrow::Cow, vec::Vec};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use crate::{
-    models::{
-        transactions::exceptions::XRPLXChainModifyBridgeException, Amount, FlagCollection, Model,
-        XChainBridge, XRPAmount, XRP,
-    },
-    Err,
+use crate::models::{
+    transactions::exceptions::XRPLXChainModifyBridgeException, Amount, FlagCollection, Model,
+    XChainBridge, XRPAmount, XRPLModelResult, XRP,
 };
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
@@ -37,7 +33,7 @@ pub struct XChainModifyBridge<'a> {
 }
 
 impl Model for XChainModifyBridge<'_> {
-    fn get_errors(&self) -> Result<()> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
         self.get_must_change_or_clear_error()?;
         self.get_account_door_mismatch_error()?;
         self.get_cannot_have_min_account_create_amount()?;
@@ -98,34 +94,34 @@ impl<'a> XChainModifyBridge<'a> {
         }
     }
 
-    fn get_must_change_or_clear_error(&self) -> Result<()> {
+    fn get_must_change_or_clear_error(&self) -> XRPLModelResult<()> {
         if self.signature_reward.is_none()
             && self.min_account_create_amount.is_none()
             && !self.has_flag(&XChainModifyBridgeFlags::TfClearAccountCreateAmount)
         {
-            Err!(XRPLXChainModifyBridgeException::MustChangeOrClear)
+            Err(XRPLXChainModifyBridgeException::MustChangeOrClear.into())
         } else {
             Ok(())
         }
     }
 
-    fn get_account_door_mismatch_error(&self) -> Result<()> {
+    fn get_account_door_mismatch_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         if [&bridge.locking_chain_door, &bridge.issuing_chain_door]
             .contains(&&self.get_common_fields().account)
         {
-            Err!(XRPLXChainModifyBridgeException::AccountDoorMismatch)
+            Err(XRPLXChainModifyBridgeException::AccountDoorMismatch.into())
         } else {
             Ok(())
         }
     }
 
-    fn get_cannot_have_min_account_create_amount(&self) -> Result<()> {
+    fn get_cannot_have_min_account_create_amount(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
         if self.min_account_create_amount.is_some()
             && bridge.locking_chain_issue != XRP::new().into()
         {
-            Err!(XRPLXChainModifyBridgeException::CannotHaveMinAccountCreateAmount)
+            Err(XRPLXChainModifyBridgeException::CannotHaveMinAccountCreateAmount.into())
         } else {
             Ok(())
         }

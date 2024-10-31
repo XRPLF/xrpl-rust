@@ -7,16 +7,16 @@
 //! 4. Required specific fields in alphabetical order
 //! 5. Optional specific fields in alphabetical order
 
-#[cfg(feature = "ledger-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod ledger;
-#[cfg(feature = "request-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod requests;
-#[cfg(feature = "result-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod results;
-#[cfg(feature = "transaction-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod transactions;
 

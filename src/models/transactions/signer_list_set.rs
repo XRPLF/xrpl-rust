@@ -2,7 +2,6 @@ use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use anyhow::Result;
 use derive_new::new;
 use serde::{ser::SerializeMap, Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -10,12 +9,13 @@ use serde_with::skip_serializing_none;
 use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::FlagCollection;
 use crate::models::NoFlags;
+use crate::models::XRPLModelResult;
 use crate::models::{
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::{serde_with_tag, Err};
+use crate::serde_with_tag;
 
 use super::CommonFields;
 
@@ -64,14 +64,11 @@ pub struct SignerListSet<'a> {
 }
 
 impl<'a> Model for SignerListSet<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_signer_entries_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => match self._get_signer_quorum_error() {
-                Err(error) => Err!(error),
-                Ok(_no_error) => Ok(()),
-            },
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_signer_entries_error()?;
+        self._get_signer_quorum_error()?;
+
+        Ok(())
     }
 }
 
@@ -90,28 +87,28 @@ impl<'a> Transaction<'a, NoFlags> for SignerListSet<'a> {
 }
 
 impl<'a> SignerListSetError for SignerListSet<'a> {
-    fn _get_signer_entries_error(&self) -> Result<(), XRPLSignerListSetException> {
+    fn _get_signer_entries_error(&self) -> XRPLModelResult<()> {
         if let Some(signer_entries) = &self.signer_entries {
             if self.signer_quorum == 0 {
                 Err(XRPLSignerListSetException::ValueCausesValueDeletion {
                     field1: "signer_entries".into(),
                     field2: "signer_quorum".into(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else if signer_entries.is_empty() {
                 Err(XRPLSignerListSetException::CollectionTooFewItems {
                     field: "signer_entries".into(),
                     min: 1_usize,
                     found: signer_entries.len(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else if signer_entries.len() > 8 {
                 Err(XRPLSignerListSetException::CollectionTooManyItems {
                     field: "signer_entries".into(),
                     max: 8_usize,
                     found: signer_entries.len(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -120,7 +117,7 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
         }
     }
 
-    fn _get_signer_quorum_error(&self) -> Result<(), XRPLSignerListSetException> {
+    fn _get_signer_quorum_error(&self) -> XRPLModelResult<()> {
         let mut accounts = Vec::new();
         let mut signer_weight_sum: u32 = 0;
         if self.signer_entries.is_some() {
@@ -137,8 +134,8 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
                 return Err(XRPLSignerListSetException::CollectionItemDuplicate {
                     field: "signer_entries".into(),
                     found: account.into(),
-                    resource: "".into(),
-                });
+                }
+                .into());
             } else {
                 check_account.push(account);
             }
@@ -147,16 +144,16 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
             if accounts.contains(&self.common_fields.account.to_string()) {
                 Err(XRPLSignerListSetException::CollectionInvalidItem {
                     field: "signer_entries".into(),
-                    found: self.common_fields.account.clone(),
-                    resource: "".into(),
-                })
+                    found: self.common_fields.account.clone().into(),
+                }
+                .into())
             } else if self.signer_quorum > signer_weight_sum {
                 Err(
                     XRPLSignerListSetException::SignerQuorumExceedsSignerWeight {
                         max: signer_weight_sum,
                         found: self.signer_quorum,
-                        resource: "".into(),
-                    },
+                    }
+                    .into(),
                 )
             } else {
                 Ok(())
@@ -166,8 +163,8 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
                 field: "signer_quorum".into(),
                 expected: 0,
                 found: self.signer_quorum,
-                resource: "".into(),
-            })
+            }
+            .into())
         } else {
             Ok(())
         }
@@ -212,8 +209,8 @@ impl<'a> SignerListSet<'a> {
 }
 
 pub trait SignerListSetError {
-    fn _get_signer_entries_error(&self) -> Result<(), XRPLSignerListSetException>;
-    fn _get_signer_quorum_error(&self) -> Result<(), XRPLSignerListSetException>;
+    fn _get_signer_entries_error(&self) -> XRPLModelResult<()>;
+    fn _get_signer_quorum_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -246,7 +243,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` can not be defined with the field `signer_quorum` because it would cause the deletion of `signer_entries`. For more information see: "
+            "The value of the field `\"signer_entries\"` can not be defined with the field `\"signer_quorum\"` because it would cause the deletion of `\"signer_entries\"`"
         );
 
         signer_list_set.signer_quorum = 3;
@@ -254,7 +251,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` has the wrong value to be deleted (expected 0, found 3). For more information see: "
+            "The field `\"signer_quorum\"` has the wrong value to be deleted (expected 0, found 3)"
         );
     }
 
@@ -276,7 +273,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` has too few items in it (min 1, found 0). For more information see: "
+            "The value of the field `\"signer_entries\"` has too few items in it (min 1, found 0)"
         );
 
         signer_list_set.signer_entries = Some(vec![
@@ -320,7 +317,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` has too many items in it (max 8, found 9). For more information see: "
+            "The value of the field `\"signer_entries\"` has too many items in it (max 8, found 9)"
         );
 
         signer_list_set.signer_entries = Some(vec![
@@ -340,7 +337,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_entries` contains an invalid value (found rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb). For more information see: "
+            "The field `\"signer_entries\"` contains an invalid value (found \"rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb\")"
         );
 
         signer_list_set.signer_entries = Some(vec![SignerEntry {
@@ -351,7 +348,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`. For more information see: "
+            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`"
         );
 
         signer_list_set.signer_entries = Some(vec![
@@ -368,7 +365,7 @@ mod test_signer_list_set_error {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `signer_entries` has a duplicate in it (found rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW). For more information see: "
+            "The value of the field `\"signer_entries\"` has a duplicate in it (found \"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW\")"
         );
     }
 }

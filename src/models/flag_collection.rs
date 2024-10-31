@@ -1,13 +1,12 @@
 use core::convert::TryFrom;
 
 use alloc::vec::Vec;
-use anyhow::Result;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use crate::{models::XRPLFlagsException, Err};
+use super::{XRPLModelException, XRPLModelResult};
 
 /// Represents the type of flags when the XRPL model has no flags.
 #[derive(
@@ -53,9 +52,9 @@ impl<T> TryFrom<u32> for FlagCollection<T>
 where
     T: IntoEnumIterator + Serialize,
 {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(flags: u32) -> Result<Self> {
+    fn try_from(flags: u32) -> XRPLModelResult<Self> {
         let mut flag_collection = Vec::new();
         for flag in T::iter() {
             let flag_as_u32 = flag_to_u32(&flag)?;
@@ -71,9 +70,9 @@ impl<T> TryFrom<FlagCollection<T>> for u32
 where
     T: IntoEnumIterator + Serialize,
 {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(flag_collection: FlagCollection<T>) -> Result<Self> {
+    fn try_from(flag_collection: FlagCollection<T>) -> XRPLModelResult<Self> {
         let mut flags = 0;
         for flag in flag_collection {
             let flag_as_u32 = flag_to_u32(&flag)?;
@@ -97,15 +96,9 @@ where
     }
 }
 
-fn flag_to_u32<T>(flag: &T) -> Result<u32>
+fn flag_to_u32<T>(flag: &T) -> XRPLModelResult<u32>
 where
     T: Serialize,
 {
-    match serde_json::to_string(flag) {
-        Ok(flag_as_string) => match flag_as_string.parse::<u32>() {
-            Ok(flag_as_u32) => Ok(flag_as_u32),
-            Err(_error) => Err!(XRPLFlagsException::CannotConvertFlagToU32),
-        },
-        Err(_error) => Err!(XRPLFlagsException::CannotConvertFlagToU32),
-    }
+    Ok(serde_json::to_string(flag)?.parse::<u32>()?)
 }

@@ -1,6 +1,5 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -8,6 +7,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{exceptions::XRPLAccountSetException, CommonFields};
+use crate::models::{XRPLModelException, XRPLModelResult};
 use crate::{
     constants::{
         DISABLE_TICK_SIZE, MAX_DOMAIN_LENGTH, MAX_TICK_SIZE, MAX_TRANSFER_RATE, MIN_TICK_SIZE,
@@ -17,7 +17,6 @@ use crate::{
         transactions::{Memo, Signer, Transaction, TransactionType},
         Model,
     },
-    Err,
 };
 
 use super::FlagCollection;
@@ -121,23 +120,14 @@ pub struct AccountSet<'a> {
 }
 
 impl<'a> Model for AccountSet<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_tick_size_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => match self._get_transfer_rate_error() {
-                Err(error) => Err!(error),
-                Ok(_no_error) => match self._get_domain_error() {
-                    Err(error) => Err!(error),
-                    Ok(_no_error) => match self._get_clear_flag_error() {
-                        Err(error) => Err!(error),
-                        Ok(_no_error) => match self._get_nftoken_minter_error() {
-                            Err(error) => Err!(error),
-                            Ok(_no_error) => Ok(()),
-                        },
-                    },
-                },
-            },
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_tick_size_error()?;
+        self._get_transfer_rate_error()?;
+        self._get_domain_error()?;
+        self._get_clear_flag_error()?;
+        self._get_nftoken_minter_error()?;
+
+        Ok(())
     }
 }
 
@@ -160,21 +150,19 @@ impl<'a> Transaction<'a, AccountSetFlag> for AccountSet<'a> {
 }
 
 impl<'a> AccountSetError for AccountSet<'a> {
-    fn _get_tick_size_error(&self) -> Result<(), XRPLAccountSetException> {
+    fn _get_tick_size_error(&self) -> Result<(), XRPLModelException> {
         if let Some(tick_size) = self.tick_size {
             if tick_size > MAX_TICK_SIZE {
-                Err(XRPLAccountSetException::ValueTooHigh {
+                Err(XRPLModelException::ValueTooHigh {
                     field: "tick_size".into(),
                     max: MAX_TICK_SIZE,
                     found: tick_size,
-                    resource: "".into(),
                 })
             } else if tick_size < MIN_TICK_SIZE && tick_size != DISABLE_TICK_SIZE {
-                Err(XRPLAccountSetException::ValueTooLow {
+                Err(XRPLModelException::ValueTooLow {
                     field: "tick_size".into(),
                     min: MIN_TICK_SIZE,
                     found: tick_size,
-                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -184,23 +172,21 @@ impl<'a> AccountSetError for AccountSet<'a> {
         }
     }
 
-    fn _get_transfer_rate_error(&self) -> Result<(), XRPLAccountSetException> {
+    fn _get_transfer_rate_error(&self) -> Result<(), XRPLModelException> {
         if let Some(transfer_rate) = self.transfer_rate {
             if transfer_rate > MAX_TRANSFER_RATE {
-                Err(XRPLAccountSetException::ValueTooHigh {
+                Err(XRPLModelException::ValueTooHigh {
                     field: "transfer_rate".into(),
                     max: MAX_TRANSFER_RATE,
                     found: transfer_rate,
-                    resource: "".into(),
                 })
             } else if transfer_rate < MIN_TRANSFER_RATE
                 && transfer_rate != SPECIAL_CASE_TRANFER_RATE
             {
-                Err(XRPLAccountSetException::ValueTooLow {
+                Err(XRPLModelException::ValueTooLow {
                     field: "transfer_rate".into(),
                     min: MIN_TRANSFER_RATE,
                     found: transfer_rate,
-                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -210,21 +196,19 @@ impl<'a> AccountSetError for AccountSet<'a> {
         }
     }
 
-    fn _get_domain_error(&self) -> Result<(), XRPLAccountSetException> {
+    fn _get_domain_error(&self) -> Result<(), XRPLModelException> {
         if let Some(domain) = self.domain.clone() {
             if domain.to_lowercase().as_str() != domain {
-                Err(XRPLAccountSetException::InvalidValueFormat {
+                Err(XRPLModelException::InvalidValueFormat {
                     field: "domain".into(),
-                    found: domain,
+                    found: domain.into(),
                     format: "lowercase".into(),
-                    resource: "".into(),
                 })
             } else if domain.len() > MAX_DOMAIN_LENGTH {
-                Err(XRPLAccountSetException::ValueTooLong {
+                Err(XRPLModelException::ValueTooLong {
                     field: "domain".into(),
                     max: MAX_DOMAIN_LENGTH,
                     found: domain.len(),
-                    resource: "".into(),
                 })
             } else {
                 Ok(())
@@ -234,19 +218,19 @@ impl<'a> AccountSetError for AccountSet<'a> {
         }
     }
 
-    fn _get_clear_flag_error(&self) -> Result<(), XRPLAccountSetException> {
+    fn _get_clear_flag_error(&self) -> Result<(), XRPLModelException> {
         if self.clear_flag.is_some() && self.set_flag.is_some() && self.clear_flag == self.set_flag
         {
             Err(XRPLAccountSetException::SetAndUnsetSameFlag {
                 found: self.clear_flag.unwrap(),
-                resource: "".into(),
-            })
+            }
+            .into())
         } else {
             Ok(())
         }
     }
 
-    fn _get_nftoken_minter_error(&self) -> Result<(), XRPLAccountSetException> {
+    fn _get_nftoken_minter_error(&self) -> Result<(), XRPLModelException> {
         if let Some(_nftoken_minter) = self.nftoken_minter.clone() {
             if self.set_flag.is_none() {
                 if let Some(clear_flag) = &self.clear_flag {
@@ -255,8 +239,8 @@ impl<'a> AccountSetError for AccountSet<'a> {
                             Err(XRPLAccountSetException::SetFieldWhenUnsetRequiredFlag {
                                 field: "nftoken_minter".into(),
                                 flag: AccountSetFlag::AsfAuthorizedNFTokenMinter,
-                                resource: "".into(),
-                            })
+                            }
+                            .into())
                         }
                         _ => Ok(()),
                     }
@@ -264,8 +248,8 @@ impl<'a> AccountSetError for AccountSet<'a> {
                     Err(XRPLAccountSetException::FieldRequiresFlag {
                         field: "set_flag".into(),
                         flag: AccountSetFlag::AsfAuthorizedNFTokenMinter,
-                        resource: "".into(),
-                    })
+                    }
+                    .into())
                 }
             } else {
                 Ok(())
@@ -276,8 +260,8 @@ impl<'a> AccountSetError for AccountSet<'a> {
                     Err(XRPLAccountSetException::FlagRequiresField {
                         flag: AccountSetFlag::AsfAuthorizedNFTokenMinter,
                         field: "nftoken_minter".into(),
-                        resource: "".into(),
-                    })
+                    }
+                    .into())
                 }
                 _ => Ok(()),
             }
@@ -338,11 +322,11 @@ impl<'a> AccountSet<'a> {
 }
 
 pub trait AccountSetError {
-    fn _get_tick_size_error(&self) -> Result<(), XRPLAccountSetException>;
-    fn _get_transfer_rate_error(&self) -> Result<(), XRPLAccountSetException>;
-    fn _get_domain_error(&self) -> Result<(), XRPLAccountSetException>;
-    fn _get_clear_flag_error(&self) -> Result<(), XRPLAccountSetException>;
-    fn _get_nftoken_minter_error(&self) -> Result<(), XRPLAccountSetException>;
+    fn _get_tick_size_error(&self) -> Result<(), XRPLModelException>;
+    fn _get_transfer_rate_error(&self) -> Result<(), XRPLModelException>;
+    fn _get_domain_error(&self) -> Result<(), XRPLModelException>;
+    fn _get_clear_flag_error(&self) -> Result<(), XRPLModelException>;
+    fn _get_nftoken_minter_error(&self) -> Result<(), XRPLModelException>;
 }
 
 #[cfg(test)]
@@ -380,7 +364,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `tick_size` is defined below its minimum (min 3, found 2). For more information see: "
+            "The value of the field `\"tick_size\"` is defined below its minimum (min 3, found 2)"
         );
 
         let tick_size_too_high = Some(16);
@@ -388,7 +372,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `tick_size` is defined above its maximum (max 15, found 16). For more information see: "
+            "The value of the field `\"tick_size\"` is defined above its maximum (max 15, found 16)"
         );
     }
 
@@ -419,7 +403,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `transfer_rate` is defined below its minimum (min 1000000000, found 999999999). For more information see: "
+            "The value of the field `\"transfer_rate\"` is defined below its minimum (min 1000000000, found 999999999)"
         );
 
         let tick_size_too_high = Some(2000000001);
@@ -427,7 +411,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `transfer_rate` is defined above its maximum (max 2000000000, found 2000000001). For more information see: "
+            "The value of the field `\"transfer_rate\"` is defined above its maximum (max 2000000000, found 2000000001)"
         );
     }
 
@@ -458,7 +442,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `domain` does not have the correct format (expected lowercase, found https://Example.com/). For more information see: "
+            "The value of the field `\"domain\"` does not have the correct format (expected \"lowercase\", found \"https://Example.com/\")"
         );
 
         let domain_too_long = Some("https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
@@ -466,7 +450,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `domain` exceeds its maximum length of characters (max 256, found 270). For more information see: "
+            "The value of the field `\"domain\"` exceeds its maximum length of characters (max 256, found 270)"
         );
     }
 
@@ -495,7 +479,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "A flag cannot be set and unset at the same time (found AsfDisallowXRP). For more information see: "
+            "A flag cannot be set and unset at the same time (found AsfDisallowXRP)"
         );
     }
 
@@ -525,7 +509,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "For the field `set_flag` to be defined it is required to set the flag `AsfAuthorizedNFTokenMinter`. For more information see: "
+            "For the field `\"set_flag\"` to be defined it is required to set the flag `AsfAuthorizedNFTokenMinter`"
         );
 
         account_set.nftoken_minter = None;
@@ -533,7 +517,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "For the flag `AsfAuthorizedNFTokenMinter` to be set it is required to define the field `nftoken_minter`. For more information see: "
+            "For the flag `AsfAuthorizedNFTokenMinter` to be set it is required to define the field `\"nftoken_minter\"`"
         );
 
         account_set.set_flag = None;
@@ -542,7 +526,7 @@ mod test_account_set_errors {
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
-            "The field `nftoken_minter` cannot be defined if its required flag `AsfAuthorizedNFTokenMinter` is being unset. For more information see: "
+            "The field `\"nftoken_minter\"` cannot be defined if its required flag `AsfAuthorizedNFTokenMinter` is being unset"
         );
     }
 }

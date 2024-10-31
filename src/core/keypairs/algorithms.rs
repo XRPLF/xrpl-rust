@@ -8,6 +8,7 @@
 //! `<https://xrpl.org/cryptographic-keys.html#secp256k1-key-derivation>`
 
 use crate::constants::CryptoAlgorithm;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::keypairs::exceptions::XRPLKeypairsException;
 use crate::core::keypairs::utils::*;
 use crate::core::keypairs::CryptoImplementation;
@@ -91,10 +92,11 @@ impl Secp256k1 {
     fn _derive_part(
         bytes: &[u8],
         phase: Secp256k1Phase,
-    ) -> Result<(secp256k1::PublicKey, secp256k1::SecretKey), XRPLKeypairsException> {
+    ) -> XRPLCoreResult<(secp256k1::PublicKey, secp256k1::SecretKey)> {
         let raw_private = Self::_get_secret(bytes, &phase)?;
         let secp = secp256k1::Secp256k1::new();
-        let wrapped_private = secp256k1::SecretKey::from_slice(&raw_private)?;
+        let wrapped_private = secp256k1::SecretKey::from_slice(&raw_private)
+            .map_err(XRPLKeypairsException::SECP256K1Error)?;
         let wrapped_public = secp256k1::PublicKey::from_secret_key(&secp, &wrapped_private);
 
         Ok((wrapped_public, wrapped_private))
@@ -106,9 +108,13 @@ impl Secp256k1 {
         root_private: secp256k1::SecretKey,
         mid_public: secp256k1::PublicKey,
         mid_private: secp256k1::SecretKey,
-    ) -> Result<(secp256k1::PublicKey, secp256k1::SecretKey), XRPLKeypairsException> {
-        let wrapped_private = root_private.add_tweak(&Scalar::from(mid_private))?;
-        let wrapped_public = root_public.combine(&mid_public)?;
+    ) -> XRPLCoreResult<(secp256k1::PublicKey, secp256k1::SecretKey)> {
+        let wrapped_private = root_private
+            .add_tweak(&Scalar::from(mid_private))
+            .map_err(XRPLKeypairsException::SECP256K1Error)?;
+        let wrapped_public = root_public
+            .combine(&mid_public)
+            .map_err(XRPLKeypairsException::SECP256K1Error)?;
 
         Ok((wrapped_public, wrapped_private))
     }
@@ -122,7 +128,7 @@ impl Secp256k1 {
     fn _get_secret(
         input: &[u8],
         phase: &Secp256k1Phase,
-    ) -> Result<[u8; SHA512_HASH_LENGTH], XRPLKeypairsException> {
+    ) -> XRPLCoreResult<[u8; SHA512_HASH_LENGTH]> {
         for raw_root in 0..SECP256K1_SEQUENCE_MAX {
             let root = (raw_root as u32).to_be_bytes();
             let candidate = sha512_first_half(&Self::_candidate_merger(input, &root, phase));
@@ -134,7 +140,7 @@ impl Secp256k1 {
             }
         }
 
-        Err(XRPLKeypairsException::InvalidSecret)
+        Err(XRPLKeypairsException::InvalidSecret.into())
     }
 }
 
@@ -179,6 +185,7 @@ impl CryptoImplementation for Secp256k1 {
     /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let decoded_seed: &[u8] = &[
     ///     207, 45, 227, 120, 251, 221, 126, 46,
@@ -196,9 +203,9 @@ impl CryptoImplementation for Secp256k1 {
     /// ) {
     ///     Ok((public, private)) => Some((public, private)),
     ///     Err(e) => match e {
-    ///         XRPLKeypairsException::InvalidSignature => None,
-    ///         XRPLKeypairsException::InvalidSecret => None,
-    ///         XRPLKeypairsException::SECP256K1Error => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSignature) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSecret) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
     ///         _ => None,
     ///     },
     /// };
@@ -209,7 +216,7 @@ impl CryptoImplementation for Secp256k1 {
         &self,
         decoded_seed: &[u8],
         is_validator: bool,
-    ) -> Result<(String, String), XRPLKeypairsException> {
+    ) -> XRPLCoreResult<(String, String)> {
         let (root_public, root_secret) = Self::_derive_part(decoded_seed, Secp256k1Phase::Root)?;
         if is_validator {
             Ok(Secp256k1::_format_keys(root_public, root_secret))
@@ -235,6 +242,7 @@ impl CryptoImplementation for Secp256k1 {
     /// use xrpl::core::keypairs::Secp256k1;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let message: &[u8] = "test message".as_bytes();
     /// let private_key: &str = "00D78B9735C3F26501C7337B8A5727FD5\
@@ -254,22 +262,19 @@ impl CryptoImplementation for Secp256k1 {
     /// ) {
     ///     Ok(signature) => Some(signature),
     ///     Err(e) => match e {
-    ///         XRPLKeypairsException::SECP256K1Error => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::SECP256K1Error(_)) => None,
     ///         _ => None,
     ///     },
     /// };
     ///
     /// assert_eq!(Some(signature), signing);
     /// ```
-    fn sign(
-        &self,
-        message_bytes: &[u8],
-        private_key: &str,
-    ) -> Result<Vec<u8>, XRPLKeypairsException> {
+    fn sign(&self, message_bytes: &[u8], private_key: &str) -> XRPLCoreResult<Vec<u8>> {
         let secp = secp256k1::Secp256k1::<secp256k1::SignOnly>::signing_only();
         let message = Self::_get_message(message_bytes);
         let trimmed_key = private_key.trim_start_matches(SECP256K1_PREFIX);
-        let private = secp256k1::SecretKey::from_str(trimmed_key)?;
+        let private = secp256k1::SecretKey::from_str(trimmed_key)
+            .map_err(XRPLKeypairsException::SECP256K1Error)?;
         let signature = secp.sign_ecdsa(&message, &private);
 
         Ok(signature.serialize_der().to_vec())
@@ -332,6 +337,7 @@ impl CryptoImplementation for Ed25519 {
     /// use xrpl::core::keypairs::Ed25519;
     /// use xrpl::core::keypairs::exceptions::XRPLKeypairsException;
     /// use xrpl::core::keypairs::CryptoImplementation;
+    /// use xrpl::core::exceptions::XRPLCoreException;
     ///
     /// let decoded_seed: &[u8] = &[
     ///     207, 45, 227, 120, 251, 221, 126, 46,
@@ -349,9 +355,9 @@ impl CryptoImplementation for Ed25519 {
     /// ) {
     ///     Ok((public, private)) => Some((public, private)),
     ///     Err(e) => match e {
-    ///         XRPLKeypairsException::InvalidSignature => None,
-    ///         XRPLKeypairsException::ED25519Error => None,
-    ///         XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ } => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::InvalidSignature) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::ED25519Error) => None,
+    ///         XRPLCoreException::XRPLKeypairsError(XRPLKeypairsException::UnsupportedValidatorAlgorithm { expected: _ }) => None,
     ///         _ => None,
     ///     },
     /// };
@@ -362,11 +368,12 @@ impl CryptoImplementation for Ed25519 {
         &self,
         decoded_seed: &[u8],
         is_validator: bool,
-    ) -> Result<(String, String), XRPLKeypairsException> {
+    ) -> XRPLCoreResult<(String, String)> {
         if is_validator {
             Err(XRPLKeypairsException::UnsupportedValidatorAlgorithm {
                 expected: CryptoAlgorithm::ED25519,
-            })
+            }
+            .into())
         } else {
             let raw_private = sha512_first_half(decoded_seed);
             let private: [u8; SECRET_KEY_LENGTH] = ed25519_dalek::SecretKey::from(raw_private);
@@ -408,7 +415,7 @@ impl CryptoImplementation for Ed25519 {
     ///
     /// assert_eq!(Some(signature), signing);
     /// ```
-    fn sign(&self, message: &[u8], private_key: &str) -> Result<Vec<u8>, XRPLKeypairsException> {
+    fn sign(&self, message: &[u8], private_key: &str) -> XRPLCoreResult<Vec<u8>> {
         let raw_private = hex::decode(&private_key[ED25519_PREFIX.len()..])?;
         let raw_private_slice: &[u8; SECRET_KEY_LENGTH] = raw_private
             .as_slice()

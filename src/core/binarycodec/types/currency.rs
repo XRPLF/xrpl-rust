@@ -1,9 +1,11 @@
 //! Codec for currency property inside an XRPL
 //! issued currency amount json.
 
-use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::utils::CURRENCY_CODE_LENGTH;
-use crate::core::types::*;
+use super::utils::CURRENCY_CODE_LENGTH;
+use super::Hash160;
+use super::TryFromParser;
+use super::XRPLType;
+use crate::core::exceptions::XRPLCoreException;
 use crate::core::BinaryParser;
 use crate::utils::exceptions::ISOCodeException;
 use crate::utils::*;
@@ -13,6 +15,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::convert::TryInto;
+use core::fmt::Display;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
@@ -65,7 +68,7 @@ fn _iso_to_bytes(value: &str) -> Result<[u8; CURRENCY_CODE_LENGTH], ISOCodeExcep
 }
 
 impl XRPLType for Currency {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
         let hash160 = Hash160::new(buffer.or(Some(&[0; CURRENCY_CODE_LENGTH])))?;
@@ -74,7 +77,7 @@ impl XRPLType for Currency {
 }
 
 impl TryFromParser for Currency {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Build Currency from a BinaryParser.
     fn from_parser(
@@ -96,7 +99,7 @@ impl Serialize for Currency {
 }
 
 impl TryFrom<&str> for Currency {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct a Currency object from a string
     /// representation of a currency.
@@ -108,9 +111,7 @@ impl TryFrom<&str> for Currency {
         } else if is_iso_hex(value) {
             Ok(Currency(Hash160::new(Some(&hex::decode(value)?))?))
         } else {
-            Err(XRPLHashException::ISOCodeError(
-                ISOCodeException::UnsupportedCurrencyRepresentation,
-            ))
+            Err(ISOCodeException::UnsupportedCurrencyRepresentation.into())
         }
     }
 }

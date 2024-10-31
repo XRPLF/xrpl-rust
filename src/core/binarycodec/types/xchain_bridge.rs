@@ -2,11 +2,14 @@ use alloc::vec::Vec;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::core::{BinaryParser, Parser};
+use crate::core::{
+    exceptions::{XRPLCoreException, XRPLCoreResult},
+    BinaryParser, Parser,
+};
 
 use super::{
-    exceptions::{XRPLTypeException, XRPLXChainBridgeException},
-    AccountId, Issue, SerializedType, TryFromParser, XRPLType,
+    exceptions::XRPLXChainBridgeException, AccountId, Issue, SerializedType, TryFromParser,
+    XRPLType,
 };
 
 const TYPE_ORDER: [[&str; 2]; 4] = [
@@ -20,9 +23,9 @@ const TYPE_ORDER: [[&str; 2]; 4] = [
 pub struct XChainBridge(SerializedType);
 
 impl XRPLType for XChainBridge {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> anyhow::Result<Self, Self::Error>
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error>
     where
         Self: Sized,
     {
@@ -35,9 +38,12 @@ impl XRPLType for XChainBridge {
 }
 
 impl TryFromParser for XChainBridge {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn from_parser(parser: &mut BinaryParser, length: Option<usize>) -> Result<Self, Self::Error> {
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> XRPLCoreResult<Self, Self::Error> {
         let mut buf = Vec::new();
         for [_, object_type] in TYPE_ORDER {
             if object_type == "AccountID" {
@@ -62,9 +68,9 @@ impl TryFromParser for XChainBridge {
 }
 
 impl TryFrom<Value> for XChainBridge {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
+    fn try_from(value: Value) -> XRPLCoreResult<Self, Self::Error> {
         if !value.is_object() {
             return Err(XRPLXChainBridgeException::InvalidXChainBridgeType.into());
         }
@@ -92,9 +98,9 @@ impl TryFrom<Value> for XChainBridge {
 }
 
 impl TryFrom<&str> for XChainBridge {
-    type Error = XRPLTypeException;
+    type Error = XRPLCoreException;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         Ok(XChainBridge(SerializedType::from(hex::decode(value)?)))
     }
 }

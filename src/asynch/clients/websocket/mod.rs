@@ -1,16 +1,12 @@
-use crate::{
-    models::{requests::XRPLRequest, results::XRPLResponse},
-    Err,
-};
+use crate::models::{requests::XRPLRequest, results::XRPLResponse};
 #[cfg(feature = "std")]
 use alloc::string::String;
 #[cfg(not(feature = "std"))]
 use alloc::string::ToString;
-use anyhow::Result;
 #[cfg(not(feature = "std"))]
-use core::fmt::Display;
+use embedded_io_async::Error;
 #[cfg(not(feature = "std"))]
-use embedded_io_async::{ErrorType, Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
+use embedded_io_async::{Read as EmbeddedIoRead, Write as EmbeddedIoWrite};
 #[cfg(feature = "std")]
 use futures::{Sink, SinkExt, Stream, StreamExt};
 
@@ -29,34 +25,31 @@ pub use _no_std::*;
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub use _std::*;
 
+use super::exceptions::{XRPLClientException, XRPLClientResult};
+
 pub struct WebSocketOpen;
 pub struct WebSocketClosed;
 
 #[allow(async_fn_in_trait)]
 pub trait XRPLAsyncWebsocketIO {
-    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()>;
+    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()>;
 
-    async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>>;
+    async fn xrpl_receive(&mut self) -> XRPLClientResult<Option<XRPLResponse<'_>>>;
 }
 
 #[cfg(not(feature = "std"))]
-impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLAsyncWebsocketIO for T
-where
-    <T as ErrorType>::Error: Display,
-{
-    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()> {
-        let message = match serde_json::to_string(&message) {
-            Ok(message) => message,
-            Err(error) => return Err!(error),
-        };
+impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLAsyncWebsocketIO for T {
+    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()> {
+        let message = serde_json::to_string(&message)?;
         let message_buffer = message.as_bytes();
-        match self.write(message_buffer).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err!(e),
-        }
+        self.write(message_buffer)
+            .await
+            .map_err(|e| XRPLWebSocketException::EmbeddedIoError(e.kind()))?;
+
+        Ok(())
     }
 
-    async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>> {
+    async fn xrpl_receive(&mut self) -> XRPLClientResult<Option<XRPLResponse<'_>>> {
         let mut buffer = [0; 1024];
         loop {
             match self.read(&mut buffer).await {
@@ -65,20 +58,16 @@ where
                     if u_size == 0 {
                         continue;
                     }
-                    let response_str = match core::str::from_utf8(&buffer[..u_size]) {
-                        Ok(response_str) => response_str,
-                        Err(error) => {
-                            return Err!(XRPLWebsocketException::<anyhow::Error>::Utf8(error))
-                        }
-                    };
+                    let response_str = core::str::from_utf8(&buffer[..u_size])
+                        .map_err(|e| XRPLWebSocketException::Utf8(e))?;
                     self.handle_message(response_str.to_string()).await?;
                     let message = self.pop_message().await;
-                    match serde_json::from_str(&message) {
-                        Ok(response) => return Ok(response),
-                        Err(error) => return Err!(error),
-                    }
+
+                    return Ok(serde_json::from_str(&message)?);
                 }
-                Err(error) => return Err!(error),
+                Err(error) => {
+                    return Err(XRPLWebSocketException::EmbeddedIoError(error.kind()).into())
+                }
             }
         }
     }
@@ -87,30 +76,26 @@ where
 #[cfg(feature = "std")]
 impl<T: ?Sized> XRPLAsyncWebsocketIO for T
 where
-    T: Stream<Item = Result<String>> + Sink<String, Error = anyhow::Error> + MessageHandler + Unpin,
+    T: Stream<Item = XRPLClientResult<String>>
+        + Sink<String, Error = XRPLClientException>
+        + MessageHandler
+        + Unpin,
 {
-    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> Result<()> {
-        let message = match serde_json::to_string(&message) {
-            Ok(message) => message,
-            Err(error) => return Err!(error),
-        };
-        match self.send(message).await {
-            Ok(()) => Ok(()),
-            Err(error) => Err!(error),
-        }
+    async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()> {
+        let message = serde_json::to_string(&message)?;
+
+        self.send(message).await
     }
 
-    async fn xrpl_receive(&mut self) -> Result<Option<XRPLResponse<'_>>> {
+    async fn xrpl_receive(&mut self) -> XRPLClientResult<Option<XRPLResponse<'_>>> {
         match self.next().await {
             Some(Ok(item)) => {
                 self.handle_message(item).await?;
                 let message = self.pop_message().await;
-                match serde_json::from_str(&message) {
-                    Ok(response) => Ok(response),
-                    Err(error) => Err!(error),
-                }
+
+                Ok(serde_json::from_str(&message)?)
             }
-            Some(Err(error)) => Err!(error),
+            Some(Err(error)) => Err(error),
             None => Ok(None),
         }
     }

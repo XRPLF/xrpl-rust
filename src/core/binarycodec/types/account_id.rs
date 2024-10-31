@@ -1,14 +1,18 @@
 //! Codec for currency property inside an XRPL
 //! issued currency amount json.
 
+use super::Hash160;
+use super::TryFromParser;
+use super::XRPLType;
 use crate::constants::ACCOUNT_ID_LENGTH;
 use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
 use crate::core::addresscodec::*;
-use crate::core::types::exceptions::XRPLHashException;
-use crate::core::types::*;
+use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use crate::utils::is_hex_address;
 use core::convert::TryFrom;
+use core::fmt::Display;
 use serde::ser::Error;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
@@ -24,7 +28,7 @@ use serde::{Deserialize, Serialize};
 pub struct AccountId(Hash160);
 
 impl XRPLType for AccountId {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct an AccountID from given bytes.
     /// If buffer is not provided, default to 20 zero bytes.
@@ -35,7 +39,7 @@ impl XRPLType for AccountId {
 }
 
 impl TryFromParser for AccountId {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Build AccountId from a BinaryParser.
     fn from_parser(
@@ -64,11 +68,11 @@ impl Serialize for AccountId {
 }
 
 impl TryFrom<&str> for AccountId {
-    type Error = XRPLHashException;
+    type Error = XRPLCoreException;
 
     /// Construct an AccountId from a hex string or
     /// a base58 r-Address.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         if is_hex_address(value) {
             Self::new(Some(&hex::decode(value)?))
         } else if is_valid_classic_address(value) {
@@ -77,7 +81,7 @@ impl TryFrom<&str> for AccountId {
             let (classic_address, _, _) = xaddress_to_classic_address(value)?;
             Self::new(Some(&decode_classic_address(&classic_address)?))
         } else {
-            Err(XRPLHashException::XRPLAddressCodecError(
+            Err(XRPLCoreException::XRPLAddressCodecError(
                 XRPLAddressCodecException::InvalidClassicAddressValue,
             ))
         }
@@ -105,7 +109,7 @@ impl AsRef<[u8]> for AccountId {
 #[cfg(test)]
 mod test {
     use super::*;
-    use alloc::format;
+    use alloc::{format, string::ToString};
 
     const HEX_ENCODING: &str = "5E7B112523F68D2F5E879DB4EAC51C6698A69304";
     const BASE58_ENCODING: &str = "r9cZA1mLK5R5Am25ArfXFmqgNwjZgnfk59";

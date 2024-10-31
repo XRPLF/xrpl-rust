@@ -3,13 +3,15 @@
 //! See Blob Fields:
 //! `<https://xrpl.org/serialization.html#blob-fields>`
 
-use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
-use crate::core::types::*;
+use crate::core::exceptions::{XRPLCoreException, XRPLCoreResult};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
+use core::fmt::Display;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
+
+use super::XRPLType;
 
 /// Codec for serializing and deserializing blob fields.
 ///
@@ -20,9 +22,9 @@ use serde::{Deserialize, Serialize};
 pub struct Blob(Vec<u8>);
 
 impl XRPLType for Blob {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(Blob(data.to_vec()))
         } else {
@@ -32,7 +34,7 @@ impl XRPLType for Blob {
 }
 
 impl Serialize for Blob {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -41,10 +43,10 @@ impl Serialize for Blob {
 }
 
 impl TryFrom<&str> for Blob {
-    type Error = XRPLBinaryCodecException;
+    type Error = XRPLCoreException;
 
     /// Construct a Blob from a hex string.
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         Self::new(Some(&hex::decode(value)?))
     }
 }

@@ -33,16 +33,14 @@ pub mod xchain_create_bridge;
 pub mod xchain_create_claim_id;
 pub mod xchain_modify_bridge;
 
-use super::FlagCollection;
+use super::{FlagCollection, XRPLModelResult};
 use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
-use crate::Err;
 use crate::{_serde::txn_flags, serde_with_tag};
 use alloc::borrow::Cow;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use anyhow::Result;
 use core::fmt::Debug;
 use derive_new::new;
 use exceptions::XRPLTransactionException;
@@ -321,11 +319,10 @@ where
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, T>;
 
-    fn get_field_value(&self, field: &str) -> Result<Option<String>> {
-        match serde_json::to_value(self) {
-            Ok(value) => Ok(value.get(field).map(|v| v.to_string())),
-            Err(e) => Err!(e),
-        }
+    fn get_field_value(&self, field: &str) -> XRPLModelResult<Option<String>> {
+        let value = serde_json::to_value(self)?;
+
+        Ok(value.get(field).map(|v| v.to_string()))
     }
 
     fn is_signed(&self) -> bool {
@@ -335,22 +332,19 @@ where
 
     /// Hashes the Transaction object as the ledger does. Only valid for signed
     /// Transaction objects.
-    fn get_hash(&self) -> Result<Cow<str>>
+    fn get_hash(&self) -> XRPLModelResult<Cow<str>>
     where
         Self: Serialize + DeserializeOwned + Debug + Clone,
     {
         if self.get_common_fields().txn_signature.is_none()
             && self.get_common_fields().signers.is_none()
         {
-            return Err!(XRPLTransactionException::TxMustBeSigned);
+            return Err(XRPLTransactionException::TxMustBeSigned.into());
         }
         let prefix = format!("{:X}", TRANSACTION_HASH_PREFIX);
-        let tx_hex = encode(self)?;
+        let tx_hex = encode(self).map_err(XRPLTransactionException::XRPLCoreError)?;
         let tx_hex = prefix + &tx_hex;
-        let tx_bytes = match hex::decode(&tx_hex) {
-            Ok(bytes) => bytes,
-            Err(e) => return Err!(e),
-        };
+        let tx_bytes = hex::decode(&tx_hex)?;
         let mut hasher = Sha512::new();
         hasher.update(&tx_bytes);
         let hash = hasher.finalize();
@@ -376,15 +370,15 @@ pub enum Flag {
 #[cfg(all(
     feature = "std",
     feature = "websocket",
-    feature = "transaction-models",
-    feature = "transaction-helpers",
+    feature = "models",
+    feature = "helpers",
     feature = "wallet"
 ))]
 #[cfg(test)]
 mod test_tx_common_fields {
     use super::*;
     use account_set::AccountSet;
-    
+
     use offer_create::OfferCreate;
 
     #[tokio::test]

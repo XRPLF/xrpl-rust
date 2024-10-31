@@ -1,9 +1,11 @@
 //! Codec for serializing and deserializing
 //! vectors of Hash256.
 
-use crate::core::types::exceptions::XRPLVectorException;
-use crate::core::types::hash::Hash256;
-use crate::core::types::*;
+use crate::core::binarycodec::types::exceptions::XRPLVectorException;
+use crate::core::binarycodec::types::hash::Hash256;
+use crate::core::binarycodec::types::*;
+use crate::core::exceptions::XRPLCoreException;
+use crate::core::exceptions::XRPLCoreResult;
 use crate::core::BinaryParser;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -24,7 +26,7 @@ pub struct Vector256(Vec<u8>);
 impl XRPLType for Vector256 {
     type Error = XRPLVectorException;
 
-    fn new(buffer: Option<&[u8]>) -> Result<Self, Self::Error> {
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         if let Some(data) = buffer {
             Ok(Vector256(data.to_vec()))
         } else {
@@ -34,13 +36,13 @@ impl XRPLType for Vector256 {
 }
 
 impl TryFromParser for Vector256 {
-    type Error = XRPLVectorException;
+    type Error = XRPLCoreException;
 
     /// Build Vector256 from a BinaryParser.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
-    ) -> Result<Vector256, Self::Error> {
+    ) -> XRPLCoreResult<Vector256, Self::Error> {
         let mut bytes = vec![];
 
         let num_bytes: usize = if let Some(value) = length {
@@ -60,7 +62,7 @@ impl TryFromParser for Vector256 {
 }
 
 impl Serialize for Vector256 {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -80,10 +82,10 @@ impl Serialize for Vector256 {
 }
 
 impl TryFrom<Vec<&str>> for Vector256 {
-    type Error = XRPLVectorException;
+    type Error = XRPLCoreException;
 
     /// Construct a Vector256 from a list of strings.
-    fn try_from(value: Vec<&str>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<&str>) -> XRPLCoreResult<Self, Self::Error> {
         let mut bytes = vec![];
 
         for string in value {
