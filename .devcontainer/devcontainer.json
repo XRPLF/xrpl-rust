@@ -25,7 +25,8 @@
 				"panicbit.cargo",
 				"vadimcn.vscode-lldb",
 				"tamasfe.even-better-toml",
-				"Swellaby.vscode-rust-test-adapter"
+				"Swellaby.vscode-rust-test-adapter",
+				"fill-labs.dependi"
 			],
 			"settings": {
 				"files.autoSave": "onFocusChange",
