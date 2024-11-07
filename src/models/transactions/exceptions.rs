@@ -26,6 +26,8 @@ pub enum XRPLTransactionException {
     #[error("{0}")]
     XRPLXChainModifyBridgeError(#[from] XRPLXChainModifyBridgeException),
     #[error("{0}")]
+    XRPLAMMCreateError(#[from] XRPLAMMCreateException),
+    #[error("{0}")]
     XRPLCoreError(#[from] XRPLCoreException),
     #[error("The transaction must be signed")]
     TxMustBeSigned,
@@ -203,3 +205,12 @@ pub enum XRPLXChainModifyBridgeException {
     #[error("Cannot have MinAccountCreateAmount if bridge is IOU-IOU")]
     CannotHaveMinAccountCreateAmount,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLAMMCreateException {
+    #[error("The trading fee must be between 0 and {max:?} (found {found:?})")]
+    TradingFeeOutOfRange { max: u16, found: u16 },
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLAMMCreateException {}
