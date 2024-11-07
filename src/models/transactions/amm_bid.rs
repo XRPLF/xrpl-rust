@@ -8,8 +8,8 @@ use crate::models::{
 
 use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AmmBid<'a> {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AMMBid<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     pub asset: Currency<'a>,
@@ -19,9 +19,9 @@ pub struct AmmBid<'a> {
     pub auth_accounts: Option<Vec<AuthAccount>>,
 }
 
-impl Model for AmmBid<'_> {}
+impl Model for AMMBid<'_> {}
 
-impl<'a> Transaction<'a, NoFlags> for AmmBid<'a> {
+impl<'a> Transaction<'a, NoFlags> for AMMBid<'a> {
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
         &self.common_fields
     }
@@ -35,7 +35,7 @@ impl<'a> Transaction<'a, NoFlags> for AmmBid<'a> {
     }
 }
 
-impl<'a> AmmBid<'_> {
+impl<'a> AMMBid<'_> {
     pub fn new(
         account: Cow<'a, str>,
         account_txn_id: Option<Cow<'a, str>>,
@@ -51,8 +51,8 @@ impl<'a> AmmBid<'_> {
         bid_min: Option<IssuedCurrencyAmount<'a>>,
         bid_max: Option<IssuedCurrencyAmount<'a>>,
         auth_accounts: Option<Vec<AuthAccount>>,
-    ) -> AmmBid<'a> {
-        AmmBid {
+    ) -> AMMBid<'a> {
+        AMMBid {
             common_fields: CommonFields {
                 account,
                 transaction_type: TransactionType::AmmBid,
