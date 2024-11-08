@@ -76,6 +76,7 @@ impl<'a> AMMDeposit<'a> {
         account: Cow<'a, str>,
         account_txn_id: Option<Cow<'a, str>>,
         fee: Option<XRPAmount<'a>>,
+        flags: FlagCollection<AMMDepositFlag>,
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
@@ -92,10 +93,10 @@ impl<'a> AMMDeposit<'a> {
         AMMDeposit {
             common_fields: CommonFields {
                 account,
-                transaction_type: TransactionType::AmmDeposit,
+                transaction_type: TransactionType::AMMDeposit,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                flags,
                 last_ledger_sequence,
                 memos,
                 sequence,

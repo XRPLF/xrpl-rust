@@ -59,7 +59,7 @@ impl<'a> AMMCreate<'a> {
         AMMCreate {
             common_fields: CommonFields {
                 account,
-                transaction_type: TransactionType::AmmCreate,
+                transaction_type: TransactionType::AMMCreate,
                 account_txn_id,
                 fee,
                 flags: FlagCollection::default(),

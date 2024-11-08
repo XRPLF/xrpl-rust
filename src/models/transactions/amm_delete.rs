@@ -46,7 +46,7 @@ impl<'a> AMMDelete<'a> {
         AMMDelete {
             common_fields: CommonFields {
                 account,
-                transaction_type: TransactionType::AmmDelete,
+                transaction_type: TransactionType::AMMDelete,
                 account_txn_id,
                 fee,
                 flags: FlagCollection::default(),

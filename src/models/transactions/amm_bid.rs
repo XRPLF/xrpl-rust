@@ -55,7 +55,7 @@ impl<'a> AMMBid<'_> {
         AMMBid {
             common_fields: CommonFields {
                 account,
-                transaction_type: TransactionType::AmmBid,
+                transaction_type: TransactionType::AMMBid,
                 account_txn_id,
                 fee,
                 flags: FlagCollection::default(),
