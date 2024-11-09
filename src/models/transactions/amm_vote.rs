@@ -1,5 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::models::{
     Currency, FlagCollection, Model, NoFlags, XRPAmount, XRPLModelException, XRPLModelResult,
@@ -15,12 +16,15 @@ pub const AMM_VOTE_MAX_TRADING_FEE: u16 = 1000;
 /// they hold.
 /// Each new vote re-calculates the AMM's trading fee based on a weighted average
 /// of the votes.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct AMMVote<'a> {
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
     /// The definition for the other asset in the AMM's pool.
+    #[serde(rename = "Asset2")]
     pub asset2: Currency<'a>,
     /// The proposed fee to vote for, in units of 1/100,000; a value of 1 is equivalent
     /// to 0.001%.

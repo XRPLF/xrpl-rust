@@ -1,5 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::models::{
     transactions::TransactionType, Currency, FlagCollection, IssuedCurrencyAmount, Model, NoFlags,
@@ -16,13 +17,16 @@ use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
 /// of your bid based on how much time remains.
 /// You bid using the AMM's LP Tokens; the amount of a winning bid is returned
 /// to the AMM, decreasing the outstanding balance of LP Tokens.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct AMMBid<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
     /// The definition for the other asset in the AMM's pool.
+    #[serde(rename = "Asset2")]
     pub asset2: Currency<'a>,
     /// Pay at least this LPToken amount for the slot.
     /// Setting this value higher makes it harder for others to outbid you.

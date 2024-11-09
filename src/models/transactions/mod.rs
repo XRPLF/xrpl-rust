@@ -302,7 +302,7 @@ pub struct Memo {
 
 serde_with_tag! {
     /// Represents one entry in a list of AuthAccounts used in AMMBid transaction.
-    #[derive(Debug, Clone, new)]
+    #[derive(Debug, Clone, PartialEq, Eq, new)]
     pub struct AuthAccount {
         pub account: String,
     }

@@ -1,5 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::models::{Currency, FlagCollection, Model, NoFlags, XRPAmount};
 
@@ -16,13 +17,16 @@ use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 /// cases, it may take several AMMDelete transactions to fully delete the trust lines
 /// and the associated AMM. In all cases, the AMM ledger entry and AMM account are
 /// deleted by the last such transaction.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct AMMDelete<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
     /// The definition for the other asset in the AMM's pool.
+    #[serde(rename = "Asset2")]
     pub asset2: Currency<'a>,
 }
 

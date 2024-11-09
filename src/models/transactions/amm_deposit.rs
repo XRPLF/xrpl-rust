@@ -1,6 +1,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
@@ -31,13 +32,16 @@ pub enum AMMDepositFlag {
 /// You can deposit one or both of the assets in the AMM's pool.
 /// If successful, this transaction creates a trust line to the AMM Account (limit 0)
 /// to hold the LP Tokens.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct AMMDeposit<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, AMMDepositFlag>,
     /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
     /// The definition for the other asset in the AMM's pool.
+    #[serde(rename = "Asset2")]
     pub asset2: Currency<'a>,
     /// The amount of one asset to deposit to the AMM.
     /// If present, this must match the type of one of the assets (tokens or XRP)
@@ -46,6 +50,7 @@ pub struct AMMDeposit<'a> {
     /// The amount of another asset to add to the AMM.
     /// If present, this must match the type of the other asset in the AMM's pool
     /// and cannot be the same asset as Amount.
+    #[serde(rename = "Amount2")]
     pub amount2: Option<Amount<'a>>,
     /// The maximum effective price, in the deposit asset, to pay
     /// for each LP Token received.

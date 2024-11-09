@@ -1,5 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 use crate::models::{Amount, FlagCollection, Model, NoFlags, XRPAmount, XRPLModelResult};
 
@@ -26,13 +27,16 @@ pub const AMM_CREATE_MAX_FEE: u16 = 1000;
 /// volatility (potential for imbalance) of the asset pair.
 /// The higher the trading fee, the more it offsets this risk,
 /// so it's best to set the trading fee based on the volatility of the asset pair.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct AMMCreate<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The first of the two assets to fund this AMM with. This must be a positive amount.
     pub amount: Amount<'a>,
     /// The second of the two assets to fund this AMM with. This must be a positive amount.
+    #[serde(rename = "Amount2")]
     pub amount2: Amount<'a>,
     /// The fee to charge for trades against this AMM instance, in units of 1/100,000;
     /// a value of 1 is equivalent to 0.001%.

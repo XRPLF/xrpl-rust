@@ -1,6 +1,7 @@
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{Amount, Currency, FlagCollection, IssuedCurrencyAmount, Model, XRPAmount};
@@ -25,12 +26,15 @@ pub enum AMMWithdrawFlag {
 
 /// Withdraw assets from an Automated Market Maker (AMM) instance by returning the
 /// AMM's liquidity provider tokens (LP Tokens).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "PascalCase")]
 pub struct AMMWithdraw<'a> {
     pub common_fields: CommonFields<'a, AMMWithdrawFlag>,
     /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
     /// The definition for the other asset in the AMM's pool.
+    #[serde(rename = "Asset2")]
     pub asset2: Currency<'a>,
     /// The amount of one asset to withdraw from the AMM.
     /// This must match the type of one of the assets (tokens or XRP) in the AMM's pool.
@@ -38,6 +42,7 @@ pub struct AMMWithdraw<'a> {
     /// The amount of another asset to withdraw from the AMM.
     /// If present, this must match the type of the other asset in the AMM's pool
     /// and cannot be the same type as Amount.
+    #[serde(rename = "Amount2")]
     pub amount2: Option<Amount<'a>>,
     /// The minimum effective price, in LP Token returned, to pay per unit of the asset
     /// to withdraw.
