@@ -135,3 +135,86 @@ impl<'a> AMMDeposit<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod test_errors {
+    use crate::models::{IssuedCurrency, XRP};
+
+    use super::*;
+
+    #[test]
+    fn test_no_amount() {
+        let deposit = AMMDeposit::new(
+            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
+            None,
+            Some("10".into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            XRP::new().into(),
+            IssuedCurrency::new("USD".into(), "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into()).into(),
+            None,
+            None,
+            Some(XRPAmount::from("10").into()),
+            None,
+        );
+
+        assert!(deposit.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_no_lp_token_out_or_amount() {
+        let deposit = AMMDeposit::new(
+            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
+            None,
+            Some("10".into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            XRP::new().into(),
+            IssuedCurrency::new("USD".into(), "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into()).into(),
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert!(deposit.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_amount2_no_amount() {
+        let deposit = AMMDeposit::new(
+            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
+            None,
+            Some("10".into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            XRP::new().into(),
+            IssuedCurrency::new("USD".into(), "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into()).into(),
+            None,
+            Some(Amount::XRPAmount("10".into())),
+            None,
+            Some(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                "10".into(),
+            )),
+        );
+
+        assert!(deposit.get_errors().is_err());
+    }
+}

@@ -13,4 +13,9 @@ pub trait Model {
     fn validate(&self) -> XRPLModelResult<()> {
         self.get_errors()
     }
+
+    /// Checks if the model is valid.
+    fn is_valid(&self) -> bool {
+        self.validate().is_ok()
+    }
 }

@@ -51,8 +51,10 @@ const LEDGER_OFFSET: u8 = 20;
 pub fn sign<'a, T, F>(transaction: &mut T, wallet: &Wallet, multisign: bool) -> XRPLHelperResult<()>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
-    T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone + Debug,
+    T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
 {
+    transaction.validate()?;
+
     if multisign {
         let serialized_for_signing =
             encode_for_multisigning(transaction, wallet.classic_address.clone().into())?;

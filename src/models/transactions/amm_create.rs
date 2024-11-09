@@ -115,3 +115,70 @@ impl<'a> AMMCreate<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod test_errors {
+    use crate::models::IssuedCurrencyAmount;
+
+    use super::*;
+
+    #[test]
+    fn test_trading_fee_error() {
+        let amm_create = AMMCreate::new(
+            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
+            None,
+            Some(XRPAmount::from("1000")),
+            Some(20),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                "1000".into(),
+            )
+            .into(),
+            IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                "1000".into(),
+            )
+            .into(),
+            1001,
+        );
+
+        assert!(amm_create.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_no_error() {
+        let amm_create = AMMCreate::new(
+            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
+            None,
+            Some(XRPAmount::from("1000")),
+            Some(20),
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                "1000".into(),
+            )
+            .into(),
+            IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                "1000".into(),
+            )
+            .into(),
+            1000,
+        );
+
+        assert!(amm_create.get_errors().is_ok());
+    }
+}
