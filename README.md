@@ -24,6 +24,9 @@
   <img alt="" src="/assets/xrpl-rust_black.png">
 </picture>
 
+> [!WARNING]
+> This repository is under active development. All releases before v1.0.0 can be considered as **beta-releases**
+
 A Rust library to interact with the XRPL.
 Based off of the [xrpl-py](https://github.com/XRPLF/xrpl-py) library.
 
@@ -47,7 +50,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.xrpl]
-version = "0.1.1"
+version = "0.4.0"
 ```
 
 # 🕮 Documentation [![docs_status]][docs]
@@ -60,37 +63,36 @@ TODO - Most core functionality is in place and working.
 
 In Progress:
 
-- Models
-- Asynchronous ledger interactions
-  - JSON RPC
-  - API
-  - Websocket
+- no_std examples
+- Response Models
 - Benchmarks
 - Integration tests
 
 # ⚐ Flags
 
-By default, the `std` and `core` features are enabled.
+By default, the the following features are enabled:
+
+- std
+- core
+- models
+- wallet
+- utils
+- websocket
+- json-rpc
+- helpers
+- tokio-rt
+
+When `helpers` is enabled you also need to specify a `*-rt` feature flag as it is needed for waiting between requests when using the `submit_and_wait` function.
+
 To operate in a `#![no_std]` environment simply disable the defaults
 and enable features manually:
 
 ```toml
 [dependencies.xrpl]
-version = "0.1.1"
+version = "0.4.0"
 default-features = false
-features = ["core", "models"]
+features = ["core", "models", "wallet", "utils", "websocket", "json-rpc", "helpers", "embassy-rt"]
 ```
-
-## ‼ Exported Dependencies
-
-### Serde
-
-This project exports [serde](https://serde.rs) for handling JSON.
-
-### Indexmap
-
-This project exports [indexmap](https://docs.rs/crate/indexmap) as `HashMap` is
-not supported in the `alloc` crate. TODO: Support both.
 
 ## ⚙ #![no_std]
 

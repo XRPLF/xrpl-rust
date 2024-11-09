@@ -1,10 +1,10 @@
 [package]
 name = "xrpl-rust"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = [
     "Tanveer Wahid <tan@wahid.email>",
-    "Steffen Konermann <contact@limpidcrypto.com>",
+    "LimpidCrypto <contact@limpidcrypto.com>",
 ]
 description = "A 100% Rust library to interact with the XRPL"
 readme = "README.md"
