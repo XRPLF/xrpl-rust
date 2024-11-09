@@ -9,11 +9,22 @@ use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
 pub const AMM_VOTE_MAX_TRADING_FEE: u16 = 1000;
 
+/// Vote on the trading fee for an Automated Market Maker (AMM) instance.
+///
+/// Up to 8 accounts can vote in proportion to the amount of the AMM's LP Tokens
+/// they hold.
+/// Each new vote re-calculates the AMM's trading fee based on a weighted average
+/// of the votes.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AMMVote<'a> {
     pub common_fields: CommonFields<'a, NoFlags>,
+    /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
+    /// The definition for the other asset in the AMM's pool.
     pub asset2: Currency<'a>,
+    /// The proposed fee to vote for, in units of 1/100,000; a value of 1 is equivalent
+    /// to 0.001%.
+    /// The maximum value is 1000, indicating a 1% fee.
     pub trading_fee: Option<u16>,
 }
 

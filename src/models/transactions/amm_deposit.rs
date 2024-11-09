@@ -10,6 +10,8 @@ use crate::models::{
 
 use super::{CommonFields, Memo, Signer, Transaction};
 
+/// Transactions of the AMMDeposit type support additional values in the Flags field.
+/// This enum represents those options.
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
@@ -23,15 +25,32 @@ pub enum AMMDepositFlag {
     TfTwoAssetIfEmpty = 0x00800000,
 }
 
+/// Deposit funds into an Automated Market Maker (AMM) instance
+/// and receive the AMM's liquidity provider tokens (LP Tokens) in exchange.
+///
+/// You can deposit one or both of the assets in the AMM's pool.
+/// If successful, this transaction creates a trust line to the AMM Account (limit 0)
+/// to hold the LP Tokens.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AMMDeposit<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, AMMDepositFlag>,
+    /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
+    /// The definition for the other asset in the AMM's pool.
     pub asset2: Currency<'a>,
+    /// The amount of one asset to deposit to the AMM.
+    /// If present, this must match the type of one of the assets (tokens or XRP)
+    /// in the AMM's pool.
     pub amount: Option<Amount<'a>>,
+    /// The amount of another asset to add to the AMM.
+    /// If present, this must match the type of the other asset in the AMM's pool
+    /// and cannot be the same asset as Amount.
     pub amount2: Option<Amount<'a>>,
+    /// The maximum effective price, in the deposit asset, to pay
+    /// for each LP Token received.
     pub e_price: Option<Amount<'a>>,
+    /// How many of the AMM's LP Tokens to buy.
     pub lp_token_out: Option<IssuedCurrencyAmount<'a>>,
 }
 

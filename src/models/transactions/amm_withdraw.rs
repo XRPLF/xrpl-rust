@@ -7,6 +7,8 @@ use crate::models::{Amount, Currency, FlagCollection, IssuedCurrencyAmount, Mode
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
+/// Transactions of the AMMWithdraw type support additional values in the Flags field.
+/// This enum represents those options.
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
@@ -21,14 +23,26 @@ pub enum AMMWithdrawFlag {
     TfLimitLpToken = 0x00400000,
 }
 
+/// Withdraw assets from an Automated Market Maker (AMM) instance by returning the
+/// AMM's liquidity provider tokens (LP Tokens).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AMMWithdraw<'a> {
     pub common_fields: CommonFields<'a, AMMWithdrawFlag>,
+    /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
+    /// The definition for the other asset in the AMM's pool.
     pub asset2: Currency<'a>,
+    /// The amount of one asset to withdraw from the AMM.
+    /// This must match the type of one of the assets (tokens or XRP) in the AMM's pool.
     pub amount: Option<Amount<'a>>,
+    /// The amount of another asset to withdraw from the AMM.
+    /// If present, this must match the type of the other asset in the AMM's pool
+    /// and cannot be the same type as Amount.
     pub amount2: Option<Amount<'a>>,
+    /// The minimum effective price, in LP Token returned, to pay per unit of the asset
+    /// to withdraw.
     pub e_price: Option<Amount<'a>>,
+    /// How many of the AMM's LP Tokens to redeem.
     pub lp_token_in: Option<IssuedCurrencyAmount<'a>>,
 }
 

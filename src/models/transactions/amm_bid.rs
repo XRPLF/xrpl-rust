@@ -8,14 +8,32 @@ use crate::models::{
 
 use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
 
+/// Bid on an Automated Market Maker's (AMM's) auction slot.
+///
+/// If you win, you can trade against the AMM at a discounted fee until you are outbid
+/// or 24 hours have passed.
+/// If you are outbid before 24 hours have passed, you are refunded part of the cost
+/// of your bid based on how much time remains.
+/// You bid using the AMM's LP Tokens; the amount of a winning bid is returned
+/// to the AMM, decreasing the outstanding balance of LP Tokens.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AMMBid<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
+    /// The definition for one of the assets in the AMM's pool.
     pub asset: Currency<'a>,
+    /// The definition for the other asset in the AMM's pool.
     pub asset2: Currency<'a>,
+    /// Pay at least this LPToken amount for the slot.
+    /// Setting this value higher makes it harder for others to outbid you.
+    /// If omitted, pay the minimum necessary to win the bid.
     pub bid_min: Option<IssuedCurrencyAmount<'a>>,
+    /// Pay at most this LPToken amount for the slot.
+    /// If the cost to win the bid is higher than this amount, the transaction fails.
+    /// If omitted, pay as much as necessary to win the bid.
     pub bid_max: Option<IssuedCurrencyAmount<'a>>,
+    /// A list of up to 4 additional accounts that you allow to trade at the discounted fee.
+    /// This cannot include the address of the transaction sender.
     pub auth_accounts: Option<Vec<AuthAccount>>,
 }
 
