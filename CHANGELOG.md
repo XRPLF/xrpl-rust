@@ -13,7 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
-## [[v0.2.0-beta.1]]
+## [[v0.4.0]]
+
+- add amm support
+  - Transaction models
+  - Transaction signing
+  - Request models
+- add sidechain support
+  - Transaction models
+  - Transaction signing
+- improve errorhandling utilizing thiserror
+- simplifying feature flags
+
+## [[v0.3.0]]
 
 - Examples
   - Wallet from seed

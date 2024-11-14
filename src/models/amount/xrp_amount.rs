@@ -1,13 +1,14 @@
-use crate::models::Model;
-use crate::{models::amount::exceptions::XRPLAmountException, Err};
+use crate::models::{Model, XRPLModelException, XRPLModelResult};
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
 };
-use anyhow::Result;
-use core::convert::{TryFrom, TryInto};
+use bigdecimal::BigDecimal;
 use core::str::FromStr;
-use rust_decimal::Decimal;
+use core::{
+    convert::{TryFrom, TryInto},
+    fmt::Display,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -23,9 +24,15 @@ impl Default for XRPAmount<'_> {
     }
 }
 
+impl Display for XRPAmount<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // implement Deserializing from Cow<str>, &str, String, Decimal, f64, u32, and Value
 impl<'de, 'a> Deserialize<'de> for XRPAmount<'a> {
-    fn deserialize<D>(deserializer: D) -> Result<XRPAmount<'a>, D::Error>
+    fn deserialize<D>(deserializer: D) -> XRPLModelResult<XRPAmount<'a>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -52,8 +59,8 @@ impl<'a> From<String> for XRPAmount<'a> {
     }
 }
 
-impl<'a> From<Decimal> for XRPAmount<'a> {
-    fn from(value: Decimal) -> Self {
+impl<'a> From<BigDecimal> for XRPAmount<'a> {
+    fn from(value: BigDecimal) -> Self {
         Self(value.to_string().into())
     }
 }
@@ -71,56 +78,47 @@ impl<'a> From<u32> for XRPAmount<'a> {
 }
 
 impl<'a> TryFrom<Value> for XRPAmount<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(value: Value) -> Result<Self, Self::Error> {
+    fn try_from(value: Value) -> XRPLModelResult<Self, Self::Error> {
         match serde_json::to_string(&value) {
             Ok(amount_string) => {
                 let amount_string = amount_string.clone().replace("\"", "");
                 Ok(Self(amount_string.into()))
             }
-            Err(serde_error) => Err!(XRPLAmountException::FromSerdeError(serde_error)),
+            Err(serde_error) => Err(serde_error.into()),
         }
     }
 }
 
 impl<'a> TryInto<f64> for XRPAmount<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<f64, Self::Error> {
-        match self.0.parse::<f64>() {
-            Ok(f64_value) => Ok(f64_value),
-            Err(parse_error) => Err!(XRPLAmountException::ToFloatError(parse_error)),
-        }
+    fn try_into(self) -> XRPLModelResult<f64, Self::Error> {
+        Ok(self.0.parse::<f64>()?)
     }
 }
 
 impl<'a> TryInto<u32> for XRPAmount<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<u32, Self::Error> {
-        match self.0.parse::<u32>() {
-            Ok(u32_value) => Ok(u32_value),
-            Err(parse_error) => Err!(XRPLAmountException::ToIntError(parse_error)),
-        }
+    fn try_into(self) -> XRPLModelResult<u32, Self::Error> {
+        Ok(self.0.parse::<u32>()?)
     }
 }
 
-impl<'a> TryInto<Decimal> for XRPAmount<'a> {
-    type Error = anyhow::Error;
+impl<'a> TryInto<BigDecimal> for XRPAmount<'a> {
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<Decimal, Self::Error> {
-        match Decimal::from_str(&self.0) {
-            Ok(decimal) => Ok(decimal),
-            Err(decimal_error) => Err!(XRPLAmountException::ToDecimalError(decimal_error)),
-        }
+    fn try_into(self) -> XRPLModelResult<BigDecimal, Self::Error> {
+        Ok(BigDecimal::from_str(&self.0)?)
     }
 }
 
 impl<'a> TryInto<Cow<'a, str>> for XRPAmount<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<Cow<'a, str>, Self::Error> {
+    fn try_into(self) -> XRPLModelResult<Cow<'a, str>, Self::Error> {
         Ok(self.0)
     }
 }
@@ -133,8 +131,8 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        let self_decimal: Decimal = self.clone().try_into().unwrap();
-        let other_decimal: Decimal = other.clone().try_into().unwrap();
+        let self_decimal: BigDecimal = self.clone().try_into().unwrap();
+        let other_decimal: BigDecimal = other.clone().try_into().unwrap();
         self_decimal.cmp(&other_decimal)
     }
 }

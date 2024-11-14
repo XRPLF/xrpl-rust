@@ -1,16 +1,15 @@
 use core::fmt::Debug;
 
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::Serialize;
 use strum::IntoEnumIterator;
 
 use crate::{
-    core::addresscodec::decode_classic_address, models::transactions::Transaction,
-    transaction::exceptions::XRPLMultisignException, Err,
+    asynch::exceptions::XRPLHelperResult, core::addresscodec::decode_classic_address,
+    models::transactions::Transaction, transaction::exceptions::XRPLMultisignException,
 };
 
-pub fn multisign<'a, T, F>(transaction: &mut T, tx_list: &'a Vec<T>) -> Result<()>
+pub fn multisign<'a, T, F>(transaction: &mut T, tx_list: &'a Vec<T>) -> XRPLHelperResult<()>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq + 'a,
     T: Transaction<'a, F>,
@@ -19,11 +18,11 @@ where
     for tx in tx_list {
         let tx_signers = match tx.get_common_fields().signers.as_ref() {
             Some(signers) => signers,
-            None => return Err!(XRPLMultisignException::NoSigners),
+            None => return Err(XRPLMultisignException::NoSigners.into()),
         };
         let tx_signer = match tx_signers.first() {
             Some(signer) => signer,
-            None => return Err!(XRPLMultisignException::NoSigners),
+            None => return Err(XRPLMultisignException::NoSigners.into()),
         };
         decoded_tx_signers.push(tx_signer.clone());
     }

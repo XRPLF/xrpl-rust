@@ -1,19 +1,21 @@
 //! Base model
 
-use anyhow::Result;
+use super::XRPLModelResult;
 
 /// A trait that implements basic functions to every model.
 pub trait Model {
     /// Collects a models errors and returns the first error that occurs.
-    fn get_errors(&self) -> Result<()> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
         Ok(())
     }
 
     /// Simply forwards the error from `get_errors` if there was one.
-    fn validate(&self) -> Result<()> {
-        match self.get_errors() {
-            Ok(_no_error) => Ok(()),
-            Err(error) => Err(error),
-        }
+    fn validate(&self) -> XRPLModelResult<()> {
+        self.get_errors()
+    }
+
+    /// Checks if the model is valid.
+    fn is_valid(&self) -> bool {
+        self.validate().is_ok()
     }
 }

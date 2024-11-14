@@ -2,7 +2,7 @@
 
 pub mod exceptions;
 pub mod time_conversion;
-#[cfg(feature = "transaction-models")]
+#[cfg(feature = "models")]
 pub(crate) mod transactions;
 pub mod xrpl_conversion;
 

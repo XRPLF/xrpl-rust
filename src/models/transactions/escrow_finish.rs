@@ -1,15 +1,12 @@
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::transactions::exceptions::XRPLEscrowFinishException;
 use crate::models::{
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, XRPLModelException, XRPLModelResult,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -48,11 +45,10 @@ pub struct EscrowFinish<'a> {
 }
 
 impl<'a: 'static> Model for EscrowFinish<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_condition_and_fulfillment_error() {
-            Ok(_) => Ok(()),
-            Err(error) => Err!(error),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_condition_and_fulfillment_error()?;
+
+        Ok(())
     }
 }
 
@@ -71,14 +67,13 @@ impl<'a> Transaction<'a, NoFlags> for EscrowFinish<'a> {
 }
 
 impl<'a> EscrowFinishError for EscrowFinish<'a> {
-    fn _get_condition_and_fulfillment_error(&self) -> Result<(), XRPLEscrowFinishException> {
+    fn _get_condition_and_fulfillment_error(&self) -> XRPLModelResult<()> {
         if (self.condition.is_some() && self.fulfillment.is_none())
             || (self.condition.is_none() && self.condition.is_some())
         {
-            Err(XRPLEscrowFinishException::FieldRequiresField {
+            Err(XRPLModelException::FieldRequiresField {
                 field1: "condition".into(),
                 field2: "fulfillment".into(),
-                resource: "".into(),
             })
         } else {
             Ok(())
@@ -128,7 +123,7 @@ impl<'a> EscrowFinish<'a> {
 }
 
 pub trait EscrowFinishError {
-    fn _get_condition_and_fulfillment_error(&self) -> Result<(), XRPLEscrowFinishException>;
+    fn _get_condition_and_fulfillment_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -162,7 +157,7 @@ mod test_escrow_finish_errors {
 
         assert_eq!(
             escrow_finish.validate().unwrap_err().to_string().as_str(),
-            "For the field `condition` to be defined it is required to also define the field `fulfillment`. For more information see: "
+            "If the field `\"condition\"` is defined, the field `\"fulfillment\"` must also be defined"
         );
     }
 }

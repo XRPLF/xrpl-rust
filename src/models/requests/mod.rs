@@ -6,11 +6,11 @@ pub mod account_nfts;
 pub mod account_objects;
 pub mod account_offers;
 pub mod account_tx;
+pub mod amm_info;
 pub mod book_offers;
 pub mod channel_authorize;
 pub mod channel_verify;
 pub mod deposit_authorize;
-pub mod exceptions;
 pub mod fee;
 pub mod gateway_balances;
 pub mod ledger;
@@ -56,6 +56,8 @@ pub enum RequestMethod {
     AccountObjects,
     AccountOffers,
     AccountTx,
+    #[serde(rename = "amm_info")]
+    AMMInfo,
     GatewayBalances,
     NoRippleCheck,
 
@@ -112,6 +114,7 @@ pub enum XRPLRequest<'a> {
     AccountObjects(account_objects::AccountObjects<'a>),
     AccountOffers(account_offers::AccountOffers<'a>),
     AccountTx(account_tx::AccountTx<'a>),
+    AMMInfo(amm_info::AMMInfo<'a>),
     GatewayBalances(gateway_balances::GatewayBalances<'a>),
     NoRippleCheck(no_ripple_check::NoRippleCheck<'a>),
     Submit(submit::Submit<'a>),
@@ -186,6 +189,12 @@ impl<'a> From<account_offers::AccountOffers<'a>> for XRPLRequest<'a> {
 impl<'a> From<account_tx::AccountTx<'a>> for XRPLRequest<'a> {
     fn from(request: account_tx::AccountTx<'a>) -> Self {
         XRPLRequest::AccountTx(request)
+    }
+}
+
+impl<'a> From<amm_info::AMMInfo<'a>> for XRPLRequest<'a> {
+    fn from(request: amm_info::AMMInfo<'a>) -> Self {
+        XRPLRequest::AMMInfo(request)
     }
 }
 
@@ -362,6 +371,7 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::AccountObjects(request) => request.get_common_fields(),
             XRPLRequest::AccountOffers(request) => request.get_common_fields(),
             XRPLRequest::AccountTx(request) => request.get_common_fields(),
+            XRPLRequest::AMMInfo(request) => request.get_common_fields(),
             XRPLRequest::GatewayBalances(request) => request.get_common_fields(),
             XRPLRequest::NoRippleCheck(request) => request.get_common_fields(),
             XRPLRequest::Submit(request) => request.get_common_fields(),
@@ -402,6 +412,7 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::AccountObjects(request) => request.get_common_fields_mut(),
             XRPLRequest::AccountOffers(request) => request.get_common_fields_mut(),
             XRPLRequest::AccountTx(request) => request.get_common_fields_mut(),
+            XRPLRequest::AMMInfo(request) => request.get_common_fields_mut(),
             XRPLRequest::GatewayBalances(request) => request.get_common_fields_mut(),
             XRPLRequest::NoRippleCheck(request) => request.get_common_fields_mut(),
             XRPLRequest::Submit(request) => request.get_common_fields_mut(),
@@ -450,13 +461,11 @@ pub trait Request<'a> {
     fn get_common_fields_mut(&mut self) -> &mut CommonFields<'a>;
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "camelCase")]
-#[skip_serializing_none]
 pub struct FundFaucet<'a> {
     pub destination: Cow<'a, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub usage_context: Option<Cow<'a, str>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub user_agent: Option<Cow<'a, str>>,
 }

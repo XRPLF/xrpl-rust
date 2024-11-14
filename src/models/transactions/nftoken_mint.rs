@@ -1,6 +1,5 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -10,13 +9,11 @@ use crate::{
     constants::{MAX_TRANSFER_FEE, MAX_URI_LENGTH},
     models::{
         transactions::{Memo, Signer, Transaction, TransactionType},
-        Model,
+        Model, XRPLModelException, XRPLModelResult,
     },
-    Err,
 };
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::exceptions::XRPLNFTokenMintException;
 
 use super::{CommonFields, FlagCollection};
 
@@ -90,18 +87,13 @@ pub struct NFTokenMint<'a> {
     pub uri: Option<Cow<'a, str>>,
 }
 
-impl<'a: 'static> Model for NFTokenMint<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_issuer_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => match self._get_transfer_fee_error() {
-                Err(error) => Err!(error),
-                Ok(_no_error) => match self._get_uri_error() {
-                    Err(error) => Err!(error),
-                    Ok(_no_error) => Ok(()),
-                },
-            },
-        }
+impl<'a> Model for NFTokenMint<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_issuer_error()?;
+        self._get_transfer_fee_error()?;
+        self._get_uri_error()?;
+
+        Ok(())
     }
 }
 
@@ -124,14 +116,14 @@ impl<'a> Transaction<'a, NFTokenMintFlag> for NFTokenMint<'a> {
 }
 
 impl<'a> NFTokenMintError for NFTokenMint<'a> {
-    fn _get_issuer_error(&self) -> Result<(), XRPLNFTokenMintException> {
+    fn _get_issuer_error(&self) -> XRPLModelResult<()> {
         if let Some(issuer) = self.issuer.clone() {
             if issuer == self.common_fields.account {
-                Err(XRPLNFTokenMintException::ValueEqualsValue {
+                Err(XRPLModelException::ValueEqualsValue {
                     field1: "issuer".into(),
                     field2: "account".into(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -140,15 +132,15 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
         }
     }
 
-    fn _get_transfer_fee_error(&self) -> Result<(), XRPLNFTokenMintException> {
+    fn _get_transfer_fee_error(&self) -> XRPLModelResult<()> {
         if let Some(transfer_fee) = self.transfer_fee {
             if transfer_fee > MAX_TRANSFER_FEE {
-                Err(XRPLNFTokenMintException::ValueTooHigh {
+                Err(XRPLModelException::ValueTooHigh {
                     field: "transfer_fee".into(),
                     max: MAX_TRANSFER_FEE,
                     found: transfer_fee,
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -157,15 +149,15 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
         }
     }
 
-    fn _get_uri_error(&self) -> Result<(), XRPLNFTokenMintException> {
+    fn _get_uri_error(&self) -> XRPLModelResult<()> {
         if let Some(uri) = self.uri.clone() {
             if uri.len() > MAX_URI_LENGTH {
-                Err(XRPLNFTokenMintException::ValueTooLong {
+                Err(XRPLModelException::ValueTooLong {
                     field: "uri".into(),
                     max: MAX_URI_LENGTH,
                     found: uri.len(),
-                    resource: "".into(),
-                })
+                }
+                .into())
             } else {
                 Ok(())
             }
@@ -218,9 +210,9 @@ impl<'a> NFTokenMint<'a> {
 }
 
 pub trait NFTokenMintError {
-    fn _get_issuer_error(&self) -> Result<(), XRPLNFTokenMintException>;
-    fn _get_transfer_fee_error(&self) -> Result<(), XRPLNFTokenMintException>;
-    fn _get_uri_error(&self) -> Result<(), XRPLNFTokenMintException>;
+    fn _get_issuer_error(&self) -> XRPLModelResult<()>;
+    fn _get_transfer_fee_error(&self) -> XRPLModelResult<()>;
+    fn _get_uri_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -252,7 +244,7 @@ mod test_nftoken_mint_error {
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `issuer` is not allowed to be the same as the value of the field `account`. For more information see: "
+            "The value of the field `\"issuer\"` is not allowed to be the same as the value of the field `\"account\"`"
         );
     }
 
@@ -277,7 +269,7 @@ mod test_nftoken_mint_error {
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
-            "The field `transfer_fee` exceeds its maximum value (max 50000, found 50001). For more information see: "
+            "The value of the field `\"transfer_fee\"` is defined above its maximum (max 50000, found 50001)"
         );
     }
 
@@ -302,7 +294,7 @@ mod test_nftoken_mint_error {
 
         assert_eq!(
             nftoken_mint.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `uri` exceeds its maximum length of characters (max 512, found 513). For more information see: "
+            "The value of the field `\"uri\"` exceeds its maximum length of characters (max 512, found 513)"
         );
     }
 }

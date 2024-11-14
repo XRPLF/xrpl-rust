@@ -1,15 +1,14 @@
-use super::exceptions::XRPLWebsocketException;
+use super::exceptions::XRPLWebSocketException;
 use super::{WebSocketClosed, WebSocketOpen};
 use crate::asynch::clients::client::XRPLClient;
+use crate::asynch::clients::exceptions::{XRPLClientException, XRPLClientResult};
 use crate::asynch::clients::websocket::websocket_base::{MessageHandler, WebsocketBase};
 use crate::asynch::clients::SingleExecutorMutex;
 use crate::models::requests::{Request, XRPLRequest};
 use crate::models::results::XRPLResponse;
-use crate::Err;
 
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use anyhow::Result;
 use core::marker::PhantomData;
 use core::{pin::Pin, task::Poll};
 use embassy_futures::block_on;
@@ -38,36 +37,36 @@ impl<M> Sink<String> for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
-    type Error = anyhow::Error;
+    type Error = XRPLClientException;
 
     fn poll_ready(
         self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
-    ) -> core::task::Poll<Result<()>> {
+    ) -> core::task::Poll<XRPLClientResult<()>> {
         let mut guard = block_on(self.websocket.lock());
         match Pin::new(&mut *guard).poll_ready(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => Poll::Ready(Err!(error)),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error.into())),
             Poll::Pending => Poll::Pending,
         }
     }
 
-    fn start_send(self: core::pin::Pin<&mut Self>, item: String) -> Result<()> {
+    fn start_send(self: core::pin::Pin<&mut Self>, item: String) -> XRPLClientResult<()> {
         let mut guard = block_on(self.websocket.lock());
         match Pin::new(&mut *guard).start_send(tungstenite::Message::Text(item)) {
             Ok(()) => Ok(()),
-            Err(error) => Err!(error),
+            Err(error) => Err(error.into()),
         }
     }
 
     fn poll_flush(
         self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
-    ) -> core::task::Poll<Result<()>> {
+    ) -> core::task::Poll<XRPLClientResult<()>> {
         let mut guard = block_on(self.websocket.lock());
         match Pin::new(&mut *guard).poll_flush(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => Poll::Ready(Err!(error)),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error.into())),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -75,11 +74,11 @@ where
     fn poll_close(
         self: core::pin::Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
-    ) -> core::task::Poll<Result<()>> {
+    ) -> core::task::Poll<XRPLClientResult<()>> {
         let mut guard = block_on(self.websocket.lock());
         match Pin::new(&mut *guard).poll_close(cx) {
             Poll::Ready(Ok(())) => Poll::Ready(Ok(())),
-            Poll::Ready(Err(error)) => Poll::Ready(Err!(error)),
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error.into())),
             Poll::Pending => Poll::Pending,
         }
     }
@@ -89,7 +88,7 @@ impl<M> Stream for AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
-    type Item = Result<String>;
+    type Item = XRPLClientResult<String>;
 
     fn poll_next(
         self: Pin<&mut Self>,
@@ -104,27 +103,26 @@ where
                         let response_string = match String::from_utf8(response) {
                             Ok(string) => string,
                             Err(error) => {
-                                return Poll::Ready(Some(Err!(XRPLWebsocketException::<
-                                    anyhow::Error,
-                                >::Utf8(
-                                    error.utf8_error()
-                                ))));
+                                return Poll::Ready(Some(Err(XRPLWebSocketException::Utf8(
+                                    error.utf8_error(),
+                                )
+                                .into())));
                             }
                         };
                         Poll::Ready(Some(Ok(response_string)))
                     }
-                    tungstenite::Message::Close(_) => Poll::Ready(Some(Err!(
-                        XRPLWebsocketException::<anyhow::Error>::Disconnected
-                    ))),
-                    _ => Poll::Ready(Some(Err!(
-                        XRPLWebsocketException::<anyhow::Error>::UnexpectedMessageType
+                    tungstenite::Message::Close(_) => {
+                        Poll::Ready(Some(Err(XRPLWebSocketException::Disconnected.into())))
+                    }
+                    _ => Poll::Ready(Some(Err(
+                        XRPLWebSocketException::UnexpectedMessageType.into()
                     ))),
                 },
-                Err(error) => Poll::Ready(Some(Err!(error))),
+                Err(error) => Poll::Ready(Some(Err(error.into()))),
             },
-            Poll::Ready(None) => Poll::Ready(Some(Err!(
-                XRPLWebsocketException::<anyhow::Error>::Disconnected
-            ))),
+            Poll::Ready(None) => {
+                Poll::Ready(Some(Err(XRPLWebSocketException::Disconnected.into())))
+            }
             Poll::Pending => Poll::Pending,
         }
     }
@@ -134,10 +132,10 @@ impl<M> AsyncWebSocketClient<M, WebSocketClosed>
 where
     M: RawMutex,
 {
-    pub async fn open(uri: Url) -> Result<AsyncWebSocketClient<M, WebSocketOpen>> {
+    pub async fn open(uri: Url) -> XRPLClientResult<AsyncWebSocketClient<M, WebSocketOpen>> {
         let stream = match tokio_tungstenite_connect_async(uri.to_string()).await {
             Ok((stream, _)) => stream,
-            Err(error) => return Err!(error),
+            Err(error) => return Err(error.into()),
         };
         Ok(AsyncWebSocketClient {
             websocket: Arc::new(Mutex::new(stream)),
@@ -152,13 +150,13 @@ impl<M> AsyncWebSocketClient<M, WebSocketOpen>
 where
     M: RawMutex,
 {
-    pub async fn close(&self) -> Result<()> {
+    pub async fn close(&self) -> XRPLClientResult<()> {
         let mut websocket = self.websocket.lock().await;
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base.close();
         match websocket.close(None).await {
             Ok(()) => Ok(()),
-            Err(error) => Err!(error),
+            Err(error) => Err(error.into()),
         }
     }
 }
@@ -181,7 +179,7 @@ where
         websocket_base.setup_request_future(id).await;
     }
 
-    async fn handle_message(&mut self, message: String) -> Result<()> {
+    async fn handle_message(&mut self, message: String) -> XRPLClientResult<()> {
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base.handle_message(message).await
     }
@@ -191,7 +189,7 @@ where
         websocket_base.pop_message().await
     }
 
-    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>> {
+    async fn try_recv_request(&mut self, id: String) -> XRPLClientResult<Option<String>> {
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base.try_recv_request(id).await
     }
@@ -208,7 +206,7 @@ where
     async fn request_impl<'a: 'b, 'b>(
         &self,
         mut request: XRPLRequest<'a>,
-    ) -> Result<XRPLResponse<'b>> {
+    ) -> XRPLClientResult<XRPLResponse<'b>> {
         // setup request future
         self.set_request_id(&mut request);
         let request_id = request.get_common_fields().id.as_ref().unwrap();
@@ -220,13 +218,13 @@ where
         let mut websocket = self.websocket.lock().await;
         let request_string = match serde_json::to_string(&request) {
             Ok(request_string) => request_string,
-            Err(error) => return Err!(error),
+            Err(error) => return Err(error.into()),
         };
         if let Err(error) = websocket
             .send(tungstenite::Message::Text(request_string))
             .await
         {
-            return Err!(error);
+            return Err(error.into());
         }
         // wait for response
         loop {
@@ -240,7 +238,7 @@ where
                     if let Some(message) = message_opt {
                         let response = match serde_json::from_str(&message) {
                             Ok(response) => response,
-                            Err(error) => return Err!(error),
+                            Err(error) => return Err(error.into()),
                         };
                         return Ok(response);
                     }
@@ -249,23 +247,21 @@ where
                     let message = match String::from_utf8(response) {
                         Ok(string) => string,
                         Err(error) => {
-                            return Err!(XRPLWebsocketException::<anyhow::Error>::Utf8(
-                                error.utf8_error()
-                            ));
+                            return Err(XRPLWebSocketException::Utf8(error.utf8_error()).into());
                         }
                     };
                     match serde_json::from_str(&message) {
                         Ok(response) => return Ok(response),
-                        Err(error) => return Err!(error),
+                        Err(error) => return Err(error.into()),
                     }
                 }
                 Some(Ok(tungstenite::Message::Close(_))) => {
-                    return Err!(XRPLWebsocketException::<anyhow::Error>::Disconnected)
+                    return Err(XRPLWebSocketException::Disconnected.into());
                 }
                 Some(Ok(_)) => {
-                    return Err!(XRPLWebsocketException::<anyhow::Error>::UnexpectedMessageType);
+                    return Err(XRPLWebSocketException::UnexpectedMessageType.into());
                 }
-                Some(Err(error)) => return Err!(error),
+                Some(Err(error)) => return Err(error.into()),
                 None => continue,
             }
         }

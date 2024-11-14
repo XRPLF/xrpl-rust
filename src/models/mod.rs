@@ -7,16 +7,16 @@
 //! 4. Required specific fields in alphabetical order
 //! 5. Optional specific fields in alphabetical order
 
-#[cfg(feature = "ledger-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod ledger;
-#[cfg(feature = "request-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod requests;
-#[cfg(feature = "result-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod results;
-#[cfg(feature = "transaction-models")]
+#[cfg(feature = "models")]
 #[allow(clippy::too_many_arguments)]
 pub mod transactions;
 
@@ -45,6 +45,15 @@ pub struct PathStep<'a> {
     issuer: Option<Cow<'a, str>>,
     r#type: Option<u8>,
     type_hex: Option<Cow<'a, str>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, derive_new::new)]
+#[serde(rename_all = "PascalCase")]
+pub struct XChainBridge<'a> {
+    pub issuing_chain_door: Cow<'a, str>,
+    pub issuing_chain_issue: Currency<'a>,
+    pub locking_chain_door: Cow<'a, str>,
+    pub locking_chain_issue: Currency<'a>,
 }
 
 /// For use with serde defaults.

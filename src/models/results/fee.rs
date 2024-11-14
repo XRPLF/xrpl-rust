@@ -1,11 +1,11 @@
 use core::convert::TryFrom;
 
-use anyhow::Result;
+use alloc::string::ToString;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    models::{amount::XRPAmount, results::exceptions::XRPLResultException},
-    Err,
+use crate::models::{
+    amount::XRPAmount, results::exceptions::XRPLResultException, XRPLModelException,
+    XRPLModelResult,
 };
 
 use super::XRPLResult;
@@ -24,15 +24,16 @@ pub struct Drops<'a> {
 }
 
 impl<'a> TryFrom<XRPLResult<'a>> for Fee<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(result: XRPLResult<'a>) -> Result<Self> {
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::Fee(fee) => Ok(fee),
-            res => Err!(XRPLResultException::UnexpectedResultType(
+            res => Err(XRPLResultException::UnexpectedResultType(
                 "Fee".to_string(),
-                res.get_name()
-            )),
+                res.get_name(),
+            )
+            .into()),
         }
     }
 }

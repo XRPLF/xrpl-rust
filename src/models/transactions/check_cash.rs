@@ -1,18 +1,16 @@
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{exceptions::XRPLCheckCashException, CommonFields};
+use crate::models::transactions::CommonFields;
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags};
+use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 /// Cancels an unredeemed Check, removing it from the ledger without
 /// sending any money. The source or the destination of the check can
@@ -48,11 +46,10 @@ pub struct CheckCash<'a> {
 }
 
 impl<'a: 'static> Model for CheckCash<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_amount_and_deliver_min_error() {
-            Err(error) => Err!(error),
-            Ok(_no_error) => Ok(()),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_amount_and_deliver_min_error()?;
+
+        Ok(())
     }
 }
 
@@ -71,14 +68,13 @@ impl<'a> Transaction<'a, NoFlags> for CheckCash<'a> {
 }
 
 impl<'a> CheckCashError for CheckCash<'a> {
-    fn _get_amount_and_deliver_min_error(&self) -> Result<(), XRPLCheckCashException> {
+    fn _get_amount_and_deliver_min_error(&self) -> XRPLModelResult<()> {
         if (self.amount.is_none() && self.deliver_min.is_none())
             || (self.amount.is_some() && self.deliver_min.is_some())
         {
-            Err(XRPLCheckCashException::DefineExactlyOneOf {
-                field1: "amount".into(),
-                field2: "deliver_min".into(),
-                resource: "".into(),
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "amount",
+                other_fields: &["deliver_min"],
             })
         } else {
             Ok(())
@@ -126,7 +122,7 @@ impl<'a> CheckCash<'a> {
 }
 
 pub trait CheckCashError {
-    fn _get_amount_and_deliver_min_error(&self) -> Result<(), XRPLCheckCashException>;
+    fn _get_amount_and_deliver_min_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -155,7 +151,7 @@ mod test_check_cash_error {
 
         assert_eq!(
             check_cash.validate().unwrap_err().to_string().as_str(),
-            "The field `amount` can not be defined with `deliver_min`. Define exactly one of them. For more information see: "
+            "Invalid field combination: amount with [\"deliver_min\"]"
         );
     }
 }

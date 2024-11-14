@@ -1,9 +1,8 @@
-use crate::models::Model;
-use crate::{models::amount::exceptions::XRPLAmountException, Err};
+use crate::models::{Model, XRPLModelException, XRPLModelResult};
 use alloc::borrow::Cow;
+use bigdecimal::BigDecimal;
 use core::convert::TryInto;
 use core::str::FromStr;
-use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
@@ -25,14 +24,11 @@ impl<'a> IssuedCurrencyAmount<'a> {
     }
 }
 
-impl<'a> TryInto<Decimal> for IssuedCurrencyAmount<'a> {
-    type Error = anyhow::Error;
+impl<'a> TryInto<BigDecimal> for IssuedCurrencyAmount<'a> {
+    type Error = XRPLModelException;
 
-    fn try_into(self) -> Result<Decimal, Self::Error> {
-        match Decimal::from_str(&self.value) {
-            Ok(decimal) => Ok(decimal),
-            Err(decimal_error) => Err!(XRPLAmountException::ToDecimalError(decimal_error)),
-        }
+    fn try_into(self) -> XRPLModelResult<BigDecimal, Self::Error> {
+        Ok(BigDecimal::from_str(&self.value)?)
     }
 }
 

@@ -1,10 +1,11 @@
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum XRPLJsonRpcException {
-    #[error("Reqwless error")]
-    ReqwlessError,
+    #[error("Reqwless error: {0:?}")]
+    ReqwlessError(#[from] reqwless::Error),
     #[cfg(feature = "std")]
-    #[error("Request error: {0:?}")]
-    RequestError(reqwest::Response),
+    #[error("Reqwest error: {0:?}")]
+    ReqwestError(#[from] reqwest::Error),
 }

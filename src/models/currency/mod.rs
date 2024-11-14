@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 pub use xrp::*;
 
+use super::{IssuedCurrencyAmount, XRPAmount};
+
 pub trait ToAmount<'a, A> {
     fn to_amount(&self, value: Cow<'a, str>) -> A;
 }
@@ -36,5 +38,29 @@ impl<'a> From<IssuedCurrency<'a>> for Currency<'a> {
 impl<'a> From<XRP<'a>> for Currency<'a> {
     fn from(value: XRP<'a>) -> Self {
         Self::XRP(value)
+    }
+}
+
+impl<'a> From<IssuedCurrencyAmount<'a>> for Currency<'a> {
+    fn from(value: IssuedCurrencyAmount<'a>) -> Self {
+        IssuedCurrency::new(value.currency, value.issuer).into()
+    }
+}
+
+impl<'a> From<XRPAmount<'a>> for Currency<'a> {
+    fn from(_value: XRPAmount<'a>) -> Self {
+        XRP::new().into()
+    }
+}
+
+impl<'a> From<&IssuedCurrencyAmount<'a>> for Currency<'a> {
+    fn from(value: &IssuedCurrencyAmount<'a>) -> Self {
+        IssuedCurrency::new(value.currency.clone(), value.issuer.clone()).into()
+    }
+}
+
+impl<'a> From<&XRPAmount<'a>> for Currency<'a> {
+    fn from(_value: &XRPAmount<'a>) -> Self {
+        XRP::new().into()
     }
 }

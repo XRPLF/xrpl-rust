@@ -1,10 +1,11 @@
 use core::convert::TryFrom;
 
-use alloc::{borrow::Cow, vec::Vec};
-use anyhow::Result;
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use serde::{Deserialize, Serialize};
 
-use crate::{models::results::exceptions::XRPLResultException, Err};
+use crate::models::{
+    results::exceptions::XRPLResultException, XRPLModelException, XRPLModelResult,
+};
 
 use super::XRPLResult;
 
@@ -35,15 +36,16 @@ pub struct LedgerInner<'a> {
 }
 
 impl<'a> TryFrom<XRPLResult<'a>> for Ledger<'a> {
-    type Error = anyhow::Error;
+    type Error = XRPLModelException;
 
-    fn try_from(result: XRPLResult<'a>) -> Result<Self> {
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::Ledger(ledger) => Ok(ledger),
-            res => Err!(XRPLResultException::UnexpectedResultType(
-                "ledger-models".to_string(),
-                res.get_name()
-            )),
+            res => Err(XRPLResultException::UnexpectedResultType(
+                "Ledger".to_string(),
+                res.get_name(),
+            )
+            .into()),
         }
     }
 }

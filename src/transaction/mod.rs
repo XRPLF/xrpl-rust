@@ -6,6 +6,7 @@ use core::fmt::Debug;
 use crate::{
     asynch::{
         clients::XRPLAsyncClient,
+        exceptions::XRPLHelperResult,
         transaction::{
             autofill as async_autofill, autofill_and_sign as async_autofill_and_sign,
             calculate_fee_per_transaction_type as async_calculate_fee_per_transaction_type,
@@ -20,7 +21,6 @@ use crate::{
     },
     wallet::Wallet,
 };
-use anyhow::Result;
 use embassy_futures::block_on;
 use serde::{de::DeserializeOwned, Serialize};
 use strum::IntoEnumIterator;
@@ -34,7 +34,7 @@ pub fn sign_and_submit<'a, 'b, T, F, C>(
     wallet: &Wallet,
     autofill: bool,
     check_fee: bool,
-) -> Result<Submit<'a>>
+) -> XRPLHelperResult<Submit<'a>>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
@@ -53,7 +53,7 @@ pub fn autofill<'a, 'b, F, T, C>(
     transaction: &mut T,
     client: &'b C,
     signers_count: Option<u8>,
-) -> Result<()>
+) -> XRPLHelperResult<()>
 where
     T: Transaction<'a, F> + Model + Clone,
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
@@ -67,7 +67,7 @@ pub fn autofill_and_sign<'a, 'b, T, F, C>(
     client: &'b C,
     wallet: &Wallet,
     check_fee: bool,
-) -> Result<()>
+) -> XRPLHelperResult<()>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
@@ -81,7 +81,7 @@ where
     ))
 }
 
-pub fn submit<'a, T, F, C>(transaction: &T, client: &C) -> Result<Submit<'a>>
+pub fn submit<'a, T, F, C>(transaction: &T, client: &C) -> XRPLHelperResult<Submit<'a>>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Model + Serialize + DeserializeOwned + Clone + Debug,
@@ -96,7 +96,7 @@ pub fn submit_and_wait<'a: 'b, 'b, T, F, C>(
     wallet: Option<&Wallet>,
     check_fee: Option<bool>,
     autofill: Option<bool>,
-) -> Result<Tx<'b>>
+) -> XRPLHelperResult<Tx<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -115,7 +115,7 @@ pub fn calculate_fee_per_transaction_type<'a, 'b, 'c, T, F, C>(
     transaction: &T,
     client: Option<&'b C>,
     signers_count: Option<u8>,
-) -> Result<XRPAmount<'c>>
+) -> XRPLHelperResult<XRPAmount<'c>>
 where
     T: Transaction<'a, F>,
     F: IntoEnumIterator + Serialize + Debug + PartialEq,

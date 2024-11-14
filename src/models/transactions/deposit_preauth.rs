@@ -1,17 +1,15 @@
-use crate::Err;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{exceptions::XRPLDepositPreauthException, CommonFields};
+use crate::models::transactions::CommonFields;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags};
+use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 /// A DepositPreauth transaction gives another account pre-approval
 /// to deliver payments to the sender of this transaction.
@@ -39,11 +37,10 @@ pub struct DepositPreauth<'a> {
 }
 
 impl<'a: 'static> Model for DepositPreauth<'a> {
-    fn get_errors(&self) -> Result<()> {
-        match self._get_authorize_and_unauthorize_error() {
-            Ok(_no_error) => Ok(()),
-            Err(error) => Err!(error),
-        }
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_authorize_and_unauthorize_error()?;
+
+        Ok(())
     }
 }
 
@@ -62,14 +59,13 @@ impl<'a> Transaction<'a, NoFlags> for DepositPreauth<'a> {
 }
 
 impl<'a> DepositPreauthError for DepositPreauth<'a> {
-    fn _get_authorize_and_unauthorize_error(&self) -> Result<(), XRPLDepositPreauthException> {
+    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()> {
         if (self.authorize.is_none() && self.unauthorize.is_none())
             || (self.authorize.is_some() && self.unauthorize.is_some())
         {
-            Err(XRPLDepositPreauthException::DefineExactlyOneOf {
-                field1: "authorize".into(),
-                field2: "unauthorize".into(),
-                resource: "".into(),
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "authorize",
+                other_fields: &["unauthorize"],
             })
         } else {
             Ok(())
@@ -115,7 +111,7 @@ impl<'a> DepositPreauth<'a> {
 }
 
 pub trait DepositPreauthError {
-    fn _get_authorize_and_unauthorize_error(&self) -> Result<(), XRPLDepositPreauthException>;
+    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -144,7 +140,7 @@ mod test_deposit_preauth_exception {
 
         assert_eq!(
             deposit_preauth.validate().unwrap_err().to_string().as_str(),
-            "The field `authorize` can not be defined with `unauthorize`. Define exactly one of them. For more information see: "
+            "Invalid field combination: authorize with [\"unauthorize\"]"
         );
     }
 }

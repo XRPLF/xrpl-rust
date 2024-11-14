@@ -1,87 +1,56 @@
 //! General XRPL Binary Codec Exceptions.
 
-use crate::utils::exceptions::ISOCodeException;
 use crate::utils::exceptions::XRPRangeException;
-use strum_macros::Display;
 
-#[derive(Debug, Clone, PartialEq, Display)]
+use super::types::exceptions::XRPLTypeException;
+use thiserror_no_std::Error;
+
+#[derive(Debug, PartialEq, Error)]
 #[non_exhaustive]
 pub enum XRPLBinaryCodecException {
+    #[error("Unexpected parser skip overflow: max: {max}, found: {found}")]
     UnexpectedParserSkipOverflow { max: usize, found: usize },
+    #[error("Unexpected length prefix range: min: {min}, max: {max}")]
     UnexpectedLengthPrefixRange { min: usize, max: usize },
+    #[error("Unexpected type code range(min: {min}, max: {max})")]
     UnexpectedTypeCodeRange { min: usize, max: usize },
+    #[error("Unexpected field code range(min: {min}, max: {max})")]
     UnexpectedFieldCodeRange { min: usize, max: usize },
+    #[error("Unexpected field id byte range(min: {min}, max: {max})")]
     UnexpectedFieldIdByteRange { min: usize, max: usize },
+    #[error("Unknown field name")]
     UnknownFieldName,
+    #[error("Invalid read from bytes value")]
     InvalidReadFromBytesValue,
+    #[error("Invalid variable length too large: max: {max}")]
     InvalidVariableLengthTooLarge { max: usize },
+    #[error("Invalid hash length (expected: {expected}, found: {found})")]
     InvalidHashLength { expected: usize, found: usize },
+    #[error("Invalid path set from value")]
     InvalidPathSetFromValue,
+    #[error("Try from slice error")]
     TryFromSliceError,
-    TryFromIntError,
-    FromUtf8Error,
-    ParseIntError,
-    FromHexError,
-    XRPRangeError(XRPRangeException),
-    SerdeJsonError(serde_json::error::Category),
-    DecimalError(rust_decimal::Error),
-    ISOCodeError(ISOCodeException),
+    #[error("Field has no associated tag")]
     FieldHasNoAssiciatedTag,
+    #[error("XAddress tag mismatch")]
     XAddressTagMismatch,
+    #[error("Field is not account or destination")]
     FieldIsNotAccountOrDestination,
-}
-
-impl From<XRPRangeException> for XRPLBinaryCodecException {
-    fn from(err: XRPRangeException) -> Self {
-        XRPLBinaryCodecException::XRPRangeError(err)
-    }
-}
-
-impl From<ISOCodeException> for XRPLBinaryCodecException {
-    fn from(err: ISOCodeException) -> Self {
-        XRPLBinaryCodecException::ISOCodeError(err)
-    }
-}
-
-impl From<rust_decimal::Error> for XRPLBinaryCodecException {
-    fn from(err: rust_decimal::Error) -> Self {
-        XRPLBinaryCodecException::DecimalError(err)
-    }
-}
-
-impl From<hex::FromHexError> for XRPLBinaryCodecException {
-    fn from(_: hex::FromHexError) -> Self {
-        XRPLBinaryCodecException::FromHexError
-    }
-}
-
-impl From<serde_json::Error> for XRPLBinaryCodecException {
-    fn from(err: serde_json::Error) -> Self {
-        XRPLBinaryCodecException::SerdeJsonError(err.classify())
-    }
-}
-
-impl From<core::num::TryFromIntError> for XRPLBinaryCodecException {
-    fn from(_: core::num::TryFromIntError) -> Self {
-        XRPLBinaryCodecException::TryFromIntError
-    }
+    #[error("Try from int error: {0}")]
+    TryFromIntError(#[from] core::num::TryFromIntError),
+    #[error("From utf8 error: {0}")]
+    FromUtf8Error(#[from] alloc::string::FromUtf8Error),
+    #[error("Parse int error: {0}")]
+    ParseIntError(#[from] core::num::ParseIntError),
+    #[error("XRPL Type error: {0}")]
+    XRPLTypeError(#[from] XRPLTypeException),
+    #[error("XRP Range error: {0}")]
+    XRPRangeError(#[from] XRPRangeException),
 }
 
 impl From<core::array::TryFromSliceError> for XRPLBinaryCodecException {
     fn from(_: core::array::TryFromSliceError) -> Self {
         XRPLBinaryCodecException::TryFromSliceError
-    }
-}
-
-impl From<core::num::ParseIntError> for XRPLBinaryCodecException {
-    fn from(_: core::num::ParseIntError) -> Self {
-        XRPLBinaryCodecException::ParseIntError
-    }
-}
-
-impl From<alloc::string::FromUtf8Error> for XRPLBinaryCodecException {
-    fn from(_: alloc::string::FromUtf8Error) -> Self {
-        XRPLBinaryCodecException::FromUtf8Error
     }
 }
 

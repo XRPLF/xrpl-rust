@@ -1,12 +1,12 @@
 use alloc::string::{String, ToString};
-use anyhow::Result;
 use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Channel};
 use futures::channel::oneshot::{self, Receiver, Sender};
 use hashbrown::HashMap;
 use serde_json::Value;
 
-use super::exceptions::XRPLWebsocketException;
-use crate::Err;
+use crate::asynch::clients::exceptions::XRPLClientResult;
+
+use super::exceptions::XRPLWebSocketException;
 
 const _MAX_CHANNEL_MSG_CNT: usize = 10;
 
@@ -45,9 +45,9 @@ where
 pub trait MessageHandler {
     /// Setup an empty future for a request.
     async fn setup_request_future(&mut self, id: String);
-    async fn handle_message(&mut self, message: String) -> Result<()>;
+    async fn handle_message(&mut self, message: String) -> XRPLClientResult<()>;
     async fn pop_message(&mut self) -> String;
-    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>>;
+    async fn try_recv_request(&mut self, id: String) -> XRPLClientResult<Option<String>>;
 }
 
 impl<M> MessageHandler for WebsocketBase<M>
@@ -63,27 +63,23 @@ where
         self.request_senders.insert(id, sender);
     }
 
-    async fn handle_message(&mut self, message: String) -> Result<()> {
-        let message_value: Value = match serde_json::from_str(&message) {
-            Ok(value) => value,
-            Err(error) => return Err!(error),
-        };
+    async fn handle_message(&mut self, message: String) -> XRPLClientResult<()> {
+        let message_value: Value = serde_json::from_str(&message)?;
         let id = match message_value.get("id") {
             Some(id) => match id.as_str() {
                 Some(id) => id.to_string(),
-                None => return Err!(XRPLWebsocketException::<anyhow::Error>::InvalidMessage),
+                None => return Err(XRPLWebSocketException::InvalidMessage.into()),
             },
             None => String::new(),
         };
         if let Some(_receiver) = self.pending_requests.get(&id) {
             let sender = match self.request_senders.remove(&id) {
                 Some(sender) => sender,
-                None => return Err!(XRPLWebsocketException::<anyhow::Error>::MissingRequestSender),
+                None => return Err(XRPLWebSocketException::MissingRequestSender.into()),
             };
-            match sender.send(message) {
-                Ok(()) => (),
-                Err(error) => return Err!(error),
-            };
+            sender
+                .send(message)
+                .map_err(|e| XRPLWebSocketException::MessageChannelError(e))?;
         } else {
             self.messages.send(message).await;
         }
@@ -94,10 +90,10 @@ where
         self.messages.receive().await
     }
 
-    async fn try_recv_request(&mut self, id: String) -> Result<Option<String>> {
+    async fn try_recv_request(&mut self, id: String) -> XRPLClientResult<Option<String>> {
         let fut = match self.pending_requests.get_mut(&id) {
             Some(fut) => fut,
-            None => return Err!(XRPLWebsocketException::<anyhow::Error>::MissingRequestReceiver),
+            None => return Err(XRPLWebSocketException::MissingRequestReceiver.into()),
         };
         match fut.try_recv() {
             Ok(Some(message)) => {
@@ -106,9 +102,7 @@ where
                 Ok(Some(message))
             }
             Ok(None) => Ok(None),
-            Err(error) => {
-                Err!(error)
-            }
+            Err(error) => Err(XRPLWebSocketException::Canceled(error).into()),
         }
     }
 }

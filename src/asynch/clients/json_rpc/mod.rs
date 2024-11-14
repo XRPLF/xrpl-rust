@@ -1,25 +1,33 @@
 use alloc::{string::ToString, vec};
-use anyhow::Result;
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::{models::results::XRPLResponse, Err};
+use crate::{models::results::XRPLResponse, XRPLSerdeJsonError};
 
 mod exceptions;
 pub use exceptions::XRPLJsonRpcException;
 
-use super::client::XRPLClient;
+use super::{client::XRPLClient, exceptions::XRPLClientResult};
 
 /// Renames the requests field `command` to `method` for JSON-RPC.
-fn request_to_json_rpc(request: &impl Serialize) -> Result<Value> {
+fn request_to_json_rpc(request: &impl Serialize) -> XRPLClientResult<Value> {
     let mut json_rpc_request = Map::new();
-    let mut request = match serde_json::to_value(request) {
-        Ok(request) => match request.as_object().cloned() {
-            Some(request) => request,
-            None => todo!("Handle non-object requests"),
-        },
-        Err(error) => return Err!(error),
-    };
+    // let mut request = match serde_json::to_value(request) {
+    //     Ok(request) => match request.as_object().cloned() {
+    //         Some(request) => request,
+    //         None => todo!("Handle non-object requests"),
+    //     },
+    //     Err(error) => return Err!(error),
+    // };
+    let request_value = serde_json::to_value(request)?;
+    let mut request = request_value
+        .clone()
+        .as_object()
+        .ok_or(XRPLSerdeJsonError::UnexpectedValueType {
+            expected: "Object".to_string(),
+            found: request_value,
+        })?
+        .clone();
     if let Some(command) = request.remove("command") {
         json_rpc_request.insert("method".to_string(), command);
         json_rpc_request.insert(
@@ -33,13 +41,13 @@ fn request_to_json_rpc(request: &impl Serialize) -> Result<Value> {
 
 #[cfg(all(feature = "json-rpc", feature = "std"))]
 mod _std {
-    use crate::{
-        asynch::clients::XRPLFaucet,
-        models::requests::{FundFaucet, XRPLRequest},
-    };
+    use crate::models::requests::XRPLRequest;
+    #[cfg(feature = "helpers")]
+    use crate::{asynch::clients::XRPLFaucet, models::requests::FundFaucet};
+    #[cfg(feature = "helpers")]
+    use alloc::string::ToString;
 
     use super::*;
-    use alloc::string::ToString;
     use reqwest::Client as HttpClient;
     use url::Url;
 
@@ -57,7 +65,7 @@ mod _std {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b>> {
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             let client = HttpClient::new();
             let request_json_rpc = request_to_json_rpc(&request)?;
             let response = client
@@ -70,9 +78,9 @@ mod _std {
                     Ok(response) => {
                         Ok(serde_json::from_str::<XRPLResponse<'b>>(&response).unwrap())
                     }
-                    Err(error) => Err!(error),
+                    Err(error) => Err(error.into()),
                 },
-                Err(error) => Err!(error),
+                Err(error) => Err(error.into()),
             }
         }
 
@@ -81,8 +89,13 @@ mod _std {
         }
     }
 
+    #[cfg(feature = "helpers")]
     impl XRPLFaucet for AsyncJsonRpcClient {
-        async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()> {
+        async fn request_funding(
+            &self,
+            url: Option<Url>,
+            request: FundFaucet<'_>,
+        ) -> XRPLClientResult<()> {
             let faucet_url = self.get_faucet_url(url)?;
             let client = HttpClient::new();
             let request_json_rpc = serde_json::to_value(&request).unwrap();
@@ -97,12 +110,9 @@ mod _std {
                         Ok(())
                     } else {
                         todo!()
-                        // Err!(XRPLJsonRpcException::RequestError())
                     }
                 }
-                Err(error) => {
-                    Err!(error)
-                }
+                Err(error) => Err(error.into()),
             }
         }
     }
@@ -110,10 +120,9 @@ mod _std {
 
 #[cfg(all(feature = "json-rpc", not(feature = "std")))]
 mod _no_std {
-    use crate::{
-        asynch::clients::{SingleExecutorMutex, XRPLFaucet},
-        models::requests::{FundFaucet, XRPLRequest},
-    };
+    use crate::{asynch::clients::SingleExecutorMutex, models::requests::XRPLRequest};
+    #[cfg(feature = "helpers")]
+    use crate::{asynch::clients::XRPLFaucet, models::requests::FundFaucet};
 
     use super::*;
     use alloc::sync::Arc;
@@ -166,7 +175,7 @@ mod _no_std {
         async fn request_impl<'a: 'b, 'b>(
             &self,
             request: XRPLRequest<'a>,
-        ) -> Result<XRPLResponse<'b>> {
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
             let request_json_rpc = request_to_json_rpc(&request)?;
             let request_string = request_json_rpc.to_string();
             let request_buf = request_string.as_bytes();
@@ -174,21 +183,18 @@ mod _no_std {
             let mut client = self.client.lock().await;
             let response = match client.request(Method::POST, self.url.as_str()).await {
                 Ok(client) => {
-                    if let Err(_error) = client
+                    if let Err(error) = client
                         .body(request_buf)
                         .content_type(ContentType::ApplicationJson)
                         .send(&mut rx_buffer)
                         .await
                     {
-                        Err!(XRPLJsonRpcException::ReqwlessError)
+                        Err(error.into())
                     } else {
-                        match serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer) {
-                            Ok(response) => Ok(response),
-                            Err(error) => Err!(error),
-                        }
+                        Ok(serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)?)
                     }
                 }
-                Err(_error) => Err!(XRPLJsonRpcException::ReqwlessError),
+                Err(error) => Err(error.into()),
             };
 
             response
@@ -199,13 +205,18 @@ mod _no_std {
         }
     }
 
+    #[cfg(feature = "helpers")]
     impl<'a, const BUF: usize, T, D, M> XRPLFaucet for AsyncJsonRpcClient<'a, BUF, T, D, M>
     where
         M: RawMutex,
         T: TcpConnect + 'a,
         D: Dns + 'a,
     {
-        async fn request_funding(&self, url: Option<Url>, request: FundFaucet<'_>) -> Result<()> {
+        async fn request_funding(
+            &self,
+            url: Option<Url>,
+            request: FundFaucet<'_>,
+        ) -> XRPLClientResult<()> {
             let faucet_url = self.get_faucet_url(url)?;
             let request_json_rpc = serde_json::to_value(&request).unwrap();
             let request_string = request_json_rpc.to_string();
@@ -214,31 +225,27 @@ mod _no_std {
             let mut client = self.client.lock().await;
             let response = match client.request(Method::POST, faucet_url.as_str()).await {
                 Ok(client) => {
-                    if let Err(_error) = client
+                    if let Err(error) = client
                         .body(request_buf)
                         .content_type(ContentType::ApplicationJson)
                         .send(&mut rx_buffer)
                         .await
                     {
-                        Err!(XRPLJsonRpcException::ReqwlessError)
+                        Err(error.into())
                     } else {
-                        if let Ok(response) = serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)
-                        {
-                            if response.is_success() {
-                                Ok(())
-                            } else {
-                                todo!()
-                                // Err!(XRPLJsonRpcException::RequestError())
-                            }
+                        let response = serde_json::from_slice::<XRPLResponse<'_>>(&rx_buffer)?;
+                        if response.is_success() {
+                            Ok(())
                         } else {
-                            Err!(XRPLJsonRpcException::ReqwlessError)
+                            todo!()
+                            // Err!(XRPLJsonRpcException::RequestError())
                         }
                     }
                 }
-                Err(_error) => Err!(XRPLJsonRpcException::ReqwlessError),
+                Err(error) => Err(XRPLJsonRpcException::ReqwlessError(error)),
             };
 
-            response
+            response.map_err(Into::into)
         }
     }
 }

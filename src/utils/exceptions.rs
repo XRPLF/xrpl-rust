@@ -1,76 +1,80 @@
 //! Exception for invalid XRP Ledger amount data.
 
 use alloc::string::String;
-use strum_macros::Display;
+use thiserror_no_std::Error;
 
-#[derive(Debug, Clone, PartialEq, Display)]
+use crate::XRPLSerdeJsonError;
+
+pub type XRPLUtilsResult<T, E = XRPLUtilsException> = core::result::Result<T, E>;
+
+#[derive(Debug, PartialEq, Error)]
+#[non_exhaustive]
+pub enum XRPLUtilsException {
+    #[error("XRPL Time Range error: {0}")]
+    XRPLTimeRangeError(#[from] XRPLTimeRangeException),
+    #[error("XRP Range error: {0}")]
+    XRPRangeError(#[from] XRPRangeException),
+    #[error("ISO Code error: {0}")]
+    ISOCodeError(#[from] ISOCodeException),
+    #[error("Decimal error: {0}")]
+    DecimalError(#[from] rust_decimal::Error),
+    #[error("BigDecimal error: {0}")]
+    BigDecimalError(#[from] bigdecimal::ParseBigDecimalError),
+    #[error("serde_json error: {0}")]
+    SerdeJsonError(#[from] XRPLSerdeJsonError),
+    #[error("Invalid Hex error: {0}")]
+    FromHexError(#[from] hex::FromHexError),
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 pub enum XRPLTimeRangeException {
+    #[error("Invalid time before epoch (min: {min} found: {found})")]
     InvalidTimeBeforeEpoch { min: i64, found: i64 },
+    #[error("Invalid time after epoch (max: {max} found: {found})")]
     UnexpectedTimeOverflow { max: i64, found: i64 },
+    #[error("Invalid local time")]
     InvalidLocalTime,
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum XRPRangeException {
+    #[error("Invalid XRP amount")]
     InvalidXRPAmount,
+    #[error("Invalid Issued Currency amount")]
     InvalidICAmount,
+    #[error("Invalid value contains decimal")]
     InvalidValueContainsDecimal,
+    #[error("Invalid XRP amount too small (min: {min} found: {found})")]
     InvalidXRPAmountTooSmall { min: String, found: String },
+    #[error("Invalid XRP amount too large (max: {max} found: {found})")]
     InvalidXRPAmountTooLarge { max: u64, found: String },
+    #[error("Invalid Issued Currency precision too small (min: {min} found: {found})")]
     InvalidICPrecisionTooSmall { min: i32, found: i32 },
+    #[error("Invalid Issued Currency precision too large (max: {max} found: {found})")]
     InvalidICPrecisionTooLarge { max: i32, found: i32 },
+    #[error("Invalid Drops amount too large (max: {max} found: {found})")]
     InvalidDropsAmountTooLarge { max: String, found: String },
+    #[error("Invalid Issued Currency serialization length (expected: {expected} found: {found})")]
     InvalidICSerializationLength { expected: usize, found: usize },
+    #[error("Invalid Issued Currency amount overflow (max: {max} found: {found})")]
     UnexpectedICAmountOverflow { max: usize, found: usize },
-    FromHexError,
-    DecimalError(rust_decimal::Error),
 }
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
 pub enum ISOCodeException {
+    #[error("Invalid ISO code")]
     InvalidISOCode,
+    #[error("Invalid ISO length")]
     InvalidISOLength,
+    #[error("Invalid XRP bytes")]
     InvalidXRPBytes,
-    InvalidSerdeValue {
-        expected: String,
-        found: serde_json::Value,
-    },
+    #[error("Invalid Currency representation")]
     UnsupportedCurrencyRepresentation,
-    FromHexError,
+    #[error("Invalid UTF-8")]
     Utf8Error,
-    DecimalError(rust_decimal::Error),
-}
-
-#[derive(Debug, Clone, PartialEq, Display)]
-#[non_exhaustive]
-pub enum JSONParseException {
-    ISOCodeError(ISOCodeException),
-    DecimalError(rust_decimal::Error),
-    XRPRangeError(XRPRangeException),
-    InvalidSerdeValue {
-        expected: String,
-        found: serde_json::Value,
-    },
-}
-
-impl From<rust_decimal::Error> for XRPRangeException {
-    fn from(err: rust_decimal::Error) -> Self {
-        XRPRangeException::DecimalError(err)
-    }
-}
-
-impl From<hex::FromHexError> for XRPRangeException {
-    fn from(_: hex::FromHexError) -> Self {
-        XRPRangeException::FromHexError
-    }
-}
-
-impl From<rust_decimal::Error> for ISOCodeException {
-    fn from(err: rust_decimal::Error) -> Self {
-        ISOCodeException::DecimalError(err)
-    }
 }
 
 impl From<core::str::Utf8Error> for ISOCodeException {
@@ -79,27 +83,9 @@ impl From<core::str::Utf8Error> for ISOCodeException {
     }
 }
 
-impl From<hex::FromHexError> for ISOCodeException {
-    fn from(_: hex::FromHexError) -> Self {
-        ISOCodeException::FromHexError
-    }
-}
-
-impl From<XRPRangeException> for JSONParseException {
-    fn from(err: XRPRangeException) -> Self {
-        JSONParseException::XRPRangeError(err)
-    }
-}
-
-impl From<ISOCodeException> for JSONParseException {
-    fn from(err: ISOCodeException) -> Self {
-        JSONParseException::ISOCodeError(err)
-    }
-}
-
-impl From<rust_decimal::Error> for JSONParseException {
-    fn from(err: rust_decimal::Error) -> Self {
-        JSONParseException::DecimalError(err)
+impl From<serde_json::Error> for XRPLUtilsException {
+    fn from(error: serde_json::Error) -> Self {
+        XRPLUtilsException::SerdeJsonError(error.into())
     }
 }
 
@@ -111,3 +97,6 @@ impl alloc::error::Error for XRPRangeException {}
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for ISOCodeException {}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLUtilsException {}
