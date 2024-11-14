@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// The ledger_data method retrieves contents of the specified
 /// ledger. You can iterate through several calls to retrieve
@@ -29,7 +29,7 @@ pub struct LedgerData<'a> {
     pub limit: Option<u16>,
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for LedgerData<'a> {}
@@ -51,7 +51,7 @@ impl<'a> LedgerData<'a> {
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {

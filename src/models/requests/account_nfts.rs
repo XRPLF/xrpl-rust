@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, Marker, Request};
 
 /// This method retrieves all of the NFTs currently owned
 /// by the specified account.
@@ -24,7 +24,7 @@ pub struct AccountNfts<'a> {
     pub limit: Option<u32>,
     /// Value from a previous paginated response. Resume
     /// retrieving data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for AccountNfts<'a> {}
@@ -44,7 +44,7 @@ impl<'a> AccountNfts<'a> {
         id: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         limit: Option<u32>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {

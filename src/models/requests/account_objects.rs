@@ -5,7 +5,7 @@ use strum_macros::Display;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// Represents the object types that an AccountObjects
 /// Request can ask for.
@@ -56,7 +56,7 @@ pub struct AccountObjects<'a> {
     pub limit: Option<u16>,
     /// Value from a previous paginated response. Resume retrieving
     /// data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for AccountObjects<'a> {}
@@ -80,7 +80,7 @@ impl<'a> AccountObjects<'a> {
         r#type: Option<AccountObjectType>,
         deletion_blockers_only: Option<bool>,
         limit: Option<u16>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {

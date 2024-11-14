@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// This request retrieves a list of offers made by a given account
 /// that are outstanding as of a particular ledger version.
@@ -33,7 +33,7 @@ pub struct AccountOffers<'a> {
     pub strict: Option<bool>,
     /// Value from a previous paginated response. Resume retrieving
     /// data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for AccountOffers<'a> {}
@@ -56,7 +56,7 @@ impl<'a> AccountOffers<'a> {
         ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
         strict: Option<bool>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {

@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// This request returns information about an account's Payment
 /// Channels. This includes only channels where the specified
@@ -54,7 +54,7 @@ pub struct AccountChannels<'a> {
     pub destination_account: Option<Cow<'a, str>>,
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for AccountChannels<'a> {}
@@ -67,7 +67,7 @@ impl<'a> AccountChannels<'a> {
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {

@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// This request retrieves from the ledger a list of
 /// transactions that involved the specified account.
@@ -47,7 +47,7 @@ pub struct AccountTx<'a> {
     /// data where that response left off. This value is stable even
     /// if there is a change in the server's range of available
     /// ledgers.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for AccountTx<'a> {}
@@ -73,7 +73,7 @@ impl<'a> AccountTx<'a> {
         ledger_index_min: Option<u32>,
         ledger_index_max: Option<u32>,
         limit: Option<u16>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
