@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{currency::Currency, requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// The book_offers method retrieves a list of offers, also known
 /// as the order book, between two currencies.
@@ -27,11 +27,9 @@ pub struct BookOffers<'a> {
     /// issuer fields (omit issuer for XRP),
     /// like currency amounts.
     pub taker_pays: Currency<'a>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// If provided, the server does not provide more than
     /// this many offers in the results. The total number of
     /// results returned may be fewer than the limit,
@@ -62,7 +60,7 @@ impl<'a> BookOffers<'a> {
         taker_gets: Currency<'a>,
         taker_pays: Currency<'a>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
         taker: Option<Cow<'a, str>>,
     ) -> Self {
@@ -73,8 +71,10 @@ impl<'a> BookOffers<'a> {
             },
             taker_gets,
             taker_pays,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             limit,
             taker,
         }

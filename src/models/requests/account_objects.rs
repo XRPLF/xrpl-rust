@@ -5,7 +5,7 @@ use strum_macros::Display;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// Represents the object types that an AccountObjects
 /// Request can ask for.
@@ -39,11 +39,9 @@ pub struct AccountObjects<'a> {
     /// A unique identifier for the account, most commonly the
     /// account's address.
     pub account: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// If included, filter results to include only this type
     /// of ledger object. The valid types are: check, deposit_preauth,
     /// escrow, offer, payment_channel, signer_list, ticket,
@@ -78,7 +76,7 @@ impl<'a> AccountObjects<'a> {
         id: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         r#type: Option<AccountObjectType>,
         deletion_blockers_only: Option<bool>,
         limit: Option<u16>,
@@ -90,8 +88,10 @@ impl<'a> AccountObjects<'a> {
                 id,
             },
             account,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             r#type,
             deletion_blockers_only,
             limit,

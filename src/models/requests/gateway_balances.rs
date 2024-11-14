@@ -5,7 +5,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// This request calculates the total balances issued by a
 /// given account, optionally excluding amounts held by
@@ -24,11 +24,9 @@ pub struct GatewayBalances<'a> {
     /// An operational address to exclude from the balances
     /// issued, or an array of such addresses.
     pub hotwallet: Option<Vec<Cow<'a, str>>>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger version to use, or a
-    /// shortcut string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// If true, only accept an address or public key for the
     /// account parameter. Defaults to false.
     pub strict: Option<bool>,
@@ -52,7 +50,7 @@ impl<'a> GatewayBalances<'a> {
         account: Cow<'a, str>,
         hotwallet: Option<Vec<Cow<'a, str>>>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         strict: Option<bool>,
     ) -> Self {
         Self {
@@ -62,8 +60,10 @@ impl<'a> GatewayBalances<'a> {
             },
             account,
             strict,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             hotwallet,
         }
     }

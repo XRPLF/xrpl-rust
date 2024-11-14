@@ -33,7 +33,7 @@ impl<'a> NftSellOffers<'a> {
     pub fn new(id: Option<Cow<'a, str>>, nft_id: Cow<'a, str>) -> Self {
         Self {
             common_fields: CommonFields {
-                command: RequestMethod::NftSellOffers,
+                command: RequestMethod::NFTSellOffers,
                 id,
             },
             nft_id,

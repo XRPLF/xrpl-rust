@@ -2,34 +2,29 @@ use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{requests::RequestMethod, Model};
+use crate::models::Model;
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request, RequestMethod};
 
-/// The transaction_entry method retrieves information on a
-/// single transaction from a specific ledger version.
-/// (The tx method, by contrast, searches all ledgers for
-/// the specified transaction. We recommend using that
-/// method instead.)
-///
-/// See Transaction Entry:
-/// `<https://xrpl.org/transaction_entry.html>`
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct TransactionEntry<'a> {
-    /// The common fields shared by all requests.
+pub struct NFTHistory<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a>,
-    /// Unique hash of the transaction you are looking up.
-    pub tx_hash: Cow<'a, str>,
-    /// The unique identifier of a ledger.
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
+    pub nft_id: Cow<'a, str>,
+    pub ledger_index_min: Option<u32>,
+    pub ledger_index_max: Option<u32>,
+    pub binary: Option<bool>,
+    pub forward: Option<bool>,
+    pub limit: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
-impl<'a> Model for TransactionEntry<'a> {}
+impl Model for NFTHistory<'_> {}
 
-impl<'a> Request<'a> for TransactionEntry<'a> {
+impl<'a> Request<'a> for NFTHistory<'a> {
     fn get_common_fields(&self) -> &CommonFields<'a> {
         &self.common_fields
     }
@@ -39,23 +34,35 @@ impl<'a> Request<'a> for TransactionEntry<'a> {
     }
 }
 
-impl<'a> TransactionEntry<'a> {
+impl<'a> NFTHistory<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
-        tx_hash: Cow<'a, str>,
+        nft_id: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
+        ledger_index_min: Option<u32>,
+        ledger_index_max: Option<u32>,
+        binary: Option<bool>,
+        forward: Option<bool>,
+        limit: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
-                command: RequestMethod::TransactionEntry,
+                command: RequestMethod::NFTHistory,
                 id,
             },
-            tx_hash,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,
             }),
+            nft_id,
+            ledger_index_min,
+            ledger_index_max,
+            binary,
+            forward,
+            limit,
+            marker,
         }
     }
 }
