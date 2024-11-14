@@ -6,13 +6,19 @@ use crate::models::Model;
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request, RequestMethod};
 
+/// The `nft_info` method retrieves all the information about the
+/// NFToken
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct NFTInfo<'a> {
+    /// The common fields shared by all requests.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a>,
+    /// The unique identifier of a ledger.
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
+    /// The unique identifier of an NFToken.
+    /// The request returns past transactions of this NFToken.
     pub nft_id: Cow<'a, str>,
 }
 
