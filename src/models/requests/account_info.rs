@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// This request retrieves information about an account, its
 /// activity, and its XRP balance. All information retrieved
@@ -21,11 +21,9 @@ pub struct AccountInfo<'a> {
     /// A unique identifier for the account, most commonly the
     /// account's Address.
     pub account: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// If true, then the account field only accepts a public
     /// key or XRP Ledger address. Otherwise, account can be
     /// a secret or passphrase (not recommended).
@@ -59,7 +57,7 @@ impl<'a> AccountInfo<'a> {
         id: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         strict: Option<bool>,
         queue: Option<bool>,
         signer_lists: Option<bool>,
@@ -70,8 +68,10 @@ impl<'a> AccountInfo<'a> {
                 id,
             },
             account,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             strict,
             queue,
             signer_lists,

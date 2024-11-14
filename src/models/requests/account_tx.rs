@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// This request retrieves from the ledger a list of
 /// transactions that involved the specified account.
@@ -20,10 +20,9 @@ pub struct AccountTx<'a> {
     /// A unique identifier for the account, most commonly the
     /// account's address.
     pub account: Cow<'a, str>,
-    /// Use to look for transactions from a single ledger only.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// Use to look for transactions from a single ledger only.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// Defaults to false. If set to true, returns transactions
     /// as hex strings instead of JSON.
     pub binary: Option<bool>,
@@ -68,7 +67,7 @@ impl<'a> AccountTx<'a> {
         id: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         binary: Option<bool>,
         forward: Option<bool>,
         ledger_index_min: Option<u32>,
@@ -82,8 +81,10 @@ impl<'a> AccountTx<'a> {
                 id,
             },
             account,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             binary,
             forward,
             ledger_index_min,
