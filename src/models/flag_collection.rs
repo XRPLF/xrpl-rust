@@ -96,6 +96,15 @@ where
     }
 }
 
+impl<T> FlagCollection<T>
+where
+    T: IntoEnumIterator + Serialize,
+{
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
 fn flag_to_u32<T>(flag: &T) -> XRPLModelResult<u32>
 where
     T: Serialize,

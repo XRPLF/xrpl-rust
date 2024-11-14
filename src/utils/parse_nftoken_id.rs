@@ -1,12 +1,16 @@
 use alloc::borrow::Cow;
 
-use crate::{core::addresscodec::encode_classic_address, utils::exceptions::XRPLNFTIdException};
+use crate::{
+    core::addresscodec::encode_classic_address,
+    models::{transactions::nftoken_mint::NFTokenMintFlag, FlagCollection},
+    utils::exceptions::XRPLNFTIdException,
+};
 
 use super::exceptions::XRPLUtilsResult;
 
 pub struct NFTokenId<'a> {
     pub nftoken_id: Cow<'a, str>,
-    pub flags: u32,
+    pub flags: FlagCollection<NFTokenMintFlag>,
     pub transfer_fee: u32,
     pub issuer: Cow<'a, str>,
     pub taxon: u64,
@@ -67,10 +71,26 @@ pub fn parse_nftoken_id(nft_id: Cow<str>) -> XRPLUtilsResult<NFTokenId<'_>> {
 
     Ok(NFTokenId {
         nftoken_id: nft_id,
-        flags,
+        flags: flags.try_into()?,
         transfer_fee,
         issuer: issuer.into(),
         taxon: unscramble_taxon(scrambled_taxon, sequence as u64),
         sequence,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_nftoken_id() {
+        let nft_id = "000B0539C35B55AA096BA6D87A6E6C965A6534150DC56E5E12C5D09E0000000C";
+        let nftoken_id = parse_nftoken_id(Cow::Borrowed(nft_id)).unwrap();
+        assert_eq!(nftoken_id.flags.len(), 3);
+        assert_eq!(nftoken_id.transfer_fee, 1337);
+        assert_eq!(nftoken_id.issuer, "rJoxBSzpXhPtAuqFmqxQtGKjA13jUJWthE");
+        assert_eq!(nftoken_id.taxon, 1337);
+        assert_eq!(nftoken_id.sequence, 12);
+    }
 }

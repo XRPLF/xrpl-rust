@@ -3,7 +3,7 @@
 use alloc::string::String;
 use thiserror_no_std::Error;
 
-use crate::{core::exceptions::XRPLCoreException, XRPLSerdeJsonError};
+use crate::{core::exceptions::XRPLCoreException, models::XRPLModelException, XRPLSerdeJsonError};
 
 pub type XRPLUtilsResult<T, E = XRPLUtilsException> = core::result::Result<T, E>;
 
@@ -18,6 +18,8 @@ pub enum XRPLUtilsException {
     XRPLNFTIdError(#[from] XRPLNFTIdException),
     #[error("XRPL Core error: {0}")]
     XRPLCoreError(#[from] XRPLCoreException),
+    #[error("XRPL Model error: {0}")]
+    XRPLModelError(#[from] XRPLModelException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
