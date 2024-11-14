@@ -22,7 +22,7 @@ pub struct NFTsByIssuer<'a> {
     pub issuer: Cow<'a, str>,
     pub limit: Option<u32>,
     pub marker: Option<Marker<'a>>,
-    pub nft_taxon: Option<u32>,
+    pub nft_taxon: Option<u64>,
 }
 
 impl Model for NFTsByIssuer<'_> {}
@@ -45,7 +45,7 @@ impl<'a> NFTsByIssuer<'a> {
         ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u32>,
         marker: Option<Marker<'a>>,
-        nft_taxon: Option<u32>,
+        nft_taxon: Option<u64>,
     ) -> Self {
         Self {
             common_fields: CommonFields {

@@ -1,6 +1,7 @@
 //! Convenience utilities for the XRP Ledger
 
 pub mod exceptions;
+pub mod parse_nftoken_id;
 pub mod time_conversion;
 #[cfg(feature = "models")]
 pub(crate) mod transactions;
