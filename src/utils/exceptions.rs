@@ -20,6 +20,8 @@ pub enum XRPLUtilsException {
     XRPLCoreError(#[from] XRPLCoreException),
     #[error("XRPL Model error: {0}")]
     XRPLModelError(#[from] XRPLModelException),
+    #[error("XRPL XChain Claim ID error: {0}")]
+    XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
@@ -76,6 +78,16 @@ pub enum XRPLNFTIdException {
     #[error("Invalid NFT ID length (expected: {expected} found: {found})")]
     InvalidNFTIdLength { expected: usize, found: usize },
 }
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum XRPLXChainClaimIdException {
+    #[error("No XChainOwnedClaimID created")]
+    NoXChainOwnedClaimID,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLXChainClaimIdException {}
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

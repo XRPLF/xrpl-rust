@@ -2,6 +2,7 @@
 
 pub mod exceptions;
 pub mod get_nftoken_id;
+pub mod get_xchain_claim_id;
 pub mod parse_nftoken_id;
 pub mod time_conversion;
 #[cfg(feature = "models")]
