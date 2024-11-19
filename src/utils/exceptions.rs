@@ -27,6 +27,8 @@ pub enum XRPLUtilsException {
     XRPLTxnParserError(#[from] XRPLTxnParserException),
     #[error("XRPL XChain Claim ID error: {0}")]
     XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
+    #[error("XRPL Txn Parser error: {0}")]
+    XRPLTxnParserError(#[from] XRPLTxnParserException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
