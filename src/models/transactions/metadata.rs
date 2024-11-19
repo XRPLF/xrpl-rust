@@ -5,7 +5,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::requests::LedgerIndex;
-use crate::models::Amount;
+use crate::models::{Amount, IssuedCurrencyAmount};
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,15 +31,15 @@ pub struct Fields<'a> {
     pub account: Option<Cow<'a, str>>,
     pub balance: Option<Cow<'a, str>>,
     pub book_directory: Option<Cow<'a, str>>,
-    pub expiration: Option<i32>,
-    pub flags: Option<i32>,
-    pub low_limit: Option<BTreeMap<Cow<'a, str>, Cow<'a, str>>>,
-    pub high_limit: Option<BTreeMap<Cow<'a, str>, Cow<'a, str>>>,
+    pub expiration: Option<u32>,
+    pub flags: Option<u32>,
+    pub low_limit: Option<IssuedCurrencyAmount<'a>>,
+    pub high_limit: Option<IssuedCurrencyAmount<'a>>,
     pub next_page_min: Option<Cow<'a, str>>,
     #[serde(rename = "NFTokens")]
     pub nftokens: Option<Vec<NFTokenMetadata<'a>>>,
     pub previous_page_min: Option<Cow<'a, str>>,
-    pub sequence: Option<i32>,
+    pub sequence: Option<u32>,
     pub taker_gets: Option<Amount<'a>>,
     pub taker_pays: Option<Amount<'a>>,
     pub xchain_claim_id: Option<Cow<'a, str>>,
@@ -62,7 +62,7 @@ pub enum AffectedNode<'a> {
         final_fields: Option<Fields<'a>>,
         previous_fields: Option<Fields<'a>>,
         previous_txn_id: Option<Cow<'a, str>>,
-        previous_txn_lgr_seq: Option<i32>,
+        previous_txn_lgr_seq: Option<u32>,
     },
     #[serde(rename_all = "PascalCase")]
     DeletedNode {
@@ -73,12 +73,19 @@ pub enum AffectedNode<'a> {
     },
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum NodeType {
+    CreatedNode,
+    ModifiedNode,
+    DeletedNode,
+}
+
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct TransactionMetadata<'a> {
     pub affected_nodes: Vec<AffectedNode<'a>>,
-    pub transaction_index: i32,
+    pub transaction_index: u32,
     pub transaction_result: Amount<'a>,
     #[serde(rename = "delivered_amount")]
     pub delivered_amount: Option<Amount<'a>>,

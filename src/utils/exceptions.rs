@@ -22,6 +22,8 @@ pub enum XRPLUtilsException {
     XRPLModelError(#[from] XRPLModelException),
     #[error("XRPL XChain Claim ID error: {0}")]
     XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
+    #[error("XRPL Txn Parser error: {0}")]
+    XRPLTxnParserError(#[from] XRPLTxnParserException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
@@ -90,6 +92,16 @@ pub enum XRPLXChainClaimIdException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLXChainClaimIdException {}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum XRPLTxnParserException {
+    #[error("Missing field: {0}")]
+    MissingField(&'static str),
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLTxnParserException {}
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

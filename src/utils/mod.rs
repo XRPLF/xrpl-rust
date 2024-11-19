@@ -8,6 +8,7 @@ pub mod str_conversion;
 pub mod time_conversion;
 #[cfg(feature = "models")]
 pub(crate) mod transactions;
+pub mod txn_parser;
 pub mod xrpl_conversion;
 
 pub use self::time_conversion::*;
