@@ -23,10 +23,10 @@ pub enum XRPLUtilsException {
     #[cfg(feature = "models")]
     #[error("XRPL Model error: {0}")]
     XRPLModelError(#[from] XRPLModelException),
-    #[error("XRPL XChain Claim ID error: {0}")]
-    XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
     #[error("XRPL Txn Parser error: {0}")]
     XRPLTxnParserError(#[from] XRPLTxnParserException),
+    #[error("XRPL XChain Claim ID error: {0}")]
+    XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
