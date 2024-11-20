@@ -3,7 +3,9 @@
 use alloc::string::String;
 use thiserror_no_std::Error;
 
-use crate::{core::exceptions::XRPLCoreException, models::XRPLModelException, XRPLSerdeJsonError};
+#[cfg(feature = "models")]
+use crate::models::XRPLModelException;
+use crate::{core::exceptions::XRPLCoreException, XRPLSerdeJsonError};
 
 pub type XRPLUtilsResult<T, E = XRPLUtilsException> = core::result::Result<T, E>;
 
@@ -18,6 +20,7 @@ pub enum XRPLUtilsException {
     XRPLNFTIdError(#[from] XRPLNFTIdException),
     #[error("XRPL Core error: {0}")]
     XRPLCoreError(#[from] XRPLCoreException),
+    #[cfg(feature = "models")]
     #[error("XRPL Model error: {0}")]
     XRPLModelError(#[from] XRPLModelException),
     #[error("XRPL XChain Claim ID error: {0}")]
