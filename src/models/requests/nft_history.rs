@@ -2,39 +2,35 @@ use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{requests::RequestMethod, Model};
+use crate::models::Model;
 
-use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request, RequestMethod};
 
-/// The ledger_data method retrieves contents of the specified
-/// ledger. You can iterate through several calls to retrieve
-/// the entire contents of a single ledger version.
-///
-/// See Ledger Data:
-/// `<https://xrpl.org/ledger_data.html>`
+/// The `nft_history` method retreives a list of transactions that involved the
+/// specified NFToken.
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct LedgerData<'a> {
+pub struct NFTHistory<'a> {
     /// The common fields shared by all requests.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a>,
-    /// If set to true, return ledger objects as hashed hex
-    /// strings instead of JSON.
-    pub binary: Option<bool>,
     /// The unique identifier of a ledger.
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
-    /// Limit the number of ledger objects to retrieve.
-    /// The server is not required to honor this value.
-    pub limit: Option<u16>,
-    /// Value from a previous paginated response.
-    /// Resume retrieving data where that response left off.
+    /// The unique identifier of an NFToken.
+    /// The request returns past transactions of this NFToken.
+    pub nft_id: Cow<'a, str>,
+    pub ledger_index_min: Option<u32>,
+    pub ledger_index_max: Option<u32>,
+    pub binary: Option<bool>,
+    pub forward: Option<bool>,
+    pub limit: Option<u32>,
     pub marker: Option<Marker<'a>>,
 }
 
-impl<'a> Model for LedgerData<'a> {}
+impl Model for NFTHistory<'_> {}
 
-impl<'a> Request<'a> for LedgerData<'a> {
+impl<'a> Request<'a> for NFTHistory<'a> {
     fn get_common_fields(&self) -> &CommonFields<'a> {
         &self.common_fields
     }
@@ -44,25 +40,33 @@ impl<'a> Request<'a> for LedgerData<'a> {
     }
 }
 
-impl<'a> LedgerData<'a> {
+impl<'a> NFTHistory<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
-        binary: Option<bool>,
+        nft_id: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
-        limit: Option<u16>,
+        ledger_index_min: Option<u32>,
+        ledger_index_max: Option<u32>,
+        binary: Option<bool>,
+        forward: Option<bool>,
+        limit: Option<u32>,
         marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
-                command: RequestMethod::LedgerData,
+                command: RequestMethod::NFTHistory,
                 id,
             },
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,
             }),
+            nft_id,
+            ledger_index_min,
+            ledger_index_max,
             binary,
+            forward,
             limit,
             marker,
         }

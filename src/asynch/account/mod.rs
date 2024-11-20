@@ -68,7 +68,7 @@ where
         None,
         classic_address,
         None,
-        Some(ledger_index),
+        Some(ledger_index.into()),
         None,
         None,
         None,

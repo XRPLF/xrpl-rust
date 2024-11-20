@@ -5,7 +5,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{currency::Currency, requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// The ripple_path_find method is a simpl<'a>ified version of
 /// the path_find method that provides a single response with
@@ -42,11 +42,9 @@ pub struct RipplePathFind<'a> {
     /// Unique address of the account that would send funds
     /// in a transaction.
     pub source_account: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// Currency Amount that would be spent in the transaction.
     /// Cannot be used with source_currencies.
     pub send_max: Option<Currency<'a>>,
@@ -79,7 +77,7 @@ impl<'a> RipplePathFind<'a> {
         destination_amount: Currency<'a>,
         source_account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         send_max: Option<Currency<'a>>,
         source_currencies: Option<Vec<Currency<'a>>>,
     ) -> Self {
@@ -91,8 +89,10 @@ impl<'a> RipplePathFind<'a> {
             destination_account,
             destination_amount,
             source_account,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             send_max,
             source_currencies,
         }

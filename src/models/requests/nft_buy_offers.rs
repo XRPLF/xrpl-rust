@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// This method retrieves all of buy offers for the specified NFToken.
 #[skip_serializing_none]
@@ -15,18 +15,16 @@ pub struct NftBuyOffers<'a> {
     pub common_fields: CommonFields<'a>,
     /// The unique identifier of a NFToken object.
     pub nft_id: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// Limit the number of NFT buy offers to retrieve.
     /// This value cannot be lower than 50 or more than 500.
     /// The default is 250.
     pub limit: Option<u16>,
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for NftBuyOffers<'a> {}
@@ -46,18 +44,20 @@ impl<'a> NftBuyOffers<'a> {
         id: Option<Cow<'a, str>>,
         nft_id: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
-                command: RequestMethod::NftBuyOffers,
+                command: RequestMethod::NFTBuyOffers,
                 id,
             },
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             nft_id,
-            ledger_hash,
-            ledger_index,
             limit,
             marker,
         }

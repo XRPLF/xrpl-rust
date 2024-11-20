@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// This request returns information about an account's Payment
 /// Channels. This includes only channels where the specified
@@ -42,11 +42,9 @@ pub struct AccountChannels<'a> {
     /// account's Address. The request returns channels where
     /// this account is the channel's owner/source.
     pub account: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// Limit the number of transactions to retrieve. Cannot
     /// be less than 10 or more than 400. The default is 200.
     pub limit: Option<u16>,
@@ -56,7 +54,7 @@ pub struct AccountChannels<'a> {
     pub destination_account: Option<Cow<'a, str>>,
     /// Value from a previous paginated response.
     /// Resume retrieving data where that response left off.
-    pub marker: Option<u32>,
+    pub marker: Option<Marker<'a>>,
 }
 
 impl<'a> Model for AccountChannels<'a> {}
@@ -67,9 +65,9 @@ impl<'a> AccountChannels<'a> {
         account: Cow<'a, str>,
         destination_account: Option<Cow<'a, str>>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
-        marker: Option<u32>,
+        marker: Option<Marker<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -77,8 +75,10 @@ impl<'a> AccountChannels<'a> {
                 id,
             },
             account,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             limit,
             destination_account,
             marker,
