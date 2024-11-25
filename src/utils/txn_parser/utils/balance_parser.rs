@@ -2,17 +2,23 @@ use core::str::FromStr;
 
 use alloc::{
     string::{String, ToString},
-    vec::{self, Vec},
+    vec::Vec,
 };
 use bigdecimal::{num_bigint::Sign, BigDecimal};
 
-use crate::utils::{
-    drops_to_xrp,
-    exceptions::{XRPLTxnParserException, XRPLUtilsResult},
-    txn_parser::utils::{negate, Balance},
+use crate::{
+    models::transactions::metadata::TransactionMetadata,
+    utils::{
+        drops_to_xrp,
+        exceptions::{XRPLTxnParserException, XRPLUtilsResult},
+        txn_parser::utils::{negate, nodes::normalize_nodes, Balance},
+    },
 };
 
-use super::{nodes::NormalizedNode, AccountBalance};
+use super::{
+    nodes::NormalizedNode, parser::group_balances_by_account as group_account_balances_by_account,
+    AccountBalance, AccountBalances,
+};
 
 fn get_xrp_quantity(
     node: NormalizedNode,
@@ -65,9 +71,9 @@ fn get_xrp_quantity(
     }
 }
 
-fn flip_trustline_perspective<'a: 'b, 'b>(
-    account_balance: &'a AccountBalance<'_>,
-) -> XRPLUtilsResult<AccountBalance<'b>> {
+fn flip_trustline_perspective<'a>(
+    account_balance: &'a AccountBalance,
+) -> XRPLUtilsResult<AccountBalance<'a>> {
     let balance = account_balance.balance.clone();
     let negated_value = negate(&BigDecimal::from_str(balance.value.as_ref())?);
     let issuer = balance.issuer.clone();
@@ -81,83 +87,36 @@ fn flip_trustline_perspective<'a: 'b, 'b>(
         },
     })
 }
-fn get_trustline_quantity(
-    node: NormalizedNode,
+fn get_trustline_quantity<'a>(
+    node: &NormalizedNode,
     value: Option<BigDecimal>,
-) -> XRPLUtilsResult<Vec<AccountBalance>> {
-    if value.is_none() {
-        return Ok(Vec::new());
-    }
-    let fields = if let Some(new_fields) = node.new_fields {
-        new_fields
-    } else if let Some(final_fields) = node.final_fields {
-        final_fields
-    } else {
-        return Ok(Vec::new());
-    };
-    let low_limit = fields.low_limit;
-    let balance = fields.balance;
-    let high_limit = fields.high_limit;
-    if let (Some(low_limit), Some(balance), Some(high_limit)) = (low_limit, balance, high_limit) {
-        let low_limit_issuer = low_limit.issuer;
-        let balance_currency = balance;
-        let high_limit_issuer = high_limit.issuer;
-        if let (Some(low_limit_issuer), Some(balance_currency), Some(high_limit_issuer)) =
-            (low_limit_issuer, balance_currency, high_limit_issuer)
-        {
-            let result = AccountBalance {
-                account: low_limit_issuer.to_string().into(),
-                balance: Balance {
-                    currency: balance_currency.to_string().into(),
-                    issuer: Some(high_limit_issuer.to_string().into()),
-                    value: value.unwrap().normalized().to_string().into(),
-                },
-            };
-            return Ok(vec![result.clone(), flip_trustline_perspective(&result)?]);
-        }
-    }
-    Ok(Vec::new())
+) -> XRPLUtilsResult<Vec<AccountBalance<'a>>> {
+    todo!()
 }
 
-fn get_node_balances(
-    node: NormalizedNode,
+fn get_node_balances<'a>(
+    node: &NormalizedNode,
     value: Option<BigDecimal>,
-) -> XRPLUtilsResult<Vec<AccountBalance>> {
-    match node.ledger_entry_type.as_str() {
-        "AccountRoot" => {
-            if let Some(xrp_quantity) = get_xrp_quantity(node, value)? {
-                Ok(vec![xrp_quantity])
-            } else {
-                Ok(Vec::new())
-            }
-        }
-        "RippleState" => get_trustline_quantity(node, value),
-        _ => Ok(Vec::new()),
-    }
+) -> XRPLUtilsResult<Vec<AccountBalance<'a>>> {
+    todo!()
 }
 
 fn group_balances_by_account(account_balances: Vec<AccountBalance>) -> Vec<AccountBalances> {
-    let grouped_balances = group_by_account(account_balances);
-    let mut result = Vec::new();
-    for (account, account_obj) in grouped_balances {
-        let balances: Vec<Balance> = account_obj.into_iter().map(|ab| ab.balance).collect();
-        result.push(AccountBalances {
-            account: account.to_string().into(),
-            balances,
-        });
-    }
-    result
+    let grouped_balances = group_account_balances_by_account(account_balances.as_ref());
+    let mut account_balances_grouped: Vec<AccountBalances> = Vec::new();
 }
 
-fn derive_account_balances(
-    metadata: TransactionMetadata,
-    parser: impl Fn(NormalizedNode) -> Option<BigDecimal>,
-) -> XRPLUtilsResult<Vec<AccountBalances>> {
-    let mut quantities = Vec::new();
-    for node in normalize_nodes(metadata) {
-        if let Some(value) = parser(node.clone()) {
-            quantities.extend(get_node_balances(node, Some(value))?);
-        }
+pub fn derive_account_balances<'a>(
+    metadata: &TransactionMetadata,
+    parser_fn: impl Fn(&NormalizedNode) -> XRPLUtilsResult<Option<BigDecimal>>,
+) -> XRPLUtilsResult<Vec<AccountBalances<'a>>> {
+    let mut account_balances: Vec<AccountBalance> = Vec::new();
+    let nodes = normalize_nodes(metadata);
+    for node in nodes.into_iter() {
+        let value = parser_fn(&node)?;
+        let node_balances = get_node_balances(&node, value)?;
+        account_balances.extend(node_balances);
     }
-    Ok(group_balances_by_account(quantities))
+
+    Ok(group_balances_by_account(account_balances))
 }
