@@ -122,8 +122,7 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
                 Err(XRPLModelException::ValueEqualsValue {
                     field1: "issuer".into(),
                     field2: "account".into(),
-                }
-                .into())
+                })
             } else {
                 Ok(())
             }
@@ -139,8 +138,7 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
                     field: "transfer_fee".into(),
                     max: MAX_TRANSFER_FEE,
                     found: transfer_fee,
-                }
-                .into())
+                })
             } else {
                 Ok(())
             }
@@ -156,8 +154,7 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
                     field: "uri".into(),
                     max: MAX_URI_LENGTH,
                     found: uri.len(),
-                }
-                .into())
+                })
             } else {
                 Ok(())
             }

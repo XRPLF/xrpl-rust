@@ -42,7 +42,7 @@ pub mod core;
 #[cfg(feature = "helpers")]
 pub mod ledger;
 pub mod macros;
-#[cfg(any(feature = "models"))]
+#[cfg(feature = "models")]
 pub mod models;
 #[cfg(feature = "helpers")]
 pub mod transaction;
@@ -53,7 +53,7 @@ pub mod wallet;
 
 pub extern crate serde_json;
 
-#[cfg(any(feature = "models"))]
+#[cfg(feature = "models")]
 mod _serde;
 
 #[cfg(all(

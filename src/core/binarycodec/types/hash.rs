@@ -176,7 +176,7 @@ impl dyn Hash {
         length: Option<usize>,
     ) -> XRPLCoreResult<Vec<u8>> {
         let read_length = length.or_else(|| Some(T::get_length())).unwrap();
-        Ok(parser.read(read_length)?)
+        parser.read(read_length)
     }
 }
 

@@ -94,10 +94,11 @@ where
                 if error == "txnNotFound" {
                     continue;
                 } else {
-                    return Err(XRPLSubmitAndWaitException::SubmissionFailed(
-                        format!("{}: {}", error, response.error_message.unwrap_or("".into()))
-                            .into(),
-                    )
+                    return Err(XRPLSubmitAndWaitException::SubmissionFailed(format!(
+                        "{}: {}",
+                        error,
+                        response.error_message.unwrap_or("".into())
+                    ))
                     .into());
                 }
             } else {

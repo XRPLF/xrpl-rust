@@ -12,7 +12,7 @@ use super::XRPLResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tx<'a> {
-    ///	The transaction's compact transaction identifier.
+    /// The transaction's compact transaction identifier.
     pub ctid: Cow<'a, str>,
     /// The close time of the ledger in which the transaction was applied, in seconds since the Ripple Epoch.
     pub date: u32,

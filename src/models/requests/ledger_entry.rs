@@ -93,7 +93,7 @@ pub struct LedgerEntry<'a> {
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        Ok(self._get_field_error()?)
+        self._get_field_error()
     }
 }
 
