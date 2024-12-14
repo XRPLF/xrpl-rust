@@ -16,10 +16,10 @@ pub struct Tx<'a> {
     pub date: u32,
     pub hash: Cow<'a, str>,
     pub ledger_index: u32,
-    pub meta: Value,
-    /// Various fields of the transaction
-    #[serde(flatten)]
-    pub various: Value,
+    pub meta: Value, // TODO: replace with metadata as soon as implemented
+    pub meta_blob: Cow<'a, str>,
+    pub tx_blob: Cow<'a, str>,
+    pub tx_json: Value,
     pub validated: Option<bool>,
     /// (Deprecated) Alias for `ledger_index`
     #[serde(rename = "inLedger")]
