@@ -271,14 +271,14 @@ fn txn_needs_network_id(common_fields: CommonFields<'_>) -> XRPLHelperResult<boo
             Ok(is_not_later_rippled_version) => {
                 Ok(is_higher_restricted_networks && is_not_later_rippled_version)
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(e),
         }
     } else {
         Ok(false)
     }
 }
 
-fn is_not_later_rippled_version<'a>(source: String, target: String) -> XRPLHelperResult<bool> {
+fn is_not_later_rippled_version(source: String, target: String) -> XRPLHelperResult<bool> {
     if source == target {
         Ok(true)
     } else {

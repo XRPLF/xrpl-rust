@@ -73,7 +73,7 @@ impl Model for AMMDeposit<'_> {
             })
         } else if self.lp_token_out.is_none() && self.amount.is_none() {
             Err(XRPLModelException::ExpectedOneOf(
-                ["lp_token_out", "amount"].as_ref().into(),
+                ["lp_token_out", "amount"].as_ref(),
             ))
         } else {
             Ok(())

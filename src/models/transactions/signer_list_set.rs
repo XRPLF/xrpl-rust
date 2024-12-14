@@ -133,7 +133,7 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
             if check_account.contains(&account) {
                 return Err(XRPLSignerListSetException::CollectionItemDuplicate {
                     field: "signer_entries".into(),
-                    found: account.into(),
+                    found: account,
                 }
                 .into());
             } else {
