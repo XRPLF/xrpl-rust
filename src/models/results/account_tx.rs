@@ -17,7 +17,9 @@ pub struct AccountTx<'a> {
     pub ledger_index_max: Option<u32>,
     pub limit: Option<u16>,
     pub marker: Option<Value>,
-    pub transactions: Vec<Value>,
+    pub meta: Option<Value>,
+    pub meta_blob: Option<Cow<'a, str>>,
+    pub transactions: Vec<Value>, // TODO: replace with transaction metadata as soon as implemented
     pub validated: Option<bool>,
 }
 

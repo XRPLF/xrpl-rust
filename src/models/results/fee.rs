@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 
-use alloc::string::ToString;
+use alloc::{borrow::Cow, string::ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
@@ -12,7 +12,21 @@ use super::XRPLResult;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Fee<'a> {
+    pub current_ledger_size: Cow<'a, str>,
+    pub current_queue_size: Cow<'a, str>,
     pub drops: Drops<'a>,
+    pub expected_ledger_size: Cow<'a, str>,
+    pub ledger_current_index: u32,
+    pub levels: Levels<'a>,
+    pub max_queue_size: Cow<'a, str>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Levels<'a> {
+    pub median_level: Cow<'a, str>,
+    pub minimum_level: Cow<'a, str>,
+    pub open_ledger_level: Cow<'a, str>,
+    pub reference_level: Cow<'a, str>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
