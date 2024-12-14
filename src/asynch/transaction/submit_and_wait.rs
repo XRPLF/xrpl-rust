@@ -105,7 +105,8 @@ where
                 let validated = opt_result.try_get_typed("validated")?;
                 if validated {
                     let result = opt_result.try_into_result()?;
-                    let return_code = match result.meta.get("TransactionResult") {
+                    let meta = result.meta.as_ref().unwrap(); // safe to unwrap because we requested using non-binary mode
+                    let return_code = match meta.get("TransactionResult") {
                         Some(Value::String(s)) => s,
                         _ => {
                             return Err(XRPLSubmitAndWaitException::ExpectedFieldInTxMeta(
