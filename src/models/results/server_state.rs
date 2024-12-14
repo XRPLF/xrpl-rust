@@ -206,7 +206,7 @@ impl<'a> TryFrom<XRPLResult<'a>> for ServerState<'a> {
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
-            XRPLResult::ServerState(server_state) => Ok(server_state),
+            XRPLResult::ServerState(server_state) => Ok(*server_state),
             res => Err(XRPLResultException::UnexpectedResultType(
                 "ServerState".to_string(),
                 res.get_name(),

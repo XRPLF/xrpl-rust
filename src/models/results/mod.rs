@@ -12,6 +12,7 @@ use crate::XRPLSerdeJsonError;
 use super::{requests::XRPLRequest, XRPLModelException, XRPLModelResult};
 use alloc::{
     borrow::Cow,
+    boxed::Box,
     format,
     string::{String, ToString},
     vec::Vec,
@@ -126,7 +127,7 @@ pub enum XRPLResult<'a> {
     AccountTx(account_tx::AccountTx<'a>),
     Fee(fee::Fee<'a>),
     Ledger(ledger::Ledger<'a>),
-    ServerState(server_state::ServerState<'a>),
+    ServerState(Box<server_state::ServerState<'a>>),
     Submit(submit::Submit<'a>),
     Tx(tx::Tx<'a>),
     Other(XRPLOtherResult),
@@ -158,7 +159,7 @@ impl<'a> From<ledger::Ledger<'a>> for XRPLResult<'a> {
 
 impl<'a> From<server_state::ServerState<'a>> for XRPLResult<'a> {
     fn from(server_state: server_state::ServerState<'a>) -> Self {
-        XRPLResult::ServerState(server_state)
+        XRPLResult::ServerState(Box::new(server_state))
     }
 }
 
