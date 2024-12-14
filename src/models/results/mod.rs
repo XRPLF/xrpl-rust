@@ -128,7 +128,7 @@ pub enum XRPLResult<'a> {
     AccountTx(account_tx::AccountTx<'a>),
     Fee(fee::Fee<'a>),
     Ledger(ledger::Ledger<'a>),
-    ServerState(Box<server_state::ServerState<'a>>),
+    ServerState(Box<server_state::ServerState<'a>>), // Boxed because ServerState is large
     Submit(submit::Submit<'a>),
     Tx(tx::Tx<'a>),
     NFTokenMint(nftoken::NFTokenMintResult),
