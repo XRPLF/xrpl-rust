@@ -17,7 +17,12 @@ use crate::{
         },
         wait_seconds,
     },
-    models::{requests, results::tx::Tx, transactions::Transaction, Model},
+    models::{
+        requests::{self},
+        results::tx::{TxMap, TxMetaV1, TxV1},
+        transactions::Transaction,
+        Model,
+    },
     wallet::Wallet,
 };
 
@@ -27,7 +32,7 @@ pub async fn submit_and_wait<'a: 'b, 'b, T, F, C>(
     wallet: Option<&Wallet>,
     check_fee: Option<bool>,
     autofill: Option<bool>,
-) -> XRPLHelperResult<Tx<'b>>
+) -> XRPLHelperResult<TxMap<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -40,7 +45,7 @@ where
 async fn send_reliable_submission<'a: 'b, 'b, T, F, C>(
     transaction: &'b mut T,
     client: &C,
-) -> XRPLHelperResult<Tx<'b>>
+) -> XRPLHelperResult<TxMap<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -72,7 +77,7 @@ async fn wait_for_final_transaction_result<'a: 'b, 'b, C>(
     tx_hash: Cow<'a, str>,
     client: &C,
     last_ledger_sequence: u32,
-) -> XRPLHelperResult<Tx<'b>>
+) -> XRPLHelperResult<TxMap<'b>>
 where
     C: XRPLAsyncClient,
 {
@@ -81,7 +86,12 @@ where
     while validated_ledger_sequence < last_ledger_sequence {
         c += 1;
         if c > 20 {
-            panic!()
+            return Err(XRPLSubmitAndWaitException::SubmissionTimeout {
+                last_ledger_sequence,
+                validated_ledger_sequence,
+                prelim_result: "Transaction not included in ledger".into(),
+            }
+            .into());
         }
         validated_ledger_sequence = get_latest_validated_ledger_sequence(client).await?;
         // sleep for 1 second
@@ -102,11 +112,22 @@ where
                     .into());
                 }
             } else {
-                let opt_result = response.try_into_opt_result::<Tx>()?;
-                let validated = opt_result.try_get_typed("validated")?;
+                let result: TxMap = response.try_into()?;
+                let base = match &result {
+                    TxMap::Default(tx) => tx.base.clone(),
+                    TxMap::V1(tx) => tx.base.clone(),
+                };
+                let validated = base.validated.unwrap_or(false);
                 if validated {
-                    let result = opt_result.try_into_result()?;
-                    let meta = result.meta.as_ref().unwrap(); // safe to unwrap because we requested using non-binary mode
+                    let meta = match result {
+                        TxMap::Default(ref tx) => tx.meta.clone(),
+                        TxMap::V1(TxV1 {
+                            meta: Some(TxMetaV1::Json(ref meta)),
+                            ..
+                        }) => Some(meta.clone()),
+                        _ => None,
+                    };
+                    let meta = meta.unwrap(); // safe to unwrap because we requested using non-binary mode and we checked that the transaction was validated
                     let return_code = match meta.get("TransactionResult") {
                         Some(Value::String(s)) => s,
                         _ => {

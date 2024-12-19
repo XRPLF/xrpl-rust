@@ -14,8 +14,6 @@ pub enum XRPLResultException {
     UnexpectedResultType(String, String),
     #[error("Index not found.")]
     IndexNotFound,
-    #[error("Called unwrap on `XRPLOtherResult`.")]
-    UnwrapOnOther,
     #[error("Expected a XRPL Result model but got `XRPLOtherResult`: {0:?}.")]
     ExpectedResult(XRPLOtherResult),
 }

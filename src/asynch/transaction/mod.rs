@@ -165,7 +165,7 @@ where
     let req = Submit::new(None, txn_blob.into(), None);
     let res = client.request(req.into()).await?;
 
-    Ok(res.try_into_result::<SubmitResult<'_>>()?)
+    Ok(res.try_into()?)
 }
 
 pub async fn calculate_fee_per_transaction_type<'a, 'b, 'c, T, F, C>(
@@ -222,11 +222,8 @@ async fn get_owner_reserve_from_response(
     client: &impl XRPLAsyncClient,
 ) -> XRPLHelperResult<XRPAmount<'_>> {
     let owner_reserve_response = client.request(ServerState::new(None).into()).await?;
-    match owner_reserve_response
-        .try_into_result::<ServerStateResult<'_>>()?
-        .state
-        .validated_ledger
-    {
+    let result: ServerStateResult = owner_reserve_response.try_into()?;
+    match result.state.validated_ledger {
         Some(validated_ledger) => Ok(validated_ledger.reserve_base),
         None => Err(XRPLModelException::MissingField("validated_ledger".to_string()).into()),
     }

@@ -262,8 +262,8 @@ where
         self.flags.0.contains(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
-        self.transaction_type.clone()
+    fn get_transaction_type(&self) -> &TransactionType {
+        &self.transaction_type
     }
 
     fn get_common_fields(&self) -> &CommonFields<'_, T> {
@@ -334,7 +334,7 @@ where
         false
     }
 
-    fn get_transaction_type(&self) -> TransactionType;
+    fn get_transaction_type(&self) -> &TransactionType;
 
     fn get_common_fields(&self) -> &CommonFields<'_, T>;
 

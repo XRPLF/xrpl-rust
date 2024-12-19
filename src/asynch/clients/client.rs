@@ -18,19 +18,16 @@ pub trait XRPLClient {
 
     fn set_request_id(&self, request: &mut XRPLRequest<'_>) {
         let common_fields = request.get_common_fields_mut();
-        common_fields.id = match &common_fields.id {
-            Some(id) => Some(id.clone()),
-            None => {
-                #[cfg(feature = "std")]
-                {
-                    Some(self.get_random_id())
-                }
-                #[cfg(not(feature = "std"))]
-                unimplemented!(
-                    "Random ID generation is not supported in no_std. Please provide an ID."
-                )
+        if common_fields.id.is_none() {
+            #[cfg(feature = "std")]
+            {
+                common_fields.id = Some(self.get_random_id());
             }
-        };
+            #[cfg(not(feature = "std"))]
+            unimplemented!(
+                "Random ID generation is not supported in no_std. Please provide an ID."
+            );
+        }
     }
 
     /// Generate a random id.

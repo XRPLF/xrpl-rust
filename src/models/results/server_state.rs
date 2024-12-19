@@ -8,7 +8,7 @@ use crate::models::{
     XRPLModelResult,
 };
 
-use super::XRPLResult;
+use super::{XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ServerState<'a> {
@@ -51,11 +51,11 @@ pub struct State<'a> {
     pub pubkey_node: Cow<'a, str>,
     /// (Admin only) Public key used by this node to sign ledger validations. This validation key pair is derived from
     /// the `[validator_token]` or `[validation_seed]` config field.
-    pub pubkey_validator: Cow<'a, str>,
+    pub pubkey_validator: Option<Cow<'a, str>>,
     /// A string indicating to what extent the server is participating in the network. See Possible Server States for more details.
     pub server_state: Cow<'a, str>,
     /// The number of consecutive microseconds the server has been in the current state.
-    pub server_state_duration_us: u32,
+    pub server_state_duration_us: Cow<'a, str>,
     /// A map of various server states with information about the time the server spends in each. This can be useful for tracking
     /// the long-term health of your server's connectivity to the network.
     pub state_accounting: RippledServerState<'a>,
@@ -99,6 +99,7 @@ pub struct State<'a> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
 pub enum JqTransOverflow<'a> {
     Int(u32),
     String(Cow<'a, str>),
@@ -121,6 +122,7 @@ pub struct PortDescriptor<'a> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
 pub enum Port<'a> {
     Int(u32),
     String(Cow<'a, str>),
@@ -172,9 +174,9 @@ pub struct RippledServerState<'a> {
     /// (possibly because it has not been configured as a validator).
     pub full: StateAccounting<'a>,
     /// The server is currently participating in validation of the ledger.
-    pub validating: StateAccounting<'a>,
+    pub validating: Option<StateAccounting<'a>>,
     /// The server is participating in validation of the ledger and currently proposing its own version.
-    pub proposing: StateAccounting<'a>,
+    pub proposing: Option<StateAccounting<'a>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -213,5 +215,105 @@ impl<'a> TryFrom<XRPLResult<'a>> for ServerState<'a> {
             )
             .into()),
         }
+    }
+}
+
+impl<'a> TryFrom<XRPLResponse<'a>> for ServerState<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => ServerState::try_from(result),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_serde {
+    use super::*;
+
+    const RESPONSE: &str = r#"
+        {
+            "state": {
+                "build_version": "2.3.0-b2+20240815210350.d9bd75e6",
+                "complete_ledgers": "2832692-3167746",
+                "initial_sync_duration_us": "105476373",
+                "io_latency_ms": 1,
+                "jq_trans_overflow": "0",
+                "last_close": {
+                    "converge_time": 2001,
+                    "proposers": 6
+                },
+                "load_base": 256,
+                "load_factor": 256,
+                "load_factor_fee_escalation": 256,
+                "load_factor_fee_queue": 256,
+                "load_factor_fee_reference": 256,
+                "load_factor_server": 256,
+                "network_id": 1,
+                "peer_disconnects": "2872",
+                "peer_disconnects_resources": "0",
+                "peers": 21,
+                "ports": [
+                    {
+                        "port": "8181",
+                        "protocol": ["ws"]
+                    },
+                    {
+                        "port": "443",
+                        "protocol": ["https"]
+                    },
+                    {
+                        "port": "51235",
+                        "protocol": ["peer"]
+                    }
+                ],
+                "pubkey_node": "n9L1TwhZc3XAqLpDxcnET7Umy7tvjbMKtEC3EKh88PmWJXsp6WQe",
+                "server_state": "full",
+                "server_state_duration_us": "248221680809",
+                "state_accounting": {
+                "connected": {
+                    "duration_us": "100368477",
+                    "transitions": "2"
+                },
+                "disconnected": {
+                    "duration_us": "1104982",
+                    "transitions": "2"
+                },
+                "full": {
+                    "duration_us": "248221680809",
+                    "transitions": "1"
+                },
+                "syncing": {
+                    "duration_us": "4002911",
+                    "transitions": "1"
+                },
+                "tracking": {
+                    "duration_us": "0",
+                    "transitions": "1"
+                }
+                },
+                "time": "2024-Dec-16 12:01:32.125255 UTC",
+                "uptime": 248327,
+                "validated_ledger": {
+                "base_fee": 10,
+                "close_time": 787665690,
+                "hash": "EDDC975CC0F6E2A5EAF1BDB0A5EDC62CD42FE0AA368DA52940B8693FB2E471F8",
+                "reserve_base": 10000000,
+                "reserve_inc": 2000000,
+                "seq": 3167746
+                },
+                "validation_quorum": 5
+            },
+            "status": "success"
+        }
+    "#;
+
+    #[test]
+    fn test_deserialize_server_state() -> XRPLModelResult<()> {
+        let _: ServerState = serde_json::from_str(RESPONSE)?;
+
+        Ok(())
     }
 }

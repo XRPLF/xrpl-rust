@@ -90,7 +90,7 @@ impl<'a> Transaction<'a, AMMDepositFlag> for AMMDeposit<'a> {
         self.common_fields.get_mut_common_fields()
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 }

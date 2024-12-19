@@ -1,4 +1,4 @@
-use alloc::borrow::Cow;
+use alloc::borrow::{Cow, ToOwned};
 
 use crate::{
     core::addresscodec::{is_valid_xaddress, xaddress_to_classic_address},
@@ -38,7 +38,7 @@ pub async fn get_next_valid_seq_number(
 
 pub async fn get_xrp_balance<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
-    client: &C,
+    client: &'a C,
     ledger_index: Option<Cow<'a, str>>,
 ) -> XRPLHelperResult<XRPAmount<'b>>
 where
@@ -54,7 +54,7 @@ where
 
 pub async fn get_account_root<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
-    client: &C,
+    client: &'a C,
     ledger_index: Cow<'a, str>,
 ) -> XRPLHelperResult<AccountRoot<'b>>
 where
@@ -74,17 +74,17 @@ where
         None,
     )
     .into();
-    let account_info = client.request(request).await?;
+    let response = client.request(request).await?;
+    let account_info = results::account_info::AccountInfoMap::try_from(response)?;
+    let account_root = account_info.get_account_root().to_owned();
 
-    Ok(account_info
-        .try_into_result::<results::account_info::AccountInfo<'_>>()?
-        .account_data)
+    Ok(account_root)
 }
 
 pub async fn get_latest_transaction<'a: 'b, 'b, C>(
     mut address: Cow<'a, str>,
     client: &C,
-) -> XRPLHelperResult<crate::models::results::account_tx::AccountTx<'b>>
+) -> XRPLHelperResult<crate::models::results::account_tx::AccountTxMap<'b>>
 where
     C: XRPLAsyncClient,
 {
@@ -103,7 +103,8 @@ where
         Some(1),
         None,
     );
-    let response = client.request(account_tx.into()).await?;
+    let response: results::account_tx::AccountTxMap =
+        client.request(account_tx.into()).await?.try_into()?;
 
-    Ok(response.try_into_result::<results::account_tx::AccountTx<'_>>()?)
+    Ok(response)
 }

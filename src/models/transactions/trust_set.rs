@@ -77,7 +77,7 @@ impl<'a> Transaction<'a, TrustSetFlag> for TrustSet<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

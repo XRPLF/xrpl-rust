@@ -13,7 +13,11 @@ use crate::{
         clients::XRPLClient,
         exceptions::XRPLHelperResult,
     },
-    models::{ledger::objects::AccountRoot, results::account_tx::AccountTx, XRPAmount},
+    models::{
+        ledger::objects::AccountRoot,
+        results::account_tx::AccountTxMap,
+        XRPAmount,
+    },
 };
 
 pub fn does_account_exist<C>(
@@ -44,7 +48,7 @@ where
 
 pub fn get_xrp_balance<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
-    client: &C,
+    client: &'a C,
     ledger_index: Option<Cow<'a, str>>,
 ) -> XRPLHelperResult<XRPAmount<'b>>
 where
@@ -55,7 +59,7 @@ where
 
 pub fn get_account_root<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
-    client: &C,
+    client: &'a C,
     ledger_index: Cow<'a, str>,
 ) -> XRPLHelperResult<AccountRoot<'b>>
 where
@@ -67,7 +71,7 @@ where
 pub fn get_latest_transaction<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
     client: &C,
-) -> XRPLHelperResult<AccountTx<'b>>
+) -> XRPLHelperResult<AccountTxMap<'b>>
 where
     C: XRPLClient,
 {

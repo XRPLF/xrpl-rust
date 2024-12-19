@@ -48,7 +48,7 @@ pub struct SetRegularKey<'a> {
 impl<'a> Model for SetRegularKey<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for SetRegularKey<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
