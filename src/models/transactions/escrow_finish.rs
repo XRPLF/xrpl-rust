@@ -53,7 +53,7 @@ impl<'a: 'static> Model for EscrowFinish<'a> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for EscrowFinish<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

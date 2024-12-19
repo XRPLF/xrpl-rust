@@ -15,7 +15,7 @@ use crate::{
         },
     },
     models::{
-        results::{submit::Submit, tx::Tx},
+        results::{submit::Submit, tx::TxMap},
         transactions::Transaction,
         Model, XRPAmount,
     },
@@ -96,7 +96,7 @@ pub fn submit_and_wait<'a: 'b, 'b, T, F, C>(
     wallet: Option<&Wallet>,
     check_fee: Option<bool>,
     autofill: Option<bool>,
-) -> XRPLHelperResult<Tx<'b>>
+) -> XRPLHelperResult<TxMap<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,

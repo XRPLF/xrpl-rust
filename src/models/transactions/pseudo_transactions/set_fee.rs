@@ -42,7 +42,7 @@ pub struct SetFee<'a> {
 impl<'a> Model for SetFee<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for SetFee<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

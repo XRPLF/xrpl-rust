@@ -102,7 +102,7 @@ impl<'a> Transaction<'a, NFTokenMintFlag> for NFTokenMint<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -117,8 +117,8 @@ impl<'a> Transaction<'a, NFTokenMintFlag> for NFTokenMint<'a> {
 
 impl<'a> NFTokenMintError for NFTokenMint<'a> {
     fn _get_issuer_error(&self) -> XRPLModelResult<()> {
-        if let Some(issuer) = self.issuer.clone() {
-            if issuer == self.common_fields.account {
+        if let Some(issuer) = &self.issuer {
+            if issuer == &self.common_fields.account {
                 Err(XRPLModelException::ValueEqualsValue {
                     field1: "issuer".into(),
                     field2: "account".into(),
@@ -148,7 +148,7 @@ impl<'a> NFTokenMintError for NFTokenMint<'a> {
     }
 
     fn _get_uri_error(&self) -> XRPLModelResult<()> {
-        if let Some(uri) = self.uri.clone() {
+        if let Some(uri) = &self.uri {
             if uri.len() > MAX_URI_LENGTH {
                 Err(XRPLModelException::ValueTooLong {
                     field: "uri".into(),

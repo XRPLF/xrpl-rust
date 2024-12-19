@@ -53,7 +53,7 @@ pub struct PaymentChannelFund<'a> {
 impl<'a> Model for PaymentChannelFund<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for PaymentChannelFund<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

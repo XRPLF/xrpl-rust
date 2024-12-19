@@ -4,7 +4,7 @@ use alloc::string::ToString;
 
 use crate::models::{
     requests::{fee::Fee, ledger::Ledger},
-    results::{fee::Drops, fee::Fee as FeeResult, ledger::Ledger as LedgerResult},
+    results::{self},
     XRPAmount,
 };
 
@@ -30,10 +30,9 @@ pub async fn get_latest_validated_ledger_sequence(
             .into(),
         )
         .await?;
+    let ledger_result: results::ledger::Ledger = ledger_response.try_into()?;
 
-    Ok(ledger_response
-        .try_into_result::<LedgerResult<'_>>()?
-        .ledger_index)
+    Ok(ledger_result.ledger_index)
 }
 
 pub async fn get_latest_open_ledger_sequence(
@@ -56,10 +55,9 @@ pub async fn get_latest_open_ledger_sequence(
             .into(),
         )
         .await?;
+    let ledger_result: results::ledger::Ledger = ledger_response.try_into()?;
 
-    Ok(ledger_response
-        .try_into_result::<LedgerResult<'_>>()?
-        .ledger_index)
+    Ok(ledger_result.ledger_index)
 }
 
 pub enum FeeType {
@@ -75,7 +73,8 @@ pub async fn get_fee(
 ) -> XRPLHelperResult<XRPAmount<'_>> {
     let fee_request = Fee::new(None);
     let response = client.request(fee_request.into()).await?;
-    let drops = response.try_into_result::<FeeResult<'_>>()?.drops;
+    let result: results::fee::Fee = response.try_into()?;
+    let drops = result.drops;
     let fee = match_fee_type(fee_type, drops)?;
 
     if let Some(max_fee) = max_fee {
@@ -85,7 +84,10 @@ pub async fn get_fee(
     }
 }
 
-fn match_fee_type(fee_type: Option<FeeType>, drops: Drops<'_>) -> XRPLHelperResult<u32> {
+fn match_fee_type(
+    fee_type: Option<FeeType>,
+    drops: results::fee::Drops<'_>,
+) -> XRPLHelperResult<u32> {
     match fee_type {
         None | Some(FeeType::Open) => Ok(drops.open_ledger_fee.try_into()?),
         Some(FeeType::Minimum) => Ok(drops.minimum_fee.try_into()?),

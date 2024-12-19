@@ -8,7 +8,7 @@ use crate::models::{
     XRPLModelResult,
 };
 
-use super::XRPLResult;
+use super::{XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Fee<'a> {
@@ -64,5 +64,46 @@ impl<'a> TryFrom<XRPLResult<'a>> for Fee<'a> {
             )
             .into()),
         }
+    }
+}
+
+impl<'a> TryFrom<XRPLResponse<'a>> for Fee<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => Fee::try_from(result),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_serde {
+    use super::*;
+
+    const RESPONSE: &str = r#"{
+        "current_ledger_size": "14",
+        "current_queue_size": "0",
+        "drops": {
+            "base_fee": "10",
+            "median_fee": "11000",
+            "minimum_fee": "10",
+            "open_ledger_fee": "10"
+        },
+        "expected_ledger_size": "24",
+        "ledger_current_index": 26575101,
+        "levels": {
+            "median_level": "281600",
+            "minimum_level": "256",
+            "open_ledger_level": "256",
+            "reference_level": "256"
+        },
+        "max_queue_size": "480"
+    }"#;
+
+    #[test]
+    fn test_deserialize_fee() -> XRPLModelResult<()> {
+        Ok(())
     }
 }

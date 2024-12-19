@@ -8,22 +8,21 @@ use crate::models::{
     XRPLModelException, XRPLModelResult,
 };
 
-use super::{exceptions::XRPLResultException, XRPLResult};
+use super::{exceptions::XRPLResultException, XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct AccountInfo<'a> {
+#[serde(untagged)]
+pub enum AccountInfoMap<'a> {
+    Default(AccountInfo<'a>),
+    V1(AccountInfoV1<'a>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AccountInfoBase<'a> {
     /// The AccountRoot ledger object with this account's information, as stored in the ledger.
     pub account_data: AccountRoot<'a>,
     /// The account's flag statuses (see below), based on the Flags field of the account.
-    pub account_flags: AccountFlags,
-    /// True if this data is from a validated ledger version; if omitted or set to false, this data is not final.
-    pub validated: bool,
-    /// API v1: (Omitted unless the request specified signer_lists and at least one SignerList is associated with the account.)
-    /// Array of SignerList ledger objects associated with this account for Multi-Signing. Since an account can own at most one
-    /// SignerList, this array must have exactly one member if it is present. The field is nested under account_data.
-    /// API v2: Identical to API v1, but the field is returned in the root response instead. Clio implements the API v2
-    /// behavior in all cases.
-    pub signer_lists: Option<Vec<SignerList<'a>>>,
+    pub account_flags: Option<AccountFlags>,
     /// (Omitted if `ledger_index` is provided instead) The ledger index of the current in-progress ledger,
     /// which was used when retrieving this information.
     pub ledger_current_index: Option<u32>,
@@ -36,6 +35,28 @@ pub struct AccountInfo<'a> {
     /// may be different from other servers in the peer-to-peer XRP Ledger network. Some fields may be omitted
     /// because the values are calculated "lazily" by the queuing mechanism.
     pub queue_data: Option<QueueData<'a>>,
+    /// True if this data is from a validated ledger version; if omitted or set to false, this data is not final.
+    pub validated: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AccountInfo<'a> {
+    #[serde(flatten)]
+    pub base: AccountInfoBase<'a>,
+    /// If requested, array of SignerList ledger objects associated with this account for Multi-Signing.
+    /// Since an account can own at most one SignerList, this array must have exactly one
+    /// member if it is present.
+    pub signer_lists: Option<Vec<SignerList<'a>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AccountInfoV1<'a> {
+    #[serde(flatten)]
+    pub base: AccountInfoBase<'a>,
+    /// If requested, array of SignerList ledger objects associated with this account for Multi-Signing.
+    /// Since an account can own at most one SignerList, this array must have exactly one
+    /// member if it is present.
+    pub signer_lists: Option<Vec<SignerList<'a>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -91,7 +112,16 @@ pub struct QueueDataTransaction<'a> {
     pub seq: u32,
 }
 
-impl<'a> TryFrom<XRPLResult<'a>> for AccountInfo<'a> {
+impl<'a> AccountInfoMap<'a> {
+    pub fn get_account_root(&self) -> &AccountRoot<'a> {
+        match self {
+            AccountInfoMap::Default(account_info) => &account_info.base.account_data,
+            AccountInfoMap::V1(account_info) => &account_info.base.account_data,
+        }
+    }
+}
+
+impl<'a> TryFrom<XRPLResult<'a>> for AccountInfoMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
@@ -103,5 +133,69 @@ impl<'a> TryFrom<XRPLResult<'a>> for AccountInfo<'a> {
             )
             .into()),
         }
+    }
+}
+
+impl<'a> TryFrom<XRPLResponse<'a>> for AccountInfoMap<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => AccountInfoMap::try_from(result),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_serde {
+    use super::*;
+
+    const RESPONSE: &str = r#"{
+            "account_data": {
+                "Account": "rG1QQv2nh2gr7RCZ1P8YYcBUKCCN633jCn",
+                "Balance": "999999999960",
+                "Flags": 8388608,
+                "LedgerEntryType": "AccountRoot",
+                "OwnerCount": 0,
+                "PreviousTxnID": "4294BEBE5B569A18C0A2702387C9B1E7146DC3A5850C1E87204951C6FDAA4C42",
+                "PreviousTxnLgrSeq": 3,
+                "Sequence": 6,
+                "index": "92FA6A9FC8EA6018D5D16532D7795C91BFB0831355BDFDA177E86C8BF997985F"
+            },
+            "ledger_current_index": 4,
+            "queue_data": {
+                "auth_change_queued": true,
+                "highest_sequence": 10,
+                "lowest_sequence": 6,
+                "max_spend_drops_total": "500",
+                "transactions": [
+                    {
+                        "auth_change": false,
+                        "fee": "100",
+                        "fee_level": "2560",
+                        "max_spend_drops": "100",
+                        "seq": 6
+                    },
+                    {
+                        "LastLedgerSequence": 10,
+                        "auth_change": true,
+                        "fee": "100",
+                        "fee_level": "2560",
+                        "max_spend_drops": "100",
+                        "seq": 10
+                    }
+                ],
+                "txn_count": 5
+            },
+            "validated": false
+    }
+    "#;
+
+    #[test]
+    fn test_deserialize_account_info<'a>() -> XRPLModelResult<()> {
+        let _: AccountInfoMap = serde_json::from_str(RESPONSE)?;
+
+        Ok(())
     }
 }

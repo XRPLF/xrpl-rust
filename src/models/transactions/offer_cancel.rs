@@ -44,7 +44,7 @@ pub struct OfferCancel<'a> {
 impl<'a> Model for OfferCancel<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for OfferCancel<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

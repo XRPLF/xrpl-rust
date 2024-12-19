@@ -24,8 +24,8 @@ pub struct XChainAccountCreateCommit<'a> {
 impl Model for XChainAccountCreateCommit<'_> {}
 
 impl<'a> Transaction<'a, NoFlags> for XChainAccountCreateCommit<'a> {
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainAccountCreateCommit
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
