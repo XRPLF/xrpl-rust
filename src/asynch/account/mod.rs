@@ -3,7 +3,7 @@ use alloc::borrow::{Cow, ToOwned};
 use crate::{
     core::addresscodec::{is_valid_xaddress, xaddress_to_classic_address},
     models::{
-        ledger::objects::AccountRoot,
+        ledger::objects::account_root::AccountRoot,
         requests::{account_info::AccountInfo, account_tx::AccountTx},
         results::{self},
         XRPAmount,

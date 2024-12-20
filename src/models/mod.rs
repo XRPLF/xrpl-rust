@@ -47,7 +47,7 @@ pub struct PathStep<'a> {
     type_hex: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, derive_new::new)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, derive_new::new)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainBridge<'a> {
     pub issuing_chain_door: Cow<'a, str>,

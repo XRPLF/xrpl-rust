@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use serde::{Deserialize, Serialize};
 
 use crate::models::{
-    ledger::objects::{signer_list::SignerList, AccountRoot},
+    ledger::objects::{account_root::AccountRoot, signer_list::SignerList},
     XRPLModelException, XRPLModelResult,
 };
 

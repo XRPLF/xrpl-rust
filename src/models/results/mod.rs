@@ -3,12 +3,17 @@ pub mod account_tx;
 pub mod exceptions;
 pub mod fee;
 pub mod ledger;
+pub mod nft_buy_offer;
+pub mod nft_history;
+pub mod nft_info;
+pub mod nft_sell_offers;
 pub mod nftoken;
+pub mod nfts_by_issuer;
 pub mod server_state;
 pub mod submit;
 pub mod tx;
 
-use super::{requests::XRPLRequest, XRPLModelException, XRPLModelResult};
+use super::{requests::XRPLRequest, Amount, XRPLModelException, XRPLModelResult};
 use alloc::{
     borrow::Cow,
     boxed::Box,
@@ -19,6 +24,16 @@ use core::convert::{TryFrom, TryInto};
 use exceptions::XRPLResultException;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{value::Index, Map, Value};
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct NftOffer<'a> {
+    pub amount: Amount<'a>,
+    pub flags: u32,
+    pub nft_offer_index: Cow<'a, str>,
+    pub owner: Cow<'a, str>,
+    pub destination: Option<Cow<'a, str>>,
+    pub expiration: Option<u32>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct XRPLOtherResult(Value);
@@ -76,6 +91,11 @@ pub enum XRPLResult<'a> {
     AccountTx(account_tx::AccountTxMap<'a>),
     Fee(fee::Fee<'a>),
     Ledger(ledger::Ledger<'a>),
+    NFTBuyOffer(nft_buy_offer::NFTBuyOffer<'a>),
+    NFTHistory(nft_history::NFTHistory<'a>),
+    NFTInfo(nft_info::NFTInfo<'a>),
+    NFTSellOffers(nft_sell_offers::NFTSellOffer<'a>),
+    NFTsByIssuer(nfts_by_issuer::NFTsByIssuer<'a>),
     ServerState(Box<server_state::ServerState<'a>>), // Boxed because ServerState is large
     Submit(submit::Submit<'a>),
     Tx(tx::Tx<'a>),
@@ -179,6 +199,36 @@ impl<'a> From<XRPLOtherResult> for XRPLResult<'a> {
     }
 }
 
+impl<'a> From<nft_buy_offer::NFTBuyOffer<'a>> for XRPLResult<'a> {
+    fn from(nft_buy_offer: nft_buy_offer::NFTBuyOffer<'a>) -> Self {
+        XRPLResult::NFTBuyOffer(nft_buy_offer)
+    }
+}
+
+impl<'a> From<nft_history::NFTHistory<'a>> for XRPLResult<'a> {
+    fn from(nft_history: nft_history::NFTHistory<'a>) -> Self {
+        XRPLResult::NFTHistory(nft_history)
+    }
+}
+
+impl<'a> From<nft_info::NFTInfo<'a>> for XRPLResult<'a> {
+    fn from(nft_info: nft_info::NFTInfo<'a>) -> Self {
+        XRPLResult::NFTInfo(nft_info)
+    }
+}
+
+impl<'a> From<nft_sell_offers::NFTSellOffer<'a>> for XRPLResult<'a> {
+    fn from(nft_sell_offers: nft_sell_offers::NFTSellOffer<'a>) -> Self {
+        XRPLResult::NFTSellOffers(nft_sell_offers)
+    }
+}
+
+impl<'a> From<nfts_by_issuer::NFTsByIssuer<'a>> for XRPLResult<'a> {
+    fn from(nfts_by_issuer: nfts_by_issuer::NFTsByIssuer<'a>) -> Self {
+        XRPLResult::NFTsByIssuer(nfts_by_issuer)
+    }
+}
+
 impl<'a> TryInto<Value> for XRPLResult<'a> {
     type Error = XRPLModelException;
 
@@ -197,6 +247,11 @@ impl XRPLResult<'_> {
             XRPLResult::AccountTx(_) => "AccountTx".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
+            XRPLResult::NFTBuyOffer(_) => "NFTBuyOffer".to_string(),
+            XRPLResult::NFTHistory(_) => "NFTHistory".to_string(),
+            XRPLResult::NFTInfo(_) => "NFTInfo".to_string(),
+            XRPLResult::NFTSellOffers(_) => "NFTSellOffers".to_string(),
+            XRPLResult::NFTsByIssuer(_) => "NFTsByIssuer".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
@@ -300,14 +355,6 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
                     .and_then(|v| serde_json::from_value(v).ok()),
             })
         }
-    }
-}
-
-impl TryInto<Value> for XRPLResponse<'_> {
-    type Error = XRPLModelException;
-
-    fn try_into(self) -> XRPLModelResult<Value> {
-        Ok(serde_json::to_value(self)?)
     }
 }
 

@@ -14,9 +14,7 @@ use crate::{
         exceptions::XRPLHelperResult,
     },
     models::{
-        ledger::objects::AccountRoot,
-        results::account_tx::AccountTxMap,
-        XRPAmount,
+        ledger::objects::account_root::AccountRoot, results::account_tx::AccountTxMap, XRPAmount,
     },
 };
 
