@@ -7,7 +7,7 @@ use crate::models::{Model, NoFlags, XChainBridge, XRPAmount};
 use super::{CommonFields, LedgerEntryType, LedgerObject};
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct Bridge<'a> {
     #[serde(flatten)]
