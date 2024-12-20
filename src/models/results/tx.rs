@@ -22,7 +22,7 @@ pub struct TxBase<'a> {
     /// The unique identifying hash of the transaction
     pub hash: Cow<'a, str>,
     /// The ledger index of the ledger that includes this transaction.
-    pub ledger_index: u32,
+    pub ledger_index: Option<u32>,
     /// The transaction's compact transaction identifier.
     pub ctid: Option<Cow<'a, str>>,
     /// The close time of the ledger in which the transaction was applied, in seconds since the Ripple Epoch.
@@ -254,9 +254,25 @@ mod test_serde {
         "close_time_iso": "2013-03-12T23:16:50Z"
     }"#;
 
+    const RESPONSE_V1: &str = r#"{
+        "Account": "rLQgQmY6sLmaj4syXStaBvBbbfV9EyraZu",
+        "Domain": "6578616D706C652E636F6D",
+        "Fee": "10",
+        "Flags": 0,
+        "LastLedgerSequence": 3282572,
+        "Sequence": 3282552,
+        "SigningPubKey": "ED3DC4D1235D789F4269F9EABAF122A63FDCEEF51355BE45E9D52D52D25E1174B4",
+        "TransactionType": "AccountSet",
+        "TxnSignature": "B75FA71C5411923A43B5ED9DCA836FAF30D76D485492A94A5B542FECC483F94EAF83A1CABD03DB76C77BE7FCD2D6CD5A873F0A448E8E5EF727D50EA8C7F84603",
+        "hash": "AFEDEA4FBD3B36AB168900AAF503BF949A922E8A9F6F3542CD9B3413527DC87F",
+        "status": "success",
+        "validated": false
+    }"#;
+
     #[test]
     fn test_deserialize_tx() -> XRPLModelResult<()> {
         let _: Tx = serde_json::from_str(RESPONSE).unwrap();
+        let _: TxV1 = serde_json::from_str(RESPONSE_V1).unwrap();
 
         Ok(())
     }
