@@ -32,7 +32,7 @@ pub struct NFTokenId<'a> {
 /// The XLS-20d proposal fixes m = 384160001 and c = 2459.
 /// We then take the modulus of 2^32 which is 4294967296.
 pub fn unscramble_taxon(taxon: u64, token_seq: u64) -> u64 {
-    return (taxon ^ (384160001 * token_seq + 2459)) % 4294967296;
+    (taxon ^ (384160001 * token_seq + 2459)) % 4294967296
 }
 
 /// Parse an NFTokenID into the information it is encoding.

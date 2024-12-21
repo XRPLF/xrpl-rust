@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -136,7 +137,7 @@ impl<'a> Transaction<'a, AccountSetFlag> for AccountSet<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -197,11 +198,11 @@ impl<'a> AccountSetError for AccountSet<'a> {
     }
 
     fn _get_domain_error(&self) -> Result<(), XRPLModelException> {
-        if let Some(domain) = self.domain.clone() {
+        if let Some(domain) = &self.domain {
             if domain.to_lowercase().as_str() != domain {
                 Err(XRPLModelException::InvalidValueFormat {
                     field: "domain".into(),
-                    found: domain.into(),
+                    found: domain.to_string(),
                     format: "lowercase".into(),
                 })
             } else if domain.len() > MAX_DOMAIN_LENGTH {
@@ -231,7 +232,7 @@ impl<'a> AccountSetError for AccountSet<'a> {
     }
 
     fn _get_nftoken_minter_error(&self) -> Result<(), XRPLModelException> {
-        if let Some(_nftoken_minter) = self.nftoken_minter.clone() {
+        if let Some(_nftoken_minter) = &self.nftoken_minter {
             if self.set_flag.is_none() {
                 if let Some(clear_flag) = &self.clear_flag {
                     match clear_flag {

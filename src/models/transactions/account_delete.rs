@@ -47,7 +47,7 @@ pub struct AccountDelete<'a> {
 impl<'a> Model for AccountDelete<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for AccountDelete<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

@@ -3,71 +3,35 @@ pub mod account_tx;
 pub mod exceptions;
 pub mod fee;
 pub mod ledger;
+pub mod nft_buy_offer;
+pub mod nft_history;
+pub mod nft_info;
+pub mod nft_sell_offers;
+pub mod nfts_by_issuer;
 pub mod server_state;
 pub mod submit;
 pub mod tx;
 
-use crate::XRPLSerdeJsonError;
-
-use super::{requests::XRPLRequest, XRPLModelException, XRPLModelResult};
+use super::{requests::XRPLRequest, Amount, XRPLModelException, XRPLModelResult};
 use alloc::{
     borrow::Cow,
-    format,
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    convert::{TryFrom, TryInto},
-    fmt::Display,
-};
+use core::convert::{TryFrom, TryInto};
 use exceptions::XRPLResultException;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{value::Index, Map, Value};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum XRPLOptionalResult<T> {
-    Result(T),
-    Other(XRPLOtherResult),
-}
-
-impl<T> XRPLOptionalResult<T> {
-    pub fn unwrap(self) -> T {
-        match self {
-            XRPLOptionalResult::Result(result) => result,
-            XRPLOptionalResult::Other(_) => {
-                panic!("{}", XRPLResultException::UnwrapOnOther.to_string())
-            }
-        }
-    }
-
-    /// Try to convert the result into an expected XRPL result.
-    pub fn try_into_result(self) -> XRPLModelResult<T> {
-        match self {
-            XRPLOptionalResult::Result(result) => Ok(result),
-            XRPLOptionalResult::Other(other) => {
-                Err(XRPLResultException::ExpectedResult(other).into())
-            }
-        }
-    }
-
-    /// Get a value from the result by index.
-    pub fn try_get_typed<I, U>(&self, index: I) -> XRPLModelResult<U>
-    where
-        T: Serialize,
-        I: Index + Display,
-        U: DeserializeOwned,
-    {
-        match self {
-            XRPLOptionalResult::Result(result) => {
-                let result_value = serde_json::to_value(result)?;
-                let value = result_value
-                    .get(&index)
-                    .ok_or(XRPLSerdeJsonError::InvalidNoneError(index.to_string()))?;
-                Ok(serde_json::from_value(value.clone())?)
-            }
-            XRPLOptionalResult::Other(other) => other.try_get_typed(index),
-        }
-    }
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct NftOffer<'a> {
+    pub amount: Amount<'a>,
+    pub flags: u32,
+    pub nft_offer_index: Cow<'a, str>,
+    pub owner: Cow<'a, str>,
+    pub destination: Option<Cow<'a, str>>,
+    pub expiration: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -122,24 +86,54 @@ impl XRPLOtherResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
-    AccountInfo(account_info::AccountInfo<'a>),
-    AccountTx(account_tx::AccountTx<'a>),
+    AccountInfo(account_info::AccountInfoVersionMap<'a>),
+    AccountTx(account_tx::AccountTxVersionMap<'a>),
     Fee(fee::Fee<'a>),
     Ledger(ledger::Ledger<'a>),
-    ServerState(server_state::ServerState<'a>),
+    NFTBuyOffer(nft_buy_offer::NFTBuyOffer<'a>),
+    NFTHistory(nft_history::NFTHistory<'a>),
+    NFTInfo(nft_info::NFTInfo<'a>),
+    NFTSellOffers(nft_sell_offers::NFTSellOffer<'a>),
+    NFTsByIssuer(nfts_by_issuer::NFTsByIssuer<'a>),
+    ServerState(Box<server_state::ServerState<'a>>), // Boxed because ServerState is large
     Submit(submit::Submit<'a>),
-    Tx(tx::Tx<'a>),
+    Tx(tx::TxVersionMap<'a>),
+    /// A fallback for any other result type
     Other(XRPLOtherResult),
 }
 
 impl<'a> From<account_info::AccountInfo<'a>> for XRPLResult<'a> {
     fn from(account_info: account_info::AccountInfo<'a>) -> Self {
+        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::Default(account_info))
+    }
+}
+
+impl<'a> From<account_info::AccountInfoV1<'a>> for XRPLResult<'a> {
+    fn from(account_info: account_info::AccountInfoV1<'a>) -> Self {
+        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::V1(account_info))
+    }
+}
+
+impl<'a> From<account_info::AccountInfoVersionMap<'a>> for XRPLResult<'a> {
+    fn from(account_info: account_info::AccountInfoVersionMap<'a>) -> Self {
         XRPLResult::AccountInfo(account_info)
     }
 }
 
 impl<'a> From<account_tx::AccountTx<'a>> for XRPLResult<'a> {
     fn from(account_tx: account_tx::AccountTx<'a>) -> Self {
+        XRPLResult::AccountTx(account_tx::AccountTxVersionMap::Default(account_tx))
+    }
+}
+
+impl<'a> From<account_tx::AccountTxV1<'a>> for XRPLResult<'a> {
+    fn from(account_tx: account_tx::AccountTxV1<'a>) -> Self {
+        XRPLResult::AccountTx(account_tx::AccountTxVersionMap::V1(account_tx))
+    }
+}
+
+impl<'a> From<account_tx::AccountTxVersionMap<'a>> for XRPLResult<'a> {
+    fn from(account_tx: account_tx::AccountTxVersionMap<'a>) -> Self {
         XRPLResult::AccountTx(account_tx)
     }
 }
@@ -158,7 +152,7 @@ impl<'a> From<ledger::Ledger<'a>> for XRPLResult<'a> {
 
 impl<'a> From<server_state::ServerState<'a>> for XRPLResult<'a> {
     fn from(server_state: server_state::ServerState<'a>) -> Self {
-        XRPLResult::ServerState(server_state)
+        XRPLResult::ServerState(Box::new(server_state))
     }
 }
 
@@ -170,6 +164,18 @@ impl<'a> From<submit::Submit<'a>> for XRPLResult<'a> {
 
 impl<'a> From<tx::Tx<'a>> for XRPLResult<'a> {
     fn from(tx: tx::Tx<'a>) -> Self {
+        XRPLResult::Tx(tx::TxVersionMap::Default(tx))
+    }
+}
+
+impl<'a> From<tx::TxV1<'a>> for XRPLResult<'a> {
+    fn from(tx: tx::TxV1<'a>) -> Self {
+        XRPLResult::Tx(tx::TxVersionMap::V1(tx))
+    }
+}
+
+impl<'a> From<tx::TxVersionMap<'a>> for XRPLResult<'a> {
+    fn from(tx: tx::TxVersionMap<'a>) -> Self {
         XRPLResult::Tx(tx)
     }
 }
@@ -183,6 +189,36 @@ impl<'a> From<Value> for XRPLResult<'a> {
 impl<'a> From<XRPLOtherResult> for XRPLResult<'a> {
     fn from(other: XRPLOtherResult) -> Self {
         XRPLResult::Other(other)
+    }
+}
+
+impl<'a> From<nft_buy_offer::NFTBuyOffer<'a>> for XRPLResult<'a> {
+    fn from(nft_buy_offer: nft_buy_offer::NFTBuyOffer<'a>) -> Self {
+        XRPLResult::NFTBuyOffer(nft_buy_offer)
+    }
+}
+
+impl<'a> From<nft_history::NFTHistory<'a>> for XRPLResult<'a> {
+    fn from(nft_history: nft_history::NFTHistory<'a>) -> Self {
+        XRPLResult::NFTHistory(nft_history)
+    }
+}
+
+impl<'a> From<nft_info::NFTInfo<'a>> for XRPLResult<'a> {
+    fn from(nft_info: nft_info::NFTInfo<'a>) -> Self {
+        XRPLResult::NFTInfo(nft_info)
+    }
+}
+
+impl<'a> From<nft_sell_offers::NFTSellOffer<'a>> for XRPLResult<'a> {
+    fn from(nft_sell_offers: nft_sell_offers::NFTSellOffer<'a>) -> Self {
+        XRPLResult::NFTSellOffers(nft_sell_offers)
+    }
+}
+
+impl<'a> From<nfts_by_issuer::NFTsByIssuer<'a>> for XRPLResult<'a> {
+    fn from(nfts_by_issuer: nfts_by_issuer::NFTsByIssuer<'a>) -> Self {
+        XRPLResult::NFTsByIssuer(nfts_by_issuer)
     }
 }
 
@@ -204,6 +240,11 @@ impl XRPLResult<'_> {
             XRPLResult::AccountTx(_) => "AccountTx".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
+            XRPLResult::NFTBuyOffer(_) => "NFTBuyOffer".to_string(),
+            XRPLResult::NFTHistory(_) => "NFTHistory".to_string(),
+            XRPLResult::NFTInfo(_) => "NFTInfo".to_string(),
+            XRPLResult::NFTSellOffers(_) => "NFTSellOffers".to_string(),
+            XRPLResult::NFTsByIssuer(_) => "NFTsByIssuer".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
@@ -273,39 +314,34 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
             })
         } else {
             Ok(XRPLResponse {
-                id: map.remove("id").map(|item| match item.as_str() {
-                    Some(item_str) => Cow::Owned(item_str.to_string()),
-                    None => Cow::Borrowed(""),
-                }),
-                error: map.remove("error").map(|item| match item.as_str() {
-                    Some(item_str) => Cow::Owned(item_str.to_string()),
-                    None => Cow::Borrowed(""),
-                }),
+                id: map
+                    .remove("id")
+                    .and_then(|v| serde_json::from_value(v).ok()),
+                error: map
+                    .remove("error")
+                    .and_then(|v| serde_json::from_value(v).ok()),
                 error_code: map
                     .remove("error_code")
-                    .and_then(|v| v.as_i64())
-                    .map(|v| v as i32),
-                error_message: map.remove("error_message").map(|item| match item.as_str() {
-                    Some(item_str) => Cow::Owned(item_str.to_string()),
-                    None => Cow::Borrowed(""),
-                }),
+                    .and_then(|v| serde_json::from_value(v).ok()),
+                error_message: map
+                    .remove("error_message")
+                    .and_then(|v| serde_json::from_value(v).ok()),
                 forwarded: map.remove("forwarded").and_then(|v| v.as_bool()),
                 request: map
                     .remove("request")
-                    .map(|v| serde_json::from_value(v).unwrap()),
+                    .and_then(|v| serde_json::from_value(v).ok()),
                 result: map
                     .remove("result")
-                    .map(|v| serde_json::from_value(v).unwrap()),
+                    .and_then(|v| serde_json::from_value(v).ok()),
                 status: map
                     .remove("status")
-                    .map(|v| serde_json::from_value(v).unwrap()),
+                    .and_then(|v| serde_json::from_value(v).ok()),
                 r#type: map
                     .remove("type")
-                    .map(|v| serde_json::from_value(v).unwrap()),
-                warning: map.remove("warning").map(|item| match item.as_str() {
-                    Some(item_str) => Cow::Owned(item_str.to_string()),
-                    None => Cow::Borrowed(""),
-                }),
+                    .and_then(|v| serde_json::from_value(v).ok()),
+                warning: map
+                    .remove("warning")
+                    .and_then(|v| serde_json::from_value(v).ok()),
                 warnings: map
                     .remove("warnings")
                     .and_then(|v| serde_json::from_value(v).ok()),
@@ -314,11 +350,24 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
     }
 }
 
-impl TryInto<Value> for XRPLResponse<'_> {
+impl<'a> TryInto<XRPLResult<'a>> for XRPLResponse<'a> {
     type Error = XRPLModelException;
 
-    fn try_into(self) -> XRPLModelResult<Value> {
-        Ok(serde_json::to_value(self)?)
+    fn try_into(self) -> XRPLModelResult<XRPLResult<'a>> {
+        if self.is_success() {
+            if let Some(result) = self.result {
+                Ok(result)
+            } else {
+                Err(XRPLResultException::ExpectedResultOrError.into())
+            }
+        } else {
+            Err(XRPLResultException::ResponseError(
+                self.error_message
+                    .unwrap_or(self.error.unwrap_or_else(|| "Unknown error".into()))
+                    .to_string(),
+            )
+            .into())
+        }
     }
 }
 
@@ -336,42 +385,6 @@ impl<'a> XRPLResponse<'a> {
             }
         } else {
             false
-        }
-    }
-
-    pub fn try_into_opt_result<T>(self) -> XRPLModelResult<XRPLOptionalResult<T>>
-    where
-        T: TryFrom<XRPLResult<'a>, Error = XRPLModelException>,
-    {
-        match self.result {
-            Some(result) => match result.clone().try_into() {
-                Ok(result) => Ok(XRPLOptionalResult::Result(result)),
-                Err(_) => Ok(XRPLOptionalResult::Other(result.try_into()?)),
-            },
-            None => {
-                if let Some(error) = self.error {
-                    Err(XRPLResultException::ResponseError(format!(
-                        "{}: {}",
-                        error,
-                        self.error_message.unwrap_or_default()
-                    ))
-                    .into())
-                } else {
-                    Err(XRPLResultException::ExpectedResultOrError.into())
-                }
-            }
-        }
-    }
-
-    pub fn try_into_result<T>(self) -> XRPLModelResult<T>
-    where
-        T: TryFrom<XRPLResult<'a>, Error = XRPLModelException>,
-    {
-        match self.try_into_opt_result()? {
-            XRPLOptionalResult::Result(result) => Ok(result),
-            XRPLOptionalResult::Other(other) => {
-                Err(XRPLResultException::ExpectedResult(other).into())
-            }
         }
     }
 }

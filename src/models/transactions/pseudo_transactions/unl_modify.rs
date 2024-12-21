@@ -51,7 +51,7 @@ pub struct UNLModify<'a> {
 impl<'a> Model for UNLModify<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for UNLModify<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

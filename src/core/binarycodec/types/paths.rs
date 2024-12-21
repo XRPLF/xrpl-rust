@@ -351,7 +351,7 @@ impl TryFrom<IndexMap<String, String>> for PathStep {
         buffer.extend_from_slice(&[data_type]);
         buffer.extend_from_slice(&value_bytes);
 
-        Ok(Self::new(Some(&buffer))?)
+        Self::new(Some(&buffer))
     }
 }
 
@@ -367,7 +367,7 @@ impl TryFrom<Vec<IndexMap<String, String>>> for Path {
             buffer.extend_from_slice(pathstep.as_ref());
         }
 
-        Ok(Path::new(Some(&buffer))?)
+        Path::new(Some(&buffer))
     }
 }
 

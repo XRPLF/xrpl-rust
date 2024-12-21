@@ -19,30 +19,33 @@ pub mod ticket;
 pub mod xchain_owned_claim_id;
 pub mod xchain_owned_create_account_claim_id;
 
-pub use account_root::*;
-pub use amendments::*;
-pub use amm::*;
-pub use check::*;
-pub use deposit_preauth::*;
-pub use directory_node::*;
-pub use escrow::*;
-pub use fee_settings::*;
-pub use ledger_hashes::*;
-pub use negative_unl::*;
-pub use nftoken_offer::*;
-pub use nftoken_page::*;
-pub use offer::*;
-pub use pay_channel::*;
-pub use ripple_state::*;
-pub use ticket::*;
-
+use account_root::AccountRoot;
+use amendments::Amendments;
+use amm::AMM;
+use bridge::Bridge;
+use check::Check;
+use deposit_preauth::DepositPreauth;
 use derive_new::new;
+use directory_node::DirectoryNode;
+use escrow::Escrow;
+use fee_settings::FeeSettings;
+use ledger_hashes::LedgerHashes;
+use negative_unl::NegativeUNL;
+use nftoken_offer::NFTokenOffer;
+use nftoken_page::NFTokenPage;
+use offer::Offer;
+use pay_channel::PayChannel;
+use ripple_state::RippleState;
+use signer_list::SignerList;
 use strum::IntoEnumIterator;
 
 use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
+use ticket::Ticket;
+use xchain_owned_claim_id::XChainOwnedClaimID;
+use xchain_owned_create_account_claim_id::XChainOwnedCreateAccountClaimID;
 
 use crate::_serde::lgr_obj_flags;
 use crate::models::{Amount, FlagCollection};
@@ -71,8 +74,32 @@ pub enum LedgerEntryType {
     XChainOwnedCreateAccountClaimID = 0x0074,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LedgerEntry<'a> {
+    AccountRoot(AccountRoot<'a>),
+    Amendments(Amendments<'a>),
+    AMM(AMM<'a>),
+    Bridge(Bridge<'a>),
+    Check(Check<'a>),
+    DepositPreauth(DepositPreauth<'a>),
+    DirectoryNode(DirectoryNode<'a>),
+    Escrow(Escrow<'a>),
+    FeeSettings(FeeSettings<'a>),
+    LedgerHashes(LedgerHashes<'a>),
+    NegativeUNL(NegativeUNL<'a>),
+    NFTokenOffer(NFTokenOffer<'a>),
+    NFTokenPage(NFTokenPage<'a>),
+    Offer(Offer<'a>),
+    PayChannel(PayChannel<'a>),
+    RippleState(RippleState<'a>),
+    SignerList(SignerList<'a>),
+    Ticket(Ticket<'a>),
+    XChainOwnedClaimID(XChainOwnedClaimID<'a>),
+    XChainOwnedCreateAccountClaimID(XChainOwnedCreateAccountClaimID<'a>),
+}
+
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainClaimProofSig<'a> {
     pub amount: Amount<'a>,

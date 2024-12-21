@@ -54,7 +54,7 @@ impl<'a: 'static> Model for CheckCash<'a> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for CheckCash<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

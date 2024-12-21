@@ -86,7 +86,7 @@ impl<'a> Transaction<'a, OfferCreateFlag> for OfferCreate<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -198,7 +198,7 @@ mod test {
         );
         let actual = txn.get_transaction_type();
         let expect = TransactionType::OfferCreate;
-        assert_eq!(actual, expect)
+        assert_eq!(actual, &expect)
     }
 }
 

@@ -74,7 +74,7 @@ where
     Ok(client.get_faucet_url(url)?)
 }
 
-async fn check_balance<'a: 'b, 'b, C>(client: &C, address: Cow<'a, str>) -> XRPAmount<'b>
+async fn check_balance<'a: 'b, 'b, C>(client: &'a C, address: Cow<'a, str>) -> XRPAmount<'b>
 where
     C: XRPLClient,
 {
