@@ -41,7 +41,7 @@ pub struct AccountTx<'a> {
     #[serde(flatten)]
     pub base: AccountTxBase<'a, AccountTxTransaction<'a>>,
     /// (JSON mode) The transaction results metadata in JSON.
-    pub meta: Option<Value>, // TODO: replace with transaction metadata as soon as implemented
+    pub meta: Option<Value>, // TODO: replace with transaction metadata as soon as fully implemented
     /// (Binary mode) The transaction results metadata as a hex string.
     pub meta_blob: Option<Cow<'a, str>>,
 }
