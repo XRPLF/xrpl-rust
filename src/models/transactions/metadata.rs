@@ -31,6 +31,7 @@ pub struct Fields<'a> {
     pub balance: Option<Amount<'a>>,
     pub book_directory: Option<Cow<'a, str>>,
     pub expiration: Option<u32>,
+    #[serde(default)]
     pub flags: u32,
     pub low_limit: Option<IssuedCurrencyAmount<'a>>,
     pub high_limit: Option<IssuedCurrencyAmount<'a>>,
@@ -38,6 +39,7 @@ pub struct Fields<'a> {
     #[serde(rename = "NFTokens")]
     pub nftokens: Option<Vec<NFTokenMetadata<'a>>>,
     pub previous_page_min: Option<Cow<'a, str>>,
+    #[serde(default)]
     pub sequence: u32,
     pub taker_gets: Option<Amount<'a>>,
     pub taker_pays: Option<Amount<'a>>,
@@ -146,9 +148,9 @@ mod test_serde {
                 }
             }
         "#;
-        let modified_node = serde_json::from_str::<super::AffectedNode>(json);
+        let modified_node = serde_json::from_str::<super::AffectedNode>(json).unwrap();
 
-        assert!(modified_node.is_ok());
+        assert!(true);
     }
 
     #[test]
