@@ -19,7 +19,7 @@ use crate::{
     },
     models::{
         requests::{self},
-        results::tx::{TxMap, TxMetaV1, TxV1},
+        results::tx::{TxMetaV1, TxV1, TxVersionMap},
         transactions::Transaction,
         Model,
     },
@@ -32,7 +32,7 @@ pub async fn submit_and_wait<'a: 'b, 'b, T, F, C>(
     wallet: Option<&Wallet>,
     check_fee: Option<bool>,
     autofill: Option<bool>,
-) -> XRPLHelperResult<TxMap<'b>>
+) -> XRPLHelperResult<TxVersionMap<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -45,7 +45,7 @@ where
 async fn send_reliable_submission<'a: 'b, 'b, T, F, C>(
     transaction: &'b mut T,
     client: &C,
-) -> XRPLHelperResult<TxMap<'b>>
+) -> XRPLHelperResult<TxVersionMap<'b>>
 where
     T: Transaction<'a, F> + Model + Clone + DeserializeOwned + Debug,
     F: IntoEnumIterator + Serialize + Debug + PartialEq + Debug + Clone + 'a,
@@ -77,7 +77,7 @@ async fn wait_for_final_transaction_result<'a: 'b, 'b, C>(
     tx_hash: Cow<'a, str>,
     client: &C,
     last_ledger_sequence: u32,
-) -> XRPLHelperResult<TxMap<'b>>
+) -> XRPLHelperResult<TxVersionMap<'b>>
 where
     C: XRPLAsyncClient,
 {
@@ -112,16 +112,16 @@ where
                     .into());
                 }
             } else {
-                let result: TxMap = response.try_into()?;
+                let result: TxVersionMap = response.try_into()?;
                 let base = match &result {
-                    TxMap::Default(tx) => tx.base.clone(),
-                    TxMap::V1(tx) => tx.base.clone(),
+                    TxVersionMap::Default(tx) => tx.base.clone(),
+                    TxVersionMap::V1(tx) => tx.base.clone(),
                 };
                 let validated = base.validated.unwrap_or(false);
                 if validated {
                     let meta = match result {
-                        TxMap::Default(ref tx) => tx.meta.clone(),
-                        TxMap::V1(TxV1 {
+                        TxVersionMap::Default(ref tx) => tx.meta.clone(),
+                        TxVersionMap::V1(TxV1 {
                             meta: Some(TxMetaV1::Json(ref meta)),
                             ..
                         }) => Some(meta.clone()),

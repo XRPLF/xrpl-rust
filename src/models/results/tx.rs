@@ -12,7 +12,7 @@ use super::{XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum TxMap<'a> {
+pub enum TxVersionMap<'a> {
     Default(Tx<'a>),
     V1(TxV1<'a>),
 }
@@ -68,7 +68,7 @@ pub enum TxMetaV1<'a> {
     Blob(Cow<'a, str>),
 }
 
-impl<'a> TryFrom<XRPLResult<'a>> for TxMap<'a> {
+impl<'a> TryFrom<XRPLResult<'a>> for TxVersionMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
@@ -81,12 +81,12 @@ impl<'a> TryFrom<XRPLResult<'a>> for TxMap<'a> {
     }
 }
 
-impl<'a> TryFrom<XRPLResponse<'a>> for TxMap<'a> {
+impl<'a> TryFrom<XRPLResponse<'a>> for TxVersionMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
         match response.result {
-            Some(result) => TxMap::try_from(result),
+            Some(result) => TxVersionMap::try_from(result),
             None => Err(XRPLModelException::MissingField("result".to_string())),
         }
     }
@@ -98,7 +98,7 @@ impl<'a> TryFrom<XRPLResponse<'a>> for Tx<'a> {
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
         match response.result {
             Some(result) => match result {
-                XRPLResult::Tx(TxMap::Default(tx)) => Ok(tx),
+                XRPLResult::Tx(TxVersionMap::Default(tx)) => Ok(tx),
                 res => Err(XRPLResultException::UnexpectedResultType(
                     "Tx (v2)".to_string(),
                     res.get_name(),
@@ -116,7 +116,7 @@ impl<'a> TryFrom<XRPLResponse<'a>> for TxV1<'a> {
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
         match response.result {
             Some(result) => match result {
-                XRPLResult::Tx(TxMap::V1(tx)) => Ok(tx),
+                XRPLResult::Tx(TxVersionMap::V1(tx)) => Ok(tx),
                 res => Err(XRPLResultException::UnexpectedResultType(
                     "Tx (v1)".to_string(),
                     res.get_name(),
