@@ -148,9 +148,9 @@ mod test_serde {
                 }
             }
         "#;
-        let modified_node = serde_json::from_str::<super::AffectedNode>(json).unwrap();
+        let modified_node = serde_json::from_str::<super::AffectedNode>(json);
 
-        assert!(true);
+        assert!(modified_node.is_ok());
     }
 
     #[test]
