@@ -86,8 +86,8 @@ impl XRPLOtherResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
-    AccountInfo(account_info::AccountInfoMap<'a>),
-    AccountTx(account_tx::AccountTxMap<'a>),
+    AccountInfo(account_info::AccountInfoVersionMap<'a>),
+    AccountTx(account_tx::AccountTxVersionMap<'a>),
     Fee(fee::Fee<'a>),
     Ledger(ledger::Ledger<'a>),
     NFTBuyOffer(nft_buy_offer::NFTBuyOffer<'a>),
@@ -97,43 +97,43 @@ pub enum XRPLResult<'a> {
     NFTsByIssuer(nfts_by_issuer::NFTsByIssuer<'a>),
     ServerState(Box<server_state::ServerState<'a>>), // Boxed because ServerState is large
     Submit(submit::Submit<'a>),
-    Tx(tx::TxMap<'a>),
+    Tx(tx::TxVersionMap<'a>),
     /// A fallback for any other result type
     Other(XRPLOtherResult),
 }
 
 impl<'a> From<account_info::AccountInfo<'a>> for XRPLResult<'a> {
     fn from(account_info: account_info::AccountInfo<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info::AccountInfoMap::Default(account_info))
+        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::Default(account_info))
     }
 }
 
 impl<'a> From<account_info::AccountInfoV1<'a>> for XRPLResult<'a> {
     fn from(account_info: account_info::AccountInfoV1<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info::AccountInfoMap::V1(account_info))
+        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::V1(account_info))
     }
 }
 
-impl<'a> From<account_info::AccountInfoMap<'a>> for XRPLResult<'a> {
-    fn from(account_info: account_info::AccountInfoMap<'a>) -> Self {
+impl<'a> From<account_info::AccountInfoVersionMap<'a>> for XRPLResult<'a> {
+    fn from(account_info: account_info::AccountInfoVersionMap<'a>) -> Self {
         XRPLResult::AccountInfo(account_info)
     }
 }
 
 impl<'a> From<account_tx::AccountTx<'a>> for XRPLResult<'a> {
     fn from(account_tx: account_tx::AccountTx<'a>) -> Self {
-        XRPLResult::AccountTx(account_tx::AccountTxMap::Default(account_tx))
+        XRPLResult::AccountTx(account_tx::AccountTxVersionMap::Default(account_tx))
     }
 }
 
 impl<'a> From<account_tx::AccountTxV1<'a>> for XRPLResult<'a> {
     fn from(account_tx: account_tx::AccountTxV1<'a>) -> Self {
-        XRPLResult::AccountTx(account_tx::AccountTxMap::V1(account_tx))
+        XRPLResult::AccountTx(account_tx::AccountTxVersionMap::V1(account_tx))
     }
 }
 
-impl<'a> From<account_tx::AccountTxMap<'a>> for XRPLResult<'a> {
-    fn from(account_tx: account_tx::AccountTxMap<'a>) -> Self {
+impl<'a> From<account_tx::AccountTxVersionMap<'a>> for XRPLResult<'a> {
+    fn from(account_tx: account_tx::AccountTxVersionMap<'a>) -> Self {
         XRPLResult::AccountTx(account_tx)
     }
 }
@@ -164,18 +164,18 @@ impl<'a> From<submit::Submit<'a>> for XRPLResult<'a> {
 
 impl<'a> From<tx::Tx<'a>> for XRPLResult<'a> {
     fn from(tx: tx::Tx<'a>) -> Self {
-        XRPLResult::Tx(tx::TxMap::Default(tx))
+        XRPLResult::Tx(tx::TxVersionMap::Default(tx))
     }
 }
 
 impl<'a> From<tx::TxV1<'a>> for XRPLResult<'a> {
     fn from(tx: tx::TxV1<'a>) -> Self {
-        XRPLResult::Tx(tx::TxMap::V1(tx))
+        XRPLResult::Tx(tx::TxVersionMap::V1(tx))
     }
 }
 
-impl<'a> From<tx::TxMap<'a>> for XRPLResult<'a> {
-    fn from(tx: tx::TxMap<'a>) -> Self {
+impl<'a> From<tx::TxVersionMap<'a>> for XRPLResult<'a> {
+    fn from(tx: tx::TxVersionMap<'a>) -> Self {
         XRPLResult::Tx(tx)
     }
 }

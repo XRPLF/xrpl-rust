@@ -12,7 +12,7 @@ use super::{XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum AccountTxMap<'a> {
+pub enum AccountTxVersionMap<'a> {
     Default(AccountTx<'a>),
     V1(AccountTxV1<'a>),
 }
@@ -94,7 +94,7 @@ pub struct AccountTxTransactionV1<'a> {
     pub tx: Cow<'a, str>,
 }
 
-impl<'a> TryFrom<XRPLResult<'a>> for AccountTxMap<'a> {
+impl<'a> TryFrom<XRPLResult<'a>> for AccountTxVersionMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
@@ -109,12 +109,12 @@ impl<'a> TryFrom<XRPLResult<'a>> for AccountTxMap<'a> {
     }
 }
 
-impl<'a> TryFrom<XRPLResponse<'a>> for AccountTxMap<'a> {
+impl<'a> TryFrom<XRPLResponse<'a>> for AccountTxVersionMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
         match response.result {
-            Some(result) => AccountTxMap::try_from(result),
+            Some(result) => AccountTxVersionMap::try_from(result),
             None => Err(XRPLModelException::MissingField("result".to_string())),
         }
     }
@@ -282,7 +282,7 @@ mod test_serde {
 
     #[test]
     fn test_deserialize_account_tx() -> XRPLModelResult<()> {
-        let _: AccountTxMap = serde_json::from_str(RESPONSE)?;
+        let _: AccountTxVersionMap = serde_json::from_str(RESPONSE)?;
 
         Ok(())
     }

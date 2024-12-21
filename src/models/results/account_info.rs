@@ -12,7 +12,7 @@ use super::{exceptions::XRPLResultException, XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
-pub enum AccountInfoMap<'a> {
+pub enum AccountInfoVersionMap<'a> {
     Default(AccountInfo<'a>),
     V1(AccountInfoV1<'a>),
 }
@@ -112,16 +112,16 @@ pub struct QueueDataTransaction<'a> {
     pub seq: u32,
 }
 
-impl<'a> AccountInfoMap<'a> {
+impl<'a> AccountInfoVersionMap<'a> {
     pub fn get_account_root(&self) -> &AccountRoot<'a> {
         match self {
-            AccountInfoMap::Default(account_info) => &account_info.base.account_data,
-            AccountInfoMap::V1(account_info) => &account_info.base.account_data,
+            AccountInfoVersionMap::Default(account_info) => &account_info.base.account_data,
+            AccountInfoVersionMap::V1(account_info) => &account_info.base.account_data,
         }
     }
 }
 
-impl<'a> TryFrom<XRPLResult<'a>> for AccountInfoMap<'a> {
+impl<'a> TryFrom<XRPLResult<'a>> for AccountInfoVersionMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
@@ -136,12 +136,12 @@ impl<'a> TryFrom<XRPLResult<'a>> for AccountInfoMap<'a> {
     }
 }
 
-impl<'a> TryFrom<XRPLResponse<'a>> for AccountInfoMap<'a> {
+impl<'a> TryFrom<XRPLResponse<'a>> for AccountInfoVersionMap<'a> {
     type Error = XRPLModelException;
 
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
         match response.result {
-            Some(result) => AccountInfoMap::try_from(result),
+            Some(result) => AccountInfoVersionMap::try_from(result),
             None => Err(XRPLModelException::MissingField("result".to_string())),
         }
     }
@@ -194,7 +194,7 @@ mod test_serde {
 
     #[test]
     fn test_deserialize_account_info<'a>() -> XRPLModelResult<()> {
-        let _: AccountInfoMap = serde_json::from_str(RESPONSE)?;
+        let _: AccountInfoVersionMap = serde_json::from_str(RESPONSE)?;
 
         Ok(())
     }

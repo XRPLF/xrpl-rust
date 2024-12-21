@@ -14,7 +14,8 @@ use crate::{
         exceptions::XRPLHelperResult,
     },
     models::{
-        ledger::objects::account_root::AccountRoot, results::account_tx::AccountTxMap, XRPAmount,
+        ledger::objects::account_root::AccountRoot, results::account_tx::AccountTxVersionMap,
+        XRPAmount,
     },
 };
 
@@ -69,7 +70,7 @@ where
 pub fn get_latest_transaction<'a: 'b, 'b, C>(
     address: Cow<'a, str>,
     client: &C,
-) -> XRPLHelperResult<AccountTxMap<'b>>
+) -> XRPLHelperResult<AccountTxVersionMap<'b>>
 where
     C: XRPLClient,
 {

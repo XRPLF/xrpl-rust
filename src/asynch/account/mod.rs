@@ -75,7 +75,7 @@ where
     )
     .into();
     let response = client.request(request).await?;
-    let account_info = results::account_info::AccountInfoMap::try_from(response)?;
+    let account_info = results::account_info::AccountInfoVersionMap::try_from(response)?;
     let account_root = account_info.get_account_root().to_owned();
 
     Ok(account_root)
@@ -84,7 +84,7 @@ where
 pub async fn get_latest_transaction<'a: 'b, 'b, C>(
     mut address: Cow<'a, str>,
     client: &C,
-) -> XRPLHelperResult<crate::models::results::account_tx::AccountTxMap<'b>>
+) -> XRPLHelperResult<crate::models::results::account_tx::AccountTxVersionMap<'b>>
 where
     C: XRPLAsyncClient,
 {
@@ -103,7 +103,7 @@ where
         Some(1),
         None,
     );
-    let response: results::account_tx::AccountTxMap =
+    let response: results::account_tx::AccountTxVersionMap =
         client.request(account_tx.into()).await?.try_into()?;
 
     Ok(response)
