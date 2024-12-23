@@ -70,9 +70,12 @@ where
         Ok(())
     } else {
         prepare_transaction(transaction, wallet)?;
+        // dbg!("Transaction prepared");
         let serialized_for_signing = encode_for_signing(transaction)?;
         let serialized_bytes = hex::decode(serialized_for_signing)?;
+        // dbg!("Transaction serialized");
         let signature = keypairs_sign(&serialized_bytes, &wallet.private_key)?;
+        // dbg!("Signature created");
         transaction.get_mut_common_fields().txn_signature = Some(signature.into());
 
         Ok(())

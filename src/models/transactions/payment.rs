@@ -418,3 +418,51 @@ mod tests {
         assert_eq!(default_txn, deserialized);
     }
 }
+
+#[cfg(all(feature = "helpers", feature = "wallet"))]
+#[cfg(test)]
+mod test_sign {
+    use alloc::vec;
+
+    use crate::{
+        asynch::{exceptions::XRPLHelperResult, transaction::sign},
+        models::transactions::Transaction,
+        wallet::Wallet,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_payment_sign_with_memo() -> XRPLHelperResult<()> {
+        let mut payment = Payment::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            Some(vec![Memo {
+                memo_data: Some("68656c6c6f".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            None,
+            None,
+            None,
+            None,
+            Amount::XRPAmount("1000000".into()),
+            "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let wallet = Wallet::create(None)?;
+        sign(&mut payment, &wallet, false)?;
+
+        assert!(payment.get_common_fields().is_signed());
+
+        Ok(())
+    }
+}
