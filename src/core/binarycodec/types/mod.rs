@@ -91,71 +91,76 @@ pub enum XRPLTypes {
 }
 
 impl XRPLTypes {
-    pub fn from_value(name: &str, value: Value) -> XRPLCoreResult<XRPLTypes> {
-        let mut value = value;
+    pub fn from_value(name: &str, value: Value) -> XRPLCoreResult<Option<XRPLTypes>> {
         if value.is_null() {
-            value = Value::Number(0.into());
-        }
-        if let Some(value) = value.as_str() {
+            Ok(None)
+        } else if let Some(value) = value.as_str() {
+            // dbg!("is str");
             match name {
-                "AccountID" => Ok(XRPLTypes::AccountID(Self::type_from_str(value)?)),
-                "Amount" => Ok(XRPLTypes::Amount(Self::type_from_str(value)?)),
-                "Blob" => Ok(XRPLTypes::Blob(Self::type_from_str(value)?)),
-                "Currency" => Ok(XRPLTypes::Currency(Self::type_from_str(value)?)),
-                "Hash128" => Ok(XRPLTypes::Hash128(Self::type_from_str(value)?)),
-                "Hash160" => Ok(XRPLTypes::Hash160(Self::type_from_str(value)?)),
-                "Hash256" => Ok(XRPLTypes::Hash256(Self::type_from_str(value)?)),
-                "XChainClaimID" => Ok(XRPLTypes::Hash256(Self::type_from_str(value)?)),
-                "UInt8" => Ok(XRPLTypes::UInt8(
+                "AccountID" => Ok(Some(XRPLTypes::AccountID(Self::type_from_str(value)?))),
+                "Amount" => Ok(Some(XRPLTypes::Amount(Self::type_from_str(value)?))),
+                "Blob" => Ok(Some(XRPLTypes::Blob(Self::type_from_str(value)?))),
+                "Currency" => Ok(Some(XRPLTypes::Currency(Self::type_from_str(value)?))),
+                "Hash128" => Ok(Some(XRPLTypes::Hash128(Self::type_from_str(value)?))),
+                "Hash160" => Ok(Some(XRPLTypes::Hash160(Self::type_from_str(value)?))),
+                "Hash256" => Ok(Some(XRPLTypes::Hash256(Self::type_from_str(value)?))),
+                "XChainClaimID" => Ok(Some(XRPLTypes::Hash256(Self::type_from_str(value)?))),
+                "UInt8" => Ok(Some(XRPLTypes::UInt8(
                     value
                         .parse::<u8>()
                         .map_err(XRPLTypeException::ParseIntError)?,
-                )),
-                "UInt16" => Ok(XRPLTypes::UInt16(
+                ))),
+                "UInt16" => Ok(Some(XRPLTypes::UInt16(
                     value
                         .parse::<u16>()
                         .map_err(XRPLTypeException::ParseIntError)?,
-                )),
-                "UInt32" => Ok(XRPLTypes::UInt32(
+                ))),
+                "UInt32" => Ok(Some(XRPLTypes::UInt32(
                     value
                         .parse::<u32>()
                         .map_err(XRPLTypeException::ParseIntError)?,
-                )),
-                "UInt64" => Ok(XRPLTypes::UInt64(
+                ))),
+                "UInt64" => Ok(Some(XRPLTypes::UInt64(
                     value
                         .parse::<u64>()
                         .map_err(XRPLTypeException::ParseIntError)?,
-                )),
+                ))),
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_u64() {
+            // dbg!("is u64");
             match name {
-                "UInt8" => Ok(XRPLTypes::UInt8(value as u8)),
-                "UInt16" => Ok(XRPLTypes::UInt16(value as u16)),
-                "UInt32" => Ok(XRPLTypes::UInt32(value as u32)),
-                "UInt64" => Ok(XRPLTypes::UInt64(value)),
+                "UInt8" => Ok(Some(XRPLTypes::UInt8(value as u8))),
+                "UInt16" => Ok(Some(XRPLTypes::UInt16(value as u16))),
+                "UInt32" => Ok(Some(XRPLTypes::UInt32(value as u32))),
+                "UInt64" => Ok(Some(XRPLTypes::UInt64(value))),
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_object() {
+            // dbg!("is object");
             match name {
-                "Amount" => Ok(XRPLTypes::Amount(Self::amount_from_map(value.to_owned())?)),
-                "STObject" => Ok(XRPLTypes::STObject(STObject::try_from_value(
+                "Amount" => Ok(Some(XRPLTypes::Amount(Self::amount_from_map(
+                    value.to_owned(),
+                )?))),
+                "STObject" => Ok(Some(XRPLTypes::STObject(STObject::try_from_value(
                     Value::Object(value.to_owned()),
                     false,
-                )?)),
-                "XChainBridge" => Ok(XRPLTypes::XChainBridge(XChainBridge::try_from(
+                )?))),
+                "XChainBridge" => Ok(Some(XRPLTypes::XChainBridge(XChainBridge::try_from(
                     Value::Object(value.to_owned()),
-                )?)),
+                )?))),
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_array() {
+            // dbg!("is array");
             match name {
-                "STArray" => Ok(XRPLTypes::STArray(STArray::try_from_value(Value::Array(
-                    value.to_owned(),
-                ))?)),
+                "STArray" => Ok(Some(XRPLTypes::STArray(STArray::try_from_value(
+                    Value::Array(value.to_owned()),
+                )?))),
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else {
+            // dbg!("Unknown XRPLType", name, &value);
             Err(exceptions::XRPLTypeException::UnknownXRPLType.into())
         }
     }
@@ -444,7 +449,15 @@ impl STObject {
                 &field_instance.associated_type,
                 associated_value.to_owned(),
             )?;
+            if associated_value.is_none() {
+                continue;
+            }
+            let associated_value = associated_value.unwrap(); // safe to unwrap because only `null` values are `None` and we skip those
             let associated_value: SerializedType = associated_value.into();
+            // dbg!(
+            //     field_instance.name.clone(),
+            //     hex::encode_upper(associated_value.clone())
+            // );
             if field_instance.name == "TransactionType"
                 && associated_value.to_string() == UNL_MODIFY_TX_TYPE
             {
