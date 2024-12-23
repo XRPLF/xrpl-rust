@@ -17,7 +17,7 @@
 .idea
 
 # Additional
-src/main.rs
+**/src/main.rs
 
 **/.DS_Store
 
