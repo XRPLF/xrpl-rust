@@ -1,11 +1,6 @@
 use core::str::FromStr;
 
-use alloc::{
-    borrow::Cow,
-    dbg,
-    string::ToString,
-    vec::Vec,
-};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use bigdecimal::BigDecimal;
 
 use crate::models::{transactions::offer_create::OfferCreateFlag, Amount, FlagCollection};
@@ -92,7 +87,6 @@ pub struct AccountObjectGroup<'a> {
 pub fn negate(value: &BigDecimal) -> BigDecimal {
     let zero = BigDecimal::from_str("0").unwrap();
     let working_value = zero - value;
-    dbg!(working_value.clone());
 
     BigDecimal::from_str(&working_value.to_string()).unwrap()
 }
