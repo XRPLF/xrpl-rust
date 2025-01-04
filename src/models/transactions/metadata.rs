@@ -1,4 +1,3 @@
-use alloc::collections::BTreeMap;
 use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -32,14 +31,14 @@ pub struct Fields<'a> {
     pub balance: Option<Amount<'a>>,
     pub book_directory: Option<Cow<'a, str>>,
     pub expiration: Option<u32>,
-    pub flags: u32,
+    pub flags: Option<u32>,
     pub low_limit: Option<IssuedCurrencyAmount<'a>>,
     pub high_limit: Option<IssuedCurrencyAmount<'a>>,
     pub next_page_min: Option<Cow<'a, str>>,
     #[serde(rename = "NFTokens")]
     pub nftokens: Option<Vec<NFTokenMetadata<'a>>>,
     pub previous_page_min: Option<Cow<'a, str>>,
-    pub sequence: u32,
+    pub sequence: Option<u32>,
     pub taker_gets: Option<Amount<'a>>,
     pub taker_pays: Option<Amount<'a>>,
     pub xchain_claim_id: Option<Cow<'a, str>>,

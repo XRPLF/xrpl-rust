@@ -11,10 +11,8 @@ pub fn get_value(balance: &Balance) -> XRPLUtilsResult<BigDecimal> {
     Ok(BigDecimal::from_str(balance.value.as_ref())?)
 }
 
-pub fn group_balances_by_account<'a: 'b, 'b>(
-    account_balances: Vec<&'a AccountBalance<'_>>,
-) -> Vec<AccountObjectGroup<'b>> {
-    let mut account_object_groups: Vec<AccountObjectGroup<'b>> = Vec::new();
+pub fn group_balances_by_account(account_balances: Vec<AccountBalance>) -> Vec<AccountObjectGroup> {
+    let mut account_object_groups: Vec<AccountObjectGroup> = Vec::new();
 
     for balance in account_balances.iter() {
         // Find the account object group with the same account. If it doesn't exist, create a new one.
@@ -22,7 +20,7 @@ pub fn group_balances_by_account<'a: 'b, 'b>(
             .iter_mut()
             .find(|group| group.account == balance.account.as_ref());
         if let Some(group) = account_object_group {
-            group.account_balances.push(balance);
+            group.account_balances.push(balance.clone());
         } else {
             account_object_groups.push(AccountObjectGroup {
                 account: balance.account.clone(),
@@ -33,7 +31,7 @@ pub fn group_balances_by_account<'a: 'b, 'b>(
                 .last_mut()
                 .unwrap()
                 .account_balances
-                .push(balance);
+                .push(balance.clone());
         }
     }
 
@@ -43,7 +41,7 @@ pub fn group_balances_by_account<'a: 'b, 'b>(
 pub fn group_offers_by_account(
     account_offer_changes: Vec<AccountOfferChange>,
 ) -> Vec<AccountObjectGroup> {
-    let mut account_object_groups = Vec::new();
+    let mut account_object_groups: Vec<AccountObjectGroup<'_>> = Vec::new();
 
     for offer_change in account_offer_changes.into_iter() {
         // Find the account object group with the same account. If it doesn't exist, create a new one.

@@ -2,7 +2,8 @@ use core::str::FromStr;
 
 use alloc::{
     borrow::Cow,
-    string::{String, ToString},
+    dbg,
+    string::ToString,
     vec::Vec,
 };
 use bigdecimal::BigDecimal;
@@ -84,13 +85,14 @@ pub struct AccountOfferChanges<'a> {
 #[derive(Debug, Clone)]
 pub struct AccountObjectGroup<'a> {
     pub account: Cow<'a, str>,
-    pub account_balances: Vec<&'a AccountBalance<'a>>,
-    pub account_offer_changes: Vec<&'a AccountOfferChange<'a>>,
+    pub account_balances: Vec<AccountBalance<'a>>,
+    pub account_offer_changes: Vec<AccountOfferChange<'a>>,
 }
 
 pub fn negate(value: &BigDecimal) -> BigDecimal {
-    let mut negated_value_string = String::from("-");
-    negated_value_string.push_str(&value.to_string());
+    let zero = BigDecimal::from_str("0").unwrap();
+    let working_value = zero - value;
+    dbg!(working_value.clone());
 
-    BigDecimal::from_str(&negated_value_string).unwrap()
+    BigDecimal::from_str(&working_value.to_string()).unwrap()
 }
