@@ -86,7 +86,7 @@ impl XRPLOtherResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
-    AccountInfo(account_info::AccountInfoVersionMap<'a>),
+    AccountInfo(Box<account_info::AccountInfoVersionMap<'a>>), // Boxed because AccountInfo is large
     AccountTx(account_tx::AccountTxVersionMap<'a>),
     Fee(fee::Fee<'a>),
     Ledger(ledger::Ledger<'a>),
@@ -104,19 +104,23 @@ pub enum XRPLResult<'a> {
 
 impl<'a> From<account_info::AccountInfo<'a>> for XRPLResult<'a> {
     fn from(account_info: account_info::AccountInfo<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::Default(account_info))
+        XRPLResult::AccountInfo(Box::new(account_info::AccountInfoVersionMap::Default(
+            account_info,
+        )))
     }
 }
 
 impl<'a> From<account_info::AccountInfoV1<'a>> for XRPLResult<'a> {
     fn from(account_info: account_info::AccountInfoV1<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::V1(account_info))
+        XRPLResult::AccountInfo(Box::new(account_info::AccountInfoVersionMap::V1(
+            account_info,
+        )))
     }
 }
 
 impl<'a> From<account_info::AccountInfoVersionMap<'a>> for XRPLResult<'a> {
     fn from(account_info: account_info::AccountInfoVersionMap<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info)
+        XRPLResult::AccountInfo(Box::new(account_info))
     }
 }
 

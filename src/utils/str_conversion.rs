@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, format, string::String};
+use alloc::{borrow::Cow, string::String};
 
 use super::exceptions::XRPLUtilsResult;
 
@@ -6,11 +6,8 @@ use super::exceptions::XRPLUtilsResult;
 /// XRPL uses hex strings as inputs in fields like `domain`
 /// in the `AccountSet` transaction.
 pub fn str_to_hex<'a: 'b, 'b>(value: Cow<'a, str>) -> XRPLUtilsResult<Cow<'b, str>> {
-    let hex_string = value
-        .as_bytes()
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
+    let hex_string = hex::encode(value.as_bytes());
+
     Ok(Cow::Owned(hex_string))
 }
 

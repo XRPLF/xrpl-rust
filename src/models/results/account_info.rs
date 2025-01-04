@@ -126,7 +126,7 @@ impl<'a> TryFrom<XRPLResult<'a>> for AccountInfoVersionMap<'a> {
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
-            XRPLResult::AccountInfo(account_info) => Ok(account_info),
+            XRPLResult::AccountInfo(account_info) => Ok(*account_info),
             res => Err(XRPLResultException::UnexpectedResultType(
                 "AccountInfo".to_string(),
                 res.get_name(),

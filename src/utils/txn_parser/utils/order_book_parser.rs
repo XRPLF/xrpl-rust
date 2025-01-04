@@ -9,7 +9,7 @@ fn get_offer_status(node: &NormalizedNode<'_>) -> OfferStatus {
         NodeType::CreatedNode => OfferStatus::Created,
         NodeType::ModifiedNode => OfferStatus::PartiallyFilled,
         NodeType::DeletedNode => {
-            if let Some(_) = node.previous_fields {
+            if node.previous_fields.is_some() {
                 // a filled offer has previous fields
                 OfferStatus::Filled
             } else {

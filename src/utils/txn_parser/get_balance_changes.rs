@@ -3,10 +3,7 @@ use bigdecimal::BigDecimal;
 
 use crate::{
     models::transactions::metadata::TransactionMetadata,
-    utils::{
-        exceptions::XRPLUtilsResult,
-        txn_parser::utils::parser::get_value,
-    },
+    utils::{exceptions::XRPLUtilsResult, txn_parser::utils::parser::get_value},
 };
 
 use super::utils::{
@@ -16,7 +13,7 @@ use super::utils::{
 pub fn get_balance_changes<'a: 'b, 'b>(
     meta: &'a TransactionMetadata<'a>,
 ) -> XRPLUtilsResult<Vec<AccountBalances<'b>>> {
-    Ok(derive_account_balances(meta, compute_balance_change)?)
+    derive_account_balances(meta, compute_balance_change)
 }
 
 /// Get the balance change from a node.
@@ -56,7 +53,6 @@ mod test {
 
     use super::*;
     use crate::models::transactions::metadata::TransactionMetadata;
-    
 
     #[test]
     fn test_parse_balance_changes() {
