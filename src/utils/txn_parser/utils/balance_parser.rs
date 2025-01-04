@@ -38,7 +38,7 @@ fn get_xrp_quantity(
         } else {
             let xrp_value = drops_to_xrp(absulte_value.to_string().as_str())?;
             let dec = BigDecimal::from_str(&xrp_value)?;
-            negate(&dec)
+            negate(&dec)?
         };
         if let Some(final_fields) = node.final_fields {
             if let Some(account) = final_fields.account {
@@ -76,7 +76,7 @@ fn get_xrp_quantity(
 
 fn flip_trustline_perspective(account_balance: AccountBalance) -> XRPLUtilsResult<AccountBalance> {
     let balance = account_balance.balance.clone();
-    let negated_value = negate(&BigDecimal::from_str(balance.value.as_ref())?);
+    let negated_value = negate(&BigDecimal::from_str(balance.value.as_ref())?)?;
     let issuer = balance.issuer.clone();
 
     Ok(AccountBalance {
@@ -122,7 +122,7 @@ fn get_trustline_quantity<'a>(
                 balance: Balance {
                     currency: balance_currency.to_string().into(),
                     issuer: Some(high_limit_issuer.to_string().into()),
-                    value: format!("{}", value.unwrap().normalized()).into(),
+                    value: format!("{}", value.unwrap().normalized()).into(), // safe to unwrap because we checked for None above
                 },
             };
             return Ok([result.clone(), flip_trustline_perspective(result)?].into());

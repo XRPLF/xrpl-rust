@@ -3,7 +3,10 @@ use core::str::FromStr;
 use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use bigdecimal::BigDecimal;
 
-use crate::models::{transactions::offer_create::OfferCreateFlag, Amount, FlagCollection};
+use crate::{
+    models::{transactions::offer_create::OfferCreateFlag, Amount, FlagCollection},
+    utils::exceptions::XRPLUtilsResult,
+};
 
 pub mod balance_parser;
 pub mod nodes;
@@ -84,9 +87,9 @@ pub struct AccountObjectGroup<'a> {
     pub account_offer_changes: Vec<AccountOfferChange<'a>>,
 }
 
-pub fn negate(value: &BigDecimal) -> BigDecimal {
-    let zero = BigDecimal::from_str("0").unwrap();
+pub fn negate(value: &BigDecimal) -> XRPLUtilsResult<BigDecimal> {
+    let zero = BigDecimal::from_str("0")?;
     let working_value = zero - value;
 
-    BigDecimal::from_str(&working_value.to_string()).unwrap()
+    Ok(BigDecimal::from_str(&working_value.to_string())?)
 }
