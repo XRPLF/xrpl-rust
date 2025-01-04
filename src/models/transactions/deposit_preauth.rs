@@ -45,7 +45,7 @@ impl<'a: 'static> Model for DepositPreauth<'a> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for DepositPreauth<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 

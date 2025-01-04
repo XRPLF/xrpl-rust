@@ -77,6 +77,7 @@ where
 
     let json_value =
         serde_json::to_value(prepared_transaction).map_err(XRPLSerdeJsonError::from)?;
+    // dbg!(&json_value);
     let st_object = STObject::try_from_value(json_value, signing_only)?;
     buffer.extend(st_object.as_ref());
 

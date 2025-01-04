@@ -70,9 +70,12 @@ where
         Ok(())
     } else {
         prepare_transaction(transaction, wallet)?;
+        // dbg!("Transaction prepared");
         let serialized_for_signing = encode_for_signing(transaction)?;
         let serialized_bytes = hex::decode(serialized_for_signing)?;
+        // dbg!("Transaction serialized");
         let signature = keypairs_sign(&serialized_bytes, &wallet.private_key)?;
+        // dbg!("Signature created");
         transaction.get_mut_common_fields().txn_signature = Some(signature.into());
 
         Ok(())
@@ -165,7 +168,7 @@ where
     let req = Submit::new(None, txn_blob.into(), None);
     let res = client.request(req.into()).await?;
 
-    Ok(res.try_into_result::<SubmitResult<'_>>()?)
+    Ok(res.try_into()?)
 }
 
 pub async fn calculate_fee_per_transaction_type<'a, 'b, 'c, T, F, C>(
@@ -222,11 +225,8 @@ async fn get_owner_reserve_from_response(
     client: &impl XRPLAsyncClient,
 ) -> XRPLHelperResult<XRPAmount<'_>> {
     let owner_reserve_response = client.request(ServerState::new(None).into()).await?;
-    match owner_reserve_response
-        .try_into_result::<ServerStateResult<'_>>()?
-        .state
-        .validated_ledger
-    {
+    let result: ServerStateResult = owner_reserve_response.try_into()?;
+    match result.state.validated_ledger {
         Some(validated_ledger) => Ok(validated_ledger.reserve_base),
         None => Err(XRPLModelException::MissingField("validated_ledger".to_string()).into()),
     }
@@ -271,14 +271,14 @@ fn txn_needs_network_id(common_fields: CommonFields<'_>) -> XRPLHelperResult<boo
             Ok(is_not_later_rippled_version) => {
                 Ok(is_higher_restricted_networks && is_not_later_rippled_version)
             }
-            Err(e) => Err(e.into()),
+            Err(e) => Err(e),
         }
     } else {
         Ok(false)
     }
 }
 
-fn is_not_later_rippled_version<'a>(source: String, target: String) -> XRPLHelperResult<bool> {
+fn is_not_later_rippled_version(source: String, target: String) -> XRPLHelperResult<bool> {
     if source == target {
         Ok(true)
     } else {

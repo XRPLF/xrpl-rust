@@ -80,7 +80,7 @@ impl<'a> Amendments<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::ledger::objects::{Amendments, Majority};
+    use crate::models::ledger::objects::{amendments::Majority, Amendments};
     use alloc::borrow::Cow;
     use alloc::string::ToString;
     use alloc::vec;

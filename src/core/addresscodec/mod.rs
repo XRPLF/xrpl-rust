@@ -149,7 +149,7 @@ pub fn decode_seed(seed: &str) -> XRPLCoreResult<([u8; SEED_LENGTH], CryptoAlgor
         Some(Ok(val)) => {
             let decoded: [u8; SEED_LENGTH] = val
                 .try_into()
-                .map_err(|err| XRPLAddressCodecException::VecResizeError(err))?;
+                .map_err(XRPLAddressCodecException::VecResizeError)?;
             Ok((decoded, algo.expect("decode_seed")))
         }
         Some(Err(_)) | None => Err(XRPLAddressCodecException::UnknownSeedEncoding.into()),

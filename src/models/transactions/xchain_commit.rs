@@ -31,8 +31,8 @@ impl<'a> Transaction<'a, NoFlags> for XChainCommit<'a> {
         &mut self.common_fields
     }
 
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainCommit
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 }
 

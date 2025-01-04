@@ -93,7 +93,7 @@ impl<'a> Transaction<'a, NFTokenCreateOfferFlag> for NFTokenCreateOffer<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -117,8 +117,8 @@ impl<'a> NFTokenCreateOfferError for NFTokenCreateOffer<'a> {
     }
 
     fn _get_destination_error(&self) -> XRPLModelResult<()> {
-        if let Some(destination) = self.destination.clone() {
-            if destination == self.common_fields.account {
+        if let Some(destination) = &self.destination {
+            if destination == &self.common_fields.account {
                 Err(XRPLModelException::ValueEqualsValue {
                     field1: "destination".into(),
                     field2: "account".into(),
@@ -132,14 +132,14 @@ impl<'a> NFTokenCreateOfferError for NFTokenCreateOffer<'a> {
     }
 
     fn _get_owner_error(&self) -> XRPLModelResult<()> {
-        if let Some(owner) = self.owner.clone() {
+        if let Some(owner) = &self.owner {
             if self.has_flag(&NFTokenCreateOfferFlag::TfSellOffer) {
                 Err(XRPLNFTokenCreateOfferException::IllegalOption {
                     field: "owner".into(),
                     context: "NFToken sell offers".into(),
                 }
                 .into())
-            } else if owner == self.common_fields.account {
+            } else if owner == &self.common_fields.account {
                 Err(XRPLModelException::ValueEqualsValue {
                     field1: "owner".into(),
                     field2: "account".into(),

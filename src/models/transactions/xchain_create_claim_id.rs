@@ -31,8 +31,8 @@ impl Model for XChainCreateClaimID<'_> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for XChainCreateClaimID<'a> {
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainCreateClaimID
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {

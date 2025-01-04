@@ -41,7 +41,7 @@ impl<'a> Transaction<'a, NoFlags> for AMMDelete<'a> {
         self.common_fields.get_mut_common_fields()
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 }

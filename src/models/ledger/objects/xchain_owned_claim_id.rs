@@ -7,7 +7,7 @@ use crate::models::{Amount, Model, NoFlags, XChainBridge};
 use super::{CommonFields, LedgerEntryType, LedgerObject, XChainClaimProofSig};
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainOwnedClaimID<'a> {
     #[serde(flatten)]

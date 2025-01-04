@@ -50,8 +50,8 @@ impl<'a> Transaction<'a, XChainModifyBridgeFlags> for XChainModifyBridge<'a> {
         &mut self.common_fields
     }
 
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainModifyBridge
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 }
 

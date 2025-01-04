@@ -344,13 +344,12 @@ impl TryFrom<serde_json::Value> for Amount {
         } else if value.is_object() {
             Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
         } else {
-            Err(
-                XRPLCoreException::SerdeJsonError(XRPLSerdeJsonError::UnexpectedValueType {
+            Err(XRPLCoreException::SerdeJsonError(
+                XRPLSerdeJsonError::UnexpectedValueType {
                     expected: "String/Object".into(),
                     found: value,
-                })
-                .into(),
-            )
+                },
+            ))
         }
     }
 }

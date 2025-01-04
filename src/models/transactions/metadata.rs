@@ -7,7 +7,7 @@ use crate::models::requests::LedgerIndex;
 use crate::models::{Amount, IssuedCurrencyAmount};
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenMetadata<'a> {
     #[serde(rename = "NFToken")]
@@ -15,7 +15,7 @@ pub struct NFTokenMetadata<'a> {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenMetadataFields<'a> {
     #[serde(rename = "NFTokenID")]
@@ -24,14 +24,15 @@ pub struct NFTokenMetadataFields<'a> {
     pub uri: Cow<'a, str>,
 }
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct Fields<'a> {
     pub account: Option<Cow<'a, str>>,
     pub balance: Option<Amount<'a>>,
     pub book_directory: Option<Cow<'a, str>>,
     pub expiration: Option<u32>,
-    pub flags: Option<u32>,
+    #[serde(default)]
+    pub flags: u32,
     pub low_limit: Option<IssuedCurrencyAmount<'a>>,
     pub high_limit: Option<IssuedCurrencyAmount<'a>>,
     pub next_page_min: Option<Cow<'a, str>>,
@@ -45,7 +46,7 @@ pub struct Fields<'a> {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub enum AffectedNode<'a> {
     #[serde(rename_all = "PascalCase")]
@@ -72,7 +73,7 @@ pub enum AffectedNode<'a> {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NodeType {
     CreatedNode,
     ModifiedNode,
@@ -80,7 +81,7 @@ pub enum NodeType {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub struct TransactionMetadata<'a> {
     pub affected_nodes: Vec<AffectedNode<'a>>,

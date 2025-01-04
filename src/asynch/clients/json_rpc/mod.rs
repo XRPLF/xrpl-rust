@@ -1,3 +1,4 @@
+
 use alloc::{string::ToString, vec};
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -12,20 +13,12 @@ use super::{client::XRPLClient, exceptions::XRPLClientResult};
 /// Renames the requests field `command` to `method` for JSON-RPC.
 fn request_to_json_rpc(request: &impl Serialize) -> XRPLClientResult<Value> {
     let mut json_rpc_request = Map::new();
-    // let mut request = match serde_json::to_value(request) {
-    //     Ok(request) => match request.as_object().cloned() {
-    //         Some(request) => request,
-    //         None => todo!("Handle non-object requests"),
-    //     },
-    //     Err(error) => return Err!(error),
-    // };
     let request_value = serde_json::to_value(request)?;
     let mut request = request_value
-        .clone()
         .as_object()
         .ok_or(XRPLSerdeJsonError::UnexpectedValueType {
             expected: "Object".to_string(),
-            found: request_value,
+            found: request_value.clone(),
         })?
         .clone();
     if let Some(command) = request.remove("command") {

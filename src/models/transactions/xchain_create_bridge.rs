@@ -31,8 +31,8 @@ impl Model for XChainCreateBridge<'_> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for XChainCreateBridge<'a> {
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainCreateBridge
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {

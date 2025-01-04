@@ -41,7 +41,7 @@ pub struct EscrowCancel<'a> {
 impl<'a> Model for EscrowCancel<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for EscrowCancel<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
