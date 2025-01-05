@@ -48,7 +48,6 @@ fn compute_balance_change(node: &NormalizedNode) -> XRPLUtilsResult<Option<BigDe
 mod test {
     use core::cell::LazyCell;
 
-    use alloc::dbg;
     use serde_json::Value;
 
     use super::*;
@@ -59,13 +58,11 @@ mod test {
         let txn: LazyCell<TransactionMetadata> = LazyCell::new(|| {
             let txn_value: Value =
                 serde_json::from_str(include_str!("./test_data/payment_iou.json")).unwrap();
-            dbg!(&txn_value);
             let txn_meta = txn_value["meta"].clone();
-            dbg!(&txn_meta);
             let txn_meta: TransactionMetadata = serde_json::from_value(txn_meta).unwrap();
 
             txn_meta
         });
-        dbg!(get_balance_changes(&txn).unwrap());
+        assert!(get_balance_changes(&txn).is_ok());
     }
 }
