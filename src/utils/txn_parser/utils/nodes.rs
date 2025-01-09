@@ -6,6 +6,7 @@ use crate::models::{
     transactions::metadata::{AffectedNode, Fields, NodeType, TransactionMetadata},
 };
 
+#[derive(Debug)]
 pub struct NormalizedNode<'a> {
     pub node_type: NodeType,
     pub ledger_entry_type: LedgerEntryType,

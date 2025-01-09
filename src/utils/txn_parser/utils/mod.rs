@@ -37,6 +37,20 @@ impl<'a: 'b, 'b> From<Amount<'a>> for Balance<'b> {
     }
 }
 
+impl<'a> Into<Amount<'a>> for Balance<'a> {
+    fn into(self) -> Amount<'a> {
+        if self.currency == "XRP" {
+            Amount::XRPAmount(self.value.into())
+        } else {
+            Amount::IssuedCurrencyAmount(crate::models::IssuedCurrencyAmount {
+                currency: self.currency,
+                value: self.value,
+                issuer: self.issuer.unwrap_or("".into()),
+            })
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AccountBalance<'a> {
     pub account: Cow<'a, str>,
