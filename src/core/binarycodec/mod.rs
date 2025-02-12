@@ -23,7 +23,7 @@ use crate::XRPLSerdeJsonError;
 use super::exceptions::XRPLCoreResult;
 
 const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
-const TRANSACTION_MULTISIG_PREFIX: i32 = 0x534D5400;
+const TRANSACTION_MULTISIG_PREFIX: [u8; 4] = (0x534D5400u32).to_be_bytes();
 
 pub fn encode<T>(signed_transaction: &T) -> XRPLCoreResult<String>
 where
@@ -55,7 +55,7 @@ where
 
     serialize_json(
         prepared_transaction,
-        Some(TRANSACTION_MULTISIG_PREFIX.to_be_bytes().as_ref()),
+        Some(TRANSACTION_MULTISIG_PREFIX.as_ref()),
         Some(signing_account_id.as_ref()),
         true,
     )
