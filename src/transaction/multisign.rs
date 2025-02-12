@@ -29,6 +29,7 @@ where
     decoded_tx_signers
         .sort_by_key(|signer| decode_classic_address(signer.account.as_ref()).unwrap());
     transaction.get_mut_common_fields().signers = Some(decoded_tx_signers);
+    transaction.get_mut_common_fields().signing_pub_key = Some("".into());
 
     Ok(())
 }
@@ -36,18 +37,33 @@ where
 #[cfg(test)]
 mod test {
     use alloc::borrow::Cow;
+    use alloc::{dbg, vec};
 
     use super::*;
-    use crate::asynch::transaction::sign;
+    use crate::asynch::clients::XRPLAsyncClient;
+    use crate::asynch::transaction::{autofill, sign};
+    use crate::asynch::wallet::generate_faucet_wallet;
+    use crate::clients::json_rpc::JsonRpcClient;
+    use crate::models::requests::submit_multisigned::SubmitMultisigned;
     use crate::models::transactions::account_set::AccountSet;
+    use crate::models::transactions::signer_list_set::SignerEntry;
     use crate::wallet::Wallet;
 
     #[tokio::test]
     async fn test_multisign() {
-        let wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
-        let wallet1 = Wallet::create(None).unwrap();
-        let wallet2 = Wallet::create(None).unwrap();
-        let mut multi_signed_tx = AccountSet::new(
+        let client =
+            JsonRpcClient::connect("https://s.altnet.rippletest.net:51234".parse().unwrap());
+        let wallet = Wallet::create(None).unwrap();
+        let wallet = generate_faucet_wallet(&client, Some(wallet), None, None, None)
+            .await
+            .unwrap();
+        let first_signer = Wallet::new("sEdTLQkHAWpdS7FDk7EvuS7Mz8aSMRh", 0).unwrap();
+        let second_signer = Wallet::new("sEd7DXaHkGQD8mz8xcRLDxfMLqCurif", 0).unwrap();
+        let signer_entries = vec![
+            SignerEntry::new(first_signer.classic_address.clone(), 1),
+            SignerEntry::new(second_signer.classic_address.clone(), 1),
+        ];
+        let mut account_set_txn = AccountSet::new(
             Cow::from(wallet.classic_address.clone()),
             None,
             None,
@@ -67,13 +83,28 @@ mod test {
             None,
             None,
         );
-        let mut tx_1 = multi_signed_tx.clone();
-        sign(&mut tx_1, &wallet1, true).unwrap();
-        let mut tx_2 = multi_signed_tx.clone();
-        sign(&mut tx_2, &wallet2, true).unwrap();
+        autofill(
+            &mut account_set_txn,
+            &client,
+            Some(signer_entries.len().try_into().unwrap()),
+        )
+        .await
+        .unwrap();
+        let mut tx_1 = account_set_txn.clone();
+        sign(&mut tx_1, &first_signer, true).unwrap();
+        let mut tx_2 = account_set_txn.clone();
+        sign(&mut tx_2, &second_signer, true).unwrap();
         let tx_list = [tx_1.clone(), tx_2.clone()].to_vec();
-
-        multisign(&mut multi_signed_tx, &tx_list).unwrap();
-        assert!(multi_signed_tx.get_common_fields().is_signed());
+        dbg!(&account_set_txn, &tx_list);
+        multisign(&mut account_set_txn, &tx_list).unwrap();
+        dbg!(&account_set_txn);
+        assert!(account_set_txn.get_common_fields().is_signed());
+        let res = client
+            .request(
+                SubmitMultisigned::new(None, serde_json::to_value(&account_set_txn).unwrap(), None)
+                    .into(),
+            )
+            .await;
+        dbg!(&res);
     }
 }

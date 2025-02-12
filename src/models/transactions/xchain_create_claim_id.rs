@@ -52,7 +52,7 @@ impl<'a> XChainCreateClaimID<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         other_chain_source: Cow<'a, str>,
