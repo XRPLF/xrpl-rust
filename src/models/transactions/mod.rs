@@ -181,7 +181,7 @@ where
     /// payment, or a sender on whose behalf this transaction is
     /// made. Conventionally, a refund should specify the initial
     /// payment's SourceTag as the refund payment's DestinationTag.
-    pub signers: Option<Vec<Signer<'a>>>,
+    pub signers: Option<Vec<Signer>>,
     /// Hex representation of the public key that corresponds to the
     /// private key used to sign this transaction. If an empty string,
     /// indicates a multi-signature is present in the Signers field instead.
@@ -214,7 +214,7 @@ where
         memos: Option<Vec<Memo>>,
         network_id: Option<u32>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         signing_pub_key: Option<Cow<'a, str>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
@@ -231,7 +231,7 @@ where
             network_id,
             sequence,
             signers,
-            signing_pub_key,
+            signing_pub_key: Some(signing_pub_key.unwrap_or("".into())),
             source_tag,
             ticket_sequence,
             txn_signature,
@@ -309,18 +309,19 @@ serde_with_tag! {
     }
 }
 
+serde_with_tag! {
 /// One Signer in a multi-signature. A multi-signed transaction
 /// can have an array of up to 8 Signers, each contributing a
 /// signature, in the Signers field.
 ///
 /// See Signers Field:
 /// `<https://xrpl.org/transaction-common-fields.html#signers-field>`
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Default, Clone, new)]
-#[serde(rename_all = "PascalCase")]
-pub struct Signer<'a> {
-    pub account: Cow<'a, str>,
-    pub txn_signature: Cow<'a, str>,
-    pub signing_pub_key: Cow<'a, str>,
+#[derive(Debug, PartialEq, Eq, Default, Clone, new)]
+pub struct Signer {
+    pub account: String,
+    pub txn_signature: String,
+    pub signing_pub_key: String,
+}
 }
 
 /// Standard functions for transactions.

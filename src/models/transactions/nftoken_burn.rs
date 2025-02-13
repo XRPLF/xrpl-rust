@@ -70,29 +70,29 @@ impl<'a> NFTokenBurn<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         nftoken_id: Cow<'a, str>,
         owner: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::NFTokenBurn,
+                TransactionType::NFTokenBurn,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             nftoken_id,
             owner,
         }
@@ -118,7 +118,7 @@ mod tests {
             "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
             Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
         );
-        let default_json_str = r#"{"Account":"rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2","TransactionType":"NFTokenBurn","Fee":"10","Flags":0,"NFTokenID":"000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65","Owner":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"}"#;
+        let default_json_str = r#"{"Account":"rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2","TransactionType":"NFTokenBurn","Fee":"10","Flags":0,"SigningPubKey":"","NFTokenID":"000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65","Owner":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
