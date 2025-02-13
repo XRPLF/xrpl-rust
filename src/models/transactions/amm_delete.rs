@@ -61,22 +61,22 @@ impl<'a> AMMDelete<'a> {
         asset2: Currency<'a>,
     ) -> AMMDelete<'a> {
         AMMDelete {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::AMMDelete,
+                TransactionType::AMMDelete,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             asset,
             asset2,
         }

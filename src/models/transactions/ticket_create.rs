@@ -69,22 +69,22 @@ impl<'a> TicketCreate<'a> {
         ticket_count: u32,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::TicketCreate,
+                TransactionType::TicketCreate,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             ticket_count,
         }
     }
@@ -108,7 +108,7 @@ mod tests {
             None,
             10,
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"TicketCreate","Fee":"10","Flags":0,"Sequence":381,"TicketCount":10}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"TicketCreate","Fee":"10","Flags":0,"Sequence":381,"SigningPubKey":"","TicketCount":10}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

@@ -37,40 +37,32 @@ where
 #[cfg(test)]
 mod test {
     use alloc::borrow::Cow;
-    use alloc::{dbg, vec};
 
     use super::*;
-    use crate::asynch::clients::XRPLAsyncClient;
-    use crate::asynch::transaction::{autofill, sign};
+    use crate::asynch::transaction::sign;
     use crate::asynch::wallet::generate_faucet_wallet;
     use crate::clients::json_rpc::JsonRpcClient;
-    use crate::models::requests::submit_multisigned::SubmitMultisigned;
     use crate::models::transactions::account_set::AccountSet;
-    use crate::models::transactions::signer_list_set::SignerEntry;
     use crate::wallet::Wallet;
 
     #[tokio::test]
     async fn test_multisign() {
         let client =
             JsonRpcClient::connect("https://s.altnet.rippletest.net:51234".parse().unwrap());
-        let wallet = Wallet::create(None).unwrap();
+        let wallet = Wallet::new("sEdSkooMk31MeTjbHVE7vLvgCpEMAdB", 0).unwrap();
         let wallet = generate_faucet_wallet(&client, Some(wallet), None, None, None)
             .await
             .unwrap();
         let first_signer = Wallet::new("sEdTLQkHAWpdS7FDk7EvuS7Mz8aSMRh", 0).unwrap();
         let second_signer = Wallet::new("sEd7DXaHkGQD8mz8xcRLDxfMLqCurif", 0).unwrap();
-        let signer_entries = vec![
-            SignerEntry::new(first_signer.classic_address.clone(), 1),
-            SignerEntry::new(second_signer.classic_address.clone(), 1),
-        ];
         let mut account_set_txn = AccountSet::new(
             Cow::from(wallet.classic_address.clone()),
             None,
+            Some("40".into()),
             None,
+            Some(4814775),
             None,
-            None,
-            None,
-            None,
+            Some(4814738),
             None,
             None,
             None,
@@ -83,28 +75,35 @@ mod test {
             None,
             None,
         );
-        autofill(
-            &mut account_set_txn,
-            &client,
-            Some(signer_entries.len().try_into().unwrap()),
-        )
-        .await
-        .unwrap();
         let mut tx_1 = account_set_txn.clone();
         sign(&mut tx_1, &first_signer, true).unwrap();
+        let tx_1_expected_signature = "E3BEF86AEFC61E5ED66C95D0C5CE699721A8DAF86B6ED0D1CBAC86C2C03D96A098767B4F163FADBD937A99AC40BD6CED16B2CA98B198C2343D4BA31ECE57530C";
+        assert_eq!(
+            tx_1.get_common_fields().signers.as_ref().unwrap()[0]
+                .txn_signature
+                .as_str(),
+            tx_1_expected_signature
+        );
         let mut tx_2 = account_set_txn.clone();
         sign(&mut tx_2, &second_signer, true).unwrap();
+        let tx_2_expected_signature = "DB64FC69F34A4881F6087226681E7BDDB212027B3FAFB617E598DCA5BBC8FA1A15A6E37A760B534BA554FBCD8D4A9FDEC8DFED206E3EBC393B875F59C765D304";
+        assert_eq!(
+            tx_2.get_common_fields().signers.as_ref().unwrap()[0]
+                .txn_signature
+                .as_str(),
+            tx_2_expected_signature
+        );
         let tx_list = [tx_1.clone(), tx_2.clone()].to_vec();
-        dbg!(&account_set_txn, &tx_list);
         multisign(&mut account_set_txn, &tx_list).unwrap();
-        dbg!(&account_set_txn);
         assert!(account_set_txn.get_common_fields().is_signed());
-        let res = client
-            .request(
-                SubmitMultisigned::new(None, serde_json::to_value(&account_set_txn).unwrap(), None)
-                    .into(),
-            )
-            .await;
-        dbg!(&res);
+        assert_eq!(
+            account_set_txn
+                .get_common_fields()
+                .signers
+                .as_ref()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 }
