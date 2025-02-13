@@ -69,22 +69,22 @@ impl<'a> EscrowCancel<'a> {
         offer_sequence: u32,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::EscrowCancel,
+                TransactionType::EscrowCancel,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             owner,
             offer_sequence,
         }
@@ -110,7 +110,7 @@ mod tests {
             "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
             7,
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowCancel","Flags":0,"Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowCancel","Flags":0,"SigningPubKey":"","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

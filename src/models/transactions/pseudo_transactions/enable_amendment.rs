@@ -86,22 +86,22 @@ impl<'a> EnableAmendment<'a> {
         ledger_sequence: u32,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::EnableAmendment,
+                 TransactionType::EnableAmendment,
                 account_txn_id,
                 fee,
-                flags: flags.unwrap_or_default(),
+                Some(flags.unwrap_or_default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             amendment,
             ledger_sequence,
         }

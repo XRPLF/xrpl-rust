@@ -231,7 +231,7 @@ where
             network_id,
             sequence,
             signers,
-            signing_pub_key,
+            signing_pub_key: Some(signing_pub_key.unwrap_or("".into())),
             source_tag,
             ticket_sequence,
             txn_signature,
