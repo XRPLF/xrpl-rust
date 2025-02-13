@@ -71,22 +71,22 @@ impl<'a> OfferCancel<'a> {
         offer_sequence: u32,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::OfferCancel,
+                TransactionType::OfferCancel,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             offer_sequence,
         }
     }
@@ -110,7 +110,7 @@ mod tests {
             None,
             6,
         );
-        let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"OfferCancel","Fee":"12","Flags":0,"LastLedgerSequence":7108629,"Sequence":7,"OfferSequence":6}"#;
+        let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"OfferCancel","Fee":"12","Flags":0,"LastLedgerSequence":7108629,"Sequence":7,"SigningPubKey":"","OfferSequence":6}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
