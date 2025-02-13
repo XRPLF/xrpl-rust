@@ -40,19 +40,12 @@ mod test {
 
     use super::*;
     use crate::asynch::transaction::sign;
-    use crate::asynch::wallet::generate_faucet_wallet;
-    use crate::clients::json_rpc::JsonRpcClient;
     use crate::models::transactions::account_set::AccountSet;
     use crate::wallet::Wallet;
 
     #[tokio::test]
     async fn test_multisign() {
-        let client =
-            JsonRpcClient::connect("https://s.altnet.rippletest.net:51234".parse().unwrap());
         let wallet = Wallet::new("sEdSkooMk31MeTjbHVE7vLvgCpEMAdB", 0).unwrap();
-        let wallet = generate_faucet_wallet(&client, Some(wallet), None, None, None)
-            .await
-            .unwrap();
         let first_signer = Wallet::new("sEdTLQkHAWpdS7FDk7EvuS7Mz8aSMRh", 0).unwrap();
         let second_signer = Wallet::new("sEd7DXaHkGQD8mz8xcRLDxfMLqCurif", 0).unwrap();
         let mut account_set_txn = AccountSet::new(
