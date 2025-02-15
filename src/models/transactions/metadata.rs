@@ -5,7 +5,6 @@ use serde_with::skip_serializing_none;
 use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::requests::LedgerIndex;
 use crate::models::{Amount, IssuedCurrencyAmount};
-use crate::models::{Amount, IssuedCurrencyAmount};
 
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -63,7 +62,6 @@ pub enum AffectedNode<'a> {
         previous_fields: Option<Fields<'a>>,
         previous_txn_id: Option<Cow<'a, str>>,
         previous_txn_lgr_seq: Option<u32>,
-        previous_txn_lgr_seq: Option<u32>,
     },
     #[serde(rename_all = "PascalCase")]
     DeletedNode {
@@ -86,7 +84,6 @@ pub enum NodeType {
 #[serde(rename_all = "PascalCase")]
 pub struct TransactionMetadata<'a> {
     pub affected_nodes: Vec<AffectedNode<'a>>,
-    pub transaction_index: u32,
     pub transaction_index: u32,
     pub transaction_result: Amount<'a>,
     #[serde(rename = "delivered_amount")]
