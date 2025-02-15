@@ -66,6 +66,20 @@ where
     }
 }
 
+impl<T> TryFrom<Option<u32>> for FlagCollection<T>
+where
+    T: IntoEnumIterator + Serialize,
+{
+    type Error = XRPLModelException;
+
+    fn try_from(flags: Option<u32>) -> XRPLModelResult<Self> {
+        match flags {
+            Some(flags) => FlagCollection::try_from(flags),
+            None => Ok(FlagCollection::default()),
+        }
+    }
+}
+
 impl<T> TryFrom<FlagCollection<T>> for u32
 where
     T: IntoEnumIterator + Serialize,

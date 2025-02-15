@@ -3,7 +3,6 @@
 pub mod exceptions;
 #[cfg(feature = "models")]
 pub mod get_nftoken_id;
-pub mod get_xchain_claim_id;
 #[cfg(feature = "models")]
 pub mod get_xchain_claim_id;
 #[cfg(feature = "models")]
