@@ -3,6 +3,7 @@ pub mod account_tx;
 pub mod exceptions;
 pub mod fee;
 pub mod ledger;
+pub mod nftoken;
 pub mod server_state;
 pub mod submit;
 pub mod tx;
@@ -129,6 +130,7 @@ pub enum XRPLResult<'a> {
     ServerState(server_state::ServerState<'a>),
     Submit(submit::Submit<'a>),
     Tx(tx::Tx<'a>),
+    NFTokenMint(nftoken::NFTokenMintResult),
     Other(XRPLOtherResult),
 }
 
@@ -174,6 +176,12 @@ impl<'a> From<tx::Tx<'a>> for XRPLResult<'a> {
     }
 }
 
+impl<'a> From<nftoken::NFTokenMintResult> for XRPLResult<'a> {
+    fn from(result: nftoken::NFTokenMintResult) -> Self {
+        XRPLResult::NFTokenMint(result)
+    }
+}
+
 impl<'a> From<Value> for XRPLResult<'a> {
     fn from(value: Value) -> Self {
         XRPLResult::Other(XRPLOtherResult(value))
@@ -207,6 +215,7 @@ impl XRPLResult<'_> {
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
+            XRPLResult::NFTokenMint(_) => "NFTokenMint".to_string(),
             XRPLResult::Other(_) => "Other".to_string(),
         }
     }
