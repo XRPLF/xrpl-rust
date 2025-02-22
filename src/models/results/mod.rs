@@ -25,7 +25,6 @@ pub mod nft_buy_offers;
 pub mod nft_offer;
 pub mod nft_sell_offers;
 pub mod nftoken;
-pub mod nfts_by_issuer;
 pub mod no_ripple_check;
 pub mod path_find;
 pub mod ping;
