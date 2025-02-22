@@ -1,3 +1,5 @@
+pub mod constants;
+
 use anyhow::Result;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_io_adapters::tokio_1::FromTokio;
@@ -29,6 +31,7 @@ pub async fn open_websocket(
     }
 }
 
+#[allow(dead_code)]
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub async fn open_websocket(
     uri: Url,
