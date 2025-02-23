@@ -8,7 +8,7 @@ use serde_json::Value;
 ///
 /// See Server Info:
 /// `<https://xrpl.org/server_info.html#server_info>`
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ServerInfo<'a> {
     /// If true, this server is amendment blocked
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,14 +132,14 @@ pub struct ServerInfo<'a> {
     pub validator_list: Option<ValidatorList<'a>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ValidatorList<'a> {
     pub count: u32,
     pub expiration: u32,
     pub status: Cow<'a, str>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct LastClose {
     /// Time to reach consensus in seconds
     pub converge_time_s: u64,
@@ -147,7 +147,7 @@ pub struct LastClose {
     pub proposers: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Load {
     /// Information about job types and time spent
     pub job_types: Vec<Value>,
@@ -155,7 +155,7 @@ pub struct Load {
     pub threads: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Reporting<'a> {
     /// List of P2P-mode servers
     pub etl_sources: Vec<Value>,
@@ -165,7 +165,7 @@ pub struct Reporting<'a> {
     pub last_publish_time: Cow<'a, str>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct LedgerInfo<'a> {
     /// Time since ledger close in seconds
     #[serde(skip_serializing_if = "Option::is_none")]
