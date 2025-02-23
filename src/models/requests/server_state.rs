@@ -23,6 +23,7 @@ pub struct ServerState<'a> {
     /// The common fields shared by all requests.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a>,
+    pub ledger_index: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for ServerState<'a> {}
@@ -40,6 +41,7 @@ impl<'a> Request<'a> for ServerState<'a> {
 impl<'a> ServerState<'a> {
     pub fn new(id: Option<Cow<'a, str>>) -> Self {
         Self {
+            ledger_index: Some("current".into()),
             common_fields: CommonFields {
                 command: RequestMethod::ServerState,
                 id,
