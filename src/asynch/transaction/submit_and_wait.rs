@@ -2,7 +2,6 @@ use core::fmt::Debug;
 
 use alloc::{borrow::Cow, format};
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::Value;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -19,7 +18,7 @@ use crate::{
     },
     models::{
         requests::{self},
-        results::tx::{TxMetaV1, TxV1, TxVersionMap},
+        results::tx::TxVersionMap,
         transactions::Transaction,
         Model,
     },
@@ -121,25 +120,12 @@ where
                 if validated {
                     let meta = match result {
                         TxVersionMap::Default(ref tx) => tx.meta.clone(),
-                        TxVersionMap::V1(TxV1 {
-                            meta: Some(TxMetaV1::Json(ref meta)),
-                            ..
-                        }) => Some(meta.clone()),
-                        _ => None,
+                        TxVersionMap::V1(ref tx) => tx.meta.clone(),
                     };
-                    let meta = meta.unwrap(); // safe to unwrap because we requested using non-binary mode and we checked that the transaction was validated
-                    let return_code = match meta.get("TransactionResult") {
-                        Some(Value::String(s)) => s,
-                        _ => {
-                            return Err(XRPLSubmitAndWaitException::ExpectedFieldInTxMeta(
-                                "TransactionResult".into(),
-                            )
-                            .into());
-                        }
-                    };
-                    if return_code != "tesSUCCESS" {
+                    let meta = meta.expect("Expected field in the transaction metadata: meta");
+                    if meta.transaction_result != "tesSUCCESS" {
                         return Err(XRPLSubmitAndWaitException::SubmissionFailed(
-                            return_code.into(),
+                            meta.transaction_result.into(),
                         )
                         .into());
                     } else {
