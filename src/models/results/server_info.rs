@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -50,7 +50,7 @@ pub struct ServerInfo<'a> {
 
     /// Detailed information about the current load state
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub load: Option<Load>,
+    pub load: Option<Load<'a>>,
 
     /// Current transaction cost multiplier
     pub load_factor: u32,
@@ -84,7 +84,7 @@ pub struct ServerInfo<'a> {
 
     /// List of ports listening for API commands
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub ports: Option<Vec<Value>>,
+    pub ports: Option<Cow<'a, [Value]>>,
 
     /// Public key for peer-to-peer communications
     pub pubkey_node: Cow<'a, str>,
@@ -148,9 +148,9 @@ pub struct LastClose {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct Load {
+pub struct Load<'a> {
     /// Information about job types and time spent
-    pub job_types: Vec<Value>,
+    pub job_types: Cow<'a, [Value]>,
     /// Number of threads in main job pool
     pub threads: u32,
 }
@@ -158,7 +158,7 @@ pub struct Load {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Reporting<'a> {
     /// List of P2P-mode servers
-    pub etl_sources: Vec<Value>,
+    pub etl_sources: Cow<'a, [Value]>,
     /// Whether server is writing to external database
     pub is_writer: bool,
     /// Last publish time
