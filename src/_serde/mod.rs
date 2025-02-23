@@ -122,6 +122,89 @@ pub(crate) mod lgr_obj_flags {
     }
 }
 
+/// A module for serializing and deserializing `Marker` objects.
+/// This allows a `Marker` to be deserialized from either a string or an object.
+pub(crate) mod marker {
+    use alloc::string::String;
+    use core::fmt;
+    use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+    use crate::models::results::marker::Marker;
+
+    pub fn serialize<S>(marker: &Option<Marker>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match marker {
+            Some(m) => m.serialize(serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Marker>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // This visitor handles both string and struct deserialization
+        struct MarkerVisitor;
+
+        impl<'de> de::Visitor<'de> for MarkerVisitor {
+            type Value = Option<Marker>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string, a Marker object, or null")
+            }
+
+            // Handle null/none
+            fn visit_none<E>(self) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(None)
+            }
+
+            // Handle string deserialization
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Some(Marker::from(value)))
+            }
+
+            // Handle string deserialization
+            fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(Some(Marker::from(value)))
+            }
+
+            // Handle object deserialization
+            fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+            where
+                M: de::MapAccess<'de>,
+            {
+                // Use the default struct deserializer
+                let deserializer = de::value::MapAccessDeserializer::new(map);
+                #[derive(Deserialize)]
+                struct MarkerHelper {
+                    ledger: u32,
+                    seq: u32,
+                }
+
+                let helper = MarkerHelper::deserialize(deserializer)?;
+                Ok(Some(Marker {
+                    ledger: helper.ledger,
+                    seq: helper.seq,
+                }))
+            }
+        }
+
+        // Try to deserialize as either a string, an object, or null
+        deserializer.deserialize_any(MarkerVisitor)
+    }
+}
+
 /// A macro to tag a struct externally. With `serde` attributes, unfortunately it is not possible to
 /// serialize a struct to json with its name as `key` and its fields as `value`. Example:
 /// `{"Example":{"Field1":"hello","Field2":"world"}}`

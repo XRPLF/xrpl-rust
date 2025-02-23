@@ -1,23 +1,48 @@
+pub mod account_channels;
+pub mod account_currencies;
 pub mod account_info;
+pub mod account_lines;
+pub mod account_nfts;
+pub mod account_objects;
+pub mod account_offers;
 pub mod account_tx;
+pub mod amm_info;
+pub mod book_offers;
+pub mod channel_authorize;
+pub mod channel_verify;
+pub mod deposit_authorize;
 pub mod exceptions;
 pub mod fee;
+pub mod gateway_balances;
 pub mod ledger;
-pub mod nft_buy_offer;
-pub mod nft_history;
-pub mod nft_info;
+pub mod ledger_closed;
+pub mod ledger_current;
+pub mod ledger_data;
+pub mod ledger_entry;
+pub mod manifest;
+pub mod marker;
+pub mod metadata;
+pub mod nft_buy_offers;
+pub mod nft_offer;
 pub mod nft_sell_offers;
-pub mod nfts_by_issuer;
+pub mod no_ripple_check;
+pub mod path_find;
+pub mod ping;
+pub mod random;
+pub mod ripple_path_find;
+pub mod server_info;
 pub mod server_state;
 pub mod submit;
+pub mod submit_multisigned;
+pub mod subscribe;
+pub mod transaction_entry;
 pub mod tx;
+pub mod unsubscribe;
 
 use super::{requests::XRPLRequest, Amount, XRPLModelException, XRPLModelResult};
 use alloc::{
     borrow::Cow,
-    boxed::Box,
     string::{String, ToString},
-    vec::Vec,
 };
 use core::convert::{TryFrom, TryInto};
 use exceptions::XRPLResultException;
@@ -86,99 +111,88 @@ impl XRPLOtherResult {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum XRPLResult<'a> {
+    AccountChannels(account_channels::AccountChannels<'a>),
     AccountInfo(account_info::AccountInfoVersionMap<'a>),
+    AccountCurrencies(account_currencies::AccountCurrencies<'a>),
+    AccountLines(account_lines::AccountLines<'a>),
+    AccountObjects(account_objects::AccountObjects<'a>),
+    AccountNfts(account_nfts::AccountNfts<'a>),
+    AccountOffers(account_offers::AccountOffers<'a>),
     AccountTx(account_tx::AccountTxVersionMap<'a>),
+    AMMInfo(amm_info::AMMInfo<'a>),
+    BookOffers(book_offers::BookOffers<'a>),
+    ChannelAuthorize(channel_authorize::ChannelAuthorize<'a>),
+    ChannelVerify(channel_verify::ChannelVerify<'a>),
+    DepositAuthorized(deposit_authorize::DepositAuthorized<'a>),
     Fee(fee::Fee<'a>),
+    GatewayBalances(gateway_balances::GatewayBalances<'a>),
     Ledger(ledger::Ledger<'a>),
-    NFTBuyOffer(nft_buy_offer::NFTBuyOffer<'a>),
-    NFTHistory(nft_history::NFTHistory<'a>),
-    NFTInfo(nft_info::NFTInfo<'a>),
-    NFTSellOffers(nft_sell_offers::NFTSellOffer<'a>),
-    NFTsByIssuer(nfts_by_issuer::NFTsByIssuer<'a>),
-    ServerState(Box<server_state::ServerState<'a>>), // Boxed because ServerState is large
+    LedgerClosed(ledger_closed::LedgerClosed<'a>),
+    LedgerCurrent(ledger_current::LedgerCurrent<'a>),
+    LedgerData(ledger_data::LedgerData<'a>),
+    LedgerEntry(ledger_entry::LedgerEntry<'a>),
+    Manifest(manifest::Manifest<'a>),
+    NFTBuyOffers(nft_buy_offers::NFTBuyOffers<'a>),
+    NFTSellOffers(nft_sell_offers::NFTSellOffers<'a>),
+    NoRippleCheck(no_ripple_check::NoRippleCheck<'a>),
+    PathFind(path_find::PathFind<'a>),
+    Random(random::Random<'a>),
+    RipplePathFind(ripple_path_find::RipplePathFind<'a>),
+    ServerInfo(server_info::ServerInfo<'a>),
+    ServerState(server_state::ServerState<'a>),
     Submit(submit::Submit<'a>),
+    SubmitMultisigned(submit_multisigned::SubmitMultisigned<'a>),
+    TransactionEntry(transaction_entry::TransactionEntry<'a>),
     Tx(tx::TxVersionMap<'a>),
-    /// A fallback for any other result type
+    Subscribe(subscribe::Subscribe<'a>),
+    Unsubscribe(unsubscribe::Unsubscribe<'a>),
+    Ping(ping::Ping<'a>),
     Other(XRPLOtherResult),
 }
 
-impl<'a> From<account_info::AccountInfo<'a>> for XRPLResult<'a> {
-    fn from(account_info: account_info::AccountInfo<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::Default(account_info))
-    }
+macro_rules! impl_from_result {
+    ($module_name:ident, $variant:ident) => {
+        impl<'a> From<$module_name::$variant<'a>> for XRPLResult<'a> {
+            fn from(value: $module_name::$variant<'a>) -> Self {
+                XRPLResult::$variant(value)
+            }
+        }
+    };
 }
 
-impl<'a> From<account_info::AccountInfoV1<'a>> for XRPLResult<'a> {
-    fn from(account_info: account_info::AccountInfoV1<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info::AccountInfoVersionMap::V1(account_info))
-    }
-}
-
-impl<'a> From<account_info::AccountInfoVersionMap<'a>> for XRPLResult<'a> {
-    fn from(account_info: account_info::AccountInfoVersionMap<'a>) -> Self {
-        XRPLResult::AccountInfo(account_info)
-    }
-}
-
-impl<'a> From<account_tx::AccountTx<'a>> for XRPLResult<'a> {
-    fn from(account_tx: account_tx::AccountTx<'a>) -> Self {
-        XRPLResult::AccountTx(account_tx::AccountTxVersionMap::Default(account_tx))
-    }
-}
-
-impl<'a> From<account_tx::AccountTxV1<'a>> for XRPLResult<'a> {
-    fn from(account_tx: account_tx::AccountTxV1<'a>) -> Self {
-        XRPLResult::AccountTx(account_tx::AccountTxVersionMap::V1(account_tx))
-    }
-}
-
-impl<'a> From<account_tx::AccountTxVersionMap<'a>> for XRPLResult<'a> {
-    fn from(account_tx: account_tx::AccountTxVersionMap<'a>) -> Self {
-        XRPLResult::AccountTx(account_tx)
-    }
-}
-
-impl<'a> From<fee::Fee<'a>> for XRPLResult<'a> {
-    fn from(fee: fee::Fee<'a>) -> Self {
-        XRPLResult::Fee(fee)
-    }
-}
-
-impl<'a> From<ledger::Ledger<'a>> for XRPLResult<'a> {
-    fn from(ledger: ledger::Ledger<'a>) -> Self {
-        XRPLResult::Ledger(ledger)
-    }
-}
-
-impl<'a> From<server_state::ServerState<'a>> for XRPLResult<'a> {
-    fn from(server_state: server_state::ServerState<'a>) -> Self {
-        XRPLResult::ServerState(Box::new(server_state))
-    }
-}
-
-impl<'a> From<submit::Submit<'a>> for XRPLResult<'a> {
-    fn from(submit: submit::Submit<'a>) -> Self {
-        XRPLResult::Submit(submit)
-    }
-}
-
-impl<'a> From<tx::Tx<'a>> for XRPLResult<'a> {
-    fn from(tx: tx::Tx<'a>) -> Self {
-        XRPLResult::Tx(tx::TxVersionMap::Default(tx))
-    }
-}
-
-impl<'a> From<tx::TxV1<'a>> for XRPLResult<'a> {
-    fn from(tx: tx::TxV1<'a>) -> Self {
-        XRPLResult::Tx(tx::TxVersionMap::V1(tx))
-    }
-}
-
-impl<'a> From<tx::TxVersionMap<'a>> for XRPLResult<'a> {
-    fn from(tx: tx::TxVersionMap<'a>) -> Self {
-        XRPLResult::Tx(tx)
-    }
-}
+impl_from_result!(account_channels, AccountChannels);
+impl_from_result!(account_currencies, AccountCurrencies);
+impl_from_result!(account_lines, AccountLines);
+impl_from_result!(account_objects, AccountObjects);
+impl_from_result!(account_nfts, AccountNfts);
+impl_from_result!(account_offers, AccountOffers);
+impl_from_result!(amm_info, AMMInfo);
+impl_from_result!(book_offers, BookOffers);
+impl_from_result!(channel_authorize, ChannelAuthorize);
+impl_from_result!(channel_verify, ChannelVerify);
+impl_from_result!(deposit_authorize, DepositAuthorized);
+impl_from_result!(fee, Fee);
+impl_from_result!(gateway_balances, GatewayBalances);
+impl_from_result!(ledger, Ledger);
+impl_from_result!(ledger_closed, LedgerClosed);
+impl_from_result!(ledger_current, LedgerCurrent);
+impl_from_result!(ledger_data, LedgerData);
+impl_from_result!(ledger_entry, LedgerEntry);
+impl_from_result!(manifest, Manifest);
+impl_from_result!(nft_buy_offers, NFTBuyOffers);
+impl_from_result!(nft_sell_offers, NFTSellOffers);
+impl_from_result!(no_ripple_check, NoRippleCheck);
+impl_from_result!(path_find, PathFind);
+impl_from_result!(ping, Ping);
+impl_from_result!(random, Random);
+impl_from_result!(ripple_path_find, RipplePathFind);
+impl_from_result!(server_info, ServerInfo);
+impl_from_result!(server_state, ServerState);
+impl_from_result!(submit, Submit);
+impl_from_result!(submit_multisigned, SubmitMultisigned);
+impl_from_result!(transaction_entry, TransactionEntry);
+impl_from_result!(subscribe, Subscribe);
+impl_from_result!(unsubscribe, Unsubscribe);
 
 impl<'a> From<Value> for XRPLResult<'a> {
     fn from(value: Value) -> Self {
@@ -192,35 +206,58 @@ impl<'a> From<XRPLOtherResult> for XRPLResult<'a> {
     }
 }
 
-impl<'a> From<nft_buy_offer::NFTBuyOffer<'a>> for XRPLResult<'a> {
-    fn from(nft_buy_offer: nft_buy_offer::NFTBuyOffer<'a>) -> Self {
-        XRPLResult::NFTBuyOffer(nft_buy_offer)
-    }
+macro_rules! impl_try_from_result {
+    ($module_name:ident, $type:ident, $variant:ident) => {
+        impl<'a> TryFrom<XRPLResult<'a>> for $module_name::$type<'a> {
+            type Error = XRPLModelException;
+
+            fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+                match result {
+                    XRPLResult::$variant(value) => Ok(value),
+                    res => Err(XRPLResultException::UnexpectedResultType(
+                        stringify!($variant).to_string(),
+                        res.get_name(),
+                    )
+                    .into()),
+                }
+            }
+        }
+    };
 }
 
-impl<'a> From<nft_history::NFTHistory<'a>> for XRPLResult<'a> {
-    fn from(nft_history: nft_history::NFTHistory<'a>) -> Self {
-        XRPLResult::NFTHistory(nft_history)
-    }
-}
-
-impl<'a> From<nft_info::NFTInfo<'a>> for XRPLResult<'a> {
-    fn from(nft_info: nft_info::NFTInfo<'a>) -> Self {
-        XRPLResult::NFTInfo(nft_info)
-    }
-}
-
-impl<'a> From<nft_sell_offers::NFTSellOffer<'a>> for XRPLResult<'a> {
-    fn from(nft_sell_offers: nft_sell_offers::NFTSellOffer<'a>) -> Self {
-        XRPLResult::NFTSellOffers(nft_sell_offers)
-    }
-}
-
-impl<'a> From<nfts_by_issuer::NFTsByIssuer<'a>> for XRPLResult<'a> {
-    fn from(nfts_by_issuer: nfts_by_issuer::NFTsByIssuer<'a>) -> Self {
-        XRPLResult::NFTsByIssuer(nfts_by_issuer)
-    }
-}
+impl_try_from_result!(account_channels, AccountChannels, AccountChannels);
+impl_try_from_result!(account_currencies, AccountCurrencies, AccountCurrencies);
+impl_try_from_result!(account_lines, AccountLines, AccountLines);
+impl_try_from_result!(account_objects, AccountObjects, AccountObjects);
+impl_try_from_result!(account_nfts, AccountNfts, AccountNfts);
+impl_try_from_result!(account_offers, AccountOffers, AccountOffers);
+impl_try_from_result!(amm_info, AMMInfo, AMMInfo);
+impl_try_from_result!(book_offers, BookOffers, BookOffers);
+impl_try_from_result!(channel_authorize, ChannelAuthorize, ChannelAuthorize);
+impl_try_from_result!(channel_verify, ChannelVerify, ChannelVerify);
+impl_try_from_result!(deposit_authorize, DepositAuthorized, DepositAuthorized);
+impl_try_from_result!(fee, Fee, Fee);
+impl_try_from_result!(gateway_balances, GatewayBalances, GatewayBalances);
+impl_try_from_result!(ledger, Ledger, Ledger);
+impl_try_from_result!(ledger_closed, LedgerClosed, LedgerClosed);
+impl_try_from_result!(ledger_current, LedgerCurrent, LedgerCurrent);
+impl_try_from_result!(ledger_data, LedgerData, LedgerData);
+impl_try_from_result!(ledger_entry, LedgerEntry, LedgerEntry);
+impl_try_from_result!(manifest, Manifest, Manifest);
+impl_try_from_result!(nft_buy_offers, NFTBuyOffers, NFTBuyOffers);
+impl_try_from_result!(nft_sell_offers, NFTSellOffers, NFTSellOffers);
+impl_try_from_result!(no_ripple_check, NoRippleCheck, NoRippleCheck);
+impl_try_from_result!(path_find, PathFind, PathFind);
+impl_try_from_result!(ping, Ping, Ping);
+impl_try_from_result!(random, Random, Random);
+impl_try_from_result!(ripple_path_find, RipplePathFind, RipplePathFind);
+impl_try_from_result!(server_info, ServerInfo, ServerInfo);
+impl_try_from_result!(server_state, ServerState, ServerState);
+impl_try_from_result!(submit, Submit, Submit);
+impl_try_from_result!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
+impl_try_from_result!(transaction_entry, TransactionEntry, TransactionEntry);
+impl_try_from_result!(subscribe, Subscribe, Subscribe);
+impl_try_from_result!(unsubscribe, Unsubscribe, Unsubscribe);
 
 impl<'a> TryInto<Value> for XRPLResult<'a> {
     type Error = XRPLModelException;
@@ -236,18 +273,42 @@ impl<'a> TryInto<Value> for XRPLResult<'a> {
 impl XRPLResult<'_> {
     pub(crate) fn get_name(&self) -> String {
         match self {
+            XRPLResult::AccountChannels(_) => "AccountChannels".to_string(),
             XRPLResult::AccountInfo(_) => "AccountInfo".to_string(),
+            XRPLResult::AccountCurrencies(_) => "AccountCurrencies".to_string(),
+            XRPLResult::AccountLines(_) => "AccountLines".to_string(),
+            XRPLResult::AccountObjects(_) => "AccountObjects".to_string(),
+            XRPLResult::AccountNfts(_) => "AccountNfts".to_string(),
+            XRPLResult::AccountOffers(_) => "AccountOffers".to_string(),
             XRPLResult::AccountTx(_) => "AccountTx".to_string(),
+            XRPLResult::AMMInfo(_) => "AMMInfo".to_string(),
+            XRPLResult::BookOffers(_) => "BookOffers".to_string(),
+            XRPLResult::ChannelAuthorize(_) => "ChannelAuthorize".to_string(),
+            XRPLResult::ChannelVerify(_) => "ChannelVerify".to_string(),
+            XRPLResult::DepositAuthorized(_) => "DepositAuthorized".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
+            XRPLResult::GatewayBalances(_) => "GatewayBalances".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
-            XRPLResult::NFTBuyOffer(_) => "NFTBuyOffer".to_string(),
-            XRPLResult::NFTHistory(_) => "NFTHistory".to_string(),
-            XRPLResult::NFTInfo(_) => "NFTInfo".to_string(),
+            XRPLResult::LedgerClosed(_) => "LedgerClosed".to_string(),
+            XRPLResult::LedgerCurrent(_) => "LedgerCurrent".to_string(),
+            XRPLResult::LedgerData(_) => "LedgerData".to_string(),
+            XRPLResult::LedgerEntry(_) => "LedgerEntry".to_string(),
+            XRPLResult::Manifest(_) => "Manifest".to_string(),
+            XRPLResult::NFTBuyOffers(_) => "NFTBuyOffers".to_string(),
             XRPLResult::NFTSellOffers(_) => "NFTSellOffers".to_string(),
-            XRPLResult::NFTsByIssuer(_) => "NFTsByIssuer".to_string(),
+            XRPLResult::NoRippleCheck(_) => "NoRippleCheck".to_string(),
+            XRPLResult::PathFind(_) => "PathFind".to_string(),
+            XRPLResult::Ping(_) => "Ping".to_string(),
+            XRPLResult::Random(_) => "Random".to_string(),
+            XRPLResult::RipplePathFind(_) => "RipplePathFind".to_string(),
+            XRPLResult::ServerInfo(_) => "ServerInfo".to_string(),
             XRPLResult::ServerState(_) => "ServerState".to_string(),
             XRPLResult::Submit(_) => "Submit".to_string(),
+            XRPLResult::SubmitMultisigned(_) => "SubmitMultisigned".to_string(),
+            XRPLResult::TransactionEntry(_) => "TransactionEntry".to_string(),
+            XRPLResult::Subscribe(_) => "Subscribe".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
+            XRPLResult::Unsubscribe(_) => "Unsubscribe".to_string(),
             XRPLResult::Other(_) => "Other".to_string(),
         }
     }
@@ -280,8 +341,69 @@ pub struct XRPLResponse<'a> {
     pub status: Option<ResponseStatus>,
     pub r#type: Option<ResponseType>,
     pub warning: Option<Cow<'a, str>>,
-    pub warnings: Option<Vec<XRPLWarning<'a>>>,
+    pub warnings: Option<Cow<'a, [XRPLWarning<'a>]>>,
 }
+
+macro_rules! impl_try_from_response {
+    ($module_name:ident, $type:ident, $variant:ident) => {
+        impl<'a, 'b> TryFrom<XRPLResponse<'a>> for $module_name::$type<'b>
+        // Lifetime variance
+        where
+            'a: 'b,
+            'b: 'a,
+        {
+            type Error = XRPLModelException;
+
+            fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+                match response.result {
+                    Some(result) => match result {
+                        XRPLResult::$variant(value) => Ok(value),
+                        res => Err(XRPLResultException::UnexpectedResultType(
+                            stringify!($variant).to_string(),
+                            res.get_name(),
+                        )
+                        .into()),
+                    },
+                    None => Err(XRPLModelException::MissingField("result".to_string())),
+                }
+            }
+        }
+    };
+}
+
+impl_try_from_response!(account_channels, AccountChannels, AccountChannels);
+impl_try_from_response!(account_currencies, AccountCurrencies, AccountCurrencies);
+impl_try_from_response!(account_lines, AccountLines, AccountLines);
+impl_try_from_response!(account_objects, AccountObjects, AccountObjects);
+impl_try_from_response!(account_nfts, AccountNfts, AccountNfts);
+impl_try_from_response!(account_offers, AccountOffers, AccountOffers);
+impl_try_from_response!(amm_info, AMMInfo, AMMInfo);
+impl_try_from_response!(book_offers, BookOffers, BookOffers);
+impl_try_from_response!(channel_authorize, ChannelAuthorize, ChannelAuthorize);
+impl_try_from_response!(channel_verify, ChannelVerify, ChannelVerify);
+impl_try_from_response!(deposit_authorize, DepositAuthorized, DepositAuthorized);
+impl_try_from_response!(fee, Fee, Fee);
+impl_try_from_response!(gateway_balances, GatewayBalances, GatewayBalances);
+impl_try_from_response!(ledger, Ledger, Ledger);
+impl_try_from_response!(ledger_closed, LedgerClosed, LedgerClosed);
+impl_try_from_response!(ledger_current, LedgerCurrent, LedgerCurrent);
+impl_try_from_response!(ledger_data, LedgerData, LedgerData);
+impl_try_from_response!(ledger_entry, LedgerEntry, LedgerEntry);
+impl_try_from_response!(manifest, Manifest, Manifest);
+impl_try_from_response!(nft_buy_offers, NFTBuyOffers, NFTBuyOffers);
+impl_try_from_response!(nft_sell_offers, NFTSellOffers, NFTSellOffers);
+impl_try_from_response!(no_ripple_check, NoRippleCheck, NoRippleCheck);
+impl_try_from_response!(path_find, PathFind, PathFind);
+impl_try_from_response!(ping, Ping, Ping);
+impl_try_from_response!(random, Random, Random);
+impl_try_from_response!(ripple_path_find, RipplePathFind, RipplePathFind);
+impl_try_from_response!(server_info, ServerInfo, ServerInfo);
+impl_try_from_response!(server_state, ServerState, ServerState);
+impl_try_from_response!(submit, Submit, Submit);
+impl_try_from_response!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
+impl_try_from_response!(transaction_entry, TransactionEntry, TransactionEntry);
+impl_try_from_response!(subscribe, Subscribe, Subscribe);
+impl_try_from_response!(unsubscribe, Unsubscribe, Unsubscribe);
 
 fn is_subscription_stream_item(item: &Map<String, Value>) -> bool {
     item.get("result").is_none() && item.get("error_code").is_none()

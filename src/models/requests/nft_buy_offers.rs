@@ -7,6 +7,9 @@ use crate::models::{requests::RequestMethod, Model};
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// This method retrieves all of buy offers for the specified NFToken.
+///
+/// See Nft Buy Offers:
+/// `<https://xrpl.org/nft_buy_offers.html>`
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct NftBuyOffers<'a> {
