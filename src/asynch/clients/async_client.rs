@@ -18,7 +18,7 @@ pub trait XRPLAsyncClient: XRPLClient {
         let server_state: ServerStateResult = server_state.try_into()?;
         let common_fields = CommonFields {
             network_id: None, // TODO Server state has no network ID.
-            build_version: Some(state.build_version),
+            build_version: Some(server_state.state.build_version),
         };
 
         Ok(common_fields)
