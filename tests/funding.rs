@@ -11,40 +11,40 @@ mod tests {
         models::XRPAmount,
     };
 
-    use crate::common::constants::XRPL_TEST_NET;
+    use crate::common::{constants::XRPL_TEST_NET, get_client, get_wallet, with_blockchain_lock};
 
     #[tokio::test]
     async fn test_wallet_generation_and_funding() {
-        let client = AsyncJsonRpcClient::connect(Url::parse(XRPL_TEST_NET).unwrap());
+        with_blockchain_lock(|| async {
+            let client = get_client().await;
+            let wallet = get_wallet().await;
+            let address: String = wallet.classic_address.clone();
 
-        let wallet = generate_faucet_wallet(&client, None, None, None, None)
-            .await
-            .expect("Failed to generate and fund wallet");
-        let address: String = wallet.classic_address.clone();
+            // Verify wallet properties
+            assert!(
+                !wallet.classic_address.is_empty(),
+                "Wallet should have a classic address"
+            );
+            assert!(
+                !wallet.public_key.is_empty(),
+                "Wallet should have a public key"
+            );
+            assert!(
+                !wallet.private_key.is_empty(),
+                "Wallet should have a private key"
+            );
 
-        // Verify wallet properties
-        assert!(
-            !wallet.classic_address.is_empty(),
-            "Wallet should have a classic address"
-        );
-        assert!(
-            !wallet.public_key.is_empty(),
-            "Wallet should have a public key"
-        );
-        assert!(
-            !wallet.private_key.is_empty(),
-            "Wallet should have a private key"
-        );
+            // Verify the wallet has been funded
+            let balance: XRPAmount = get_xrp_balance(address.into(), client, None)
+                .await
+                .expect("Failed to get wallet balance");
 
-        // Verify the wallet has been funded
-        let balance: XRPAmount = get_xrp_balance(address.into(), &client, None)
-            .await
-            .expect("Failed to get wallet balance");
-
-        assert!(
-            balance > XRPAmount::from("0"),
-            "Wallet should have a positive balance"
-        );
+            assert!(
+                balance > XRPAmount::from("0"),
+                "Wallet should have a positive balance"
+            );
+        })
+        .await;
     }
 
     #[tokio::test]

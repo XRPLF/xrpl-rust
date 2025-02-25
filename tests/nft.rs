@@ -3,7 +3,7 @@ mod common;
 
 #[cfg(all(feature = "std", feature = "json-rpc", feature = "helpers"))]
 mod tests {
-    use crate::common::constants::XRPL_TEST_NET;
+    use crate::common::{constants::XRPL_TEST_NET, get_client, get_wallet, with_blockchain_lock};
     use url::Url;
     use xrpl::{
         asynch::{
@@ -25,109 +25,108 @@ mod tests {
 
     #[tokio::test]
     async fn test_mint_nft() {
-        let client = AsyncJsonRpcClient::connect(Url::parse(XRPL_TEST_NET).unwrap());
-        let wallet = generate_faucet_wallet(&client, None, None, None, None)
-            .await
-            .expect("Failed to generate and fund wallet");
+        with_blockchain_lock(|| async {
+            let client = AsyncJsonRpcClient::connect(Url::parse(XRPL_TEST_NET).unwrap());
+            let wallet = generate_faucet_wallet(&client, None, None, None, None)
+                .await
+                .expect("Failed to generate and fund wallet");
 
-        // Create NFTokenMint transaction
-        let mut nft_mint = NFTokenMint::new(
-            wallet.classic_address.clone().into(),  // account
-            None,                                   // account_txn_id
-            None,                                   // fee
-            None,                                   // flags
-            None,                                   // last_ledger_sequence
-            None,                                   // memos
-            None,                                   // sequence
-            None,                                   // signers
-            None,                                   // source_tag
-            None,                                   // ticket_sequence
-            0,                                      // token_taxon
-            None,                                   // issuer
-            None,                                   // transfer_fee
-            Some(hex::encode(TEST_NFT_URL).into()), // URI as hex
-        );
+            // Create NFTokenMint transaction
+            let mut nft_mint = NFTokenMint::new(
+                wallet.classic_address.clone().into(), // account
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                0,
+                None,
+                None,
+                Some(hex::encode(TEST_NFT_URL).into()), // URI as hex
+            );
 
-        // Sign and submit the transaction
-        let result = sign_and_submit(&mut nft_mint, &client, &wallet, true, true)
-            .await
-            .expect("Failed to submit NFTokenMint transaction");
+            // Sign and submit the transaction
+            let result = sign_and_submit(&mut nft_mint, &client, &wallet, true, true)
+                .await
+                .expect("Failed to submit NFTokenMint transaction");
 
-        assert!(
-            result.engine_result_code >= 0,
-            "NFT minting failed with result: {:?}",
-            result
-        );
+            assert!(
+                result.engine_result_code >= 0,
+                "NFT minting failed with result: {:?}",
+                result
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn test_create_nft_sell_offer() {
-        let client = AsyncJsonRpcClient::connect(Url::parse(XRPL_TEST_NET).unwrap());
-        let wallet = generate_faucet_wallet(&client, None, None, None, None)
-            .await
-            .expect("Failed to generate and fund wallet");
+        with_blockchain_lock(|| async {
+            let client = get_client().await;
+            let wallet = get_wallet().await;
 
-        // First mint an NFT
-        let mut nft_mint = NFTokenMint::new(
-            wallet.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            0,
-            None,
-            None,
-            Some(hex::encode(TEST_NFT_URL).into()),
-        );
+            // First mint an NFT
+            let mut nft_mint = NFTokenMint::new(
+                wallet.classic_address.clone().into(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                0,
+                None,
+                None,
+                Some(hex::encode(TEST_NFT_URL).into()),
+            );
 
-        // Submit the NFTokenMint transaction and wait for validation
-        let mint_result = submit_and_wait(
-            &mut nft_mint,
-            &client,
-            Some(&wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to mint NFT");
+            // Submit the NFTokenMint transaction and wait for validation
+            let mint_result =
+                submit_and_wait(&mut nft_mint, client, Some(wallet), Some(true), Some(true))
+                    .await
+                    .expect("Failed to mint NFT");
 
-        // Extract NFTokenID from transaction metadata
-        let nft_result =
-            NFTokenMintResult::try_from(mint_result).expect("Failed to extract NFTokenID");
-        let nftoken_id = nft_result.nftoken_id.to_string();
+            // Extract NFTokenID from transaction metadata
+            let nft_result =
+                NFTokenMintResult::try_from(mint_result).expect("Failed to extract NFTokenID");
+            let nftoken_id = nft_result.nftoken_id.to_string();
 
-        // Create a new transaction for the sell offer
-        let mut sell_offer = NFTokenCreateOffer::new(
-            wallet.classic_address.clone().into(),
-            None,                                                   // account_txn_id
-            None,                                                   // fee
-            Some(vec![NFTokenCreateOfferFlag::TfSellOffer].into()), // flags
-            None,                                                   // last_ledger_sequence
-            None,                                                   // memos
-            None,                                                   // sequence
-            None,                                                   // signers
-            None,                                                   // source_tag
-            None,                                                   // ticket_sequence
-            Amount::XRPAmount(XRPAmount::from("10")),               // amount (10 XRP)
-            nftoken_id.into(),                                      // nftoken_id
-            None,                                                   // destination
-            None,                                                   // expiration
-            None,                                                   // owner
-        );
+            // Create a new transaction for the sell offer
+            let mut sell_offer = NFTokenCreateOffer::new(
+                wallet.classic_address.clone().into(),
+                None,
+                None,
+                Some(vec![NFTokenCreateOfferFlag::TfSellOffer].into()), // flags
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Amount::XRPAmount(XRPAmount::from("10")), // amount (10 XRP)
+                nftoken_id.into(),                        // nftoken_id
+                None,
+                None,
+                None,
+            );
 
-        let offer_result = sign_and_submit(&mut sell_offer, &client, &wallet, true, true)
-            .await
-            .expect("Failed to create NFT sell offer");
+            let offer_result = sign_and_submit(&mut sell_offer, client, wallet, true, true)
+                .await
+                .expect("Failed to create NFT sell offer");
 
-        assert!(
-            offer_result.engine_result_code >= 0,
-            "NFT sell offer creation failed with result: {:?}",
-            offer_result
-        );
+            assert!(
+                offer_result.engine_result_code >= 0,
+                "NFT sell offer creation failed with result: {:?}",
+                offer_result
+            );
+        })
+        .await;
     }
 }
