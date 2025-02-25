@@ -3,9 +3,7 @@ use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::marker::Marker;
-
-use crate::_serde::marker;
+use crate::models::requests::Marker;
 
 /// Response format for the ledger_data method, which retrieves contents of
 /// the specified ledger.
@@ -23,8 +21,7 @@ pub struct LedgerData<'a> {
     pub state: Cow<'a, [LedgerObject<'a>]>,
     /// Server-defined value indicating the response is paginated.
     /// Pass this to the next call to resume where this call left off.
-    #[serde(with = "marker", default)]
-    pub marker: Option<Marker>,
+    pub marker: Option<Marker<'a>>,
 }
 
 /// Represents a single object in the ledger's state tree.

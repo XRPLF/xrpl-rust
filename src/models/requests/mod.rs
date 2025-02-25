@@ -485,10 +485,17 @@ pub struct LookupByLedgerRequest<'a> {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct LedgerSequenceMarker {
+    ledger: u32,
+    seq: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(untagged)]
 pub enum Marker<'a> {
     Int(u32),
     Str(Cow<'a, str>),
+    Sequence(LedgerSequenceMarker),
 }
 
 impl From<u32> for Marker<'_> {

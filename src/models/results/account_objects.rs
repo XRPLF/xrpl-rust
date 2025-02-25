@@ -3,8 +3,7 @@ use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::marker::Marker;
-use crate::_serde::marker;
+use crate::models::requests::Marker;
 
 /// Response format for the account_objects method, which returns the raw
 /// ledger format for all objects owned by an account.
@@ -35,8 +34,7 @@ pub struct AccountObjects<'a> {
     /// Server-defined value indicating the response is paginated. Pass this
     /// to the next call to resume where this call left off. Omitted when
     /// there are no additional pages after this one.
-    #[serde(with = "marker", default)]
-    pub marker: Option<Marker>,
+    pub marker: Option<Marker<'a>>,
     /// If true, the information in this response comes from a validated
     /// ledger version. Otherwise, the information is subject to change.
     pub validated: bool,
@@ -103,8 +101,15 @@ mod tests {
 
         // Test marker
         let marker = account_objects.marker.unwrap();
-        assert_eq!(marker.ledger, 46982);
-        assert_eq!(marker.seq, 8835);
+        assert_eq!(
+            marker,
+            Marker::Str(
+                "F60ADF645E78B69857D2E4AEC8B7742FEABC8431BD8611D099B42\
+                8C3E816DF93,94A9F05FEF9A153229E2E997E64919FD75AAE2028C\
+                8153E8EBDB4440BD3ECBB5"
+                    .into()
+            )
+        );
 
         // Test first account object
         let first_object = &account_objects.account_objects[0];

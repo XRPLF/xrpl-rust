@@ -2,9 +2,7 @@ use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
-use super::marker::Marker;
-use crate::_serde::marker;
-use crate::models::Amount;
+use crate::models::{requests::Marker, Amount};
 
 /// Response from an account_offers request, containing a list of offers made
 /// by a given account that are outstanding as of a particular ledger version.
@@ -35,8 +33,7 @@ pub struct AccountOffers<'a> {
     /// Server-defined value indicating the response is paginated. Pass this
     /// to the next call to resume where this call left off. Omitted when
     /// there are no pages of information after this one.
-    #[serde(with = "marker", default)]
-    pub marker: Option<Marker>,
+    pub marker: Option<Marker<'a>>,
 }
 
 /// Represents a single offer object in the account_offers response.

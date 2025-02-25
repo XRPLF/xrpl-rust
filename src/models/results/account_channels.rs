@@ -2,7 +2,7 @@ use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::amount::XRPAmount;
+use crate::models::{amount::XRPAmount, requests::Marker};
 
 /// Response from an account_channels request, containing information about
 /// an account's Payment Channels. This includes only channels where the
@@ -29,7 +29,7 @@ pub struct AccountChannels<'a> {
     pub limit: Option<u32>,
     /// Server-defined value for pagination. Pass this to the next call to
     /// resume getting results where this call left off.
-    pub marker: Option<Cow<'a, str>>,
+    pub marker: Option<Marker<'a>>,
 }
 
 /// Represents a single payment channel object in the XRP Ledger.
