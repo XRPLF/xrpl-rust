@@ -20,7 +20,6 @@ pub mod ledger_current;
 pub mod ledger_data;
 pub mod ledger_entry;
 pub mod manifest;
-pub mod marker;
 pub mod metadata;
 pub mod nft_buy_offers;
 pub mod nft_offer;

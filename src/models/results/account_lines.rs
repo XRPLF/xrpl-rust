@@ -2,6 +2,8 @@ use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
+use crate::models::requests::Marker;
+
 /// Response from an account_lines request, containing information about an
 /// account's trust lines.
 ///
@@ -29,7 +31,7 @@ pub struct AccountLines<'a> {
     /// Server-defined value indicating the response is paginated. Pass this
     /// to the next call to resume where this call left off. Omitted when
     /// there are no additional pages after this one.
-    pub marker: Option<serde_json::Value>,
+    pub marker: Option<Marker<'a>>,
 }
 
 /// Represents a single trust line object.

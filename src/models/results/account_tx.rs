@@ -4,12 +4,11 @@ use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::_serde::marker;
+use crate::models::requests::Marker;
 use crate::models::{XRPLModelException, XRPLModelResult};
 
 use super::{
-    exceptions::XRPLResultException, marker::Marker, metadata::TransactionMetadata, XRPLResponse,
-    XRPLResult,
+    exceptions::XRPLResultException, metadata::TransactionMetadata, XRPLResponse, XRPLResult,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -47,8 +46,7 @@ pub struct AccountTxBase<'a, T> {
     pub validated: Option<bool>,
     /// Server-defined value indicating the response is paginated. Pass this
     /// to the next call to resume where this call left off.
-    #[serde(with = "marker", default)]
-    pub marker: Option<Marker>,
+    pub marker: Option<Marker<'a>>,
 }
 
 /// Response from an account_tx request, containing information about

@@ -1,7 +1,8 @@
 use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+
+use crate::models::requests::Marker;
 
 /// Response from an account_nfts request, containing a list of NFTs owned by
 /// the specified account.
@@ -34,7 +35,7 @@ pub struct AccountNfts<'a> {
     /// (May be omitted) Server-defined value indicating the response is
     /// paginated. Pass this to the next call to resume where this call
     /// left off. Omitted when there are no additional pages after this one.
-    pub marker: Option<Value>,
+    pub marker: Option<Marker<'a>>,
 }
 
 /// Each object in the account_nfts array represents one NFToken.

@@ -2,8 +2,9 @@ use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
-use super::{marker::Marker, nft_offer::NFTOffer};
-use crate::_serde::marker;
+use crate::models::requests::Marker;
+
+use super::nft_offer::NFTOffer;
 
 /// Response from an nft_sell_offers request, containing a list of sell offers
 /// for a specific NFToken.
@@ -22,8 +23,7 @@ pub struct NFTSellOffers<'a> {
     /// Server-defined value indicating the response is paginated. Pass this
     /// to the next call to resume where this call left off. Omitted when
     /// there are no pages of information after this one.
-    #[serde(with = "marker", default)]
-    pub marker: Option<Marker>,
+    pub marker: Option<Marker<'a>>,
 }
 
 #[cfg(test)]
