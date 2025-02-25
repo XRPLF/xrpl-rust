@@ -85,6 +85,7 @@ mod tests {
             Some(hex::encode(TEST_NFT_URL).into()),
         );
 
+        // Submit the NFTokenMint transaction and wait for validation
         let mint_result = submit_and_wait(
             &mut nft_mint,
             &client,
@@ -98,8 +99,9 @@ mod tests {
         // Extract NFTokenID from transaction metadata
         let nft_result =
             NFTokenMintResult::try_from(mint_result).expect("Failed to extract NFTokenID");
+        let nftoken_id = nft_result.nftoken_id.to_string();
 
-        // Create sell offer for the minted NFT
+        // Create a new transaction for the sell offer
         let mut sell_offer = NFTokenCreateOffer::new(
             wallet.classic_address.clone().into(),
             None,                                                   // account_txn_id
@@ -112,7 +114,7 @@ mod tests {
             None,                                                   // source_tag
             None,                                                   // ticket_sequence
             Amount::XRPAmount(XRPAmount::from("10")),               // amount (10 XRP)
-            nft_result.nftoken_id.into(),                           // nftoken_id
+            nftoken_id.into(),                                      // nftoken_id
             None,                                                   // destination
             None,                                                   // expiration
             None,                                                   // owner

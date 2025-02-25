@@ -1,121 +1,86 @@
-use crate::models::{results::tx::Tx, XRPLModelException, XRPLModelResult};
-use alloc::{string::String, vec::Vec};
+use alloc::borrow::Cow;
 use core::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
+
+use super::{metadata::TransactionMetadata, tx::TxVersionMap};
+use crate::models::{XRPLModelException, XRPLModelResult};
 
 /// Result type for NFTokenMint transaction
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct NFTokenMintResult {
+pub struct NFTokenMintResult<'a> {
     /// The NFTokenID of the minted token
-    pub nftoken_id: String,
+    pub nftoken_id: Cow<'a, str>,
     /// The complete transaction metadata
     #[serde(flatten)]
-    pub meta: serde_json::Value,
+    pub meta: TransactionMetadata<'a>,
 }
 
 /// Result type for NFTokenCreateOffer transaction
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct NFTokenCreateOfferResult {
+pub struct NFTokenCreateOfferResult<'a> {
     /// The OfferID of the created offer
-    pub offer_id: String,
+    pub offer_id: Cow<'a, str>,
     /// The complete transaction metadata
     #[serde(flatten)]
-    pub meta: serde_json::Value,
+    pub meta: TransactionMetadata<'a>,
 }
 
 /// Result type for NFTokenCancelOffer transaction
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct NFTokenCancelOfferResult {
+pub struct NFTokenCancelOfferResult<'a> {
     /// The NFTokenIDs of all tokens affected by the cancellation
-    pub nftoken_ids: Vec<String>,
+    pub nftoken_ids: Cow<'a, [Cow<'a, str>]>,
     /// The complete transaction metadata
     #[serde(flatten)]
-    pub meta: serde_json::Value,
+    pub meta: TransactionMetadata<'a>,
 }
 
 /// Result type for NFTokenAcceptOffer transaction
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct NFTokenAcceptOfferResult {
+pub struct NFTokenAcceptOfferResult<'a> {
     /// The NFTokenID of the accepted token
-    pub nftoken_id: String,
+    pub nftoken_id: Cow<'a, str>,
     /// The complete transaction metadata
     #[serde(flatten)]
-    pub meta: serde_json::Value,
+    pub meta: TransactionMetadata<'a>,
 }
 
-impl<'a> TryFrom<Tx<'a>> for NFTokenMintResult {
-    type Error = XRPLModelException;
+/// Macro to implement TryFrom<TxVersionMap> for NFToken result types
+macro_rules! impl_try_from_tx_version_map {
+    ($result_type:ident, $field_name:ident, $field_type:ty) => {
+        impl<'a> TryFrom<TxVersionMap<'a>> for $result_type<'a> {
+            type Error = XRPLModelException;
 
-    fn try_from(tx: Tx<'a>) -> XRPLModelResult<Self> {
-        let nftoken_id = tx
-            .meta
-            .get("nftoken_id")
-            .and_then(|id| id.as_str())
-            .map(String::from)
-            .ok_or(XRPLModelException::MissingField("nftoken_id".into()))?;
+            fn try_from(tx: TxVersionMap<'a>) -> XRPLModelResult<Self> {
+                // Extract metadata based on the version
+                let meta = match &tx {
+                    TxVersionMap::Default(tx) => tx.meta.clone(),
+                    TxVersionMap::V1(tx) => tx.meta.clone(),
+                };
 
-        Ok(NFTokenMintResult {
-            nftoken_id,
-            meta: tx.meta,
-        })
-    }
+                if let Some(meta) = meta {
+                    if let Some(field_value) = meta.$field_name.clone() {
+                        return Ok($result_type {
+                            $field_name: field_value,
+                            meta,
+                        });
+                    }
+                }
+
+                return Err(XRPLModelException::MissingField(
+                    stringify!($field_name).into(),
+                ));
+            }
+        }
+    };
 }
 
-impl<'a> TryFrom<Tx<'a>> for NFTokenCreateOfferResult {
-    type Error = XRPLModelException;
-
-    fn try_from(tx: Tx<'a>) -> XRPLModelResult<Self> {
-        let offer_id = tx
-            .meta
-            .get("offer_id")
-            .and_then(|id| id.as_str())
-            .map(String::from)
-            .ok_or(XRPLModelException::MissingField("offer_id".into()))?;
-
-        Ok(NFTokenCreateOfferResult {
-            offer_id,
-            meta: tx.meta,
-        })
-    }
-}
-
-impl<'a> TryFrom<Tx<'a>> for NFTokenCancelOfferResult {
-    type Error = XRPLModelException;
-
-    fn try_from(tx: Tx<'a>) -> XRPLModelResult<Self> {
-        let nftoken_ids = tx
-            .meta
-            .get("nftoken_ids")
-            .and_then(|ids| ids.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|v| v.as_str())
-                    .map(String::from)
-                    .collect()
-            })
-            .ok_or(XRPLModelException::MissingField("nftoken_ids".into()))?;
-
-        Ok(NFTokenCancelOfferResult {
-            nftoken_ids,
-            meta: tx.meta,
-        })
-    }
-}
-
-impl<'a> TryFrom<Tx<'a>> for NFTokenAcceptOfferResult {
-    type Error = XRPLModelException;
-
-    fn try_from(tx: Tx<'a>) -> XRPLModelResult<Self> {
-        let nftoken_id = tx
-            .meta
-            .get("nftoken_id")
-            .and_then(|id| id.as_str())
-            .map(String::from)
-            .ok_or(XRPLModelException::MissingField("nftoken_id".into()))?;
-
-        Ok(NFTokenAcceptOfferResult {
-            nftoken_id,
-            meta: tx.meta,
-        })
-    }
-}
+impl_try_from_tx_version_map!(NFTokenMintResult, nftoken_id, Cow<'a, str>);
+impl_try_from_tx_version_map!(NFTokenCreateOfferResult, offer_id, Cow<'a, str>);
+impl_try_from_tx_version_map!(
+    NFTokenCancelOfferResult,
+    nftoken_ids,
+    Cow<'a, [Cow<'a, str>]>
+);
+impl_try_from_tx_version_map!(NFTokenAcceptOfferResult, nftoken_id, Cow<'a, str>);

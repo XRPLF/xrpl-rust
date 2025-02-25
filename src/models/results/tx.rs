@@ -18,6 +18,15 @@ pub enum TxVersionMap<'a> {
     V1(TxV1<'a>),
 }
 
+impl<'a> TxVersionMap<'a> {
+    pub fn get_transaction_metadata(&self) -> Option<&TransactionMetadata<'a>> {
+        match self {
+            TxVersionMap::Default(tx) => tx.meta.as_ref(),
+            TxVersionMap::V1(tx) => tx.meta.as_ref(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TxBase<'a> {
     /// The unique identifying hash of the transaction

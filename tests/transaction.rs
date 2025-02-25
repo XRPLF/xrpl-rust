@@ -13,7 +13,6 @@ mod tests {
             wallet::generate_faucet_wallet,
         },
         models::{
-            results::tx::Tx,
             transactions::{
                 account_set::AccountSet, offer_cancel::OfferCancel, offer_create::OfferCreate,
                 payment::Payment, trust_set::TrustSet, Memo, Transaction,
@@ -53,7 +52,7 @@ mod tests {
         );
 
         // Submit and wait for validation
-        let result: Tx = submit_and_wait(
+        let result = submit_and_wait(
             &mut account_set,
             &client,
             Some(&wallet),
@@ -63,14 +62,12 @@ mod tests {
         .await
         .expect("Failed to submit AccountSet transaction");
 
-        assert_eq!(
-            result
-                .meta
-                .get("TransactionResult")
-                .and_then(|v| v.as_str())
-                .unwrap(),
-            "tesSUCCESS"
-        );
+        let metadata = result
+            .get_transaction_metadata()
+            .expect("Expected metadata");
+        let result = &metadata.transaction_result;
+
+        assert_eq!(result, "tesSUCCESS");
     }
 
     #[tokio::test]

@@ -22,6 +22,7 @@ pub mod ledger_entry;
 pub mod manifest;
 pub mod metadata;
 pub mod nft_buy_offers;
+pub mod nft_info;
 pub mod nft_offer;
 pub mod nft_sell_offers;
 pub mod nftoken;
@@ -132,9 +133,10 @@ pub enum XRPLResult<'a> {
     LedgerData(ledger_data::LedgerData<'a>),
     LedgerEntry(ledger_entry::LedgerEntry<'a>),
     Manifest(manifest::Manifest<'a>),
+    NFTInfo(nft_info::NFTInfo<'a>),
     NFTBuyOffers(nft_buy_offers::NFTBuyOffers<'a>),
     NFTSellOffers(nft_sell_offers::NFTSellOffers<'a>),
-    NFTokenMint(nftoken::NFTokenMintResult),
+    NFTokenMintResult(nftoken::NFTokenMintResult<'a>),
     NoRippleCheck(no_ripple_check::NoRippleCheck<'a>),
     PathFind(path_find::PathFind<'a>),
     Random(random::Random<'a>),
@@ -180,8 +182,10 @@ impl_from_result!(ledger_current, LedgerCurrent);
 impl_from_result!(ledger_data, LedgerData);
 impl_from_result!(ledger_entry, LedgerEntry);
 impl_from_result!(manifest, Manifest);
+impl_from_result!(nft_info, NFTInfo);
 impl_from_result!(nft_buy_offers, NFTBuyOffers);
 impl_from_result!(nft_sell_offers, NFTSellOffers);
+impl_from_result!(nftoken, NFTokenMintResult);
 impl_from_result!(no_ripple_check, NoRippleCheck);
 impl_from_result!(path_find, PathFind);
 impl_from_result!(random, Random);
@@ -194,12 +198,6 @@ impl_from_result!(transaction_entry, TransactionEntry);
 impl_from_result!(ping, Ping);
 impl_from_result!(subscribe, Subscribe);
 impl_from_result!(unsubscribe, Unsubscribe);
-
-impl<'a> From<nftoken::NFTokenMintResult> for XRPLResult<'a> {
-    fn from(result: nftoken::NFTokenMintResult) -> Self {
-        XRPLResult::NFTokenMint(result)
-    }
-}
 
 impl<'a> From<Value> for XRPLResult<'a> {
     fn from(value: Value) -> Self {
@@ -253,6 +251,7 @@ impl_try_from_result!(ledger_entry, LedgerEntry, LedgerEntry);
 impl_try_from_result!(manifest, Manifest, Manifest);
 impl_try_from_result!(nft_buy_offers, NFTBuyOffers, NFTBuyOffers);
 impl_try_from_result!(nft_sell_offers, NFTSellOffers, NFTSellOffers);
+impl_try_from_result!(nftoken, NFTokenMintResult, NFTokenMintResult);
 impl_try_from_result!(no_ripple_check, NoRippleCheck, NoRippleCheck);
 impl_try_from_result!(path_find, PathFind, PathFind);
 impl_try_from_result!(random, Random, Random);
@@ -301,9 +300,10 @@ impl XRPLResult<'_> {
             XRPLResult::LedgerData(_) => "LedgerData".to_string(),
             XRPLResult::LedgerEntry(_) => "LedgerEntry".to_string(),
             XRPLResult::Manifest(_) => "Manifest".to_string(),
+            XRPLResult::NFTInfo(_) => "NFTInfo".to_string(),
             XRPLResult::NFTBuyOffers(_) => "NFTBuyOffers".to_string(),
             XRPLResult::NFTSellOffers(_) => "NFTSellOffers".to_string(),
-            XRPLResult::NFTokenMint(_) => "NFTokenMint".to_string(),
+            XRPLResult::NFTokenMintResult(_) => "NFTokenMintResult".to_string(),
             XRPLResult::NoRippleCheck(_) => "NoRippleCheck".to_string(),
             XRPLResult::PathFind(_) => "PathFind".to_string(),
             XRPLResult::Ping(_) => "Ping".to_string(),
@@ -398,8 +398,10 @@ impl_try_from_response!(ledger_current, LedgerCurrent, LedgerCurrent);
 impl_try_from_response!(ledger_data, LedgerData, LedgerData);
 impl_try_from_response!(ledger_entry, LedgerEntry, LedgerEntry);
 impl_try_from_response!(manifest, Manifest, Manifest);
+impl_try_from_response!(nft_info, NFTInfo, NFTInfo);
 impl_try_from_response!(nft_buy_offers, NFTBuyOffers, NFTBuyOffers);
 impl_try_from_response!(nft_sell_offers, NFTSellOffers, NFTSellOffers);
+impl_try_from_response!(nftoken, NFTokenMintResult, NFTokenMintResult);
 impl_try_from_response!(no_ripple_check, NoRippleCheck, NoRippleCheck);
 impl_try_from_response!(path_find, PathFind, PathFind);
 impl_try_from_response!(ping, Ping, Ping);
