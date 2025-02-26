@@ -23,6 +23,7 @@ pub struct SubmitMultisigned<'a> {
     /// The common fields shared by all requests.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a>,
+    pub tx_json: serde_json::Value,
     /// If true, and the transaction fails locally, do not
     /// retry or relay the transaction to other servers.
     pub fail_hard: Option<bool>,
@@ -41,13 +42,18 @@ impl<'a> Request<'a> for SubmitMultisigned<'a> {
 }
 
 impl<'a> SubmitMultisigned<'a> {
-    pub fn new(id: Option<Cow<'a, str>>, fail_hard: Option<bool>) -> Self {
+    pub fn new(
+        id: Option<Cow<'a, str>>,
+        tx_json: serde_json::Value,
+        fail_hard: Option<bool>,
+    ) -> Self {
         Self {
             common_fields: CommonFields {
                 command: RequestMethod::SubmitMultisigned,
                 id,
             },
             fail_hard,
+            tx_json,
         }
     }
 }

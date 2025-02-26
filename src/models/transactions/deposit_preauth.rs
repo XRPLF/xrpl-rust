@@ -45,7 +45,7 @@ impl<'a: 'static> Model for DepositPreauth<'a> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for DepositPreauth<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -81,29 +81,29 @@ impl<'a> DepositPreauth<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         authorize: Option<Cow<'a, str>>,
         unauthorize: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::DepositPreauth,
+                TransactionType::DepositPreauth,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             authorize,
             unauthorize,
         }
@@ -164,7 +164,7 @@ mod tests {
             Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
             None,
         );
-        let default_json_str = r#"{"Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","TransactionType":"DepositPreauth","Fee":"10","Flags":0,"Sequence":2,"Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
+        let default_json_str = r#"{"Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","TransactionType":"DepositPreauth","Fee":"10","Flags":0,"Sequence":2,"SigningPubKey":"","Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

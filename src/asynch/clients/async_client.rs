@@ -15,12 +15,10 @@ pub trait XRPLAsyncClient: XRPLClient {
 
     async fn get_common_fields(&self) -> XRPLClientResult<CommonFields<'_>> {
         let server_state = self.request(ServerState::new(None).into()).await?;
-        let state = server_state
-            .try_into_result::<ServerStateResult<'_>>()?
-            .state;
+        let server_state: ServerStateResult = server_state.try_into()?;
         let common_fields = CommonFields {
-            network_id: state.network_id,
-            build_version: Some(state.build_version),
+            network_id: None, // TODO Server state has no network ID.
+            build_version: Some(server_state.state.build_version),
         };
 
         Ok(common_fields)

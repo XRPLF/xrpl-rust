@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -73,7 +74,7 @@ impl<'a> Model for SignerListSet<'a> {
 }
 
 impl<'a> Transaction<'a, NoFlags> for SignerListSet<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -122,18 +123,18 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
         let mut signer_weight_sum: u32 = 0;
         if self.signer_entries.is_some() {
             for signer_entry in self.signer_entries.as_ref().unwrap() {
-                accounts.push(signer_entry.account.clone());
+                accounts.push(&signer_entry.account);
                 let weight: u32 = signer_entry.signer_weight.into();
                 signer_weight_sum += weight;
             }
         }
         accounts.sort_unstable();
         let mut check_account = Vec::new();
-        for account in accounts.clone() {
+        for account in &accounts {
             if check_account.contains(&account) {
                 return Err(XRPLSignerListSetException::CollectionItemDuplicate {
                     field: "signer_entries".into(),
-                    found: account.into(),
+                    found: account.to_owned().to_owned(),
                 }
                 .into());
             } else {
@@ -141,10 +142,10 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
             }
         }
         if let Some(_signer_entries) = &self.signer_entries {
-            if accounts.contains(&self.common_fields.account.to_string()) {
+            if accounts.contains(&&self.common_fields.account.to_string()) {
                 Err(XRPLSignerListSetException::CollectionInvalidItem {
                     field: "signer_entries".into(),
-                    found: self.common_fields.account.clone().into(),
+                    found: self.common_fields.account.to_string(),
                 }
                 .into())
             } else if self.signer_quorum > signer_weight_sum {
@@ -179,29 +180,29 @@ impl<'a> SignerListSet<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         signer_quorum: u32,
         signer_entries: Option<Vec<SignerEntry>>,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::SignerListSet,
+                TransactionType::SignerListSet,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             signer_quorum,
             signer_entries,
         }
@@ -396,7 +397,7 @@ mod tests {
                 SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1),
             ]),
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"SignerListSet","Fee":"12","Flags":0,"SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"SignerListSet","Fee":"12","Flags":0,"SigningPubKey":"","SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

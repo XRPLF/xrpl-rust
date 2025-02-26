@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// The transaction_entry method retrieves information on a
 /// single transaction from a specific ledger version.
@@ -22,11 +22,9 @@ pub struct TransactionEntry<'a> {
     pub common_fields: CommonFields<'a>,
     /// Unique hash of the transaction you are looking up.
     pub tx_hash: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
 }
 
 impl<'a> Model for TransactionEntry<'a> {}
@@ -46,7 +44,7 @@ impl<'a> TransactionEntry<'a> {
         id: Option<Cow<'a, str>>,
         tx_hash: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -54,8 +52,10 @@ impl<'a> TransactionEntry<'a> {
                 id,
             },
             tx_hash,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
         }
     }
 }

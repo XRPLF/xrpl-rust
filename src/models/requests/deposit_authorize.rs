@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// The deposit_authorized command indicates whether one account
 /// is authorized to send payments directly to another.
@@ -21,11 +21,9 @@ pub struct DepositAuthorized<'a> {
     pub destination_account: Cow<'a, str>,
     /// The sender of a possible payment.
     pub source_account: Cow<'a, str>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut
-    /// string to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
 }
 
 impl<'a> Model for DepositAuthorized<'a> {}
@@ -46,7 +44,7 @@ impl<'a> DepositAuthorized<'a> {
         destination_account: Cow<'a, str>,
         source_account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -55,8 +53,10 @@ impl<'a> DepositAuthorized<'a> {
             },
             source_account,
             destination_account,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
         }
     }
 }

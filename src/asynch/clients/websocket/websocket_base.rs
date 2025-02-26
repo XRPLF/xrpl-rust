@@ -79,7 +79,7 @@ where
             };
             sender
                 .send(message)
-                .map_err(|e| XRPLWebSocketException::MessageChannelError(e))?;
+                .map_err(XRPLWebSocketException::MessageChannelError)?;
         } else {
             self.messages.send(message).await;
         }

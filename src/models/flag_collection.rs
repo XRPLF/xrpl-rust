@@ -96,9 +96,54 @@ where
     }
 }
 
+impl<T> FlagCollection<T>
+where
+    T: IntoEnumIterator + Serialize,
+{
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
 fn flag_to_u32<T>(flag: &T) -> XRPLModelResult<u32>
 where
     T: Serialize,
 {
     Ok(serde_json::to_string(flag)?.parse::<u32>()?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::ledger::objects::account_root::AccountRootFlag;
+
+    #[test]
+    fn test_flag_collection_conversion() {
+        // Test u32 to FlagCollection
+        let flags_u32: u32 = 0x00800000; // LsfDefaultRipple
+        let flag_collection = FlagCollection::<AccountRootFlag>::try_from(flags_u32).unwrap();
+        assert_eq!(
+            flag_collection.0,
+            alloc::vec![AccountRootFlag::LsfDefaultRipple]
+        );
+
+        // Test FlagCollection to u32
+        let flags_back: u32 = u32::try_from(flag_collection).unwrap();
+        assert_eq!(flags_back, flags_u32);
+
+        // Test multiple flags
+        let flags_u32: u32 = 0x00800000 | 0x01000000; // LsfDefaultRipple | LsfDepositAuth
+        let flag_collection = FlagCollection::<AccountRootFlag>::try_from(flags_u32).unwrap();
+        assert!(flag_collection
+            .0
+            .contains(&AccountRootFlag::LsfDefaultRipple));
+        assert!(flag_collection.0.contains(&AccountRootFlag::LsfDepositAuth));
+
+        let flags_back: u32 = u32::try_from(flag_collection).unwrap();
+        assert_eq!(flags_back, flags_u32);
+    }
 }

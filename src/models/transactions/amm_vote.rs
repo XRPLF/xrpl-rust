@@ -57,7 +57,7 @@ impl<'a> Transaction<'a, NoFlags> for AMMVote<'a> {
         self.common_fields.get_mut_common_fields()
     }
 
-    fn get_transaction_type(&self) -> super::TransactionType {
+    fn get_transaction_type(&self) -> &super::TransactionType {
         self.common_fields.get_transaction_type()
     }
 }
@@ -70,7 +70,7 @@ impl<'a> AMMVote<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         asset: Currency<'a>,
@@ -78,22 +78,22 @@ impl<'a> AMMVote<'a> {
         trading_fee: Option<u16>,
     ) -> AMMVote<'a> {
         AMMVote {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
+                TransactionType::AMMVote,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                transaction_type: TransactionType::AMMVote,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             asset,
             asset2,
             trading_fee,

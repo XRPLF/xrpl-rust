@@ -62,7 +62,7 @@ impl<'a> Transaction<'a, NoFlags> for AMMCreate<'a> {
         self.common_fields.get_mut_common_fields()
     }
 
-    fn get_transaction_type(&self) -> super::TransactionType {
+    fn get_transaction_type(&self) -> &super::TransactionType {
         self.common_fields.get_transaction_type()
     }
 }
@@ -75,7 +75,7 @@ impl<'a> AMMCreate<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         amount: Amount<'a>,
@@ -83,22 +83,22 @@ impl<'a> AMMCreate<'a> {
         trading_fee: u16,
     ) -> AMMCreate<'a> {
         AMMCreate {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::AMMCreate,
+                TransactionType::AMMCreate,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             amount,
             amount2,
             trading_fee,

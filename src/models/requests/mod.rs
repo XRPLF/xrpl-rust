@@ -20,7 +20,10 @@ pub mod ledger_data;
 pub mod ledger_entry;
 pub mod manifest;
 pub mod nft_buy_offers;
+pub mod nft_history;
+pub mod nft_info;
 pub mod nft_sell_offers;
+pub mod nfts_by_issuer;
 pub mod no_ripple_check;
 pub mod path_find;
 pub mod ping;
@@ -35,7 +38,7 @@ pub mod transaction_entry;
 pub mod tx;
 pub mod unsubscribe;
 
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::String};
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -76,8 +79,16 @@ pub enum RequestMethod {
     // Path methods
     BookOffers,
     DepositAuthorized,
-    NftBuyOffers,
-    NftSellOffers,
+    #[serde(rename = "nft_buy_offers")]
+    NFTBuyOffers,
+    #[serde(rename = "nft_history")]
+    NFTHistory,
+    #[serde(rename = "nft_info")]
+    NFTInfo,
+    #[serde(rename = "nft_sell_offers")]
+    NFTSellOffers,
+    #[serde(rename = "nfts_by_issuer")]
+    NFTsByIssuer,
     PathFind,
     RipplePathFind,
 
@@ -125,8 +136,11 @@ pub enum XRPLRequest<'a> {
     ChannelVerify(channel_verify::ChannelVerify<'a>),
     BookOffers(book_offers::BookOffers<'a>),
     DepositAuthorized(deposit_authorize::DepositAuthorized<'a>),
-    NftBuyOffers(nft_buy_offers::NftBuyOffers<'a>),
-    NftSellOffers(nft_sell_offers::NftSellOffers<'a>),
+    NFTBuyOffers(nft_buy_offers::NftBuyOffers<'a>),
+    NFTHistory(nft_history::NFTHistory<'a>),
+    NFTInfo(nft_info::NFTInfo<'a>),
+    NFTSellOffers(nft_sell_offers::NftSellOffers<'a>),
+    NFTsByIssuer(nfts_by_issuer::NFTsByIssuer<'a>),
     PathFind(path_find::PathFind<'a>),
     RipplePathFind(ripple_path_find::RipplePathFind<'a>),
     Ledger(ledger::Ledger<'a>),
@@ -260,13 +274,13 @@ impl<'a> From<deposit_authorize::DepositAuthorized<'a>> for XRPLRequest<'a> {
 
 impl<'a> From<nft_buy_offers::NftBuyOffers<'a>> for XRPLRequest<'a> {
     fn from(request: nft_buy_offers::NftBuyOffers<'a>) -> Self {
-        XRPLRequest::NftBuyOffers(request)
+        XRPLRequest::NFTBuyOffers(request)
     }
 }
 
 impl<'a> From<nft_sell_offers::NftSellOffers<'a>> for XRPLRequest<'a> {
     fn from(request: nft_sell_offers::NftSellOffers<'a>) -> Self {
-        XRPLRequest::NftSellOffers(request)
+        XRPLRequest::NFTSellOffers(request)
     }
 }
 
@@ -382,8 +396,11 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::ChannelVerify(request) => request.get_common_fields(),
             XRPLRequest::BookOffers(request) => request.get_common_fields(),
             XRPLRequest::DepositAuthorized(request) => request.get_common_fields(),
-            XRPLRequest::NftBuyOffers(request) => request.get_common_fields(),
-            XRPLRequest::NftSellOffers(request) => request.get_common_fields(),
+            XRPLRequest::NFTBuyOffers(request) => request.get_common_fields(),
+            XRPLRequest::NFTHistory(request) => request.get_common_fields(),
+            XRPLRequest::NFTInfo(request) => request.get_common_fields(),
+            XRPLRequest::NFTSellOffers(request) => request.get_common_fields(),
+            XRPLRequest::NFTsByIssuer(request) => request.get_common_fields(),
             XRPLRequest::PathFind(request) => request.get_common_fields(),
             XRPLRequest::RipplePathFind(request) => request.get_common_fields(),
             XRPLRequest::Ledger(request) => request.get_common_fields(),
@@ -423,8 +440,11 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::ChannelVerify(request) => request.get_common_fields_mut(),
             XRPLRequest::BookOffers(request) => request.get_common_fields_mut(),
             XRPLRequest::DepositAuthorized(request) => request.get_common_fields_mut(),
-            XRPLRequest::NftBuyOffers(request) => request.get_common_fields_mut(),
-            XRPLRequest::NftSellOffers(request) => request.get_common_fields_mut(),
+            XRPLRequest::NFTBuyOffers(request) => request.get_common_fields_mut(),
+            XRPLRequest::NFTHistory(request) => request.get_common_fields_mut(),
+            XRPLRequest::NFTInfo(request) => request.get_common_fields_mut(),
+            XRPLRequest::NFTSellOffers(request) => request.get_common_fields_mut(),
+            XRPLRequest::NFTsByIssuer(request) => request.get_common_fields_mut(),
             XRPLRequest::PathFind(request) => request.get_common_fields_mut(),
             XRPLRequest::RipplePathFind(request) => request.get_common_fields_mut(),
             XRPLRequest::Ledger(request) => request.get_common_fields_mut(),
@@ -452,6 +472,85 @@ pub struct CommonFields<'a> {
     pub command: RequestMethod,
     /// The unique request id.
     pub id: Option<Cow<'a, str>>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct LookupByLedgerRequest<'a> {
+    /// A 20-byte hex string for the ledger version to use.
+    pub ledger_hash: Option<Cow<'a, str>>,
+    /// The ledger index of the ledger to use, or a shortcut
+    /// string to choose a ledger automatically.
+    pub ledger_index: Option<LedgerIndex<'a>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct LedgerSequenceMarker {
+    ledger: u32,
+    seq: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum Marker<'a> {
+    Int(u32),
+    Str(Cow<'a, str>),
+    Sequence(LedgerSequenceMarker),
+}
+
+impl From<u32> for Marker<'_> {
+    fn from(value: u32) -> Self {
+        Marker::Int(value)
+    }
+}
+
+impl<'a> From<&'a str> for Marker<'a> {
+    fn from(value: &'a str) -> Self {
+        Marker::Str(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Marker<'a> {
+    fn from(value: Cow<'a, str>) -> Self {
+        Marker::Str(value)
+    }
+}
+
+impl From<String> for Marker<'_> {
+    fn from(value: String) -> Self {
+        Marker::Str(Cow::Owned(value))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum LedgerIndex<'a> {
+    Int(u32),
+    Str(Cow<'a, str>),
+}
+
+impl From<u32> for LedgerIndex<'_> {
+    fn from(value: u32) -> Self {
+        LedgerIndex::Int(value)
+    }
+}
+
+impl<'a> From<&'a str> for LedgerIndex<'a> {
+    fn from(value: &'a str) -> Self {
+        LedgerIndex::Str(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for LedgerIndex<'a> {
+    fn from(value: Cow<'a, str>) -> Self {
+        LedgerIndex::Str(value)
+    }
+}
+
+impl From<String> for LedgerIndex<'_> {
+    fn from(value: String) -> Self {
+        LedgerIndex::Str(Cow::Owned(value))
+    }
 }
 
 /// The base trait for all request models.

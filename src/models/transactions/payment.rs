@@ -102,7 +102,7 @@ impl<'a> Transaction<'a, PaymentFlag> for Payment<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -196,7 +196,7 @@ impl<'a> Payment<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         amount: Amount<'a>,
@@ -208,22 +208,22 @@ impl<'a> Payment<'a> {
         send_max: Option<Amount<'a>>,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::Payment,
+                TransactionType::Payment,
                 account_txn_id,
                 fee,
-                flags: flags.unwrap_or_default(),
+                Some(flags.unwrap_or_default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             amount,
             destination,
             destination_tag,
@@ -406,7 +406,7 @@ mod tests {
             None,
             None,
         );
-        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"Payment","Fee":"12","Flags":131072,"Sequence":2,"Amount":{"currency":"USD","issuer":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","value":"1"},"Destination":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"}"#;
+        let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"Payment","Fee":"12","Flags":131072,"Sequence":2,"SigningPubKey":"","Amount":{"currency":"USD","issuer":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","value":"1"},"Destination":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
@@ -416,5 +416,53 @@ mod tests {
         // Deserialize
         let deserialized: Payment = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+}
+
+#[cfg(all(feature = "helpers", feature = "wallet"))]
+#[cfg(test)]
+mod test_sign {
+    use alloc::vec;
+
+    use crate::{
+        asynch::{exceptions::XRPLHelperResult, transaction::sign},
+        models::transactions::Transaction,
+        wallet::Wallet,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_payment_sign_with_memo() -> XRPLHelperResult<()> {
+        let mut payment = Payment::new(
+            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            None,
+            None,
+            None,
+            None,
+            Some(vec![Memo {
+                memo_data: Some("68656c6c6f".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            None,
+            None,
+            None,
+            None,
+            Amount::XRPAmount("1000000".into()),
+            "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let wallet = Wallet::create(None)?;
+        sign(&mut payment, &wallet, false)?;
+
+        assert!(payment.get_common_fields().is_signed());
+
+        Ok(())
     }
 }

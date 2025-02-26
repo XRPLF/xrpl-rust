@@ -41,7 +41,7 @@ impl<'a> Transaction<'a, NoFlags> for AMMDelete<'a> {
         self.common_fields.get_mut_common_fields()
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 }
@@ -54,29 +54,29 @@ impl<'a> AMMDelete<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         asset: Currency<'a>,
         asset2: Currency<'a>,
     ) -> AMMDelete<'a> {
         AMMDelete {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::AMMDelete,
+                TransactionType::AMMDelete,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             asset,
             asset2,
         }

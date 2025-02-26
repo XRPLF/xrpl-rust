@@ -7,6 +7,9 @@ use crate::models::{requests::RequestMethod, Model};
 use super::{CommonFields, Request};
 
 /// This method retrieves all of sell offers for the specified NFToken.
+///
+/// See Nft Sell Offers:
+/// `<https://xrpl.org/nft_sell_offers.html>`
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct NftSellOffers<'a> {
@@ -33,7 +36,7 @@ impl<'a> NftSellOffers<'a> {
     pub fn new(id: Option<Cow<'a, str>>, nft_id: Cow<'a, str>) -> Self {
         Self {
             common_fields: CommonFields {
-                command: RequestMethod::NftSellOffers,
+                command: RequestMethod::NFTSellOffers,
                 id,
             },
             nft_id,

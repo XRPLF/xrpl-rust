@@ -30,8 +30,8 @@ pub struct XChainAddAccountCreateAttestation<'a> {
 impl Model for XChainAddAccountCreateAttestation<'_> {}
 
 impl<'a> Transaction<'a, NoFlags> for XChainAddAccountCreateAttestation<'a> {
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainAddAccountCreateAttestation
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 
     fn get_common_fields(&self) -> &super::CommonFields<'_, NoFlags> {
@@ -51,7 +51,7 @@ impl<'a> XChainAddAccountCreateAttestation<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         amount: Amount<'a>,
@@ -67,22 +67,22 @@ impl<'a> XChainAddAccountCreateAttestation<'a> {
         xchain_bridge: XChainBridge<'a>,
     ) -> XChainAddAccountCreateAttestation<'a> {
         XChainAddAccountCreateAttestation {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::XChainAddAccountCreateAttestation,
+                TransactionType::XChainAddAccountCreateAttestation,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             amount,
             attestation_reward_account,
             attestation_signer_account,

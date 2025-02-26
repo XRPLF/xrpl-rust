@@ -50,8 +50,8 @@ impl<'a> Transaction<'a, XChainModifyBridgeFlags> for XChainModifyBridge<'a> {
         &mut self.common_fields
     }
 
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainModifyBridge
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 }
 
@@ -64,7 +64,7 @@ impl<'a> XChainModifyBridge<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         xchain_bridge: XChainBridge<'a>,
@@ -72,22 +72,22 @@ impl<'a> XChainModifyBridge<'a> {
         signature_reward: Option<Amount<'a>>,
     ) -> XChainModifyBridge<'a> {
         XChainModifyBridge {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::XChainModifyBridge,
+                TransactionType::XChainModifyBridge,
                 account_txn_id,
                 fee,
-                flags: flags.unwrap_or_default(),
+                Some(flags.unwrap_or_default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             xchain_bridge,
             min_account_create_amount,
             signature_reward,

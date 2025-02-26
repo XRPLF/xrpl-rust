@@ -73,7 +73,7 @@ impl Model for AMMDeposit<'_> {
             })
         } else if self.lp_token_out.is_none() && self.amount.is_none() {
             Err(XRPLModelException::ExpectedOneOf(
-                ["lp_token_out", "amount"].as_ref().into(),
+                ["lp_token_out", "amount"].as_ref(),
             ))
         } else {
             Ok(())
@@ -90,7 +90,7 @@ impl<'a> Transaction<'a, AMMDepositFlag> for AMMDeposit<'a> {
         self.common_fields.get_mut_common_fields()
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 }
@@ -104,7 +104,7 @@ impl<'a> AMMDeposit<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         asset: Currency<'a>,
@@ -115,22 +115,22 @@ impl<'a> AMMDeposit<'a> {
         lp_token_out: Option<IssuedCurrencyAmount<'a>>,
     ) -> AMMDeposit<'a> {
         AMMDeposit {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::AMMDeposit,
+                TransactionType::AMMDeposit,
                 account_txn_id,
                 fee,
-                flags: flags.unwrap_or_default(),
+                Some(flags.unwrap_or_default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             asset,
             asset2,
             amount,

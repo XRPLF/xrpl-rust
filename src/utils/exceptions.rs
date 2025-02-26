@@ -3,7 +3,9 @@
 use alloc::string::String;
 use thiserror_no_std::Error;
 
-use crate::XRPLSerdeJsonError;
+#[cfg(feature = "models")]
+use crate::models::XRPLModelException;
+use crate::{core::exceptions::XRPLCoreException, XRPLSerdeJsonError};
 
 pub type XRPLUtilsResult<T, E = XRPLUtilsException> = core::result::Result<T, E>;
 
@@ -14,6 +16,13 @@ pub enum XRPLUtilsException {
     XRPLTimeRangeError(#[from] XRPLTimeRangeException),
     #[error("XRP Range error: {0}")]
     XRPRangeError(#[from] XRPRangeException),
+    #[error("XRPL NFT ID error: {0}")]
+    XRPLNFTIdError(#[from] XRPLNFTIdException),
+    #[error("XRPL Core error: {0}")]
+    XRPLCoreError(#[from] XRPLCoreException),
+    #[cfg(feature = "models")]
+    #[error("XRPL Model error: {0}")]
+    XRPLModelError(#[from] XRPLModelException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
@@ -22,8 +31,10 @@ pub enum XRPLUtilsException {
     BigDecimalError(#[from] bigdecimal::ParseBigDecimalError),
     #[error("serde_json error: {0}")]
     SerdeJsonError(#[from] XRPLSerdeJsonError),
-    #[error("Invalid Hex error: {0}")]
+    #[error("From Hex error: {0}")]
     FromHexError(#[from] hex::FromHexError),
+    #[error("ParseInt error: {0}")]
+    ParseIntError(#[from] core::num::ParseIntError),
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -60,6 +71,13 @@ pub enum XRPRangeException {
     InvalidICSerializationLength { expected: usize, found: usize },
     #[error("Invalid Issued Currency amount overflow (max: {max} found: {found})")]
     UnexpectedICAmountOverflow { max: usize, found: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum XRPLNFTIdException {
+    #[error("Invalid NFT ID length (expected: {expected} found: {found})")]
+    InvalidNFTIdLength { expected: usize, found: usize },
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]

@@ -51,7 +51,7 @@ pub struct UNLModify<'a> {
 impl<'a> Model for UNLModify<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for UNLModify<'a> {
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -72,7 +72,7 @@ impl<'a> UNLModify<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         ledger_sequence: u32,
@@ -80,22 +80,22 @@ impl<'a> UNLModify<'a> {
         unlmodify_validator: Cow<'a, str>,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::UNLModify,
+                TransactionType::UNLModify,
                 account_txn_id,
                 fee,
-                flags: FlagCollection::default(),
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             ledger_sequence,
             unlmodify_disabling,
             unlmodify_validator,

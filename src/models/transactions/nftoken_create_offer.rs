@@ -93,7 +93,7 @@ impl<'a> Transaction<'a, NFTokenCreateOfferFlag> for NFTokenCreateOffer<'a> {
         self.common_fields.has_flag(flag)
     }
 
-    fn get_transaction_type(&self) -> TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 
@@ -117,8 +117,8 @@ impl<'a> NFTokenCreateOfferError for NFTokenCreateOffer<'a> {
     }
 
     fn _get_destination_error(&self) -> XRPLModelResult<()> {
-        if let Some(destination) = self.destination.clone() {
-            if destination == self.common_fields.account {
+        if let Some(destination) = &self.destination {
+            if destination == &self.common_fields.account {
                 Err(XRPLModelException::ValueEqualsValue {
                     field1: "destination".into(),
                     field2: "account".into(),
@@ -132,14 +132,14 @@ impl<'a> NFTokenCreateOfferError for NFTokenCreateOffer<'a> {
     }
 
     fn _get_owner_error(&self) -> XRPLModelResult<()> {
-        if let Some(owner) = self.owner.clone() {
+        if let Some(owner) = &self.owner {
             if self.has_flag(&NFTokenCreateOfferFlag::TfSellOffer) {
                 Err(XRPLNFTokenCreateOfferException::IllegalOption {
                     field: "owner".into(),
                     context: "NFToken sell offers".into(),
                 }
                 .into())
-            } else if owner == self.common_fields.account {
+            } else if owner == &self.common_fields.account {
                 Err(XRPLModelException::ValueEqualsValue {
                     field1: "owner".into(),
                     field2: "account".into(),
@@ -168,7 +168,7 @@ impl<'a> NFTokenCreateOffer<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         amount: Amount<'a>,
@@ -178,22 +178,22 @@ impl<'a> NFTokenCreateOffer<'a> {
         owner: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::NFTokenCreateOffer,
+                TransactionType::NFTokenCreateOffer,
                 account_txn_id,
                 fee,
-                flags: flags.unwrap_or_default(),
+                Some(flags.unwrap_or_default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             nftoken_id,
             amount,
             owner,
@@ -351,7 +351,7 @@ mod tests {
             None,
             None,
         );
-        let default_json_str = r#"{"Account":"rs8jBmmfpwgmrSPgwMsh7CvKRmRt1JTVSX","TransactionType":"NFTokenCreateOffer","Flags":1,"NFTokenID":"000100001E962F495F07A990F4ED55ACCFEEF365DBAA76B6A048C0A200000007","Amount":"1000000"}"#;
+        let default_json_str = r#"{"Account":"rs8jBmmfpwgmrSPgwMsh7CvKRmRt1JTVSX","TransactionType":"NFTokenCreateOffer","Flags":1,"SigningPubKey":"","NFTokenID":"000100001E962F495F07A990F4ED55ACCFEEF365DBAA76B6A048C0A200000007","Amount":"1000000"}"#;
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

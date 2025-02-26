@@ -84,7 +84,6 @@ pub struct AMM<'a> {
     /// in units of 1/100,000. The maximum value is 1000, for a 1% fee.
     pub trading_fee: u16,
     /// Details of the current owner of the auction slot, as an `AuctionSlot` object.
-    #[serde(borrow = "'a")]
     pub auction_slot: Option<AuctionSlot<'a>>,
     /// A list of vote objects, representing votes on the pool's trading fee.
     pub vote_slots: Option<Vec<VoteEntry>>,

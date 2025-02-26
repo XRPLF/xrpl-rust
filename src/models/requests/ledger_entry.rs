@@ -5,7 +5,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// Required fields for requesting a DepositPreauth if not
 /// querying by object ID.
@@ -82,12 +82,9 @@ pub struct LedgerEntry<'a> {
     pub directory: Option<Directory<'a>>,
     pub escrow: Option<Escrow<'a>>,
     pub index: Option<Cow<'a, str>>,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut string
-    /// (e.g. "validated" or "closed" or "current") to choose a ledger
-    /// automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     pub offer: Option<Offer<'a>>,
     pub payment_channel: Option<Cow<'a, str>>,
     pub ripple_state: Option<RippleState<'a>>,
@@ -96,7 +93,7 @@ pub struct LedgerEntry<'a> {
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        Ok(self._get_field_error()?)
+        self._get_field_error()
     }
 }
 
@@ -173,7 +170,7 @@ impl<'a> LedgerEntry<'a> {
         escrow: Option<Escrow<'a>>,
         index: Option<Cow<'a, str>>,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         offer: Option<Offer<'a>>,
         payment_channel: Option<Cow<'a, str>>,
         ripple_state: Option<RippleState<'a>>,
@@ -195,8 +192,10 @@ impl<'a> LedgerEntry<'a> {
             ripple_state,
             ticket,
             binary,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
         }
     }
 }

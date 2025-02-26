@@ -31,8 +31,8 @@ impl<'a> Transaction<'a, NoFlags> for XChainCommit<'a> {
         &mut self.common_fields
     }
 
-    fn get_transaction_type(&self) -> super::TransactionType {
-        TransactionType::XChainCommit
+    fn get_transaction_type(&self) -> &super::TransactionType {
+        self.common_fields.get_transaction_type()
     }
 }
 
@@ -44,7 +44,7 @@ impl<'a> XChainCommit<'a> {
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
-        signers: Option<Vec<Signer<'a>>>,
+        signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         amount: Amount<'a>,
@@ -53,22 +53,22 @@ impl<'a> XChainCommit<'a> {
         other_chain_destination: Option<Cow<'a, str>>,
     ) -> XChainCommit<'a> {
         XChainCommit {
-            common_fields: CommonFields {
+            common_fields: CommonFields::new(
                 account,
-                transaction_type: TransactionType::XChainCommit,
+                TransactionType::XChainCommit,
                 account_txn_id,
                 fee,
+                Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
+                None,
                 sequence,
                 signers,
+                None,
                 source_tag,
                 ticket_sequence,
-                flags: FlagCollection::default(),
-                network_id: None,
-                signing_pub_key: None,
-                txn_signature: None,
-            },
+                None,
+            ),
             amount,
             other_chain_destination,
             xchain_bridge,

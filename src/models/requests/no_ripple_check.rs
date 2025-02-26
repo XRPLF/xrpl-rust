@@ -5,7 +5,7 @@ use strum_macros::Display;
 
 use crate::models::{requests::RequestMethod, Model};
 
-use super::{CommonFields, Request};
+use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
 /// Enum representing the options for the address role in
 /// a NoRippleCheckRequest.
@@ -42,11 +42,9 @@ pub struct NoRippleCheck<'a> {
     /// No Ripple on all trust lines. Users should have Default Ripple
     /// disabled, and should enable No Ripple on all trust lines.
     pub role: NoRippleCheckRole,
-    /// A 20-byte hex string for the ledger version to use.
-    pub ledger_hash: Option<Cow<'a, str>>,
-    /// The ledger index of the ledger to use, or a shortcut string
-    /// to choose a ledger automatically.
-    pub ledger_index: Option<Cow<'a, str>>,
+    /// The unique identifier of a ledger.
+    #[serde(flatten)]
+    pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// The maximum number of trust line problems to include in the
     /// results. Defaults to 300.
     pub limit: Option<u16>,
@@ -74,7 +72,7 @@ impl<'a> NoRippleCheck<'a> {
         account: Cow<'a, str>,
         role: NoRippleCheckRole,
         ledger_hash: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
         limit: Option<u16>,
         transactions: Option<bool>,
     ) -> Self {
@@ -85,8 +83,10 @@ impl<'a> NoRippleCheck<'a> {
             },
             account,
             role,
-            ledger_hash,
-            ledger_index,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
             transactions,
             limit,
         }
