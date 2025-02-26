@@ -1,14 +1,17 @@
 mod issued_currency_amount;
 mod xrp_amount;
 
-use bigdecimal::BigDecimal;
 pub use issued_currency_amount::*;
 pub use xrp_amount::*;
 
-use crate::models::Model;
+use alloc::string::ToString;
 use core::convert::TryInto;
+
+use bigdecimal::BigDecimal;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
+
+use crate::{models::Model, utils::XRP_DROPS};
 
 use super::{XRPLModelException, XRPLModelResult};
 
@@ -66,5 +69,32 @@ impl<'a> From<XRPAmount<'a>> for Amount<'a> {
 impl<'a> From<&'a str> for Amount<'a> {
     fn from(value: &'a str) -> Self {
         Self::XRPAmount(value.into())
+    }
+}
+
+impl<'a> From<u32> for Amount<'a> {
+    fn from(value: u32) -> Self {
+        Self::XRPAmount(value.to_string().into())
+    }
+}
+
+impl<'a> From<u64> for Amount<'a> {
+    fn from(value: u64) -> Self {
+        Self::XRPAmount(value.to_string().into())
+    }
+}
+
+impl<'a> From<f64> for Amount<'a> {
+    fn from(value: f64) -> Self {
+        let drops = XRP_DROPS as f64;
+        let result = value * drops;
+
+        Self::XRPAmount(result.to_string().into())
+    }
+}
+
+impl<'a> From<BigDecimal> for Amount<'a> {
+    fn from(value: BigDecimal) -> Self {
+        Self::XRPAmount((value * XRP_DROPS).to_string().into())
     }
 }

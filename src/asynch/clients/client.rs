@@ -2,7 +2,6 @@ use crate::models::{
     requests::{Request, XRPLRequest},
     results::XRPLResponse,
 };
-use alloc::borrow::Cow;
 use url::Url;
 
 use super::exceptions::XRPLClientResult;
@@ -32,11 +31,11 @@ pub trait XRPLClient {
 
     /// Generate a random id.
     #[cfg(feature = "std")]
-    fn get_random_id<'a>(&self) -> Cow<'a, str> {
+    fn get_random_id<'a>(&self) -> alloc::borrow::Cow<'a, str> {
         use alloc::string::ToString;
 
         let random_id = rand::random::<u32>().to_string();
 
-        Cow::Owned(random_id)
+        alloc::borrow::Cow::Owned(random_id)
     }
 }

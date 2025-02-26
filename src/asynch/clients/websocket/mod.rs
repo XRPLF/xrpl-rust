@@ -25,7 +25,7 @@ pub use _no_std::*;
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub use _std::*;
 
-use super::exceptions::{XRPLClientException, XRPLClientResult};
+use super::exceptions::XRPLClientResult;
 
 pub struct WebSocketOpen;
 pub struct WebSocketClosed;
@@ -77,7 +77,7 @@ impl<T: EmbeddedIoRead + EmbeddedIoWrite + MessageHandler> XRPLAsyncWebsocketIO 
 impl<T: ?Sized> XRPLAsyncWebsocketIO for T
 where
     T: Stream<Item = XRPLClientResult<String>>
-        + Sink<String, Error = XRPLClientException>
+        + Sink<String, Error = super::exceptions::XRPLClientException>
         + MessageHandler
         + Unpin,
 {
