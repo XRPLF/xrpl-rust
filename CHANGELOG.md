@@ -7,12 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Incomplete]]
 
-- Models
-- Integration Tests
 - Performance Benchmarks
 - Utility functions
 
 ## [[Unreleased]]
+
+## [[v0.5.0]]
 
 - add missing NFT request models
 - add `parse_nftoken_id` and `get_nftoken_id` utility functions
@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - add transaction `Metadata` models
 - fix serialization issue where null values were tried to be serialized
 - fix multisigning bug, because `signing_pub_key` is not set for multisigning but it is required, so it's just an empty string
+- add transaction response models
+- add integration tests with XRPL test net.
 
 ## [[v0.4.0]]
 

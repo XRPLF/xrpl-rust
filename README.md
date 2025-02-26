@@ -50,7 +50,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.xrpl]
-version = "0.4.0"
+version = "0.5.0"
 ```
 
 # 🕮 Documentation [![docs_status]][docs]
@@ -64,9 +64,7 @@ TODO - Most core functionality is in place and working.
 In Progress:
 
 - no_std examples
-- Response Models
 - Benchmarks
-- Integration tests
 
 # ⚐ Flags
 
@@ -89,7 +87,7 @@ and enable features manually:
 
 ```toml
 [dependencies.xrpl]
-version = "0.4.0"
+version = "*"
 default-features = false
 features = ["core", "models", "wallet", "utils", "websocket", "json-rpc", "helpers", "embassy-rt"]
 ```
