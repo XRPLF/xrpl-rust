@@ -357,6 +357,16 @@ pub struct TransactionTypes {
     pub deposit_preauth: i16,
     pub trust_set: i16,
     pub account_delete: i16,
+    #[serde(rename = "NFTokenMint")]
+    pub nftoken_mint: i16,
+    #[serde(rename = "NFTokenCreateOffer")]
+    pub nftoken_create_offer: i16,
+    #[serde(rename = "NFTokenCancelOffer")]
+    pub nftoken_cancel_offer: i16,
+    #[serde(rename = "NFTokenAcceptOffer")]
+    pub nftoken_accept_offer: i16,
+    #[serde(rename = "NFTokenBurn")]
+    pub nftoken_burn: i16,
     #[serde(rename = "XChainAccountCreateCommit")]
     pub xchain_account_create_commit: i16,
     #[serde(rename = "XChainAddAccountCreateAttestation")]
