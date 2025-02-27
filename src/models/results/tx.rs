@@ -5,16 +5,26 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::models::{
-    results::exceptions::XRPLResultException, XRPLModelException, XRPLModelResult,
+    results::exceptions::XRPLResultException, transactions::TransactionType, Amount,
+    XRPLModelException, XRPLModelResult,
 };
 
-use super::{XRPLResponse, XRPLResult};
+use super::{metadata::TransactionMetadata, XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum TxVersionMap<'a> {
     Default(Tx<'a>),
     V1(TxV1<'a>),
+}
+
+impl<'a> TxVersionMap<'a> {
+    pub fn get_transaction_metadata(&self) -> Option<&TransactionMetadata<'a>> {
+        match self {
+            TxVersionMap::Default(tx) => tx.meta.as_ref(),
+            TxVersionMap::V1(tx) => tx.meta.as_ref(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -25,9 +35,11 @@ pub struct TxBase<'a> {
     pub ledger_index: Option<u32>,
     /// The transaction's compact transaction identifier.
     pub ctid: Option<Cow<'a, str>>,
-    /// The close time of the ledger in which the transaction was applied, in seconds since the Ripple Epoch.
+    /// The close time of the ledger in which the transaction was applied,
+    /// in seconds since the Ripple Epoch.
     pub date: Option<u32>,
-    /// If true, this data comes from a validated ledger version; if omitted or set to false, this data is not final.
+    /// If true, this data comes from a validated ledger version; if omitted
+    /// or set to false, this data is not final.
     pub validated: Option<bool>,
     /// (Deprecated) Alias for `ledger_index`
     #[serde(rename = "inLedger")]
@@ -40,9 +52,11 @@ pub struct Tx<'a> {
     pub base: TxBase<'a>,
     /// The transaction data represented in JSON.
     pub tx_json: Value,
-    /// (JSON mode) Transaction metadata, which describes the results of the transaction.
-    pub meta: Option<Value>, // TODO: replace with metadata as soon as implemented
-    /// (Binary mode) Transaction metadata, which describes the results of the transaction, represented as a hex string.
+    /// (JSON mode) Transaction metadata, which describes the results of
+    /// the transaction.
+    pub meta: Option<TransactionMetadata<'a>>,
+    /// (Binary mode) Transaction metadata, which describes the results of
+    /// the transaction, represented as a hex string.
     pub meta_blob: Option<Cow<'a, str>>,
     /// (Binary mode) The transaction data represented as a hex string.
     pub tx_blob: Option<Cow<'a, str>>,
@@ -53,7 +67,7 @@ pub struct TxV1<'a> {
     #[serde(flatten)]
     pub base: TxBase<'a>,
     /// Transaction metadata, which describes the results of the transaction.
-    pub meta: Option<TxMetaV1<'a>>, // TODO: replace with metadata as soon as implemented
+    pub meta: Option<TransactionMetadata<'a>>,
     /// The transaction data represented as a hex string.
     pub tx: Option<Cow<'a, str>>,
     /// Other fields from the `Transaction` object
@@ -61,11 +75,29 @@ pub struct TxV1<'a> {
     pub tx_json: Value,
 }
 
+/// Represents various response transaction types.
+#[non_exhaustive]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "PascalCase")]
 #[serde(untagged)]
-pub enum TxMetaV1<'a> {
-    Json(Value),
-    Blob(Cow<'a, str>),
+pub enum Transaction<'a> {
+    #[serde(rename_all = "PascalCase")]
+    AccountSet {
+        account: Cow<'a, str>,
+        fee: u32,
+        sequence: u32,
+        set_flag: u32,
+        transaction_type: TransactionType,
+    },
+    #[serde(rename_all = "PascalCase")]
+    TrustSet {
+        account: Cow<'a, str>,
+        fee: u32,
+        flags: u32,
+        limit_amount: Amount<'a>,
+        sequence: u32,
+        transaction_type: TransactionType,
+    },
 }
 
 impl<'a> TryFrom<XRPLResult<'a>> for TxVersionMap<'a> {

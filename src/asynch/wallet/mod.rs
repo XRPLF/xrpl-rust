@@ -36,6 +36,7 @@ where
     let address = &wallet.classic_address;
     let starting_balance = check_balance(client, address.into()).await;
     let user_agent = user_agent.unwrap_or("xrpl-rust".into());
+
     fund_wallet(
         client,
         faucet_url,
@@ -44,6 +45,7 @@ where
         Some(user_agent),
     )
     .await?;
+
     let mut is_funded = false;
     for _ in 0..TIMEOUT_SECS {
         // wait 1 second
