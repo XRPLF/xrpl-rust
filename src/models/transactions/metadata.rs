@@ -31,14 +31,16 @@ pub struct Fields<'a> {
     pub balance: Option<Amount<'a>>,
     pub book_directory: Option<Cow<'a, str>>,
     pub expiration: Option<u32>,
-    pub flags: Option<u32>,
+    #[serde(default)]
+    pub flags: u32,
     pub low_limit: Option<IssuedCurrencyAmount<'a>>,
     pub high_limit: Option<IssuedCurrencyAmount<'a>>,
     pub next_page_min: Option<Cow<'a, str>>,
     #[serde(rename = "NFTokens")]
     pub nftokens: Option<Vec<NFTokenMetadata<'a>>>,
     pub previous_page_min: Option<Cow<'a, str>>,
-    pub sequence: Option<u32>,
+    #[serde(default)]
+    pub sequence: u32,
     pub taker_gets: Option<Amount<'a>>,
     pub taker_pays: Option<Amount<'a>>,
     pub xchain_claim_id: Option<Cow<'a, str>>,
@@ -72,7 +74,7 @@ pub enum AffectedNode<'a> {
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum NodeType {
     CreatedNode,
     ModifiedNode,
