@@ -8,6 +8,7 @@ use crate::{
 use alloc::vec::Vec;
 use bigdecimal::BigDecimal;
 
+/// Parses the final balances of all accounts affected by a transaction from the transaction metadata.
 pub fn get_final_balances<'a: 'b, 'b>(
     metadata: &'a TransactionMetadata<'a>,
 ) -> XRPLUtilsResult<Vec<AccountBalances<'b>>> {
@@ -38,7 +39,9 @@ mod test {
     use serde_json::Value;
 
     use super::*;
-    use crate::models::transactions::metadata::TransactionMetadata;
+    use crate::{
+        models::transactions::metadata::TransactionMetadata, utils::txn_parser::utils::Balance,
+    };
 
     #[test]
     fn test_parse_final_balances() {
@@ -50,6 +53,47 @@ mod test {
 
             txn_meta
         });
-        assert!(get_final_balances(&txn).is_ok());
+        let expected_balances = Vec::from([
+            AccountBalances {
+                account: "rKmBGxocj9Abgy25J51Mk1iqFzW9aVF9Tc".into(),
+                balances: Vec::from([
+                    Balance {
+                        currency: "USD".into(),
+                        value: "1.525330905250352".into(),
+                        issuer: Some("rMwjYedjc7qqtKYVLiAccJSmCwih4LnE2q".into()),
+                    },
+                    Balance {
+                        currency: "XRP".into(),
+                        value: "-239.555992".into(),
+                        issuer: None,
+                    },
+                ]),
+            },
+            AccountBalances {
+                account: "rMwjYedjc7qqtKYVLiAccJSmCwih4LnE2q".into(),
+                balances: Vec::from([
+                    Balance {
+                        currency: "USD".into(),
+                        value: "-1.525330905250352".into(),
+                        issuer: Some("rKmBGxocj9Abgy25J51Mk1iqFzW9aVF9Tc".into()),
+                    },
+                    Balance {
+                        currency: "USD".into(),
+                        value: "-0.02".into(),
+                        issuer: Some("rLDYrujdKUfVx28T9vRDAbyJ7G2WVXKo4K".into()),
+                    },
+                ]),
+            },
+            AccountBalances {
+                account: "rLDYrujdKUfVx28T9vRDAbyJ7G2WVXKo4K".into(),
+                balances: Vec::from([Balance {
+                    currency: "USD".into(),
+                    value: "0.02".into(),
+                    issuer: Some("rMwjYedjc7qqtKYVLiAccJSmCwih4LnE2q".into()),
+                }]),
+            },
+        ]);
+        let final_balances = get_final_balances(&txn).unwrap();
+        assert_eq!(final_balances, expected_balances);
     }
 }

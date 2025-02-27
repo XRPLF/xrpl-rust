@@ -12,7 +12,7 @@ pub mod balance_parser;
 pub mod nodes;
 pub mod parser;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Balance<'a> {
     pub currency: Cow<'a, str>,
     pub value: Cow<'a, str>,
@@ -56,7 +56,7 @@ pub struct AccountBalance<'a> {
     pub balance: Balance<'a>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AccountBalances<'a> {
     pub account: Cow<'a, str>,
     pub balances: Vec<Balance<'a>>,
