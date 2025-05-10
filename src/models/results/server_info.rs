@@ -47,6 +47,8 @@ pub struct Info<'a> {
     pub load_factor_fee_queue: Option<u32>,
     /// Transaction cost multiplier excluding open ledger
     pub load_factor_server: Option<u32>,
+    /// Network id for ledger
+    pub network_id: Option<u32>,
     /// Number of connected peer servers
     pub peers: u32,
     /// List of ports listening for API commands
@@ -155,6 +157,7 @@ mod tests {
                     "proposers": 35
                 },
                 "load_factor": 1,
+                "network_id": 10,
                 "peers": 22,
                 "ports": [
                     {
@@ -202,6 +205,7 @@ mod tests {
         assert_eq!(result.info.last_close.converge_time_s, 3);
         assert_eq!(result.info.last_close.proposers, 35);
         assert_eq!(result.info.load_factor, 1);
+        assert_eq!(result.info.network_id, Some(10));
         assert_eq!(result.info.peers, 22);
         assert_eq!(
             result.info.pubkey_node,
