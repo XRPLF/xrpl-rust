@@ -62,7 +62,7 @@ pub struct Info<'a> {
     /// Current server state
     pub server_state: Cow<'a, str>,
     /// Microseconds in current state
-    pub server_state_duration_us: Option<u64>,
+    pub server_state_duration_us: Option<Cow<'a, str>>,
     /// Server state accounting information
     pub state_accounting: Option<Value>,
     /// Current UTC time according to server
@@ -179,7 +179,7 @@ mod tests {
                 ],
                 "pubkey_node": "n9KQK8yvTDcZdGyhu2EGdDnFPEBSsY5wEGpU5GgpygTgLFsjQyPt",
                 "server_state": "full",
-                "server_state_duration_us": 91758491912,
+                "server_state_duration_us": "91758491912",
                 "time": "2023-Sep-13 22:12:31.377492 UTC",
                 "uptime": 91948,
                 "validated_ledger": {
@@ -212,7 +212,7 @@ mod tests {
             "n9KQK8yvTDcZdGyhu2EGdDnFPEBSsY5wEGpU5GgpygTgLFsjQyPt"
         );
         assert_eq!(result.info.server_state, "full");
-        assert_eq!(result.info.server_state_duration_us, Some(91758491912));
+        assert_eq!(result.info.server_state_duration_us, Some("91758491912".into()));
         assert_eq!(
             result.info.time,
             Some("2023-Sep-13 22:12:31.377492 UTC".into())
