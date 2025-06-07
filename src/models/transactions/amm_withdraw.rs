@@ -4,7 +4,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use crate::models::{Amount, Currency, FlagCollection, IssuedCurrencyAmount, Model, XRPAmount};
+use crate::models::{
+    Amount, Currency, FlagCollection, IssuedCurrencyAmount, Model, ValidateCurrencies, XRPAmount,
+};
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
@@ -27,7 +29,9 @@ pub enum AMMWithdrawFlag {
 /// Withdraw assets from an Automated Market Maker (AMM) instance by returning the
 /// AMM's liquidity provider tokens (LP Tokens).
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMWithdraw<'a> {
     pub common_fields: CommonFields<'a, AMMWithdrawFlag>,
@@ -53,6 +57,7 @@ pub struct AMMWithdraw<'a> {
 
 impl Model for AMMWithdraw<'_> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()?;
         if self.amount2.is_some() && self.amount.is_none() {
             Err(crate::models::XRPLModelException::FieldRequiresField {
                 field1: "amount2".into(),

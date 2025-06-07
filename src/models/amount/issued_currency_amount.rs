@@ -12,7 +12,13 @@ pub struct IssuedCurrencyAmount<'a> {
     pub value: Cow<'a, str>,
 }
 
-impl<'a> Model for IssuedCurrencyAmount<'a> {}
+impl<'a> Model for IssuedCurrencyAmount<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self.value.parse::<f64>()?;
+
+        Ok(())
+    }
+}
 
 impl<'a> IssuedCurrencyAmount<'a> {
     pub fn new(currency: Cow<'a, str>, issuer: Cow<'a, str>, value: Cow<'a, str>) -> Self {

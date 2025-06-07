@@ -212,7 +212,10 @@ mod tests {
             "n9KQK8yvTDcZdGyhu2EGdDnFPEBSsY5wEGpU5GgpygTgLFsjQyPt"
         );
         assert_eq!(result.info.server_state, "full");
-        assert_eq!(result.info.server_state_duration_us, Some("91758491912".into()));
+        assert_eq!(
+            result.info.server_state_duration_us,
+            Some("91758491912".into())
+        );
         assert_eq!(
             result.info.time,
             Some("2023-Sep-13 22:12:31.377492 UTC".into())

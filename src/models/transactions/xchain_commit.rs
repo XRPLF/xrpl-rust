@@ -2,12 +2,14 @@ use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{Amount, FlagCollection, Model, NoFlags, XChainBridge, XRPAmount};
+use crate::models::{
+    Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XChainBridge, XRPAmount,
+};
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, xrpl_rust_macros::ValidateCurrencies)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainCommit<'a> {
     #[serde(flatten)]
@@ -20,7 +22,11 @@ pub struct XChainCommit<'a> {
     pub other_chain_destination: Option<Cow<'a, str>>,
 }
 
-impl Model for XChainCommit<'_> {}
+impl Model for XChainCommit<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for XChainCommit<'a> {
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {

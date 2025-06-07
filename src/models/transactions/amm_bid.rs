@@ -4,7 +4,7 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{
     transactions::TransactionType, Currency, FlagCollection, IssuedCurrencyAmount, Model, NoFlags,
-    XRPAmount,
+    ValidateCurrencies, XRPAmount,
 };
 
 use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
@@ -18,7 +18,9 @@ use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
 /// You bid using the AMM's LP Tokens; the amount of a winning bid is returned
 /// to the AMM, decreasing the outstanding balance of LP Tokens.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMBid<'a> {
     #[serde(flatten)]
@@ -41,7 +43,11 @@ pub struct AMMBid<'a> {
     pub auth_accounts: Option<Vec<AuthAccount>>,
 }
 
-impl Model for AMMBid<'_> {}
+impl Model for AMMBid<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for AMMBid<'a> {
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {

@@ -2,7 +2,9 @@ use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{Amount, FlagCollection, Model, NoFlags, XRPAmount, XRPLModelResult};
+use crate::models::{
+    Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelResult,
+};
 
 use super::{
     exceptions::{XRPLAMMCreateException, XRPLTransactionException},
@@ -28,7 +30,9 @@ pub const AMM_CREATE_MAX_FEE: u16 = 1000;
 /// The higher the trading fee, the more it offsets this risk,
 /// so it's best to set the trading fee based on the volatility of the asset pair.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMCreate<'a> {
     #[serde(flatten)]
@@ -48,8 +52,7 @@ pub struct AMMCreate<'a> {
 impl Model for AMMCreate<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.get_tranding_fee_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
