@@ -7,6 +7,18 @@ mod std_cli;
 #[cfg(feature = "std")]
 pub use std_cli::run;
 
+/// Default mainnet URL for JSON-RPC requests
+pub const DEFAULT_MAINNET_URL: &str = "https://xrplcluster.com/";
+
+/// Default testnet URL for faucet functionality
+pub const DEFAULT_TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234";
+
+/// Default WebSocket URL
+pub const DEFAULT_WEBSOCKET_URL: &str = "wss://xrplcluster.com/";
+
+/// Default limit for paginated results
+pub const DEFAULT_PAGINATION_LIMIT: u32 = 10;
+
 // Common CLI commands with conditional derives
 #[cfg_attr(feature = "std", derive(clap::Subcommand))]
 #[derive(Debug, Clone)]
@@ -32,34 +44,32 @@ pub enum Commands {
         #[cfg_attr(feature = "std", arg(long))]
         address: String,
         /// The XRPL node URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "https://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
     },
     /// Get current network fee
     GetFee {
         /// The XRPL node URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "https://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
     },
     /// Subscribe to ledger events
     Subscribe {
         /// The XRPL node WebSocket URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "wss://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_WEBSOCKET_URL.into()))]
         url: String,
         /// Stream type to subscribe to (ledger, transactions, validations)
         #[cfg_attr(feature = "std", arg(long, default_value = "ledger"))]
         stream: String,
         /// Number of events to receive before exiting (0 for unlimited)
-        #[cfg_attr(feature = "std", arg(long, default_value = "10"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_PAGINATION_LIMIT))]
         limit: u32,
     },
-    /// Generate a faucet wallet (testnet only)
+    /// Generate a wallet funded by the testnet faucet
+    #[cfg(feature = "std")]
     GenerateFaucetWallet {
-        /// The XRPL testnet node URL
-        #[cfg_attr(
-            feature = "std",
-            arg(long, default_value = "https://testnet.xrpl-labs.com/")
-        )]
+        /// The XRPL node URL
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_TESTNET_URL.into()))]
         url: String,
     },
     /// Get account transactions
@@ -68,22 +78,22 @@ pub enum Commands {
         #[cfg_attr(feature = "std", arg(long))]
         address: String,
         /// The XRPL node URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "https://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
         /// Limit the number of transactions returned
-        #[cfg_attr(feature = "std", arg(long, default_value = "10"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_PAGINATION_LIMIT))]
         limit: u32,
     },
     /// Get server info
     ServerInfo {
         /// The XRPL node URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "https://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
     },
     /// Get ledger data
     LedgerData {
         /// The XRPL node URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "https://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
         /// Ledger index (empty for latest)
         #[cfg_attr(feature = "std", arg(long))]
@@ -92,7 +102,7 @@ pub enum Commands {
         #[cfg_attr(feature = "std", arg(long))]
         ledger_hash: Option<String>,
         /// Limit the number of objects returned
-        #[cfg_attr(feature = "std", arg(long, default_value = "10"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_PAGINATION_LIMIT as u16))]
         limit: u16,
     },
     /// Get account objects (trust lines, offers, etc.)
@@ -101,13 +111,13 @@ pub enum Commands {
         #[cfg_attr(feature = "std", arg(long))]
         address: String,
         /// The XRPL node URL
-        #[cfg_attr(feature = "std", arg(long, default_value = "https://xrplcluster.com/"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
         /// Type of objects to return (all, offer, state, etc.)
         #[cfg_attr(feature = "std", arg(long))]
         type_filter: Option<String>,
         /// Limit the number of objects returned
-        #[cfg_attr(feature = "std", arg(long, default_value = "10"))]
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_PAGINATION_LIMIT as u16))]
         limit: u16,
     },
     /// Validate an address
@@ -134,15 +144,12 @@ pub enum Commands {
         #[cfg_attr(feature = "std", arg(short, long))]
         tx_blob: String,
         /// The XRPL node URL
-        #[cfg_attr(
-            feature = "std",
-            arg(short, long, default_value = "https://xrplcluster.com/")
-        )]
+        #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
     },
 }
 
-// Define a custom error type for CLI operations
+/// Define a custom error type for CLI operations
 #[derive(Debug, Error)]
 pub enum CliError {
     #[error("Wallet error: {0}")]
@@ -163,6 +170,51 @@ pub enum CliError {
     Other(String),
 }
 
+/// Helper function to parse a URL string with proper error handling
+#[cfg(feature = "std")]
+fn parse_url(url_str: &str) -> Result<url::Url, CliError> {
+    url_str.parse().map_err(CliError::UrlParseError)
+}
+
+/// Helper function to create a JSON-RPC client with proper error handling
+#[cfg(feature = "std")]
+fn create_json_rpc_client(
+    url_str: &str,
+) -> Result<crate::clients::json_rpc::JsonRpcClient, CliError> {
+    use crate::clients::json_rpc::JsonRpcClient;
+    Ok(JsonRpcClient::connect(parse_url(url_str)?))
+}
+
+/// Helper function to handle response display and error conversion
+#[cfg(feature = "std")]
+fn handle_response<T: core::fmt::Debug>(
+    result: Result<T, crate::asynch::clients::exceptions::XRPLClientException>,
+    response_type: &str,
+) -> Result<(), CliError> {
+    match result {
+        Ok(response) => {
+            alloc::println!("{}: {:#?}", response_type, response);
+            Ok(())
+        }
+        Err(e) => Err(CliError::ClientError(e)),
+    }
+}
+
+/// Helper function to get or create a Tokio runtime
+#[cfg(feature = "std")]
+fn get_or_create_runtime() -> Result<tokio::runtime::Runtime, CliError> {
+    use tokio::runtime::Runtime;
+    Runtime::new().map_err(CliError::IoError)
+}
+
+/// Helper function to handle common transaction encoding and output steps
+#[cfg(feature = "std")]
+fn encode_and_print_tx<T: serde::Serialize>(tx: &T) -> Result<String, CliError> {
+    let tx_blob = crate::core::binarycodec::encode(tx)?;
+    alloc::println!("Signed transaction blob: {}", tx_blob);
+    Ok(tx_blob)
+}
+
 pub fn execute_command(command: &Commands) -> Result<(), CliError> {
     match command {
         Commands::GenerateWallet { save } => {
@@ -180,17 +232,13 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
         }
         #[cfg(feature = "std")]
         Commands::AccountInfo { address, url } => {
-            use crate::clients::{json_rpc::JsonRpcClient, XRPLSyncClient};
+            use crate::clients::XRPLSyncClient;
             use crate::models::requests::account_info::AccountInfo;
-            use tokio::runtime::Runtime;
 
-            // Create a new Tokio runtime
-            let rt = Runtime::new()?;
+            // Create client with standardized helper function
+            let client = create_json_rpc_client(url)?;
 
-            // Connect to the XRPL node
-            let client = JsonRpcClient::connect(url.parse()?);
-
-            // Create the account info request
+            // Create request
             let account_info = AccountInfo::new(
                 None,                   // id
                 address.clone().into(), // account
@@ -201,31 +249,16 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 None,                   // signer_lists
             );
 
-            // Execute the request within the Tokio runtime
-            match rt.block_on(async { client.request(account_info.into()) }) {
-                Ok(response) => {
-                    alloc::println!("Account info: {:#?}", response);
-                    Ok(())
-                }
-                Err(e) => {
-                    // Provide a more user-friendly error message
-                    Err(CliError::Other(format!(
-                        "Failed to get account info: {}",
-                        e
-                    )))
-                }
-            }
+            // Execute request and handle response
+            handle_response(client.request(account_info.into()), "Account info")
         }
         #[cfg(feature = "std")]
         Commands::GetFee { url } => {
-            use crate::clients::json_rpc::JsonRpcClient;
             use crate::ledger::{get_fee, FeeType};
-            use tokio::runtime::Runtime;
 
-            // Create a new Tokio runtime
-            let rt = Runtime::new()?;
-            // Connect to the XRPL node
-            let client = JsonRpcClient::connect(url.parse()?);
+            // Create a runtime and client
+            let rt = get_or_create_runtime()?;
+            let client = create_json_rpc_client(url)?;
 
             // Get the current fee within the Tokio runtime
             match rt.block_on(async { get_fee(&client, None, Some(FeeType::Open)) }) {
@@ -233,10 +266,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     alloc::println!("Current network fee: {} drops", fee);
                     Ok(())
                 }
-                Err(e) => {
-                    // Convert the error to a more user-friendly message
-                    Err(CliError::Other(format!("Failed to get network fee: {}", e)))
-                }
+                Err(e) => Err(CliError::HelperError(e)),
             }
         }
         #[cfg(feature = "std")]
@@ -253,9 +283,9 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 _ => return Err(CliError::Other(format!("Unknown stream type: {}", stream))),
             };
 
-            // Open a websocket connection
+            // Open a websocket connection with consistent URL parsing
             let mut websocket: WebSocketClient<SingleExecutorMutex, _> =
-                WebSocketClient::open(url.parse()?)?;
+                WebSocketClient::open(parse_url(url)?)?;
 
             // Subscribe to the stream
             let subscribe = Subscribe::new(
@@ -298,19 +328,26 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
         Commands::GenerateFaucetWallet { url } => {
             use crate::asynch::clients::AsyncJsonRpcClient;
             use crate::asynch::wallet::generate_faucet_wallet;
-            use tokio::runtime::Runtime;
 
-            // Create a runtime
-            let rt = Runtime::new()?;
+            // Get or create a runtime
+            let rt = get_or_create_runtime()?;
 
-            // Connect to the testnet
-            let client = AsyncJsonRpcClient::connect(url.parse()?);
+            // Execute within the runtime
+            let result = rt.block_on(async {
+                let client = AsyncJsonRpcClient::connect(url.parse()?);
+                generate_faucet_wallet(&client, None, None, None, None).await
+            });
 
-            // Generate a faucet wallet
-            let wallet = rt.block_on(generate_faucet_wallet(&client, None, None, None, None))?;
-
-            alloc::println!("Generated faucet wallet: {:#?}", wallet);
-            Ok(())
+            match result {
+                Ok(wallet) => {
+                    alloc::println!("Generated faucet wallet: {:#?}", wallet);
+                    Ok(())
+                }
+                Err(e) => Err(CliError::Other(format!(
+                    "Failed to generate faucet wallet: {}",
+                    e
+                ))),
+            }
         }
         #[cfg(feature = "std")]
         Commands::AccountTx {
@@ -318,10 +355,13 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             url,
             limit,
         } => {
-            use crate::clients::{json_rpc::JsonRpcClient, XRPLSyncClient};
+            use crate::clients::XRPLSyncClient;
             use crate::models::requests::account_tx::AccountTx;
 
-            let client = JsonRpcClient::connect(url.parse()?);
+            // Create client with standardized helper function
+            let client = create_json_rpc_client(url)?;
+
+            // Create request
             let account_tx = AccountTx::new(
                 None,
                 address.clone().into(),
@@ -334,20 +374,23 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 None,
                 None,
             );
-            let response = client.request(account_tx.into())?;
-            alloc::println!("Account transactions: {:#?}", response);
-            Ok(())
+
+            // Execute request and handle response
+            handle_response(client.request(account_tx.into()), "Account transactions")
         }
         #[cfg(feature = "std")]
         Commands::ServerInfo { url } => {
-            use crate::clients::{json_rpc::JsonRpcClient, XRPLSyncClient};
+            use crate::clients::XRPLSyncClient;
             use crate::models::requests::server_info::ServerInfo;
 
-            let client = JsonRpcClient::connect(url.parse()?);
+            // Create client with standardized helper function
+            let client = create_json_rpc_client(url)?;
+
+            // Create request
             let server_info = ServerInfo::new(None);
-            let response = client.request(server_info.into())?;
-            alloc::println!("Server info: {:#?}", response);
-            Ok(())
+
+            // Execute request and handle response
+            handle_response(client.request(server_info.into()), "Server info")
         }
         #[cfg(feature = "std")]
         Commands::LedgerData {
@@ -356,10 +399,13 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             ledger_hash,
             limit,
         } => {
-            use crate::clients::{json_rpc::JsonRpcClient, XRPLSyncClient};
+            use crate::clients::XRPLSyncClient;
             use crate::models::requests::ledger_data::LedgerData;
 
-            let client = JsonRpcClient::connect(url.parse()?);
+            // Create client with standardized helper function
+            let client = create_json_rpc_client(url)?;
+
+            // Create request
             let ledger_data = LedgerData::new(
                 None,
                 None,
@@ -369,19 +415,8 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 None,
             );
 
-            match client.request(ledger_data.into()) {
-                Ok(response) => {
-                    alloc::println!("Ledger data: {:#?}", response);
-                    Ok(())
-                }
-                Err(e) => {
-                    // Provide more context for the error
-                    Err(CliError::Other(format!(
-                        "Failed to retrieve ledger data: {}",
-                        e
-                    )))
-                }
-            }
+            // Execute request and handle response
+            handle_response(client.request(ledger_data.into()), "Ledger data")
         }
         #[cfg(feature = "std")]
         Commands::AccountObjects {
@@ -390,11 +425,9 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             type_filter,
             limit,
         } => {
+            use crate::clients::XRPLSyncClient;
+            use crate::models::requests::account_objects::{AccountObjectType, AccountObjects};
             use std::str::FromStr;
-
-            use crate::clients::{json_rpc::JsonRpcClient, XRPLSyncClient};
-            use crate::models::requests::account_objects::AccountObjectType;
-            use crate::models::requests::account_objects::AccountObjects;
 
             // Parse the type_filter into AccountObjectType if provided
             let object_type = if let Some(filter) = type_filter.as_deref() {
@@ -408,7 +441,10 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 None
             };
 
-            let client = JsonRpcClient::connect(url.parse()?);
+            // Create client with standardized helper function
+            let client = create_json_rpc_client(url)?;
+
+            // Create request
             let account_objects = AccountObjects::new(
                 None,
                 address.clone().into(),
@@ -419,9 +455,9 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 Some(*limit),
                 None,
             );
-            let response = client.request(account_objects.into())?;
-            alloc::println!("Account objects: {:#?}", response);
-            Ok(())
+
+            // Execute request and handle response
+            handle_response(client.request(account_objects.into()), "Account objects")
         }
         #[cfg(feature = "std")]
         Commands::ValidateAddress { address } => {
@@ -451,7 +487,6 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             transaction_type,
             json,
         } => {
-            use crate::asynch::transaction::sign;
             use crate::models::transactions::{
                 account_set::AccountSet, offer_cancel::OfferCancel, offer_create::OfferCreate,
                 payment::Payment, trust_set::TrustSet,
@@ -465,40 +500,35 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             // Parse the JSON
             let json_value: Value = serde_json::from_str(&json)?;
 
+            use crate::asynch::transaction::sign;
+
             // Handle different transaction types
-            // TODO Write a converter
             match transaction_type.to_lowercase().as_str() {
                 "payment" => {
                     let mut tx: Payment = serde_json::from_value(json_value)?;
                     sign(&mut tx, &wallet, false)?;
-                    let tx_blob = crate::core::binarycodec::encode(&tx)?;
-                    alloc::println!("Signed transaction blob: {}", tx_blob);
+                    encode_and_print_tx(&tx)?;
                 }
                 "accountset" => {
                     let mut tx: AccountSet = serde_json::from_value(json_value)?;
                     sign(&mut tx, &wallet, false)?;
-                    let tx_blob = crate::core::binarycodec::encode(&tx)?;
-                    alloc::println!("Signed transaction blob: {}", tx_blob);
+                    encode_and_print_tx(&tx)?;
                 }
                 "offercreate" => {
                     let mut tx: OfferCreate = serde_json::from_value(json_value)?;
                     sign(&mut tx, &wallet, false)?;
-                    let tx_blob = crate::core::binarycodec::encode(&tx)?;
-                    alloc::println!("Signed transaction blob: {}", tx_blob);
+                    encode_and_print_tx(&tx)?;
                 }
                 "offercancel" => {
                     let mut tx: OfferCancel = serde_json::from_value(json_value)?;
                     sign(&mut tx, &wallet, false)?;
-                    let tx_blob = crate::core::binarycodec::encode(&tx)?;
-                    alloc::println!("Signed transaction blob: {}", tx_blob);
+                    encode_and_print_tx(&tx)?;
                 }
                 "trustset" => {
                     let mut tx: TrustSet = serde_json::from_value(json_value)?;
                     sign(&mut tx, &wallet, false)?;
-                    let tx_blob = crate::core::binarycodec::encode(&tx)?;
-                    alloc::println!("Signed transaction blob: {}", tx_blob);
+                    encode_and_print_tx(&tx)?;
                 }
-                // Add more transaction types as needed
                 _ => {
                     return Err(CliError::Other(format!(
                         "Unsupported transaction type: {}",
@@ -511,26 +541,20 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
         }
         #[cfg(feature = "std")]
         Commands::SubmitTransaction { tx_blob, url } => {
-            use crate::clients::{json_rpc::JsonRpcClient, XRPLSyncClient};
+            use crate::clients::XRPLSyncClient;
             use crate::models::requests::submit::Submit;
 
-            // Create a client
-            let client = JsonRpcClient::connect(url.parse()?);
+            // Create client with standardized helper function
+            let client = create_json_rpc_client(url)?;
 
-            // Create a submit request
+            // Create request
             let submit_request = Submit::new(None, tx_blob.into(), None);
 
-            // Submit the transaction
-            match client.request(submit_request.into()) {
-                Ok(response) => {
-                    alloc::println!("Transaction submission result: {:#?}", response);
-                    Ok(())
-                }
-                Err(e) => Err(CliError::Other(format!(
-                    "Failed to submit transaction: {}",
-                    e
-                ))),
-            }
+            // Execute request and handle response
+            handle_response(
+                client.request(submit_request.into()),
+                "Transaction submission result",
+            )
         }
     }
 }
