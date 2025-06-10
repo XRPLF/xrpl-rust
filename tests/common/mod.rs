@@ -43,11 +43,22 @@ pub async fn open_websocket(
     }
 }
 
+#[cfg(all(not(feature = "std"), feature = "cli", test))]
+pub mod mock_cli;
+
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub async fn open_websocket(
-    uri: Url,
-) -> Result<AsyncWebSocketClient<SingleExecutorMutex, WebSocketOpen>> {
-    AsyncWebSocketClient::open(uri).await.map_err(Into::into)
+    uri: url::Url,
+) -> Result<
+    xrpl::asynch::clients::AsyncWebSocketClient<
+        xrpl::asynch::clients::SingleExecutorMutex,
+        xrpl::asynch::clients::WebSocketOpen,
+    >,
+    Box<dyn std::error::Error>,
+> {
+    xrpl::asynch::clients::AsyncWebSocketClient::open(uri)
+        .await
+        .map_err(Into::into)
 }
 
 #[cfg(feature = "std")]

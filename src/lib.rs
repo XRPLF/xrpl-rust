@@ -17,7 +17,7 @@
 //!
 //! For the user guide and further documentation, please read
 //! [XRP Ledger](https://xrpl.org/docs.html).
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)] // Remove eventually
 
 use ::core::fmt::Display;
@@ -34,6 +34,8 @@ extern crate std as alloc;
 pub mod account;
 #[cfg(any(feature = "json-rpc", feature = "websocket", feature = "helpers"))]
 pub mod asynch;
+#[cfg(feature = "cli")]
+pub mod cli;
 #[cfg(any(feature = "json-rpc", feature = "websocket"))]
 pub mod clients;
 pub mod constants;
