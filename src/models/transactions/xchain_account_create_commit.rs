@@ -87,7 +87,7 @@ impl<'a> XChainAccountCreateCommit<'a> {
 }
 
 #[cfg(test)]
-mod test_serde {
+mod test {
     use super::XChainAccountCreateCommit;
     use crate::models::{IssuedCurrency, XChainBridge, XRPAmount, XRP};
     use alloc::borrow::Cow;

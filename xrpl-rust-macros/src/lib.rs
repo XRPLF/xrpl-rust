@@ -7,6 +7,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, Type, parse_macro_input};
 
+/// Derive macro to implement `ValidateCurrencies` trait for structs.
+/// This macro checks for fields of type `Amount`, `XRPAmount`, `IssuedCurrencyAmount`, `Currency`, `XRP`, or `IssuedCurrency`.
+/// It generates a `validate_currencies` method that validates these values.
 #[proc_macro_derive(ValidateCurrencies)]
 pub fn derive_validate_currencies(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
