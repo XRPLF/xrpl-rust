@@ -9,7 +9,7 @@ use crate::models::amount::XRPAmount;
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
@@ -20,7 +20,9 @@ use super::CommonFields;
 /// See NFTokenAcceptOffer:
 /// `<https://xrpl.org/nftokenacceptoffer.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenAcceptOffer<'a> {
     // The base fields for all transaction models.
@@ -58,8 +60,7 @@ impl<'a: 'static> Model for NFTokenAcceptOffer<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_brokered_mode_error()?;
         self._get_nftoken_broker_fee_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

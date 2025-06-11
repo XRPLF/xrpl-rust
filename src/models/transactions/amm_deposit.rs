@@ -6,7 +6,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     transactions::TransactionType, Amount, Currency, FlagCollection, IssuedCurrencyAmount, Model,
-    XRPAmount, XRPLModelException, XRPLModelResult,
+    ValidateCurrencies, XRPAmount, XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, Memo, Signer, Transaction};
@@ -33,7 +33,9 @@ pub enum AMMDepositFlag {
 /// If successful, this transaction creates a trust line to the AMM Account (limit 0)
 /// to hold the LP Tokens.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMDeposit<'a> {
     #[serde(flatten)]
@@ -61,6 +63,7 @@ pub struct AMMDeposit<'a> {
 
 impl Model for AMMDeposit<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        self.validate_currencies()?;
         if self.amount2.is_some() && self.amount.is_none() {
             Err(XRPLModelException::FieldRequiresField {
                 field1: "amount2".into(),

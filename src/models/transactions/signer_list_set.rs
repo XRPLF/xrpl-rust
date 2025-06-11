@@ -14,7 +14,7 @@ use crate::models::XRPLModelResult;
 use crate::models::{
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::serde_with_tag;
 
@@ -37,7 +37,9 @@ serde_with_tag! {
 /// See TicketCreate:
 /// `<https://xrpl.org/signerlistset.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct SignerListSet<'a> {
     // The base fields for all transaction models.
@@ -68,8 +70,7 @@ impl<'a> Model for SignerListSet<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_signer_entries_error()?;
         self._get_signer_quorum_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

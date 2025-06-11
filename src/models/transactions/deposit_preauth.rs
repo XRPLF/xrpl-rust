@@ -9,7 +9,9 @@ use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
 
 /// A DepositPreauth transaction gives another account pre-approval
 /// to deliver payments to the sender of this transaction.
@@ -17,7 +19,9 @@ use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult
 /// See DepositPreauth:
 /// `<https://xrpl.org/depositpreauth.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct DepositPreauth<'a> {
     /// The base fields for all transaction models.
@@ -39,8 +43,7 @@ pub struct DepositPreauth<'a> {
 impl<'a: 'static> Model for DepositPreauth<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_authorize_and_unauthorize_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

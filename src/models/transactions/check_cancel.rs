@@ -9,7 +9,7 @@ use crate::models::{
     transactions::{Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags};
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 
 use super::{Memo, Signer};
 
@@ -21,7 +21,9 @@ use super::{Memo, Signer};
 /// See CheckCancel:
 /// `<https://xrpl.org/checkcancel.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCancel<'a> {
     /// The base fields for all transaction models.
@@ -39,7 +41,11 @@ pub struct CheckCancel<'a> {
     pub check_id: Cow<'a, str>,
 }
 
-impl<'a> Model for CheckCancel<'a> {}
+impl<'a> Model for CheckCancel<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for CheckCancel<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

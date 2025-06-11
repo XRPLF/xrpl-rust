@@ -10,7 +10,9 @@ use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
 
 /// Cancels an unredeemed Check, removing it from the ledger without
 /// sending any money. The source or the destination of the check can
@@ -20,7 +22,9 @@ use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult
 /// See CheckCash:
 /// `<https://xrpl.org/checkcash.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCash<'a> {
     /// The base fields for all transaction models.
@@ -48,8 +52,7 @@ pub struct CheckCash<'a> {
 impl<'a: 'static> Model for CheckCash<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_amount_and_deliver_min_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

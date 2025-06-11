@@ -9,7 +9,7 @@ use crate::{
     constants::{MAX_TRANSFER_FEE, MAX_URI_LENGTH},
     models::{
         transactions::{Memo, Signer, Transaction, TransactionType},
-        Model, XRPLModelException, XRPLModelResult,
+        Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
     },
 };
 
@@ -45,7 +45,9 @@ pub enum NFTokenMintFlag {
 /// See NFTokenMint:
 /// `<https://xrpl.org/nftokenmint.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenMint<'a> {
     // The base fields for all transaction models.
@@ -92,8 +94,7 @@ impl<'a> Model for NFTokenMint<'a> {
         self._get_issuer_error()?;
         self._get_transfer_fee_error()?;
         self._get_uri_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

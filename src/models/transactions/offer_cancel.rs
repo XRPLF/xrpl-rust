@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -18,7 +18,9 @@ use super::CommonFields;
 /// See OfferCancel:
 /// `<https://xrpl.org/offercancel.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct OfferCancel<'a> {
     // The base fields for all transaction models.
@@ -41,7 +43,11 @@ pub struct OfferCancel<'a> {
     pub offer_sequence: u32,
 }
 
-impl<'a> Model for OfferCancel<'a> {}
+impl<'a> Model for OfferCancel<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for OfferCancel<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

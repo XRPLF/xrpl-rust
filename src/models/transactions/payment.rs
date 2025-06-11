@@ -8,7 +8,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, PathStep, XRPLModelResult,
+    Model, PathStep, ValidateCurrencies, XRPLModelResult,
 };
 
 use crate::models::amount::XRPAmount;
@@ -45,7 +45,9 @@ pub enum PaymentFlag {
 /// See Payment:
 /// `<https://xrpl.org/payment.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct Payment<'a> {
     // The base fields for all transaction models.
@@ -92,8 +94,7 @@ impl<'a: 'static> Model for Payment<'a> {
         self._get_xrp_transaction_error()?;
         self._get_partial_payment_error()?;
         self._get_exchange_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

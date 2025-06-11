@@ -21,7 +21,14 @@ pub enum Currency<'a> {
     XRP(XRP<'a>),
 }
 
-impl<'a> Model for Currency<'a> {}
+impl<'a> Model for Currency<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        match self {
+            Currency::IssuedCurrency(issued_currency) => issued_currency.get_errors(),
+            Currency::XRP(xrp) => xrp.get_errors(),
+        }
+    }
+}
 
 impl<'a> Default for Currency<'a> {
     fn default() -> Self {

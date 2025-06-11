@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use crate::models::{
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, XRPLModelException, XRPLModelResult,
+    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -17,7 +17,9 @@ use super::CommonFields;
 /// See EscrowFinish:
 /// `<https://xrpl.org/escrowfinish.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowFinish<'a> {
     // The base fields for all transaction models.
@@ -47,8 +49,7 @@ pub struct EscrowFinish<'a> {
 impl<'a: 'static> Model for EscrowFinish<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_condition_and_fulfillment_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
