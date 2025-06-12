@@ -218,6 +218,30 @@ mod cli_tests {
         assert_wallet_output(&output);
     }
 
+    #[test]
+    fn test_generate_wallet_with_mnemonic() {
+        let output = run_cli_command(&["wallet", "generate", "--mnemonic", "--words", "12"])
+            .expect("Failed to run wallet generate with mnemonic");
+
+        // Check that the output contains the mnemonic and seed
+        assert!(output.contains("Generated wallet with mnemonic:"));
+        assert!(output.contains("Mnemonic:"));
+        assert!(output.contains("Seed:"));
+
+        // Check that the mnemonic has 12 words
+        let mnemonic_line = output
+            .lines()
+            .find(|l| l.contains("Mnemonic:"))
+            .expect("Mnemonic line not found");
+        let mnemonic_phrase = mnemonic_line.trim_start_matches("Mnemonic:").trim();
+        let word_count = mnemonic_phrase.split_whitespace().count();
+        assert_eq!(
+            word_count, 12,
+            "Mnemonic should have 12 words, got {}",
+            word_count
+        );
+    }
+
     // ===== ACCOUNT QUERY TESTS =====
 
     #[test]

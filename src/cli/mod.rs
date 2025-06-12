@@ -63,6 +63,14 @@ pub enum WalletCommands {
         /// Save the wallet to a file
         #[cfg_attr(feature = "std", arg(long))]
         save: bool,
+
+        /// Generate a BIP39 mnemonic phrase
+        #[cfg_attr(feature = "std", arg(long))]
+        mnemonic: bool,
+
+        /// Number of words for the mnemonic (12, 15, 18, 21, 24)
+        #[cfg_attr(feature = "std", arg(long, default_value_t = 12))]
+        words: usize,
     },
 
     /// Get wallet info from seed
@@ -410,11 +418,32 @@ fn encode_and_print_tx<T: serde::Serialize>(tx: &T) -> Result<String, CliError> 
 pub fn execute_command(command: &Commands) -> Result<(), CliError> {
     match command {
         Commands::Wallet(wallet_cmd) => match wallet_cmd {
-            WalletCommands::Generate { save } => {
-                let wallet = crate::wallet::Wallet::create(None)?;
-                alloc::println!("Generated wallet: {:#?}", wallet);
-                if *save {
-                    alloc::println!("Saving wallet functionality not implemented yet");
+            WalletCommands::Generate {
+                save,
+                mnemonic,
+                words,
+            } => {
+                if *mnemonic {
+                    use bip39::{Language, Mnemonic};
+
+                    let mut rng = rand::thread_rng();
+                    let mnemonic = Mnemonic::generate_in_with(&mut rng, Language::English, *words)
+                        .expect("Invalid word count (must be 12, 15, 18, 21, or 24)");
+                    let seed = mnemonic.to_seed(""); // Returns [u8; 64]
+                    let phrase = mnemonic.words().collect::<Vec<_>>().join(" ");
+
+                    println!(
+                        "Generated wallet with mnemonic:\nMnemonic: {}\nSeed: {}",
+                        phrase,
+                        hex::encode(seed)
+                    );
+                    // Print derived address, public key, etc.
+                } else {
+                    let wallet = crate::wallet::Wallet::create(None)?;
+                    alloc::println!("Generated wallet: {:#?}", wallet);
+                    if *save {
+                        alloc::println!("Saving wallet functionality not implemented yet");
+                    }
                 }
                 Ok(())
             }
