@@ -175,6 +175,16 @@ pub enum AccountCommands {
         limit: u16,
     },
 
+    /// Get account NFTs (XLS-20)
+    Nfts {
+        /// The account address
+        #[cfg_attr(feature = "std", arg(long))]
+        address: String,
+        /// The XRPL node URL
+        #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_MAINNET_URL.into()))]
+        url: String,
+    },
+
     /// Set an account flag
     SetFlag {
         /// The seed to use for signing
@@ -243,6 +253,38 @@ pub enum TransactionCommands {
         #[cfg_attr(feature = "std", arg(short, long))]
         limit: String,
         /// The XRPL node URL
+        #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
+        url: String,
+    },
+
+    /// Mint an NFT (XLS-20)
+    NftMint {
+        /// The seed to use for signing
+        #[cfg_attr(feature = "std", arg(short, long))]
+        seed: String,
+        /// URI for the NFT (hex-encoded)
+        #[cfg_attr(feature = "std", arg(long))]
+        uri: String,
+        /// Flags (optional)
+        #[cfg_attr(feature = "std", arg(long))]
+        flags: Option<u32>,
+        /// Transfer fee (optional)
+        #[cfg_attr(feature = "std", arg(long))]
+        transfer_fee: Option<u16>,
+        /// XRPL node URL
+        #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
+        url: String,
+    },
+
+    /// Burn an NFT (XLS-20)
+    NftBurn {
+        /// The seed to use for signing
+        #[cfg_attr(feature = "std", arg(short, long))]
+        seed: String,
+        /// NFT Token ID to burn
+        #[cfg_attr(feature = "std", arg(short, long))]
+        nftoken_id: String,
+        /// XRPL node URL
         #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
     },
@@ -595,6 +637,25 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 handle_response(client.request(account_lines.into()), "Account trust lines")
             }
             #[cfg(feature = "std")]
+            AccountCommands::Nfts { address, url } => {
+                use crate::clients::XRPLSyncClient;
+                use crate::models::requests::account_nfts::AccountNfts;
+
+                let client = create_json_rpc_client(url)?;
+
+                let req = AccountNfts::new(
+                    None,                   // id
+                    address.clone().into(), // account
+                    None,                   // limit
+                    None,                   // marker
+                );
+
+                let json = serde_json::to_string(&req).unwrap();
+                println!("Sending JSON: {}", json);
+
+                handle_response(client.request(req.into()), "Account NFTs")
+            }
+            #[cfg(feature = "std")]
             AccountCommands::SetFlag { seed, flag, url } => {
                 use alloc::borrow::Cow;
                 use core::str::FromStr;
@@ -812,6 +873,89 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     url
                 );
 
+                Ok(())
+            }
+            #[cfg(feature = "std")]
+            TransactionCommands::NftMint {
+                seed,
+                uri,
+                flags,
+                transfer_fee,
+                url,
+            } => {
+                use crate::asynch::transaction::sign;
+                use crate::models::transactions::nftoken_mint::{NFTokenMint, NFTokenMintFlag};
+                use crate::wallet::Wallet;
+                use alloc::borrow::Cow;
+
+                let wallet = Wallet::new(seed, 0)?;
+
+                // Support multiple flags via bitmask
+                let flag_collection = flags.map(|f| NFTokenMintFlag::from_bits(f).into());
+
+                let mut tx = NFTokenMint::new(
+                    Cow::Owned(wallet.classic_address.clone()),
+                    None, // account_txn_id
+                    None, // fee
+                    flag_collection,
+                    None, // last_ledger_sequence
+                    None, // memos
+                    None, // sequence
+                    None, // signers
+                    None, // source_tag
+                    None, // ticket_sequence
+                    0,    // nftoken_taxon (0 for default, or expose as CLI param)
+                    None, // issuer
+                    transfer_fee.map(|v| v as u32),
+                    Some(uri.clone().into()),
+                );
+
+                sign(&mut tx, &wallet, false)?;
+                let tx_blob = encode_and_print_tx(&tx)?;
+
+                alloc::println!(
+                    "To submit, use: xrpl transaction submit --tx-blob {} --url {}",
+                    tx_blob,
+                    url
+                );
+                Ok(())
+            }
+
+            #[cfg(feature = "std")]
+            TransactionCommands::NftBurn {
+                seed,
+                nftoken_id,
+                url,
+            } => {
+                use crate::asynch::transaction::sign;
+                use crate::models::transactions::nftoken_burn::NFTokenBurn;
+                use crate::wallet::Wallet;
+                use alloc::borrow::Cow;
+
+                let wallet = Wallet::new(seed, 0)?;
+
+                let mut tx = NFTokenBurn::new(
+                    Cow::Owned(wallet.classic_address.clone()),
+                    None, // account_txn_id
+                    None, // fee
+                    None, // last_ledger_sequence
+                    None, // memos
+                    None, // sequence
+                    None, // signers
+                    None, // source_tag
+                    None, // ticket_sequence
+                    nftoken_id.clone().into(),
+                    None, // owner (optional, only needed if burning on behalf of another)
+                );
+
+                sign(&mut tx, &wallet, false)?;
+                let tx_blob = encode_and_print_tx(&tx)?;
+
+                alloc::println!(
+                    "To submit, use: xrpl transaction submit --tx-blob {} --url {}",
+                    tx_blob,
+                    url
+                );
                 Ok(())
             }
         },

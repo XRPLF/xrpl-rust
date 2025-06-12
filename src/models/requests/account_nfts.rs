@@ -57,3 +57,24 @@ impl<'a> AccountNfts<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_account_nfts_serialization() {
+        let req = AccountNfts::new(
+            None,
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            Some(10),
+            None,
+        );
+        let json = serde_json::to_string(&req).unwrap();
+        println!("{}", json);
+        assert!(json.contains("\"account\""));
+        assert!(
+            json.contains("\"command\":\"account_nfts\"")
+                || json.contains("\"method\":\"account_nfts\"")
+        );
+    }
+}

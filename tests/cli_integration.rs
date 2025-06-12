@@ -7,7 +7,7 @@ mod cli_tests {
     /// Test-specific constants
     mod constants {
         // Test URLs
-        pub const TEST_URL: &str = "https://testnet.xrpl-labs.com/";
+        pub const TEST_URL: &str = "https://s.altnet.rippletest.net:51234";
 
         // Test accounts
         pub const TEST_SEED: &str = "sEdTM1uX8pu2do5XvTnutH6HsouMaM2";
@@ -35,6 +35,44 @@ mod cli_tests {
             "there is no reactor running",
             "must be called from the context of a Tokio",
         ];
+    }
+
+    /// Helper function to submit a transaction and check for successful submission
+    fn submit_and_check_success(tx_blob: &str, url: &str) {
+        let args = ["transaction", "submit", "--tx-blob", tx_blob, "--url", url];
+        let output = run_cli_command(&args).expect("Failed to submit transaction");
+
+        assert!(
+            output.contains("Transaction submission result:"),
+            "Submission output missing expected label"
+        );
+        assert!(
+            output.contains("error: None"),
+            "Submission output indicates an error: {}",
+            output
+        );
+    }
+
+    /// Helper function to get the latest NFT Token ID for an account
+    fn get_latest_nftoken_id(address: &str, url: &str) -> Option<String> {
+        let args = ["account", "nfts", "--address", address, "--url", url];
+        let output = run_cli_command(&args).expect("Failed to fetch NFTs");
+
+        print!("Output from account nfts command: {}", output);
+
+        // Parse NFT Token IDs from output (assume output contains "NFTokenID": "...")
+        for line in output.lines() {
+            if let Some(start) = line.find("\"NFTokenID\":") {
+                let rest = &line[start + 13..];
+                if let Some(id_start) = rest.find('"') {
+                    let rest = &rest[id_start + 1..];
+                    if let Some(id_end) = rest.find('"') {
+                        return Some(rest[..id_end].to_string());
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Helper function to run the CLI with arguments and capture output
@@ -184,12 +222,6 @@ mod cli_tests {
 
     #[test]
     fn test_account_info() {
-        // Use the test faucet account (known to exist)
-        println!(
-            "Testing account info with address: {}",
-            constants::TEST_FAUCET_ADDRESS
-        );
-
         let args = address_command_args(
             "account",
             "info",
@@ -453,6 +485,88 @@ mod cli_tests {
         assert!(
             output.contains("To submit, use: xrpl transaction submit"),
             "Output should contain submit hint"
+        );
+    }
+
+    // TODO: NFT support is not working on the testnet.
+    #[test]
+    #[ignore]
+    fn test_nft_mint_and_burn_roundtrip() {
+        // Mint NFT
+        let mint_args = [
+            "transaction",
+            "nft-mint",
+            "--seed",
+            constants::TEST_SEED,
+            "--uri",
+            "68747470733a2f2f6578616d706c652e636f6d2f6e66742e6a736f6e",
+            "--flags",
+            "8", // TfTransferable
+            "--transfer-fee",
+            "1000",
+            "--url",
+            constants::TEST_URL,
+        ];
+
+        let mint_output = run_cli_command(&mint_args).expect("Failed to fetch NFTs");
+        assert!(mint_output.contains("Signed transaction blob:"));
+
+        // Extract the signed blob
+        let tx_blob = mint_output
+            .lines()
+            .find(|l| l.contains("Signed transaction blob:"))
+            .and_then(|l| l.split(':').nth(1))
+            .map(|s| s.trim())
+            .expect("No signed transaction blob found");
+
+        // Submit the mint transaction
+        submit_and_check_success(tx_blob, constants::TEST_URL);
+
+        // Wait for the NFT to appear (polling)
+        let mut nftoken_id = None;
+        for _ in 0..5 {
+            std::thread::sleep(std::time::Duration::from_secs(4));
+            nftoken_id =
+                get_latest_nftoken_id(constants::TEST_CLASSIC_ADDRESS, constants::TEST_URL);
+            if nftoken_id.is_some() {
+                break;
+            }
+        }
+
+        let nftoken_id = nftoken_id.expect("Failed to find minted NFT on account");
+        // Burn NFT
+        let burn_args = [
+            "transaction",
+            "nft-burn",
+            "--seed",
+            constants::TEST_SEED,
+            "--nftoken-id",
+            &nftoken_id,
+            "--url",
+            constants::TEST_URL,
+        ];
+
+        let burn_output = run_cli_command(&burn_args).expect("Failed to run nft-burn command");
+        assert!(burn_output.contains("Signed transaction blob:"));
+
+        // Extract the signed blob for burn
+        let burn_tx_blob = burn_output
+            .lines()
+            .find(|l| l.contains("Signed transaction blob:"))
+            .and_then(|l| l.split(':').nth(1))
+            .map(|s| s.trim())
+            .expect("No signed transaction blob found for burn");
+
+        // Submit the burn transaction
+        submit_and_check_success(burn_tx_blob, constants::TEST_URL);
+
+        // Verify the NFT is no longer present
+        let nftoken_id_after_burn =
+            get_latest_nftoken_id(constants::TEST_CLASSIC_ADDRESS, constants::TEST_URL);
+        assert!(
+            nftoken_id_after_burn.is_none(),
+            "NFT should be burned, but found: {:?}",
+            nftoken_id_after_burn
         );
     }
 }
