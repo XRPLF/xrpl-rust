@@ -3,14 +3,7 @@ extern crate std;
 
 use clap::Parser;
 
-use super::{execute_command, CliError, Commands};
-
-#[derive(Parser)]
-#[command(author, version, about, long_about = None)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-}
+use super::{execute_command, Cli, CliError};
 
 pub fn run() -> Result<(), CliError> {
     let cli = Cli::parse();

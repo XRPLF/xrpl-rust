@@ -102,12 +102,13 @@ mod cli_tests {
 
     /// Helper to create address-related command arguments
     fn address_command_args<'a>(
-        command: &'a str,
+        command_group: &'a str,
+        subcommand: &'a str,
         address: &'a str,
         url: Option<&'a str>,
         limit: Option<u32>,
     ) -> Vec<&'a str> {
-        let mut args = vec![command, "--address", address];
+        let mut args = vec![command_group, subcommand, "--address", address];
 
         if let Some(url_str) = url {
             args.push("--url");
@@ -130,8 +131,8 @@ mod cli_tests {
 
     #[test]
     fn test_generate_wallet() {
-        let output =
-            run_cli_command(&["generate-wallet"]).expect("Failed to run generate-wallet command");
+        let output = run_cli_command(&["wallet", "generate"])
+            .expect("Failed to run wallet generate command");
 
         // Check that the output contains expected wallet information
         assert!(output.contains("Generated wallet:"));
@@ -140,8 +141,8 @@ mod cli_tests {
 
     #[test]
     fn test_wallet_from_seed() {
-        let output = run_cli_command(&["wallet-from-seed", "--seed", constants::TEST_SEED])
-            .expect("Failed to run wallet-from-seed command");
+        let output = run_cli_command(&["wallet", "from-seed", "--seed", constants::TEST_SEED])
+            .expect("Failed to run wallet from-seed command");
 
         // Check that the output contains expected wallet information
         assert!(output.contains("Wallet from seed:"));
@@ -151,13 +152,14 @@ mod cli_tests {
     #[test]
     fn test_wallet_from_seed_with_sequence() {
         let output = run_cli_command(&[
-            "wallet-from-seed",
+            "wallet",
+            "from-seed",
             "--seed",
             constants::TEST_SEED,
             "--sequence",
             "1",
         ])
-        .expect("Failed to run wallet-from-seed command with sequence");
+        .expect("Failed to run wallet from-seed command with sequence");
 
         // Check that the output contains expected wallet information
         assert!(output.contains("Wallet from seed:"));
@@ -166,7 +168,7 @@ mod cli_tests {
 
     #[test]
     fn test_generate_faucet_wallet() {
-        let result = run_cli_command(&["generate-faucet-wallet", "--url", constants::TEST_URL]);
+        let result = run_cli_command(&["wallet", "faucet", "--url", constants::TEST_URL]);
 
         assert!(
             result.is_ok(),
@@ -184,12 +186,13 @@ mod cli_tests {
     fn test_account_info() {
         // Use the test faucet account (known to exist)
         println!(
-            "Testing account-info with address: {}",
+            "Testing account info with address: {}",
             constants::TEST_FAUCET_ADDRESS
         );
 
         let args = address_command_args(
-            "account-info",
+            "account",
+            "info",
             constants::TEST_FAUCET_ADDRESS,
             Some(constants::TEST_URL),
             None,
@@ -209,7 +212,7 @@ mod cli_tests {
     #[test]
     fn test_get_fee() {
         assert_cli_command(
-            &["get-fee"],
+            &["server", "fee"],
             "Current network fee:",
             &["Failed to get network fee"],
         );
@@ -217,26 +220,32 @@ mod cli_tests {
 
     #[test]
     fn test_account_tx() {
-        let args =
-            address_command_args("account-tx", constants::TEST_CLASSIC_ADDRESS, None, Some(5));
+        let args = address_command_args(
+            "account",
+            "tx",
+            constants::TEST_CLASSIC_ADDRESS,
+            None,
+            Some(5),
+        );
 
         assert_cli_command(&args, "Account transactions:", &["Account not found"]);
     }
 
     #[test]
     fn test_server_info() {
-        assert_cli_command(&["server-info"], "Server info:", &[]);
+        assert_cli_command(&["server", "info"], "Server info:", &[]);
     }
 
     #[test]
     fn test_ledger_data() {
-        assert_cli_command(&["ledger-data", "--limit", "5"], "Ledger data:", &[]);
+        assert_cli_command(&["ledger", "data", "--limit", "5"], "Ledger data:", &[]);
     }
 
     #[test]
     fn test_account_objects() {
         let args = address_command_args(
-            "account-objects",
+            "account",
+            "objects",
             constants::TEST_CLASSIC_ADDRESS,
             None,
             Some(5),
@@ -245,12 +254,52 @@ mod cli_tests {
         assert_cli_command(&args, "Account objects:", &["Account not found"]);
     }
 
+    #[test]
+    fn test_account_channels() {
+        let args = address_command_args(
+            "account",
+            "channels",
+            constants::TEST_CLASSIC_ADDRESS,
+            Some(constants::TEST_URL),
+            Some(5),
+        );
+
+        assert_cli_command(&args, "Account channels:", &["Account not found"]);
+    }
+
+    #[test]
+    fn test_account_currencies() {
+        let args = address_command_args(
+            "account",
+            "currencies",
+            constants::TEST_CLASSIC_ADDRESS,
+            Some(constants::TEST_URL),
+            None,
+        );
+
+        assert_cli_command(&args, "Account currencies:", &["Account not found"]);
+    }
+
+    #[test]
+    fn test_account_lines() {
+        let args = address_command_args(
+            "account",
+            "lines",
+            constants::TEST_CLASSIC_ADDRESS,
+            Some(constants::TEST_URL),
+            Some(5),
+        );
+
+        assert_cli_command(&args, "Account trust lines:", &["Account not found"]);
+    }
+
     // ===== ADDRESS VALIDATION TESTS =====
 
     #[test]
     fn test_validate_classic_address() {
         let args = &[
-            "validate-address",
+            "wallet",
+            "validate",
             "--address",
             constants::TEST_CLASSIC_ADDRESS,
         ];
@@ -264,7 +313,7 @@ mod cli_tests {
 
     #[test]
     fn test_validate_x_address() {
-        let args = &["validate-address", "--address", constants::TEST_X_ADDRESS];
+        let args = &["wallet", "validate", "--address", constants::TEST_X_ADDRESS];
 
         assert_cli_command(
             args,
@@ -276,7 +325,7 @@ mod cli_tests {
     #[test]
     fn test_validate_invalid_address() {
         let address = "not_a_valid_address";
-        let result = run_cli_command(&["validate-address", "--address", address]);
+        let result = run_cli_command(&["wallet", "validate", "--address", address]);
 
         // This test specifically expects an error
         assert!(result.is_err());
@@ -289,10 +338,11 @@ mod cli_tests {
     fn test_sign_transaction() {
         assert_cli_command(
             &[
-                "sign-transaction",
+                "transaction",
+                "sign",
                 "--seed",
                 constants::TEST_SEED,
-                "--transaction-type",
+                "--type",
                 "payment",
                 "--json",
                 constants::TEST_PAYMENT_JSON,
@@ -306,7 +356,8 @@ mod cli_tests {
     fn test_submit_transaction() {
         assert_cli_command(
             &[
-                "submit-transaction",
+                "transaction",
+                "submit",
                 "--tx-blob",
                 constants::DUMMY_TX_BLOB,
                 "--url",
