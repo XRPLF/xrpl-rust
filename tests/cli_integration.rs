@@ -367,4 +367,92 @@ mod cli_tests {
             &["Failed to submit transaction"],
         );
     }
+
+    #[test]
+    fn test_trustset_command() {
+        // Use testnet seed and issuer for safety
+        let args = [
+            "transaction",
+            "trust-set",
+            "--seed",
+            constants::TEST_SEED,
+            "--issuer",
+            constants::TEST_FAUCET_ADDRESS,
+            "--currency",
+            "USD",
+            "--limit",
+            "1000",
+            "--url",
+            constants::TEST_URL,
+        ];
+
+        let result = run_cli_command(&args);
+        let output = result.expect("Failed to run trustset command");
+
+        // Check that the output contains a signed transaction blob
+        assert!(
+            output.contains("Signed transaction blob:"),
+            "Output should contain signed transaction blob, got: {}",
+            output
+        );
+        // Optionally, check for the submit hint
+        assert!(
+            output.contains("To submit, use: xrpl transaction submit"),
+            "Output should contain submit hint"
+        );
+    }
+
+    #[test]
+    fn test_account_set_flag() {
+        let args = [
+            "account",
+            "set-flag",
+            "--seed",
+            constants::TEST_SEED,
+            "--flag",
+            "asfRequireAuth",
+            "--url",
+            constants::TEST_URL,
+        ];
+
+        let result = run_cli_command(&args);
+        let output = result.expect("Failed to run account set-flag command");
+
+        assert!(
+            output.contains("Signed transaction blob:"),
+            "Output should contain signed transaction blob, got: {}",
+            output
+        );
+        assert!(
+            output.contains("To submit, use: xrpl transaction submit"),
+            "Output should contain submit hint"
+        );
+    }
+
+    #[test]
+    fn test_account_clear_flag() {
+        let args = [
+            "account",
+            "clear-flag",
+            "--seed",
+            constants::TEST_SEED,
+            "--flag",
+            "asfRequireAuth",
+            "--url",
+            constants::TEST_URL,
+        ];
+
+        let result = run_cli_command(&args);
+        let output = result.expect("Failed to run account clear-flag command");
+
+        assert!(
+            output.contains("Signed transaction blob:"),
+            "Output should contain signed transaction blob, got: {}",
+            output
+        );
+        assert!(
+            output.contains("To submit, use: xrpl transaction submit"),
+            "Output should contain submit hint"
+        );
+    }
 }

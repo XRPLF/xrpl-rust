@@ -174,6 +174,32 @@ pub enum AccountCommands {
         #[cfg_attr(feature = "std", arg(long, default_value_t = DEFAULT_PAGINATION_LIMIT as u16))]
         limit: u16,
     },
+
+    /// Set an account flag
+    SetFlag {
+        /// The seed to use for signing
+        #[cfg_attr(feature = "std", arg(short, long))]
+        seed: String,
+        /// The flag to set (e.g., asfRequireAuth, asfDisableMaster, etc.)
+        #[cfg_attr(feature = "std", arg(short, long))]
+        flag: String,
+        /// The XRPL node URL
+        #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
+        url: String,
+    },
+
+    /// Clear an account flag
+    ClearFlag {
+        /// The seed to use for signing
+        #[cfg_attr(feature = "std", arg(short, long))]
+        seed: String,
+        /// The flag to clear (e.g., asfRequireAuth, asfDisableMaster, etc.)
+        #[cfg_attr(feature = "std", arg(short, long))]
+        flag: String,
+        /// The XRPL node URL
+        #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
+        url: String,
+    },
 }
 
 #[cfg_attr(feature = "std", derive(clap::Subcommand))]
@@ -197,6 +223,25 @@ pub enum TransactionCommands {
         /// The signed transaction blob or JSON
         #[cfg_attr(feature = "std", arg(short, long))]
         tx_blob: String,
+        /// The XRPL node URL
+        #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
+        url: String,
+    },
+
+    /// Set or modify a trust line
+    TrustSet {
+        /// The seed to use for signing
+        #[cfg_attr(feature = "std", arg(short, long))]
+        seed: String,
+        /// The issuer account
+        #[cfg_attr(feature = "std", arg(short, long))]
+        issuer: String,
+        /// The currency code (3-letter or 40-char hex)
+        #[cfg_attr(feature = "std", arg(short, long))]
+        currency: String,
+        /// The trust line limit (amount)
+        #[cfg_attr(feature = "std", arg(short, long))]
+        limit: String,
         /// The XRPL node URL
         #[cfg_attr(feature = "std", arg(short, long, default_value_t = DEFAULT_MAINNET_URL.into()))]
         url: String,
@@ -443,9 +488,10 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 type_filter,
                 limit,
             } => {
+                use std::str::FromStr;
+
                 use crate::clients::XRPLSyncClient;
                 use crate::models::requests::account_objects::{AccountObjectType, AccountObjects};
-                use std::str::FromStr;
 
                 // Parse the type_filter into AccountObjectType if provided
                 let object_type = if let Some(filter) = type_filter.as_deref() {
@@ -548,17 +594,107 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 // Execute request and handle response
                 handle_response(client.request(account_lines.into()), "Account trust lines")
             }
+            #[cfg(feature = "std")]
+            AccountCommands::SetFlag { seed, flag, url } => {
+                use alloc::borrow::Cow;
+                use core::str::FromStr;
+
+                use crate::asynch::transaction::sign;
+                use crate::models::transactions::account_set::{AccountSet, AccountSetFlag};
+                use crate::wallet::Wallet;
+
+                let wallet = Wallet::new(seed, 0)?;
+                let flag_enum = AccountSetFlag::from_str(flag)
+                    .map_err(|_| CliError::Other(format!("Invalid flag: {}", flag)))?;
+
+                let mut tx = AccountSet::new(
+                    Cow::Owned(wallet.classic_address.clone()),
+                    None,            // account_txn_id
+                    None,            // fee
+                    None,            // flags
+                    None,            // last_ledger_sequence
+                    None,            // memos
+                    None,            // sequence
+                    None,            // signers
+                    None,            // source_tag
+                    None,            // ticket_sequence
+                    None,            // clear_flag
+                    None,            // domain
+                    None,            // email_hash
+                    None,            // message_key
+                    Some(flag_enum), // set_flag
+                    None,            // transfer_rate
+                    None,            // tick_size
+                    None,            // nftoken_minter
+                );
+
+                sign(&mut tx, &wallet, false)?;
+                let tx_blob = encode_and_print_tx(&tx)?;
+
+                alloc::println!(
+                    "To submit, use: xrpl transaction submit --tx-blob {} --url {}",
+                    tx_blob,
+                    url
+                );
+                Ok(())
+            }
+
+            #[cfg(feature = "std")]
+            AccountCommands::ClearFlag { seed, flag, url } => {
+                use alloc::borrow::Cow;
+                use core::str::FromStr;
+
+                use crate::asynch::transaction::sign;
+                use crate::models::transactions::account_set::{AccountSet, AccountSetFlag};
+                use crate::wallet::Wallet;
+
+                let wallet = Wallet::new(seed, 0)?;
+                let flag_enum = AccountSetFlag::from_str(flag)
+                    .map_err(|_| CliError::Other(format!("Invalid flag: {}", flag)))?;
+
+                let mut tx = AccountSet::new(
+                    Cow::Owned(wallet.classic_address.clone()),
+                    None,            // account_txn_id
+                    None,            // fee
+                    None,            // flags
+                    None,            // last_ledger_sequence
+                    None,            // memos
+                    None,            // sequence
+                    None,            // signers
+                    None,            // source_tag
+                    None,            // ticket_sequence
+                    None,            // clear_flag
+                    None,            // domain
+                    None,            // email_hash
+                    None,            // message_key
+                    Some(flag_enum), // set_flag
+                    None,            // transfer_rate
+                    None,            // tick_size
+                    None,            // nftoken_minter
+                );
+
+                sign(&mut tx, &wallet, false)?;
+                let tx_blob = encode_and_print_tx(&tx)?;
+
+                alloc::println!(
+                    "To submit, use: xrpl transaction submit --tx-blob {} --url {}",
+                    tx_blob,
+                    url
+                );
+                Ok(())
+            }
         },
 
         Commands::Transaction(tx_cmd) => match tx_cmd {
             #[cfg(feature = "std")]
             TransactionCommands::Sign { seed, r#type, json } => {
+                use serde_json::Value;
+
                 use crate::models::transactions::{
                     account_set::AccountSet, offer_cancel::OfferCancel, offer_create::OfferCreate,
                     payment::Payment, trust_set::TrustSet,
                 };
                 use crate::wallet::Wallet;
-                use serde_json::Value;
 
                 // Create wallet from seed
                 let wallet = Wallet::new(&seed, 0)?;
@@ -621,6 +757,62 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     client.request(submit_request.into()),
                     "Transaction submission result",
                 )
+            }
+            #[cfg(feature = "std")]
+            TransactionCommands::TrustSet {
+                seed,
+                issuer,
+                currency,
+                limit,
+                url,
+            } => {
+                use alloc::borrow::Cow;
+
+                use crate::models::transactions::trust_set::TrustSet;
+                use crate::models::IssuedCurrencyAmount;
+                use crate::wallet::Wallet;
+
+                // Create wallet from seed
+                let wallet = Wallet::new(seed, 0)?;
+
+                // Build IssuedCurrencyAmount for the trust line limit
+                let amount = IssuedCurrencyAmount::new(
+                    currency.clone().into(), // currency code
+                    issuer.clone().into(),   // issuer address
+                    limit.clone().into(),    // value as string
+                );
+
+                // Build TrustSet transaction
+                let mut tx = TrustSet::new(
+                    Cow::Owned(wallet.classic_address.clone()),
+                    None, // account_txn_id
+                    None, // fee
+                    None, // flags
+                    None, // last_ledger_sequence
+                    None, // memos
+                    None, // sequence
+                    None, // signers
+                    None, // source_tag
+                    None, // ticket_sequence
+                    amount,
+                    None, // quality_in
+                    None, // quality_out
+                );
+
+                // Sign the transaction
+                use crate::asynch::transaction::sign;
+                sign(&mut tx, &wallet, false)?;
+
+                // Encode and print the transaction blob
+                let tx_blob = encode_and_print_tx(&tx)?;
+
+                alloc::println!(
+                    "To submit, use: xrpl transaction submit --tx-blob {} --url {}",
+                    tx_blob,
+                    url
+                );
+
+                Ok(())
             }
         },
 

@@ -316,101 +316,42 @@ Parameters:
 - `--limit`: Maximum number of trust lines to return (default: 10)
 - `--url`: The XRPL node URL (default: https://xrplcluster.com/)
 
-### Transaction Operations
+#### account set-flag
 
-#### transaction sign
-
-Sign a transaction using your seed.
+Set an account flag.
 
 ```bash
-xrpl transaction sign --seed s123... --type payment --json '{"Account":"r123...","Destination":"r456...","Amount":"1000000"}'
+xrpl account set-flag --seed s... --flag asfRequireAuth [--url https://xrplcluster.com/]
 ```
 
 Parameters:
 
 - `--seed`, `-s` (required): The seed to use for signing
-- `--type`, `-t` (required): Transaction type (e.g., "payment", "accountset", "trustset", etc.)
-- `--json`, `-j` (required): Transaction JSON
-
-**Example Output:**
-
-```text
-Signed transaction blob: 1200002280000000240000000161400000000000000168400000000000000A73...
-```
-
-#### transaction submit
-
-Submit a signed transaction to the network.
-
-```bash
-xrpl transaction submit --tx-blob 1200... [--url https://xrplcluster.com/]
-```
-
-Parameters:
-
-- `--tx-blob`, `-t` (required): The signed transaction blob
+- `--flag`, `-f` (required): The flag to set (e.g., asfRequireAuth, asfDisableMaster, etc.)
 - `--url`, `-u` (optional, default: https://xrplcluster.com/): The XRPL node URL
 
-### Network & Server Information
+**Example Output:**
+```text
+Signed transaction blob: ...
+To submit, use: xrpl transaction submit --tx-blob ... --url ...
+```
 
-#### server fee
+#### account clear-flag
 
-Get the current network fee.
+Clear an account flag.
 
 ```bash
-xrpl server fee [--url https://xrplcluster.com/]
+xrpl account clear-flag --seed s... --flag asfRequireAuth [--url https://xrplcluster.com/]
 ```
 
 Parameters:
 
-- `--url`: The XRPL node URL (default: https://xrplcluster.com/)
+- `--seed`, `-s` (required): The seed to use for signing
+- `--flag`, `-f` (required): The flag to clear (e.g., asfRequireAuth, asfDisableMaster, etc.)
+- `--url`, `-u` (optional, default: https://xrplcluster.com/): The XRPL node URL
 
-#### server info
-
-Get information about a rippled server.
-
-```bash
-xrpl server info [--url https://xrplcluster.com/]
+**Example Output:**
+```text
+Signed transaction blob: ...
+To submit, use: xrpl transaction submit --tx-blob ... --url ...
 ```
-
-Parameters:
-
-- `--url`: The XRPL node URL (default: https://xrplcluster.com/)
-
-#### ledger data
-
-Get data about a specific ledger.
-
-```bash
-xrpl ledger data [--ledger-index validated] [--ledger-hash ABC...] [--limit 10] [--url https://xrplcluster.com/]
-```
-
-Parameters:
-
-- `--ledger-index`: The ledger index (empty for latest)
-- `--ledger-hash`: The ledger hash (empty for latest)
-- `--limit`: Maximum number of ledger objects to return (default: 10)
-- `--url`: The XRPL node URL (default: https://xrplcluster.com/)
-
-#### server subscribe
-
-Subscribe to ledger events via WebSocket.
-
-```bash
-xrpl server subscribe [--stream ledger] [--limit 10] [--url wss://xrplcluster.com/]
-```
-
-Parameters:
-
-- `--stream`: Stream type ("ledger", "transactions", or "validations") (default: "ledger")
-- `--limit`: Number of events to receive before exiting (0 for unlimited) (default: 10)
-- `--url`: The WebSocket URL (default: wss://xrplcluster.com/)
-
-# 🕊 Contributing [![contributors_status]][contributors]
-
-If you want to contribute to this project, see [CONTRIBUTING](CONTRIBUTING.md).
-
-# 🗎 License [![license_status]][license]
-
-The `xrpl-rust` library is licensed under the ISC License.
-See [LICENSE](LICENSE) for more information.
