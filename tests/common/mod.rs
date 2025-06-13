@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 #[cfg(feature = "std")]
 use tokio::sync::{Mutex, OnceCell};
 
+#[cfg(feature = "std")]
 use constants::XRPL_TEST_NET;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_io_adapters::tokio_1::FromTokio;

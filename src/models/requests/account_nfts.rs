@@ -70,7 +70,7 @@ mod tests {
             None,
         );
         let json = serde_json::to_string(&req).unwrap();
-        println!("{}", json);
+
         assert!(json.contains("\"account\""));
         assert!(
             json.contains("\"command\":\"account_nfts\"")
