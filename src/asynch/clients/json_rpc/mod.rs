@@ -45,11 +45,15 @@ mod _std {
 
     pub struct AsyncJsonRpcClient {
         url: Url,
+        client: HttpClient,
     }
 
     impl AsyncJsonRpcClient {
         pub fn connect(url: Url) -> Self {
-            Self { url }
+            Self {
+                url,
+                client: HttpClient::new(),
+            }
         }
     }
 
@@ -58,9 +62,9 @@ mod _std {
             &self,
             request: XRPLRequest<'a>,
         ) -> XRPLClientResult<XRPLResponse<'b>> {
-            let client = HttpClient::new();
             let request_json_rpc = request_to_json_rpc(&request)?;
-            let response = client
+            let response = self
+                .client
                 .post(self.url.as_ref())
                 .json(&request_json_rpc)
                 .send()
