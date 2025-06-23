@@ -52,6 +52,9 @@ pub enum XRPLHelperException {
     XRPLSerdeJsonError(#[from] XRPLSerdeJsonError),
     #[error("From hex error: {0}")]
     FromHexError(#[from] hex::FromHexError),
+    #[cfg(feature = "std")]
+    #[error("URL parse error: {0}")]
+    UrlParseError(#[from] url::ParseError),
 }
 
 impl From<serde_json::Error> for XRPLHelperException {

@@ -1,6 +1,8 @@
 use alloc::borrow::Cow;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use core::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -568,5 +570,26 @@ mod tests {
         // Deserialize
         let deserialized: AccountSet = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+}
+
+impl FromStr for AccountSetFlag {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // See https://xrpl.org/docs/references/protocol/transactions/types/accountset
+        match s {
+            "asfAccountTxnID" => Ok(AccountSetFlag::AsfAccountTxnID),
+            "asfAuthorizedNFTokenMinter" => Ok(AccountSetFlag::AsfAuthorizedNFTokenMinter),
+            "asfDefaultRipple" => Ok(AccountSetFlag::AsfDefaultRipple),
+            "asfDepositAuth" => Ok(AccountSetFlag::AsfDepositAuth),
+            "asfDisableMaster" => Ok(AccountSetFlag::AsfDisableMaster),
+            "asfDisallowXRP" => Ok(AccountSetFlag::AsfDisallowXRP),
+            "asfGlobalFreeze" => Ok(AccountSetFlag::AsfGlobalFreeze),
+            "asfNoFreeze" => Ok(AccountSetFlag::AsfNoFreeze),
+            "asfRequireAuth" => Ok(AccountSetFlag::AsfRequireAuth),
+            "asfRequireDest" => Ok(AccountSetFlag::AsfRequireDest),
+            _ => Err(()),
+        }
     }
 }

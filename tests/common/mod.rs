@@ -8,6 +8,7 @@ use once_cell::sync::Lazy;
 #[cfg(feature = "std")]
 use tokio::sync::{Mutex, OnceCell};
 
+#[cfg(feature = "std")]
 use constants::XRPL_TEST_NET;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_io_adapters::tokio_1::FromTokio;
@@ -43,11 +44,22 @@ pub async fn open_websocket(
     }
 }
 
+#[cfg(all(not(feature = "std"), feature = "cli", test))]
+pub mod mock_cli;
+
 #[cfg(all(feature = "websocket", feature = "std"))]
 pub async fn open_websocket(
-    uri: Url,
-) -> Result<AsyncWebSocketClient<SingleExecutorMutex, WebSocketOpen>> {
-    AsyncWebSocketClient::open(uri).await.map_err(Into::into)
+    uri: url::Url,
+) -> Result<
+    xrpl::asynch::clients::AsyncWebSocketClient<
+        xrpl::asynch::clients::SingleExecutorMutex,
+        xrpl::asynch::clients::WebSocketOpen,
+    >,
+    Box<dyn std::error::Error>,
+> {
+    xrpl::asynch::clients::AsyncWebSocketClient::open(uri)
+        .await
+        .map_err(Into::into)
 }
 
 #[cfg(feature = "std")]

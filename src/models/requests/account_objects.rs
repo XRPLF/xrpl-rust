@@ -1,7 +1,7 @@
 use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
-use strum_macros::Display;
+use strum_macros::{Display, EnumString};
 
 use crate::models::{requests::RequestMethod, Model};
 
@@ -9,7 +9,7 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 
 /// Represents the object types that an AccountObjects
 /// Request can ask for.
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display, EnumString)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]

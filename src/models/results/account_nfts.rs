@@ -22,7 +22,7 @@ pub struct AccountNfts<'a> {
     pub ledger_hash: Option<Cow<'a, str>>,
     /// (May be omitted) The ledger index of the ledger that was used to
     /// generate this response.
-    pub ledger_index: u32,
+    pub ledger_index: Option<u32>,
     /// (May be omitted) The ledger index of the current in-progress ledger
     /// version, which was used to generate this response.
     pub ledger_current_index: Option<u32>,
@@ -104,7 +104,7 @@ mod tests {
             account_nfts.ledger_hash.unwrap(),
             "46497E9FF17A993324F1A0A693DC068B467184023C7FD162812265EAAFEB97CB"
         );
-        assert_eq!(account_nfts.ledger_index, 2380559);
+        assert_eq!(account_nfts.ledger_index, Some(2380559));
         assert!(account_nfts.validated);
         assert_eq!(account_nfts.nfts.len(), 2);
 

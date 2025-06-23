@@ -1,5 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+use core::convert::TryFrom;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -23,7 +25,7 @@ use super::{CommonFields, FlagCollection};
 /// See NFTokenMint flags:
 /// `<https://xrpl.org/nftokenmint.html#nftokenmint-flags>`
 #[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+    Debug, Eq, PartialEq, Copy, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
 #[repr(u32)]
 pub enum NFTokenMintFlag {
@@ -37,6 +39,35 @@ pub enum NFTokenMintFlag {
     /// The minted NFToken can be transferred to others. If this flag is not
     /// enabled, the token can still be transferred from or to the issuer.
     TfTransferable = 0x00000008,
+}
+
+impl TryFrom<u32> for NFTokenMintFlag {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0x00000001 => Ok(NFTokenMintFlag::TfBurnable),
+            0x00000002 => Ok(NFTokenMintFlag::TfOnlyXRP),
+            0x00000008 => Ok(NFTokenMintFlag::TfTransferable),
+            _ => Err(()),
+        }
+    }
+}
+
+impl NFTokenMintFlag {
+    pub fn from_bits(bits: u32) -> Vec<Self> {
+        let mut flags = Vec::new();
+        if bits & 0x00000001 != 0 {
+            flags.push(NFTokenMintFlag::TfBurnable);
+        }
+        if bits & 0x00000002 != 0 {
+            flags.push(NFTokenMintFlag::TfOnlyXRP);
+        }
+        if bits & 0x00000008 != 0 {
+            flags.push(NFTokenMintFlag::TfTransferable);
+        }
+        flags
+    }
 }
 
 /// The NFTokenMint transaction creates a non-fungible token and adds it to
@@ -300,6 +331,7 @@ mod test_nftoken_mint_error {
 mod tests {
     use alloc::string::ToString;
     use alloc::vec;
+    use core::convert::TryFrom;
 
     use super::*;
 
@@ -331,5 +363,48 @@ mod tests {
         // Deserialize
         let deserialized: NFTokenMint = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_try_from_u32() {
+        let cases = [
+            (0x00000001, Ok(NFTokenMintFlag::TfBurnable)),
+            (0x00000002, Ok(NFTokenMintFlag::TfOnlyXRP)),
+            (0x00000008, Ok(NFTokenMintFlag::TfTransferable)),
+            (0x00000004, Err(())), // invalid flag
+            (0x00000009, Err(())), // not a single flag
+            (0x00000000, Err(())), // zero is not a valid single flag
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(
+                NFTokenMintFlag::try_from(input),
+                expected,
+                "try_from({:#X}) failed",
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_from_bits() {
+        use NFTokenMintFlag::*;
+        let cases = [
+            (0x00000001, vec![TfBurnable]),
+            (0x00000002, vec![TfOnlyXRP]),
+            (0x00000008, vec![TfTransferable]),
+            (0x00000009, vec![TfBurnable, TfTransferable]),
+            (0x0000000B, vec![TfBurnable, TfOnlyXRP, TfTransferable]),
+            (0x00000000, vec![]),
+            (0x00000003, vec![TfBurnable, TfOnlyXRP]),
+        ];
+
+        for (input, ref expected) in cases {
+            let mut actual = NFTokenMintFlag::from_bits(input);
+            let mut expected_sorted = expected.clone();
+            actual.sort_by_key(|f| *f as u32);
+            expected_sorted.sort_by_key(|f| *f as u32);
+            assert_eq!(actual, expected_sorted, "from_bits({:#X}) failed", input);
+        }
     }
 }
