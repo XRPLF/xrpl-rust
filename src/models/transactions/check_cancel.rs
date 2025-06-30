@@ -11,7 +11,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::{Memo, Signer};
+use super::{CommonTransactionBuilder, Memo, Signer};
 
 /// Cancels an unredeemed Check, removing it from the ledger without
 /// sending any money. The source or the destination of the check can
@@ -21,7 +21,7 @@ use super::{Memo, Signer};
 /// See CheckCancel:
 /// `<https://xrpl.org/checkcancel.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCancel<'a> {
     /// The base fields for all transaction models.
@@ -30,10 +30,6 @@ pub struct CheckCancel<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the CheckCancel model.
-    //
-    // See CheckCancel fields:
-    // `<https://xrpl.org/checkcancel.html#checkcancel-fields>`
     /// The ID of the Check ledger object to cancel, as a 64-character hexadecimal string.
     #[serde(rename = "CheckID")]
     pub check_id: Cow<'a, str>,
@@ -52,6 +48,16 @@ impl<'a> Transaction<'a, NoFlags> for CheckCancel<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for CheckCancel<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -96,27 +102,78 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = CheckCancel::new(
-            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
-            None,
-            Some("12".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
-        );
+        let default_txn = CheckCancel {
+            common_fields: CommonFields {
+                account: "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+                transaction_type: TransactionType::CheckCancel,
+                fee: Some("12".into()),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            check_id: "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
+        };
+
         let default_json_str = r#"{"Account":"rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo","TransactionType":"CheckCancel","Fee":"12","Flags":0,"SigningPubKey":"","CheckID":"49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0"}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: CheckCancel = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let check_cancel = CheckCancel {
+            common_fields: CommonFields {
+                account: "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+                transaction_type: TransactionType::CheckCancel,
+                ..Default::default()
+            },
+            check_id: "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
+        }
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345);
+
+        assert_eq!(
+            check_cancel.check_id,
+            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0"
+        );
+        assert_eq!(check_cancel.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(check_cancel.common_fields.sequence, Some(123));
+        assert_eq!(
+            check_cancel.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(check_cancel.common_fields.source_tag, Some(12345));
+    }
+
+    #[test]
+    fn test_default() {
+        let check_cancel = CheckCancel {
+            common_fields: CommonFields {
+                account: "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+                transaction_type: TransactionType::CheckCancel,
+                ..Default::default()
+            },
+            check_id: "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
+        };
+
+        assert_eq!(
+            check_cancel.common_fields.account,
+            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo"
+        );
+        assert_eq!(
+            check_cancel.common_fields.transaction_type,
+            TransactionType::CheckCancel
+        );
+        assert_eq!(
+            check_cancel.check_id,
+            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0"
+        );
     }
 }

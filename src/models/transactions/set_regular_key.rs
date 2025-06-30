@@ -11,7 +11,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::CommonFields;
+use super::{CommonFields, CommonTransactionBuilder};
 
 /// You can protect your account by assigning a regular key pair to
 /// it and using it instead of the master key pair to sign transactions
@@ -20,25 +20,17 @@ use super::CommonFields;
 /// to regain control of your account.
 ///
 /// See SetRegularKey:
-/// `<https://xrpl.org/setregularkey.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/setregularkey>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct SetRegularKey<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the SetRegularKey model.
-    //
-    // See SetRegularKey fields:
-    // `<https://xrpl.org/setregularkey.html#setregularkey-fields>`
     /// A base-58-encoded Address that indicates the regular key pair to be
     /// assigned to the account. If omitted, removes any existing regular key
     /// pair from the account. Must not match the master key pair for the address.
@@ -61,6 +53,16 @@ impl<'a> Transaction<'a, NoFlags> for SetRegularKey<'a> {
     }
 }
 
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for SetRegularKey<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
+    }
+}
+
 impl<'a> SetRegularKey<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -77,7 +79,7 @@ impl<'a> SetRegularKey<'a> {
         Self {
             common_fields: CommonFields::new(
                 account,
-                 TransactionType::SetRegularKey,
+                TransactionType::SetRegularKey,
                 account_txn_id,
                 fee,
                 Some(FlagCollection::default()),
@@ -94,6 +96,11 @@ impl<'a> SetRegularKey<'a> {
             regular_key,
         }
     }
+
+    pub fn with_regular_key(mut self, regular_key: Cow<'a, str>) -> Self {
+        self.regular_key = Some(regular_key);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -102,27 +109,92 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = SetRegularKey::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            Some("12".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some("rAR8rR8sUkBoCZFawhkWzY4Y5YoyuznwD".into()),
-        );
+        let default_txn = SetRegularKey {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SetRegularKey,
+                fee: Some("12".into()),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            regular_key: Some("rAR8rR8sUkBoCZFawhkWzY4Y5YoyuznwD".into()),
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"SetRegularKey","Fee":"12","Flags":0,"SigningPubKey":"","RegularKey":"rAR8rR8sUkBoCZFawhkWzY4Y5YoyuznwD"}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: SetRegularKey = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let set_regular_key = SetRegularKey {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SetRegularKey,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_regular_key("rAR8rR8sUkBoCZFawhkWzY4Y5YoyuznwD".into())
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345);
+
+        assert_eq!(
+            set_regular_key.regular_key.as_ref().unwrap(),
+            "rAR8rR8sUkBoCZFawhkWzY4Y5YoyuznwD"
+        );
+        assert_eq!(set_regular_key.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(set_regular_key.common_fields.sequence, Some(123));
+        assert_eq!(
+            set_regular_key.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(set_regular_key.common_fields.source_tag, Some(12345));
+    }
+
+    #[test]
+    fn test_remove_regular_key() {
+        let set_regular_key = SetRegularKey {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SetRegularKey,
+                fee: Some("12".into()),
+                ..Default::default()
+            },
+            regular_key: None, // Removes existing regular key
+        };
+
+        assert!(set_regular_key.regular_key.is_none());
+        assert_eq!(set_regular_key.common_fields.fee.as_ref().unwrap().0, "12");
+    }
+
+    #[test]
+    fn test_default() {
+        let set_regular_key = SetRegularKey {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SetRegularKey,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(
+            set_regular_key.common_fields.account,
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"
+        );
+        assert_eq!(
+            set_regular_key.common_fields.transaction_type,
+            TransactionType::SetRegularKey
+        );
+        assert!(set_regular_key.regular_key.is_none());
     }
 }

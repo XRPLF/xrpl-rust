@@ -18,7 +18,7 @@ use crate::models::{
 };
 use crate::serde_with_tag;
 
-use super::CommonFields;
+use super::{CommonFields, CommonTransactionBuilder};
 
 serde_with_tag! {
     #[derive(Debug, PartialEq, Eq, Default, Clone, new)]
@@ -34,33 +34,25 @@ serde_with_tag! {
 /// individual account. You can create, replace, or remove a signer
 /// list using a SignerListSet transaction.
 ///
-/// See TicketCreate:
-/// `<https://xrpl.org/signerlistset.html>`
+/// See SignerListSet:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/signerlistset>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct SignerListSet<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the TicketCreate model.
-    //
-    // See TicketCreate fields:
-    // `<https://xrpl.org/signerlistset.html#signerlistset-fields>`
     /// A target number for the signer weights. A multi-signature from this list
     /// is valid only if the sum weights of the signatures provided is greater
     /// than or equal to this value. To delete a signer list, use the value 0.
     pub signer_quorum: u32,
-    /// A target number for the signer weights. A multi-signature from this list is
-    /// valid only if the sum weights of the signatures provided is greater than
-    /// or equal to this value. To delete a signer list, use the value 0.
+    /// Array of SignerEntry objects, indicating the addresses and weights of
+    /// signers in this list. A SignerListSet transaction may list up to 8 members.
+    /// An empty array deletes the existing SignerList.
     pub signer_entries: Option<Vec<SignerEntry>>,
 }
 
@@ -68,7 +60,6 @@ impl<'a> Model for SignerListSet<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_signer_entries_error()?;
         self._get_signer_quorum_error()?;
-
         Ok(())
     }
 }
@@ -84,6 +75,16 @@ impl<'a> Transaction<'a, NoFlags> for SignerListSet<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for SignerListSet<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -207,6 +208,20 @@ impl<'a> SignerListSet<'a> {
             signer_entries,
         }
     }
+
+    pub fn with_signer_entries(mut self, signer_entries: Vec<SignerEntry>) -> Self {
+        self.signer_entries = Some(signer_entries);
+        self
+    }
+
+    pub fn add_signer_entry(mut self, account: String, weight: u16) -> Self {
+        let entry = SignerEntry::new(account, weight);
+        match &mut self.signer_entries {
+            Some(entries) => entries.push(entry),
+            None => self.signer_entries = Some(vec![entry]),
+        }
+        self
+    }
 }
 
 pub trait SignerListSetError {
@@ -215,32 +230,26 @@ pub trait SignerListSetError {
 }
 
 #[cfg(test)]
-mod test_signer_list_set_error {
+mod tests {
     use alloc::string::ToString;
     use alloc::vec;
-
-    use crate::models::Model;
 
     use super::*;
 
     #[test]
     fn test_signer_list_deleted_error() {
-        let mut signer_list_set = SignerListSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            0,
-            Some(vec![SignerEntry {
+        let mut signer_list_set = SignerListSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::SignerListSet,
+                ..Default::default()
+            },
+            signer_quorum: 0,
+            signer_entries: Some(vec![SignerEntry {
                 account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(),
                 signer_weight: 2,
             }]),
-        );
+        };
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
@@ -258,19 +267,15 @@ mod test_signer_list_set_error {
 
     #[test]
     fn test_signer_entries_error() {
-        let mut signer_list_set = SignerListSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            3,
-            Some(vec![]),
-        );
+        let mut signer_list_set = SignerListSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::SignerListSet,
+                ..Default::default()
+            },
+            signer_quorum: 3,
+            signer_entries: Some(vec![]),
+        };
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
@@ -369,43 +374,106 @@ mod test_signer_list_set_error {
             "The value of the field `\"signer_entries\"` has a duplicate in it (found \"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW\")"
         );
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use alloc::string::ToString;
-    use alloc::vec;
-
-    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = SignerListSet::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            Some("12".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            3,
-            Some(vec![
+        let default_txn = SignerListSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SignerListSet,
+                fee: Some("12".into()),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            signer_quorum: 3,
+            signer_entries: Some(vec![
                 SignerEntry::new("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2),
                 SignerEntry::new("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1),
                 SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1),
             ]),
-        );
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"SignerListSet","Fee":"12","Flags":0,"SigningPubKey":"","SignerQuorum":3,"SignerEntries":[{"SignerEntry":{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SignerWeight":2}},{"SignerEntry":{"Account":"rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v","SignerWeight":1}},{"SignerEntry":{"Account":"raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n","SignerWeight":1}}]}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: SignerListSet = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let signer_list_set = SignerListSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SignerListSet,
+                ..Default::default()
+            },
+            signer_quorum: 3,
+            ..Default::default()
+        }
+        .with_signer_entries(vec![
+            SignerEntry::new("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2),
+            SignerEntry::new("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1),
+            SignerEntry::new("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1),
+        ])
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345);
+
+        assert_eq!(signer_list_set.signer_quorum, 3);
+        assert_eq!(signer_list_set.signer_entries.as_ref().unwrap().len(), 3);
+        assert_eq!(signer_list_set.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(signer_list_set.common_fields.sequence, Some(123));
+        assert_eq!(
+            signer_list_set.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(signer_list_set.common_fields.source_tag, Some(12345));
+        assert!(signer_list_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_builder_add_entries() {
+        let signer_list_set = SignerListSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SignerListSet,
+                ..Default::default()
+            },
+            signer_quorum: 3,
+            ..Default::default()
+        }
+        .add_signer_entry("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".to_string(), 2)
+        .add_signer_entry("rUpy3eEg8rqjqfUoLeBnZkscbKbFsKXC3v".to_string(), 1)
+        .add_signer_entry("raKEEVSGnKSD9Zyvxu4z6Pqpm4ABH8FS6n".to_string(), 1)
+        .with_fee("12".into());
+
+        assert_eq!(signer_list_set.signer_quorum, 3);
+        assert_eq!(signer_list_set.signer_entries.as_ref().unwrap().len(), 3);
+        assert_eq!(signer_list_set.common_fields.fee.as_ref().unwrap().0, "12");
+        assert!(signer_list_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_delete_signer_list() {
+        let signer_list_set = SignerListSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::SignerListSet,
+                fee: Some("12".into()),
+                ..Default::default()
+            },
+            signer_quorum: 0, // Delete signer list
+            signer_entries: None,
+        };
+
+        assert_eq!(signer_list_set.signer_quorum, 0);
+        assert!(signer_list_set.signer_entries.is_none());
+        assert!(signer_list_set.validate().is_ok());
     }
 }

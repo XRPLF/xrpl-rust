@@ -13,13 +13,13 @@ use crate::models::{
 
 use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
 
-use super::{CommonFields, FlagCollection};
+use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the TrustSet type support additional values
 /// in the Flags field. This enum represents those options.
 ///
 /// See TrustSet flags:
-/// `<https://xrpl.org/trustset.html#trustset-flags>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/trustset>`
 #[derive(
     Debug, Eq, PartialEq, Clone, Copy, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
@@ -42,25 +42,17 @@ pub enum TrustSetFlag {
 /// Create or modify a trust line linking two accounts.
 ///
 /// See TrustSet:
-/// `<https://xrpl.org/trustset.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/trustset>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct TrustSet<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, TrustSetFlag>,
-    // The custom fields for the TrustSet model.
-    //
-    // See TrustSet fields:
-    // `<https://xrpl.org/trustset.html#trustset-fields>`
     /// Object defining the trust line to create or modify, in the format of a Currency Amount.
     pub limit_amount: IssuedCurrencyAmount<'a>,
     /// Value incoming balances on this trust line at the ratio of this number per
@@ -91,19 +83,13 @@ impl<'a> Transaction<'a, TrustSetFlag> for TrustSet<'a> {
     }
 }
 
-impl<'a> Default for TrustSet<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::TrustSet,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            limit_amount: IssuedCurrencyAmount::default(),
-            quality_in: None,
-            quality_out: None,
-        }
+impl<'a> CommonTransactionBuilder<'a, TrustSetFlag> for TrustSet<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, TrustSetFlag> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -146,67 +132,23 @@ impl<'a> TrustSet<'a> {
         }
     }
 
-    /// Set quality in
     pub fn with_quality_in(mut self, quality_in: u32) -> Self {
         self.quality_in = Some(quality_in);
         self
     }
 
-    /// Set quality out
     pub fn with_quality_out(mut self, quality_out: u32) -> Self {
         self.quality_out = Some(quality_out);
         self
     }
 
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Add flag
     pub fn with_flag(mut self, flag: TrustSetFlag) -> Self {
         self.common_fields.flags.0.push(flag);
         self
     }
 
-    /// Set multiple flags
     pub fn with_flags(mut self, flags: Vec<TrustSetFlag>) -> Self {
         self.common_fields.flags = flags.into();
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
         self
     }
 }
@@ -241,14 +183,141 @@ mod tests {
 
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"TrustSet","Fee":"12","Flags":262144,"LastLedgerSequence":8007750,"Sequence":12,"SigningPubKey":"","LimitAmount":{"currency":"USD","issuer":"rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc","value":"100"}}"#;
 
-        // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: TrustSet = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let trust_set = TrustSet {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::TrustSet,
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc".into(),
+                "100".into(),
+            ),
+            ..Default::default()
+        }
+        .with_flag(TrustSetFlag::TfClearNoRipple)
+        .with_quality_in(1000000000)
+        .with_quality_out(500000000)
+        .with_fee("12".into())
+        .with_sequence(12)
+        .with_last_ledger_sequence(8007750)
+        .with_source_tag(12345);
+
+        assert_eq!(trust_set.limit_amount.currency, "USD");
+        assert_eq!(
+            trust_set.limit_amount.issuer,
+            "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc"
+        );
+        assert_eq!(trust_set.limit_amount.value, "100");
+        assert_eq!(trust_set.quality_in, Some(1000000000));
+        assert_eq!(trust_set.quality_out, Some(500000000));
+        assert!(trust_set.has_flag(&TrustSetFlag::TfClearNoRipple));
+        assert_eq!(trust_set.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(trust_set.common_fields.sequence, Some(12));
+        assert_eq!(trust_set.common_fields.last_ledger_sequence, Some(8007750));
+        assert_eq!(trust_set.common_fields.source_tag, Some(12345));
+    }
+
+    #[test]
+    fn test_multiple_flags() {
+        let trust_set = TrustSet {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::TrustSet,
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc".into(),
+                "100".into(),
+            ),
+            ..Default::default()
+        }
+        .with_flags(vec![TrustSetFlag::TfSetAuth, TrustSetFlag::TfSetNoRipple])
+        .with_fee("12".into());
+
+        assert!(trust_set.has_flag(&TrustSetFlag::TfSetAuth));
+        assert!(trust_set.has_flag(&TrustSetFlag::TfSetNoRipple));
+        assert!(!trust_set.has_flag(&TrustSetFlag::TfClearNoRipple));
+    }
+
+    #[test]
+    fn test_default() {
+        let trust_set = TrustSet {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::TrustSet,
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc".into(),
+                "100".into(),
+            ),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            trust_set.common_fields.account,
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"
+        );
+        assert_eq!(
+            trust_set.common_fields.transaction_type,
+            TransactionType::TrustSet
+        );
+        assert_eq!(trust_set.limit_amount.currency, "USD");
+        assert!(trust_set.quality_in.is_none());
+        assert!(trust_set.quality_out.is_none());
+    }
+
+    #[test]
+    fn test_freeze_operations() {
+        let freeze_trust_line = TrustSet {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::TrustSet,
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc".into(),
+                "0".into(), // Setting to 0 doesn't delete, just modifies flags
+            ),
+            ..Default::default()
+        }
+        .with_flag(TrustSetFlag::TfSetFreeze)
+        .with_fee("12".into());
+
+        assert!(freeze_trust_line.has_flag(&TrustSetFlag::TfSetFreeze));
+
+        let unfreeze_trust_line = TrustSet {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::TrustSet,
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc".into(),
+                "0".into(),
+            ),
+            ..Default::default()
+        }
+        .with_flag(TrustSetFlag::TfClearFreeze)
+        .with_fee("12".into());
+
+        assert!(unfreeze_trust_line.has_flag(&TrustSetFlag::TfClearFreeze));
     }
 }
