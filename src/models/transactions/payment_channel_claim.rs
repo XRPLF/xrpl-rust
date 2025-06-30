@@ -13,13 +13,13 @@ use crate::models::{
 
 use crate::models::amount::XRPAmount;
 
-use super::{CommonFields, FlagCollection};
+use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the PaymentChannelClaim type support additional values
 /// in the Flags field. This enum represents those options.
 ///
 /// See PaymentChannelClaim flags:
-/// `<https://xrpl.org/paymentchannelclaim.html#paymentchannelclaim-flags>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/paymentchannelclaim>`
 #[derive(
     Debug, Eq, PartialEq, Copy, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
@@ -46,25 +46,17 @@ pub enum PaymentChannelClaimFlag {
 /// the payment channel's expiration, or both.
 ///
 /// See PaymentChannelClaim:
-/// `<https://xrpl.org/paymentchannelclaim.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/paymentchannelclaim>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct PaymentChannelClaim<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, PaymentChannelClaimFlag>,
-    // The custom fields for the PaymentChannelClaim model.
-    //
-    // See PaymentChannelClaim fields:
-    // `<https://xrpl.org/paymentchannelclaim.html#paymentchannelclaim-fields>`
     /// The unique ID of the channel, as a 64-character hexadecimal string.
     pub channel: Cow<'a, str>,
     /// Total amount of XRP, in drops, delivered by this channel after processing this claim.
@@ -108,21 +100,13 @@ impl<'a> Transaction<'a, PaymentChannelClaimFlag> for PaymentChannelClaim<'a> {
     }
 }
 
-impl<'a> Default for PaymentChannelClaim<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::PaymentChannelClaim,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            channel: "".into(),
-            balance: None,
-            amount: None,
-            signature: None,
-            public_key: None,
-        }
+impl<'a> CommonTransactionBuilder<'a, PaymentChannelClaimFlag> for PaymentChannelClaim<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, PaymentChannelClaimFlag> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -193,18 +177,6 @@ impl<'a> PaymentChannelClaim<'a> {
         self
     }
 
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
     /// Add flag
     pub fn with_flag(mut self, flag: PaymentChannelClaimFlag) -> Self {
         self.common_fields.flags.0.push(flag);
@@ -214,34 +186,6 @@ impl<'a> PaymentChannelClaim<'a> {
     /// Set multiple flags
     pub fn with_flags(mut self, flags: Vec<PaymentChannelClaimFlag>) -> Self {
         self.common_fields.flags = flags.into();
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
         self
     }
 }
@@ -277,5 +221,177 @@ mod tests {
         // Deserialize
         let deserialized: PaymentChannelClaim = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let payment_channel_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_balance("1000000".into())
+        .with_amount("1000000".into())
+        .with_signature("30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B".into())
+        .with_public_key("32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into())
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("claiming from payment channel".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(
+            payment_channel_claim.channel,
+            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198"
+        );
+        assert_eq!(payment_channel_claim.balance.as_ref().unwrap(), "1000000");
+        assert_eq!(payment_channel_claim.amount.as_ref().unwrap(), "1000000");
+        assert!(payment_channel_claim.signature.is_some());
+        assert!(payment_channel_claim.public_key.is_some());
+        assert_eq!(
+            payment_channel_claim.common_fields.fee.as_ref().unwrap().0,
+            "12"
+        );
+        assert_eq!(payment_channel_claim.common_fields.sequence, Some(123));
+        assert_eq!(
+            payment_channel_claim.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(payment_channel_claim.common_fields.source_tag, Some(12345));
+        assert_eq!(
+            payment_channel_claim
+                .common_fields
+                .memos
+                .as_ref()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_close_channel() {
+        let close_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_flag(PaymentChannelClaimFlag::TfClose)
+        .with_fee("12".into())
+        .with_sequence(123);
+
+        assert!(close_claim.has_flag(&PaymentChannelClaimFlag::TfClose));
+        assert!(close_claim.balance.is_none());
+        assert!(close_claim.amount.is_none());
+        assert!(close_claim.signature.is_none());
+        assert!(close_claim.public_key.is_none());
+    }
+
+    #[test]
+    fn test_renew_channel() {
+        let renew_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_flag(PaymentChannelClaimFlag::TfRenew)
+        .with_fee("12".into())
+        .with_sequence(123);
+
+        assert!(renew_claim.has_flag(&PaymentChannelClaimFlag::TfRenew));
+        assert_eq!(
+            renew_claim.channel,
+            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198"
+        );
+    }
+
+    #[test]
+    fn test_default() {
+        let payment_channel_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            payment_channel_claim.common_fields.account,
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"
+        );
+        assert_eq!(
+            payment_channel_claim.common_fields.transaction_type,
+            TransactionType::PaymentChannelClaim
+        );
+        assert_eq!(
+            payment_channel_claim.channel,
+            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198"
+        );
+        assert!(payment_channel_claim.balance.is_none());
+        assert!(payment_channel_claim.amount.is_none());
+        assert!(payment_channel_claim.signature.is_none());
+        assert!(payment_channel_claim.public_key.is_none());
+    }
+
+    #[test]
+    fn test_multiple_flags() {
+        let multi_flag_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_flags(vec![
+            PaymentChannelClaimFlag::TfRenew,
+            PaymentChannelClaimFlag::TfClose,
+        ])
+        .with_fee("12".into());
+
+        assert!(multi_flag_claim.has_flag(&PaymentChannelClaimFlag::TfRenew));
+        assert!(multi_flag_claim.has_flag(&PaymentChannelClaimFlag::TfClose));
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_ticket_sequence(456)
+        .with_balance("500000".into())
+        .with_amount("500000".into())
+        .with_fee("12".into());
+
+        assert_eq!(ticket_claim.common_fields.ticket_sequence, Some(456));
+        assert_eq!(ticket_claim.balance.as_ref().unwrap(), "500000");
+        assert_eq!(ticket_claim.amount.as_ref().unwrap(), "500000");
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_claim.common_fields.sequence.is_none());
     }
 }

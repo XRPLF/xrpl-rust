@@ -11,33 +11,25 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::CommonFields;
+use super::{CommonFields, CommonTransactionBuilder};
 
 /// Removes a NFToken object from the NFTokenPage in which it is being held,
 /// effectively removing the token from the ledger (burning it).
 ///
 /// See NFTokenBurn:
-/// `<https://xrpl.org/nftokenburn.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/nftokenburn>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenBurn<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the NFTokenBurn model.
-    //
-    // See NFTokenBurn fields:
-    // `<https://xrpl.org/nftokenburn.html#nftokenburn-fields>`
-    #[serde(rename = "NFTokenID")]
     /// The NFToken to be removed by this transaction.
+    #[serde(rename = "NFTokenID")]
     pub nftoken_id: Cow<'a, str>,
     /// The owner of the NFToken to burn. Only used if that owner is
     /// different than the account sending this transaction. The
@@ -62,18 +54,13 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenBurn<'a> {
     }
 }
 
-impl<'a> Default for NFTokenBurn<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::NFTokenBurn,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            nftoken_id: "".into(),
-            owner: None,
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for NFTokenBurn<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -118,46 +105,6 @@ impl<'a> NFTokenBurn<'a> {
         self.owner = Some(owner);
         self
     }
-
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
-        self
-    }
 }
 
 #[cfg(test)]
@@ -189,5 +136,181 @@ mod tests {
         // Deserialize
         let deserialized: NFTokenBurn = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let nftoken_burn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            ..Default::default()
+        }
+        .with_owner("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into())
+        .with_fee("10".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("burning NFT".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(
+            nftoken_burn.nftoken_id,
+            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65"
+        );
+        assert_eq!(
+            nftoken_burn.owner.as_ref().unwrap(),
+            "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"
+        );
+        assert_eq!(nftoken_burn.common_fields.fee.as_ref().unwrap().0, "10");
+        assert_eq!(nftoken_burn.common_fields.sequence, Some(123));
+        assert_eq!(
+            nftoken_burn.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(nftoken_burn.common_fields.source_tag, Some(12345));
+        assert_eq!(nftoken_burn.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_default() {
+        let nftoken_burn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            nftoken_burn.common_fields.account,
+            "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2"
+        );
+        assert_eq!(
+            nftoken_burn.common_fields.transaction_type,
+            TransactionType::NFTokenBurn
+        );
+        assert_eq!(
+            nftoken_burn.nftoken_id,
+            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65"
+        );
+        assert!(nftoken_burn.owner.is_none());
+        assert!(nftoken_burn.common_fields.fee.is_none());
+        assert!(nftoken_burn.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_self_burn() {
+        let self_burn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rTokenOwner123".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            ..Default::default()
+        }
+        .with_fee("12".into())
+        .with_sequence(456);
+
+        assert!(self_burn.owner.is_none()); // Burning own NFT
+        assert_eq!(self_burn.common_fields.account, "rTokenOwner123");
+        assert_eq!(self_burn.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(self_burn.common_fields.sequence, Some(456));
+    }
+
+    #[test]
+    fn test_authorized_burn() {
+        let authorized_burn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rAuthorizedBurner456".into(), // Issuer or authorized account
+                transaction_type: TransactionType::NFTokenBurn,
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            ..Default::default()
+        }
+        .with_owner("rActualOwner789".into()) // The actual owner of the NFT
+        .with_fee("15".into())
+        .with_sequence(789)
+        .with_memo(Memo {
+            memo_data: Some("authorized burn".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(authorized_burn.owner.as_ref().unwrap(), "rActualOwner789");
+        assert_eq!(
+            authorized_burn.common_fields.account,
+            "rAuthorizedBurner456"
+        );
+        assert_eq!(authorized_burn.common_fields.fee.as_ref().unwrap().0, "15");
+        assert_eq!(authorized_burn.common_fields.sequence, Some(789));
+        assert_eq!(
+            authorized_burn.common_fields.memos.as_ref().unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_burn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rTicketUser111".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            ..Default::default()
+        }
+        .with_ticket_sequence(12345)
+        .with_fee("12".into());
+
+        assert_eq!(ticket_burn.common_fields.ticket_sequence, Some(12345));
+        assert_eq!(
+            ticket_burn.nftoken_id,
+            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65"
+        );
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_burn.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_multiple_memos() {
+        let multi_memo_burn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rMemoUser222".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            ..Default::default()
+        }
+        .with_memo(Memo {
+            memo_data: Some("reason 1".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_memo(Memo {
+            memo_data: Some("reason 2".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_fee("12".into())
+        .with_sequence(111);
+
+        assert_eq!(
+            multi_memo_burn.common_fields.memos.as_ref().unwrap().len(),
+            2
+        );
+        assert_eq!(multi_memo_burn.common_fields.sequence, Some(111));
     }
 }

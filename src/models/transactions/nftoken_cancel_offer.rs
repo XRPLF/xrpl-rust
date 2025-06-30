@@ -11,31 +11,22 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags, XRPLModelResult};
 
-use super::CommonFields;
+use super::{CommonFields, CommonTransactionBuilder};
 
 /// Cancels existing token offers created using NFTokenCreateOffer.
 ///
 /// See NFTokenCancelOffer:
-/// `<https://xrpl.org/nftokencanceloffer.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/nftokencanceloffer>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenCancelOffer<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the NFTokenCancelOffer model.
-    //
-    // See NFTokenCancelOffer fields:
-    // `<https://xrpl.org/nftokencanceloffer.html#nftokencanceloffer-fields>`
-    // Lifetime issue
     /// An array of IDs of the NFTokenOffer objects to cancel (not the IDs of NFToken
     /// objects, but the IDs of the NFTokenOffer objects). Each entry must be a
     /// different object ID of an NFTokenOffer object; the transaction is invalid
@@ -67,17 +58,13 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenCancelOffer<'a> {
     }
 }
 
-impl<'a> Default for NFTokenCancelOffer<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::NFTokenCancelOffer,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            nftoken_offers: Vec::new(),
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for NFTokenCancelOffer<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -129,7 +116,7 @@ impl<'a> NFTokenCancelOffer<'a> {
         }
     }
 
-    /// Add offer to cancel6
+    /// Add offer to cancel
     pub fn add_offer(mut self, offer_id: Cow<'a, str>) -> Self {
         self.nftoken_offers.push(offer_id);
         self
@@ -138,46 +125,6 @@ impl<'a> NFTokenCancelOffer<'a> {
     /// Set offers to cancel
     pub fn with_offers(mut self, offers: Vec<Cow<'a, str>>) -> Self {
         self.nftoken_offers = offers;
-        self
-    }
-
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
         self
     }
 }
@@ -237,5 +184,194 @@ mod tests {
         // Deserialize
         let deserialized: NFTokenCancelOffer = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let nftoken_cancel_offer = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            nftoken_offers: vec![
+                "9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into(),
+            ],
+        }
+        .add_offer("1A2B3C4D5E6F7890ABCDEF1234567890FEDCBA0987654321ABCDEF1234567890".into())
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("canceling NFT offers".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(nftoken_cancel_offer.nftoken_offers.len(), 2);
+        assert_eq!(
+            nftoken_cancel_offer.nftoken_offers[0],
+            "9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D"
+        );
+        assert_eq!(
+            nftoken_cancel_offer.nftoken_offers[1],
+            "1A2B3C4D5E6F7890ABCDEF1234567890FEDCBA0987654321ABCDEF1234567890"
+        );
+        assert_eq!(
+            nftoken_cancel_offer.common_fields.fee.as_ref().unwrap().0,
+            "12"
+        );
+        assert_eq!(nftoken_cancel_offer.common_fields.sequence, Some(123));
+        assert_eq!(
+            nftoken_cancel_offer.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(nftoken_cancel_offer.common_fields.source_tag, Some(12345));
+        assert_eq!(
+            nftoken_cancel_offer
+                .common_fields
+                .memos
+                .as_ref()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_default() {
+        let nftoken_cancel_offer = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            nftoken_offers: vec![
+                "9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into(),
+            ],
+        };
+
+        assert_eq!(
+            nftoken_cancel_offer.common_fields.account,
+            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX"
+        );
+        assert_eq!(
+            nftoken_cancel_offer.common_fields.transaction_type,
+            TransactionType::NFTokenCancelOffer
+        );
+        assert_eq!(nftoken_cancel_offer.nftoken_offers.len(), 1);
+        assert!(nftoken_cancel_offer.common_fields.fee.is_none());
+        assert!(nftoken_cancel_offer.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_multiple_offers() {
+        let cancel_multiple = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "rCancelAccount123".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_offers(vec![
+            "OFFER1234567890ABCDEF1234567890FEDCBA0987654321ABCDEF1234567890".into(),
+            "OFFER2468ACEF13579BDF024681357ACE9BDF13579CE024681357BDF024681".into(),
+            "OFFER369CFBEA147D258E047AD158FB269D147D258FB047AD158E047AD158E0".into(),
+        ])
+        .with_fee("15".into())
+        .with_sequence(456);
+
+        assert_eq!(cancel_multiple.nftoken_offers.len(), 3);
+        assert_eq!(cancel_multiple.common_fields.fee.as_ref().unwrap().0, "15");
+        assert_eq!(cancel_multiple.common_fields.sequence, Some(456));
+        assert!(cancel_multiple.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_cancel = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "rTicketUser111".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            nftoken_offers: vec![
+                "9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into(),
+            ],
+        }
+        .with_ticket_sequence(789)
+        .with_fee("12".into());
+
+        assert_eq!(ticket_cancel.common_fields.ticket_sequence, Some(789));
+        assert_eq!(ticket_cancel.nftoken_offers.len(), 1);
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_cancel.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_add_offer_incrementally() {
+        let incremental_cancel = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "rIncrementalUser222".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .add_offer("FIRST1234567890ABCDEF1234567890FEDCBA0987654321ABCDEF1234567890".into())
+        .add_offer("SECOND2468ACEF13579BDF024681357ACE9BDF13579CE024681357BDF024681".into())
+        .add_offer("THIRD369CFBEA147D258E047AD158FB269D147D258FB047AD158E047AD158E0".into())
+        .with_fee("18".into())
+        .with_sequence(789);
+
+        assert_eq!(incremental_cancel.nftoken_offers.len(), 3);
+        assert_eq!(
+            incremental_cancel.nftoken_offers[0],
+            "FIRST1234567890ABCDEF1234567890FEDCBA0987654321ABCDEF1234567890"
+        );
+        assert_eq!(
+            incremental_cancel.nftoken_offers[1],
+            "SECOND2468ACEF13579BDF024681357ACE9BDF13579CE024681357BDF024681"
+        );
+        assert_eq!(
+            incremental_cancel.nftoken_offers[2],
+            "THIRD369CFBEA147D258E047AD158FB269D147D258FB047AD158E047AD158E0"
+        );
+        assert_eq!(incremental_cancel.common_fields.sequence, Some(789));
+        assert!(incremental_cancel.validate().is_ok());
+    }
+
+    #[test]
+    fn test_with_memo_and_source_tag() {
+        let memo_cancel = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "rMemoUser333".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            nftoken_offers: vec![
+                "MEMO1234567890ABCDEF1234567890FEDCBA0987654321ABCDEF1234567890".into(),
+            ],
+        }
+        .with_memo(Memo {
+            memo_data: Some("bulk cancel".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_memo(Memo {
+            memo_data: Some("cleanup".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_source_tag(98765)
+        .with_fee("12".into())
+        .with_sequence(111);
+
+        assert_eq!(memo_cancel.common_fields.memos.as_ref().unwrap().len(), 2);
+        assert_eq!(memo_cancel.common_fields.source_tag, Some(98765));
+        assert_eq!(memo_cancel.common_fields.sequence, Some(111));
+        assert!(memo_cancel.validate().is_ok());
     }
 }

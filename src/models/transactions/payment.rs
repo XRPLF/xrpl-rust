@@ -14,19 +14,20 @@ use crate::models::{
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLPaymentException;
 
-use super::{CommonFields, FlagCollection};
+use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the Payment type support additional values
 /// in the Flags field. This enum represents those options.
 ///
 /// See Payment flags:
-/// `<https://xrpl.org/payment.html#payment-flags>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/payment>`
 #[derive(
     Default,
     Debug,
     Eq,
     PartialEq,
     Clone,
+    Copy,
     Serialize_repr,
     Deserialize_repr,
     Display,
@@ -53,25 +54,17 @@ pub enum PaymentFlag {
 /// Transfers value from one account to another.
 ///
 /// See Payment:
-/// `<https://xrpl.org/payment.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/payment>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct Payment<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, PaymentFlag>,
-    // The custom fields for the Payment model.
-    //
-    // See Payment fields:
-    // `<https://xrpl.org/payment.html#payment-fields>`
     /// The amount of currency to deliver. For non-XRP amounts, the nested field names
     /// MUST be lower-case. If the tfPartialPayment flag is set, deliver up to this
     /// amount instead.
@@ -121,7 +114,17 @@ impl<'a> Transaction<'a, PaymentFlag> for Payment<'a> {
     }
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, PaymentFlag> {
+        self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, PaymentFlag> for Payment<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, PaymentFlag> {
         &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -250,28 +253,42 @@ impl<'a> Payment<'a> {
         self
     }
 
+    /// Set invoice ID
+    pub fn with_invoice_id(mut self, invoice_id: u32) -> Self {
+        self.invoice_id = Some(invoice_id);
+        self
+    }
+
     /// Set send max
     pub fn with_send_max(mut self, send_max: Amount<'a>) -> Self {
         self.send_max = Some(send_max);
         self
     }
 
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
+    /// Set deliver min
+    pub fn with_deliver_min(mut self, deliver_min: Amount<'a>) -> Self {
+        self.deliver_min = Some(deliver_min);
         self
     }
 
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
+    /// Set paths
+    pub fn with_paths(mut self, paths: Vec<Vec<PathStep<'a>>>) -> Self {
+        self.paths = Some(paths);
         self
     }
 
-    /// Add flag
+    /// Add a single path
+    pub fn add_path(mut self, path: Vec<PathStep<'a>>) -> Self {
+        match &mut self.paths {
+            Some(paths) => paths.push(path),
+            None => self.paths = Some(vec![path]),
+        }
+        self
+    }
+
+    /// Add flag (in addition to CommonTransactionBuilder flags)
     pub fn with_flag(mut self, flag: PaymentFlag) -> Self {
-        // flags is not an Option, it's directly a FlagCollection
-        self.common_fields.flags.0.push(flag); // Access the inner Vec directly
+        self.common_fields.flags.0.push(flag);
         self
     }
 
@@ -279,31 +296,6 @@ impl<'a> Payment<'a> {
     pub fn with_flags(mut self, flags: Vec<PaymentFlag>) -> Self {
         self.common_fields.flags = flags.into();
         self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-}
-
-impl<'a> Default for Payment<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields::default(),
-            amount: Amount::XRPAmount("0".into()),
-            destination: "".into(),
-            destination_tag: None,
-            invoice_id: None,
-            paths: None,
-            send_max: None,
-            deliver_min: None,
-        }
     }
 }
 
@@ -320,8 +312,40 @@ mod tests {
 
     use crate::models::amount::{Amount, IssuedCurrencyAmount, XRPAmount};
     use crate::models::{Model, PathStep};
+    use crate::{
+        asynch::{exceptions::XRPLHelperResult, transaction::sign},
+        models::transactions::Transaction,
+        wallet::Wallet,
+    };
 
     use super::*;
+
+    #[cfg(all(feature = "helpers", feature = "wallet"))]
+    #[test]
+    fn test_payment_sign_with_memo() -> XRPLHelperResult<()> {
+        let mut payment = Payment {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::Payment,
+                memos: Some(vec![Memo {
+                    memo_data: Some("68656c6c6f".into()),
+                    memo_format: None,
+                    memo_type: Some("74657874".into()),
+                }]),
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount("1000000".into()),
+            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            ..Default::default()
+        };
+
+        let wallet = Wallet::create(None)?;
+        sign(&mut payment, &wallet, false)?;
+
+        assert!(payment.get_common_fields().is_signed());
+
+        Ok(())
+    }
 
     #[test]
     fn test_xrp_to_xrp_error() {
@@ -454,44 +478,115 @@ mod tests {
         let deserialized: Payment = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
     }
-}
-
-#[cfg(all(feature = "helpers", feature = "wallet"))]
-#[cfg(test)]
-mod test_sign {
-    use alloc::vec;
-
-    use crate::{
-        asynch::{exceptions::XRPLHelperResult, transaction::sign},
-        models::transactions::Transaction,
-        wallet::Wallet,
-    };
-
-    use super::*;
 
     #[test]
-    fn test_payment_sign_with_memo() -> XRPLHelperResult<()> {
-        let mut payment = Payment {
+    fn test_builder_pattern() {
+        let payment = Payment {
             common_fields: CommonFields {
-                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 transaction_type: TransactionType::Payment,
-                memos: Some(vec![Memo {
-                    memo_data: Some("68656c6c6f".into()),
-                    memo_format: None,
-                    memo_type: Some("74657874".into()),
-                }]),
                 ..Default::default()
             },
             amount: Amount::XRPAmount("1000000".into()),
-            destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            destination: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
             ..Default::default()
-        };
+        }
+        .with_destination_tag(12345)
+        .with_send_max(Amount::XRPAmount("1100000".into()))
+        .with_flag(PaymentFlag::TfPartialPayment)
+        .with_fee("12".into())
+        .with_sequence(2)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(54321);
 
-        let wallet = Wallet::create(None)?;
-        sign(&mut payment, &wallet, false)?;
+        assert_eq!(payment.destination_tag, Some(12345));
+        assert!(payment.send_max.is_some());
+        assert!(payment.has_flag(&PaymentFlag::TfPartialPayment));
+        assert_eq!(payment.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(payment.common_fields.sequence, Some(2));
+        assert_eq!(payment.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(payment.common_fields.source_tag, Some(54321));
+    }
 
-        assert!(payment.get_common_fields().is_signed());
+    #[test]
+    fn test_cross_currency_payment() {
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "100".into(),
+            )),
+            destination: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+            ..Default::default()
+        }
+        .with_send_max(Amount::XRPAmount("110000000".into())) // 110 XRP max
+        .with_destination_tag(987654)
+        .with_fee("12".into());
 
-        Ok(())
+        assert!(payment.send_max.is_some());
+        assert_eq!(payment.destination_tag, Some(987654));
+        assert!(payment.validate().is_ok());
+    }
+
+    #[test]
+    fn test_partial_payment() {
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount("1000000".into()),
+            destination: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+            ..Default::default()
+        }
+        .with_send_max(Amount::XRPAmount("1100000".into()))
+        .with_deliver_min(Amount::XRPAmount("900000".into()))
+        .with_flag(PaymentFlag::TfPartialPayment)
+        .with_fee("12".into());
+
+        assert!(payment.has_flag(&PaymentFlag::TfPartialPayment));
+        assert!(payment.send_max.is_some());
+        assert!(payment.deliver_min.is_some());
+        assert!(payment.validate().is_ok());
+    }
+
+    #[test]
+    fn test_path_building() {
+        let path1 = vec![
+            PathStep::default().with_account("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into()),
+            PathStep::default().with_currency("USD".into()),
+        ];
+        let path2 = vec![
+            PathStep::default().with_currency("EUR".into()),
+            PathStep::default().with_issuer("rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into()),
+        ];
+
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "100".into(),
+            )),
+            destination: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+            ..Default::default()
+        }
+        .add_path(path1)
+        .add_path(path2)
+        .with_send_max(Amount::XRPAmount("110000000".into()))
+        .with_fee("12".into());
+
+        assert_eq!(payment.paths.as_ref().unwrap().len(), 2);
+        assert!(payment.validate().is_ok());
     }
 }

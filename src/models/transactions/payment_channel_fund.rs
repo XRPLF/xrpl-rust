@@ -11,31 +11,23 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::CommonFields;
+use super::{CommonFields, CommonTransactionBuilder};
 
 /// Add additional XRP to an open payment channel,
 /// and optionally update the expiration time of the channel.
 ///
 /// See PaymentChannelFund:
-/// `<https://xrpl.org/paymentchannelfund.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/paymentchannelfund>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct PaymentChannelFund<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the PaymentChannelFund model.
-    //
-    // See PaymentChannelFund fields:
-    // `<https://xrpl.org/paymentchannelfund.html#paymentchannelfund-fields>`
     /// Amount of XRP, in drops to add to the channel. Must be a positive amount of XRP.
     pub amount: XRPAmount<'a>,
     /// The unique ID of the channel to fund, as a 64-character hexadecimal string.
@@ -66,19 +58,13 @@ impl<'a> Transaction<'a, NoFlags> for PaymentChannelFund<'a> {
     }
 }
 
-impl<'a> Default for PaymentChannelFund<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::PaymentChannelFund,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            amount: XRPAmount::from("0"),
-            channel: "".into(),
-            expiration: None,
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for PaymentChannelFund<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -125,51 +111,12 @@ impl<'a> PaymentChannelFund<'a> {
         self.expiration = Some(expiration);
         self
     }
-
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
-        self
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::models::amount::XRPAmount;
+    use crate::models::transactions::Memo;
 
     use super::*;
 
@@ -198,5 +145,135 @@ mod tests {
         // Deserialize
         let deserialized: PaymentChannelFund = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let payment_channel_fund = PaymentChannelFund {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::PaymentChannelFund,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("200000"),
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_expiration(543171558)
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("funding channel".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(payment_channel_fund.amount.0, "200000");
+        assert_eq!(
+            payment_channel_fund.channel,
+            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198"
+        );
+        assert_eq!(payment_channel_fund.expiration, Some(543171558));
+        assert_eq!(
+            payment_channel_fund.common_fields.fee.as_ref().unwrap().0,
+            "12"
+        );
+        assert_eq!(payment_channel_fund.common_fields.sequence, Some(123));
+        assert_eq!(
+            payment_channel_fund.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(payment_channel_fund.common_fields.source_tag, Some(12345));
+        assert_eq!(
+            payment_channel_fund
+                .common_fields
+                .memos
+                .as_ref()
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_default() {
+        let payment_channel_fund = PaymentChannelFund {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::PaymentChannelFund,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("200000"),
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            payment_channel_fund.common_fields.account,
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"
+        );
+        assert_eq!(
+            payment_channel_fund.common_fields.transaction_type,
+            TransactionType::PaymentChannelFund
+        );
+        assert_eq!(payment_channel_fund.amount.0, "200000");
+        assert_eq!(
+            payment_channel_fund.channel,
+            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198"
+        );
+        assert!(payment_channel_fund.expiration.is_none());
+    }
+
+    #[test]
+    fn test_without_expiration() {
+        let payment_channel_fund = PaymentChannelFund {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::PaymentChannelFund,
+                fee: Some("12".into()),
+                sequence: Some(123),
+                ..Default::default()
+            },
+            amount: XRPAmount::from("500000"),
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            expiration: None, // Just funding without changing expiration
+        };
+
+        assert_eq!(payment_channel_fund.amount.0, "500000");
+        assert!(payment_channel_fund.expiration.is_none());
+        assert_eq!(
+            payment_channel_fund.common_fields.fee.as_ref().unwrap().0,
+            "12"
+        );
+        assert_eq!(payment_channel_fund.common_fields.sequence, Some(123));
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let payment_channel_fund = PaymentChannelFund {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::PaymentChannelFund,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("200000"),
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            ..Default::default()
+        }
+        .with_ticket_sequence(456)
+        .with_fee("12".into());
+
+        assert_eq!(
+            payment_channel_fund.common_fields.ticket_sequence,
+            Some(456)
+        );
+        assert_eq!(
+            payment_channel_fund.common_fields.fee.as_ref().unwrap().0,
+            "12"
+        );
+        // When using tickets, sequence should be 0
+        assert!(payment_channel_fund.common_fields.sequence.is_none());
     }
 }

@@ -4,24 +4,22 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::CommonFields;
 use crate::models::{
-    transactions::{Transaction, TransactionType},
+    transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::{Memo, Signer};
+use super::{CommonFields, CommonTransactionBuilder};
 
 /// An AccountDelete transaction deletes an account and any objects it
 /// owns in the XRP Ledger, if possible, sending the account's remaining
-/// XRP to a specified destination account. See Deletion of Accounts for
-/// the requirements to delete an account.
+/// XRP to a specified destination account.
 ///
 /// See AccountDelete:
-/// `<https://xrpl.org/accountdelete.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/accountdelete>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountDelete<'a> {
     /// The base fields for all transaction models.
@@ -30,10 +28,6 @@ pub struct AccountDelete<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the AccountDelete model.
-    //
-    // See AccountDelete fields:
-    // `<https://xrpl.org/accountdelete.html#accountdelete-fields>`
     /// The address of an account to receive any leftover XRP after
     /// deleting the sending account. Must be a funded account in
     /// the ledger, and must not be the sending account.
@@ -57,6 +51,16 @@ impl<'a> Transaction<'a, NoFlags> for AccountDelete<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for AccountDelete<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -101,61 +105,6 @@ impl<'a> AccountDelete<'a> {
         self.destination_tag = Some(tag);
         self
     }
-
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
-        self
-    }
-}
-
-impl<'a> Default for AccountDelete<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::AccountDelete,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            destination: "".into(),
-            destination_tag: None,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -188,5 +137,183 @@ mod tests {
         // Deserialize
         let deserialized: AccountDelete = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
+            ..Default::default()
+        }
+        .with_destination_tag(13)
+        .with_fee("2000000".into())
+        .with_sequence(2470665)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("deleting account".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(
+            account_delete.destination,
+            "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe"
+        );
+        assert_eq!(account_delete.destination_tag, Some(13));
+        assert_eq!(
+            account_delete.common_fields.fee.as_ref().unwrap().0,
+            "2000000"
+        );
+        assert_eq!(account_delete.common_fields.sequence, Some(2470665));
+        assert_eq!(
+            account_delete.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(account_delete.common_fields.source_tag, Some(12345));
+        assert_eq!(
+            account_delete.common_fields.memos.as_ref().unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_default() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            account_delete.common_fields.account,
+            "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm"
+        );
+        assert_eq!(
+            account_delete.common_fields.transaction_type,
+            TransactionType::AccountDelete
+        );
+        assert_eq!(
+            account_delete.destination,
+            "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe"
+        );
+        assert!(account_delete.destination_tag.is_none());
+        assert!(account_delete.common_fields.fee.is_none());
+        assert!(account_delete.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_minimal_delete() {
+        let minimal_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rAccountToDelete123".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rDestinationAccount456".into(),
+            ..Default::default()
+        }
+        .with_fee("2000000".into()) // 2 XRP minimum fee for AccountDelete
+        .with_sequence(100);
+
+        assert_eq!(minimal_delete.destination, "rDestinationAccount456");
+        assert!(minimal_delete.destination_tag.is_none());
+        assert_eq!(
+            minimal_delete.common_fields.fee.as_ref().unwrap().0,
+            "2000000"
+        );
+        assert_eq!(minimal_delete.common_fields.sequence, Some(100));
+    }
+
+    #[test]
+    fn test_with_destination_tag() {
+        let tagged_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rDeleteAccount789".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rExchange123".into(), // Exchange account
+            ..Default::default()
+        }
+        .with_destination_tag(987654321) // Exchange customer ID
+        .with_fee("2000000".into())
+        .with_sequence(200)
+        .with_memo(Memo {
+            memo_data: Some("closing account".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(tagged_delete.destination, "rExchange123");
+        assert_eq!(tagged_delete.destination_tag, Some(987654321));
+        assert_eq!(tagged_delete.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rTicketUser111".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rDestination222".into(),
+            ..Default::default()
+        }
+        .with_ticket_sequence(54321)
+        .with_fee("2000000".into());
+
+        assert_eq!(ticket_delete.common_fields.ticket_sequence, Some(54321));
+        assert_eq!(ticket_delete.destination, "rDestination222");
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_delete.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_multiple_memos() {
+        let multi_memo_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rMultiMemoAccount333".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rFinalDestination444".into(),
+            ..Default::default()
+        }
+        .with_memo(Memo {
+            memo_data: Some("reason 1".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_memo(Memo {
+            memo_data: Some("reason 2".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_destination_tag(555)
+        .with_fee("2000000".into())
+        .with_sequence(300);
+
+        assert_eq!(
+            multi_memo_delete
+                .common_fields
+                .memos
+                .as_ref()
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(multi_memo_delete.destination_tag, Some(555));
+        assert_eq!(multi_memo_delete.common_fields.sequence, Some(300));
     }
 }

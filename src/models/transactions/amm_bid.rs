@@ -7,7 +7,7 @@ use crate::models::{
     XRPAmount,
 };
 
-use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
+use super::{AuthAccount, CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction};
 
 /// Bid on an Automated Market Maker's (AMM's) auction slot.
 ///
@@ -19,13 +19,14 @@ use super::{AuthAccount, CommonFields, Memo, Signer, Transaction};
 /// refunded part of the cost of your bid based on how much time remains. You bid using
 /// the AMM's LP Tokens; the amount of a winning bid is returned to the AMM, decreasing
 /// the outstanding balance of LP Tokens.
-///
-/// See AMMBid transaction:
-/// `<https://xrpl.org/docs/references/protocol/transactions/types/ammbid>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMBid<'a> {
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The definition for one of the assets in the AMM's pool.
@@ -45,37 +46,30 @@ pub struct AMMBid<'a> {
     /// fee. This cannot include the address of the transaction sender.
     pub auth_accounts: Option<Vec<AuthAccount>>,
 }
-impl Model for AMMBid<'_> {}
+
+impl<'a> Model for AMMBid<'a> {}
 
 impl<'a> Transaction<'a, NoFlags> for AMMBid<'a> {
+    fn get_transaction_type(&self) -> &TransactionType {
+        self.common_fields.get_transaction_type()
+    }
+
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
-        &self.common_fields
+        self.common_fields.get_common_fields()
     }
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
         self.common_fields.get_mut_common_fields()
     }
-
-    fn get_transaction_type(&self) -> &TransactionType {
-        self.common_fields.get_transaction_type()
-    }
 }
 
-impl<'a> Default for AMMBid<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::AMMBid,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            asset: Currency::default(),
-            asset2: Currency::default(),
-            bid_min: None,
-            bid_max: None,
-            auth_accounts: None,
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for AMMBid<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -146,46 +140,6 @@ impl<'a> AMMBid<'a> {
         } else {
             self.auth_accounts = Some(vec![auth_account]);
         }
-        self
-    }
-
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Set last ledger sequence
-    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
-        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-
-    /// Set source tag
-    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
-        self.common_fields.source_tag = Some(source_tag);
-        self
-    }
-
-    /// Set ticket sequence
-    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
-        self.common_fields.ticket_sequence = Some(ticket_sequence);
         self
     }
 }
@@ -274,12 +228,218 @@ mod tests {
             account: "rBepJuTLFJt3WmtLXYAxSjtBWAeQxVbncv".into(),
         })
         .with_fee("12".into())
-        .with_sequence(123);
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("AMM bid transaction".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
 
         assert_eq!(bid.bid_min.as_ref().unwrap().value, Cow::from("100"));
         assert_eq!(bid.bid_max.as_ref().unwrap().value, Cow::from("110"));
         assert_eq!(bid.auth_accounts.as_ref().unwrap().len(), 2);
         assert_eq!(bid.common_fields.fee.as_ref().unwrap().0, "12");
         assert_eq!(bid.common_fields.sequence, Some(123));
+        assert_eq!(bid.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(bid.common_fields.source_tag, Some(12345));
+        assert_eq!(bid.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_default() {
+        let amm_bid = AMMBid {
+            common_fields: CommonFields {
+                account: "rBidderAccount123".into(),
+                transaction_type: TransactionType::AMMBid,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            asset2: Currency::IssuedCurrency(IssuedCurrency::new(
+                "USD".into(),
+                "rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd".into(),
+            )),
+            ..Default::default()
+        };
+
+        assert_eq!(amm_bid.common_fields.account, "rBidderAccount123");
+        assert_eq!(
+            amm_bid.common_fields.transaction_type,
+            TransactionType::AMMBid
+        );
+        assert!(matches!(amm_bid.asset, Currency::XRP(_)));
+        assert!(matches!(amm_bid.asset2, Currency::IssuedCurrency(_)));
+        assert!(amm_bid.bid_min.is_none());
+        assert!(amm_bid.bid_max.is_none());
+        assert!(amm_bid.auth_accounts.is_none());
+    }
+
+    #[test]
+    fn test_minimal_bid() {
+        let minimal_bid = AMMBid {
+            common_fields: CommonFields {
+                account: "rMinimalBidder456".into(),
+                transaction_type: TransactionType::AMMBid,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            asset2: Currency::IssuedCurrency(IssuedCurrency::new(
+                "EUR".into(),
+                "rEuroIssuer789".into(),
+            )),
+            ..Default::default()
+        }
+        .with_fee("12".into())
+        .with_sequence(100);
+
+        assert_eq!(minimal_bid.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(minimal_bid.common_fields.sequence, Some(100));
+        assert!(minimal_bid.bid_min.is_none());
+        assert!(minimal_bid.bid_max.is_none());
+        assert!(minimal_bid.auth_accounts.is_none());
+    }
+
+    #[test]
+    fn test_bid_with_range() {
+        let range_bid = AMMBid {
+            common_fields: CommonFields {
+                account: "rRangeBidder789".into(),
+                transaction_type: TransactionType::AMMBid,
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new(
+                "BTC".into(),
+                "rBTCIssuer123".into(),
+            )),
+            asset2: Currency::IssuedCurrency(IssuedCurrency::new(
+                "ETH".into(),
+                "rETHIssuer456".into(),
+            )),
+            ..Default::default()
+        }
+        .with_bid_min(IssuedCurrencyAmount::new(
+            "039C99CD9AB0B70B32ECDA51EAAE471625608EA2".into(),
+            "rLPTokenIssuer".into(),
+            "50".into(),
+        ))
+        .with_bid_max(IssuedCurrencyAmount::new(
+            "039C99CD9AB0B70B32ECDA51EAAE471625608EA2".into(),
+            "rLPTokenIssuer".into(),
+            "200".into(),
+        ))
+        .with_fee("15".into())
+        .with_sequence(200);
+
+        assert_eq!(range_bid.bid_min.as_ref().unwrap().value, "50");
+        assert_eq!(range_bid.bid_max.as_ref().unwrap().value, "200");
+        assert_eq!(range_bid.common_fields.sequence, Some(200));
+    }
+
+    #[test]
+    fn test_bid_with_auth_accounts() {
+        let auth_bid = AMMBid {
+            common_fields: CommonFields {
+                account: "rAuthBidder111".into(),
+                transaction_type: TransactionType::AMMBid,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            asset2: Currency::IssuedCurrency(IssuedCurrency::new(
+                "USD".into(),
+                "rUSDIssuer222".into(),
+            )),
+            ..Default::default()
+        }
+        .add_auth_account(AuthAccount {
+            account: "rAuthorized1".into(),
+        })
+        .add_auth_account(AuthAccount {
+            account: "rAuthorized2".into(),
+        })
+        .add_auth_account(AuthAccount {
+            account: "rAuthorized3".into(),
+        })
+        .with_fee("20".into())
+        .with_sequence(300)
+        .with_memo(Memo {
+            memo_data: Some("bid with authorized accounts".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(auth_bid.auth_accounts.as_ref().unwrap().len(), 3);
+        assert_eq!(
+            auth_bid.auth_accounts.as_ref().unwrap()[0].account,
+            "rAuthorized1"
+        );
+        assert_eq!(
+            auth_bid.auth_accounts.as_ref().unwrap()[1].account,
+            "rAuthorized2"
+        );
+        assert_eq!(
+            auth_bid.auth_accounts.as_ref().unwrap()[2].account,
+            "rAuthorized3"
+        );
+        assert_eq!(auth_bid.common_fields.sequence, Some(300));
+        assert_eq!(auth_bid.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_bid = AMMBid {
+            common_fields: CommonFields {
+                account: "rTicketBidder333".into(),
+                transaction_type: TransactionType::AMMBid,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            asset2: Currency::IssuedCurrency(IssuedCurrency::new(
+                "GBP".into(),
+                "rGBPIssuer444".into(),
+            )),
+            ..Default::default()
+        }
+        .with_ticket_sequence(54321)
+        .with_fee("12".into());
+
+        assert_eq!(ticket_bid.common_fields.ticket_sequence, Some(54321));
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_bid.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_multiple_memos() {
+        let multi_memo_bid = AMMBid {
+            common_fields: CommonFields {
+                account: "rMultiMemoBidder555".into(),
+                transaction_type: TransactionType::AMMBid,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            asset2: Currency::IssuedCurrency(IssuedCurrency::new(
+                "JPY".into(),
+                "rJPYIssuer666".into(),
+            )),
+            ..Default::default()
+        }
+        .with_memo(Memo {
+            memo_data: Some("first memo".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_memo(Memo {
+            memo_data: Some("second memo".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_fee("18".into())
+        .with_sequence(400);
+
+        assert_eq!(
+            multi_memo_bid.common_fields.memos.as_ref().unwrap().len(),
+            2
+        );
+        assert_eq!(multi_memo_bid.common_fields.sequence, Some(400));
     }
 }

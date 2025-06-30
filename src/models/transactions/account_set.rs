@@ -22,13 +22,13 @@ use crate::{
     },
 };
 
-use super::FlagCollection;
+use super::{CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the AccountSet type support additional values
 /// in the Flags field. This enum represents those options.
 ///
 /// See AccountSet flags:
-/// `<https://xrpl.org/accountset.html#accountset-flags>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/accountset>`
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter, Copy,
 )]
@@ -81,9 +81,9 @@ pub enum AccountSetFlag {
 /// account in the XRP Ledger.
 ///
 /// See AccountSet:
-/// `<https://xrpl.org/accountset.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/accountset>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountSet<'a> {
     /// The base fields for all transaction models.
@@ -95,7 +95,7 @@ pub struct AccountSet<'a> {
     // The custom fields for the AccountSet model.
     //
     // See AccountSet fields:
-    // `<https://xrpl.org/accountset.html#accountset-fields>`
+    // `<https://xrpl.org/docs/references/protocol/transactions/types/accountset>`
     /// Unique identifier of a flag to disable for this account.
     pub clear_flag: Option<AccountSetFlag>,
     /// The domain that owns this account, as a string of hex
@@ -158,6 +158,16 @@ impl<'a> Transaction<'a, AccountSetFlag> for AccountSet<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, AccountSetFlag> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, AccountSetFlag> for AccountSet<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, AccountSetFlag> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -379,44 +389,6 @@ impl<'a> AccountSet<'a> {
         self.tick_size = Some(tick_size);
         self
     }
-
-    /// Set fee
-    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
-        self.common_fields.fee = Some(fee);
-        self
-    }
-
-    /// Set sequence
-    pub fn with_sequence(mut self, sequence: u32) -> Self {
-        self.common_fields.sequence = Some(sequence);
-        self
-    }
-
-    /// Add memo
-    pub fn with_memo(mut self, memo: Memo) -> Self {
-        if let Some(ref mut memos) = self.common_fields.memos {
-            memos.push(memo);
-        } else {
-            self.common_fields.memos = Some(vec![memo]);
-        }
-        self
-    }
-}
-
-impl<'a> Default for AccountSet<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields::default(),
-            clear_flag: None,
-            domain: None,
-            email_hash: None,
-            message_key: None,
-            nftoken_minter: None,
-            set_flag: None,
-            transfer_rate: None,
-            tick_size: None,
-        }
-    }
 }
 
 impl FromStr for AccountSetFlag {
@@ -599,6 +571,7 @@ mod tests {
                 transaction_type: TransactionType::AccountSet,
                 fee: Some("12".into()),
                 sequence: Some(5),
+                signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             domain: Some("6578616D706C652E636F6D".into()),
@@ -620,5 +593,250 @@ mod tests {
         // Deserialize
         let deserialized: AccountSet = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_domain("6578616D706C652E636F6D".into())
+        .with_message_key(
+            "03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB".into(),
+        )
+        .with_set_flag(AccountSetFlag::AsfAccountTxnID)
+        .with_fee("12".into())
+        .with_sequence(5)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("setting up account".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(
+            account_set.domain.as_ref().unwrap(),
+            "6578616D706C652E636F6D"
+        );
+        assert_eq!(
+            account_set.message_key.as_ref().unwrap(),
+            "03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB"
+        );
+        assert_eq!(account_set.set_flag, Some(AccountSetFlag::AsfAccountTxnID));
+        assert_eq!(account_set.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(account_set.common_fields.sequence, Some(5));
+        assert_eq!(
+            account_set.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(account_set.common_fields.source_tag, Some(12345));
+        assert_eq!(account_set.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_default() {
+        let account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(
+            account_set.common_fields.account,
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"
+        );
+        assert_eq!(
+            account_set.common_fields.transaction_type,
+            TransactionType::AccountSet
+        );
+        assert!(account_set.clear_flag.is_none());
+        assert!(account_set.domain.is_none());
+        assert!(account_set.email_hash.is_none());
+        assert!(account_set.message_key.is_none());
+        assert!(account_set.nftoken_minter.is_none());
+        assert!(account_set.set_flag.is_none());
+        assert!(account_set.transfer_rate.is_none());
+        assert!(account_set.tick_size.is_none());
+    }
+
+    #[test]
+    fn test_enable_deposit_auth() {
+        let deposit_auth_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rDepositAccount123".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_set_flag(AccountSetFlag::AsfDepositAuth)
+        .with_fee("12".into())
+        .with_sequence(100)
+        .with_memo(Memo {
+            memo_data: Some("enabling deposit authorization".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(
+            deposit_auth_set.set_flag,
+            Some(AccountSetFlag::AsfDepositAuth)
+        );
+        assert_eq!(deposit_auth_set.common_fields.sequence, Some(100));
+        assert!(deposit_auth_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_set_transfer_rate() {
+        let transfer_rate_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rTokenIssuer456".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_transfer_rate(1020000000) // 2% transfer fee
+        .with_fee("12".into())
+        .with_sequence(200);
+
+        assert_eq!(transfer_rate_set.transfer_rate, Some(1020000000));
+        assert_eq!(transfer_rate_set.common_fields.sequence, Some(200));
+        assert!(transfer_rate_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_set_tick_size() {
+        let tick_size_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rMarketMaker789".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_tick_size(5) // 5 significant digits
+        .with_fee("12".into())
+        .with_sequence(300);
+
+        assert_eq!(tick_size_set.tick_size, Some(5));
+        assert_eq!(tick_size_set.common_fields.sequence, Some(300));
+        assert!(tick_size_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_nftoken_minter() {
+        let nftoken_auth_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rNFTIssuer111".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_set_flag(AccountSetFlag::AsfAuthorizedNFTokenMinter)
+        .with_nftoken_minter("rAuthorizedMinter222".into())
+        .with_fee("12".into())
+        .with_sequence(400);
+
+        assert_eq!(
+            nftoken_auth_set.set_flag,
+            Some(AccountSetFlag::AsfAuthorizedNFTokenMinter)
+        );
+        assert_eq!(
+            nftoken_auth_set.nftoken_minter.as_ref().unwrap(),
+            "rAuthorizedMinter222"
+        );
+        assert_eq!(nftoken_auth_set.common_fields.sequence, Some(400));
+        assert!(nftoken_auth_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_disable_master_key() {
+        let disable_master = AccountSet {
+            common_fields: CommonFields {
+                account: "rSecureAccount333".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_set_flag(AccountSetFlag::AsfDisableMaster)
+        .with_fee("12".into())
+        .with_sequence(500)
+        .with_memo(Memo {
+            memo_data: Some("disabling master key for security".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(
+            disable_master.set_flag,
+            Some(AccountSetFlag::AsfDisableMaster)
+        );
+        assert_eq!(disable_master.common_fields.sequence, Some(500));
+        assert!(disable_master.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rTicketUser444".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_set_flag(AccountSetFlag::AsfRequireDest)
+        .with_ticket_sequence(12345)
+        .with_fee("12".into());
+
+        assert_eq!(
+            ticket_account_set.common_fields.ticket_sequence,
+            Some(12345)
+        );
+        assert_eq!(
+            ticket_account_set.set_flag,
+            Some(AccountSetFlag::AsfRequireDest)
+        );
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_account_set.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_clear_and_set_different_flags() {
+        let multi_flag_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rMultiFlagAccount555".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_set_flag(AccountSetFlag::AsfRequireDest)
+        .with_clear_flag(AccountSetFlag::AsfDisallowXRP)
+        .with_fee("12".into())
+        .with_sequence(600);
+
+        assert_eq!(
+            multi_flag_set.set_flag,
+            Some(AccountSetFlag::AsfRequireDest)
+        );
+        assert_eq!(
+            multi_flag_set.clear_flag,
+            Some(AccountSetFlag::AsfDisallowXRP)
+        );
+        assert_eq!(multi_flag_set.common_fields.sequence, Some(600));
+        assert!(multi_flag_set.validate().is_ok());
     }
 }

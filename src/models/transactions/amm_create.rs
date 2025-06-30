@@ -31,9 +31,13 @@ pub const AMM_CREATE_MAX_FEE: u16 = 1000;
 /// See AMMCreate transaction:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/ammcreate>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMCreate<'a> {
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The first of the two assets to fund this AMM with. This must be a positive amount.
@@ -61,10 +65,10 @@ impl<'a> Transaction<'a, NoFlags> for AMMCreate<'a> {
     }
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
-        self.common_fields.get_mut_common_fields()
+        &mut self.common_fields
     }
 
-    fn get_transaction_type(&self) -> &super::TransactionType {
+    fn get_transaction_type(&self) -> &TransactionType {
         self.common_fields.get_transaction_type()
     }
 }
@@ -76,22 +80,6 @@ impl<'a> CommonTransactionBuilder<'a, NoFlags> for AMMCreate<'a> {
 
     fn into_self(self) -> Self {
         self
-    }
-}
-
-impl<'a> Default for AMMCreate<'a> {
-    fn default() -> Self {
-        Self {
-            common_fields: CommonFields {
-                account: "".into(),
-                transaction_type: TransactionType::AMMCreate,
-                signing_pub_key: Some("".into()),
-                ..Default::default()
-            },
-            amount: Amount::default(),
-            amount2: Amount::default(),
-            trading_fee: 0,
-        }
     }
 }
 
@@ -154,7 +142,7 @@ impl<'a> AMMCreate<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::IssuedCurrencyAmount;
+    use crate::models::{IssuedCurrencyAmount, XRPAmount};
 
     #[test]
     fn test_trading_fee_error() {
@@ -246,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_builder_pattern_with_trait() {
+    fn test_builder_pattern() {
         let amm_create = AMMCreate {
             common_fields: CommonFields {
                 account: "rJVUeRqDFNs2EQp4ikJUFMdUHURJ8rAqny".into(),
@@ -265,9 +253,11 @@ mod tests {
         .with_sequence(123) // From CommonTransactionBuilder trait
         .with_last_ledger_sequence(7108682) // From CommonTransactionBuilder trait
         .with_source_tag(12345) // From CommonTransactionBuilder trait
-        .with_memo(Memo::default()) // From CommonTransactionBuilder trait
-        .with_account_txn_id("ABCD".into()) // From CommonTransactionBuilder trait
-        .with_ticket_sequence(456); // From CommonTransactionBuilder trait
+        .with_memo(Memo {
+            memo_data: Some("creating AMM".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        }); // From CommonTransactionBuilder trait
 
         assert_eq!(amm_create.trading_fee, 500);
         assert_eq!(amm_create.common_fields.fee.as_ref().unwrap().0, "12");
@@ -275,10 +265,212 @@ mod tests {
         assert_eq!(amm_create.common_fields.last_ledger_sequence, Some(7108682));
         assert_eq!(amm_create.common_fields.source_tag, Some(12345));
         assert_eq!(amm_create.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_default() {
+        let amm_create = AMMCreate {
+            common_fields: CommonFields {
+                account: "rAMMCreator123".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "EUR".into(),
+                "rEURIssuer456".into(),
+                "1000".into(),
+            )),
+            trading_fee: 250,
+        };
+
+        assert_eq!(amm_create.common_fields.account, "rAMMCreator123");
         assert_eq!(
-            amm_create.common_fields.account_txn_id.as_ref().unwrap(),
-            "ABCD"
+            amm_create.common_fields.transaction_type,
+            TransactionType::AMMCreate
         );
-        assert_eq!(amm_create.common_fields.ticket_sequence, Some(456));
+        assert_eq!(amm_create.trading_fee, 250);
+        assert!(amm_create.common_fields.fee.is_none());
+        assert!(amm_create.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_xrp_token_amm() {
+        let xrp_token_amm = AMMCreate {
+            common_fields: CommonFields {
+                account: "rXRPTokenAMM789".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("50000000")), // 50 XRP
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "BTC".into(),
+                "rBTCIssuer123".into(),
+                "0.5".into(), // 0.5 BTC
+            )),
+            trading_fee: 100, // 0.1% trading fee
+        }
+        .with_fee("12".into())
+        .with_sequence(100)
+        .with_memo(Memo {
+            memo_data: Some("XRP-BTC AMM pool".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert!(matches!(xrp_token_amm.amount, Amount::XRPAmount(_)));
+        assert!(matches!(
+            xrp_token_amm.amount2,
+            Amount::IssuedCurrencyAmount(_)
+        ));
+        assert_eq!(xrp_token_amm.trading_fee, 100);
+        assert_eq!(xrp_token_amm.common_fields.sequence, Some(100));
+        assert!(xrp_token_amm.validate().is_ok());
+    }
+
+    #[test]
+    fn test_token_token_amm() {
+        let token_amm = AMMCreate {
+            common_fields: CommonFields {
+                account: "rTokenAMM111".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rUSDIssuer222".into(),
+                "10000".into(), // 10,000 USD
+            )),
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "EUR".into(),
+                "rEURIssuer333".into(),
+                "8500".into(), // 8,500 EUR (roughly equal value)
+            )),
+            trading_fee: 50, // 0.05% trading fee
+        }
+        .with_fee("15".into())
+        .with_sequence(200);
+
+        assert!(matches!(token_amm.amount, Amount::IssuedCurrencyAmount(_)));
+        assert!(matches!(token_amm.amount2, Amount::IssuedCurrencyAmount(_)));
+        assert_eq!(token_amm.trading_fee, 50);
+        assert_eq!(token_amm.common_fields.sequence, Some(200));
+        assert!(token_amm.validate().is_ok());
+    }
+
+    #[test]
+    fn test_high_volatility_amm() {
+        let volatile_amm = AMMCreate {
+            common_fields: CommonFields {
+                account: "rVolatileAMM444".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "DOGE".into(),
+                "rDOGEIssuer555".into(),
+                "1000000".into(), // 1M DOGE
+            )),
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "SHIB".into(),
+                "rSHIBIssuer666".into(),
+                "100000000".into(), // 100M SHIB
+            )),
+            trading_fee: 1000, // 1% trading fee for volatile assets
+        }
+        .with_fee("20".into())
+        .with_sequence(300)
+        .with_memo(Memo {
+            memo_data: Some("high volatility meme coin AMM".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert_eq!(volatile_amm.trading_fee, 1000); // Maximum allowed fee
+        assert_eq!(volatile_amm.common_fields.sequence, Some(300));
+        assert!(volatile_amm.validate().is_ok());
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_amm = AMMCreate {
+            common_fields: CommonFields {
+                account: "rTicketAMM777".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("25000000")), // 25 XRP
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "ETH".into(),
+                "rETHIssuer888".into(),
+                "10".into(), // 10 ETH
+            )),
+            trading_fee: 30, // 0.03% trading fee
+        }
+        .with_ticket_sequence(12345)
+        .with_fee("12".into());
+
+        assert_eq!(ticket_amm.common_fields.ticket_sequence, Some(12345));
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_amm.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_multiple_memos() {
+        let multi_memo_amm = AMMCreate {
+            common_fields: CommonFields {
+                account: "rMultiMemoAMM999".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("100000000")), // 100 XRP
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USDC".into(),
+                "rUSDCIssuer111".into(),
+                "50".into(), // 50 USDC
+            )),
+            trading_fee: 25, // 0.025% trading fee
+        }
+        .with_memo(Memo {
+            memo_data: Some("first memo".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_memo(Memo {
+            memo_data: Some("second memo".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        })
+        .with_fee("18".into())
+        .with_sequence(400);
+
+        assert_eq!(
+            multi_memo_amm.common_fields.memos.as_ref().unwrap().len(),
+            2
+        );
+        assert_eq!(multi_memo_amm.common_fields.sequence, Some(400));
+    }
+
+    #[test]
+    fn test_min_trading_fee() {
+        let min_fee_amm = AMMCreate {
+            common_fields: CommonFields {
+                account: "rMinFeeAMM222".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("10000000")), // 10 XRP
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USDT".into(),
+                "rUSDTIssuer333".into(),
+                "5".into(), // 5 USDT
+            )),
+            trading_fee: 0, // No trading fee
+        }
+        .with_fee("12".into())
+        .with_sequence(500);
+
+        assert_eq!(min_fee_amm.trading_fee, 0);
+        assert!(min_fee_amm.validate().is_ok());
     }
 }
