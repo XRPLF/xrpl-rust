@@ -138,7 +138,7 @@ impl<'a> AMMBid<'a> {
         if let Some(ref mut accounts) = self.auth_accounts {
             accounts.push(auth_account);
         } else {
-            self.auth_accounts = Some(vec![auth_account]);
+            self.auth_accounts = Some(alloc::vec![auth_account]);
         }
         self
     }
