@@ -374,7 +374,7 @@ mod tests {
                 .with_fee("12".into())
                 .with_sequence(500 + i)
                 .with_memo(Memo {
-                    memo_data: Some(format!("cleanup batch {}", i).into()),
+                    memo_data: Some(alloc::format!("cleanup batch {}", i).into()),
                     memo_format: None,
                     memo_type: Some("text".into()),
                 })
