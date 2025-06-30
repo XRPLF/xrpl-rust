@@ -74,6 +74,25 @@ impl<'a> Transaction<'a, NoFlags> for PaymentChannelCreate<'a> {
     }
 }
 
+impl<'a> Default for PaymentChannelCreate<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::PaymentChannelCreate,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            amount: XRPAmount::from("0"),
+            destination: "".into(),
+            settle_delay: 0,
+            public_key: "".into(),
+            cancel_after: None,
+            destination_tag: None,
+        }
+    }
+}
+
 impl<'a> PaymentChannelCreate<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -117,6 +136,58 @@ impl<'a> PaymentChannelCreate<'a> {
             destination_tag,
         }
     }
+
+    /// Set cancel after
+    pub fn with_cancel_after(mut self, cancel_after: u32) -> Self {
+        self.cancel_after = Some(cancel_after);
+        self
+    }
+
+    /// Set destination tag
+    pub fn with_destination_tag(mut self, destination_tag: u32) -> Self {
+        self.destination_tag = Some(destination_tag);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -125,24 +196,24 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = PaymentChannelCreate::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(11747),
-            None,
-            XRPAmount::from("10000"),
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            "32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into(),
-            86400,
-            Some(533171558),
-            Some(23480),
-        );
+        let default_txn = PaymentChannelCreate {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::PaymentChannelCreate,
+                signing_pub_key: Some("".into()),
+                source_tag: Some(11747),
+                ..Default::default()
+            },
+            amount: XRPAmount::from("10000"),
+            destination: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+            settle_delay: 86400,
+            public_key: "32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into(),
+            cancel_after: Some(533171558),
+            destination_tag: Some(23480),
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"PaymentChannelCreate","Flags":0,"SigningPubKey":"","SourceTag":11747,"Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","SettleDelay":86400,"PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A","CancelAfter":533171558,"DestinationTag":23480}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

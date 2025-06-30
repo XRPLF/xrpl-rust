@@ -67,6 +67,20 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenCancelOffer<'a> {
     }
 }
 
+impl<'a> Default for NFTokenCancelOffer<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            nftoken_offers: Vec::new(),
+        }
+    }
+}
+
 impl<'a> NFTokenCancelOfferError for NFTokenCancelOffer<'a> {
     fn _get_nftoken_offers_error(&self) -> XRPLModelResult<()> {
         if self.nftoken_offers.is_empty() {
@@ -114,6 +128,58 @@ impl<'a> NFTokenCancelOffer<'a> {
             nftoken_offers,
         }
     }
+
+    /// Add offer to cancel6
+    pub fn add_offer(mut self, offer_id: Cow<'a, str>) -> Self {
+        self.nftoken_offers.push(offer_id);
+        self
+    }
+
+    /// Set offers to cancel
+    pub fn with_offers(mut self, offers: Vec<Cow<'a, str>>) -> Self {
+        self.nftoken_offers = offers;
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 pub trait NFTokenCancelOfferError {
@@ -121,57 +187,47 @@ pub trait NFTokenCancelOfferError {
 }
 
 #[cfg(test)]
-mod test_nftoken_cancel_offer_error {
+mod tests {
     use alloc::string::ToString;
+    use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::models::Model;
-
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_nftoken_offer_error() {
-        let nftoken_cancel_offer = NFTokenCancelOffer::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Vec::new(),
-        );
+        let nftoken_cancel_offer = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                ..Default::default()
+            },
+            nftoken_offers: Vec::new(), // Empty vec should cause error
+        };
 
         assert_eq!(
             nftoken_cancel_offer.validate().unwrap_err().to_string().as_str(),
             "The value of the field `\"nftoken_offers\"` is not allowed to be empty (type `\"Vec\"`). If the field is optional, define it to be `None`"
         );
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use alloc::vec;
-
-    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = NFTokenCancelOffer::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            vec!["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into()],
-        );
+        let default_txn = NFTokenCancelOffer {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::NFTokenCancelOffer,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            nftoken_offers: vec![
+                "9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D".into(),
+            ],
+        };
+
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"NFTokenCancelOffer","Flags":0,"SigningPubKey":"","NFTokenOffers":["9C92E061381C1EF37A8CDE0E8FC35188BFC30B1883825042A64309AC09F4C36D"]}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

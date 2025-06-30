@@ -19,8 +19,9 @@ use super::{CommonFields, FlagCollection};
 /// in the Flags field. This enum represents those options.
 ///
 /// See TrustSet flags:
+/// `<https://xrpl.org/trustset.html#trustset-flags>`
 #[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+    Debug, Eq, PartialEq, Clone, Copy, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
 #[repr(u32)]
 pub enum TrustSetFlag {
@@ -30,7 +31,7 @@ pub enum TrustSetFlag {
     /// Enable the No Ripple flag, which blocks rippling between two trust lines
     /// of the same currency if this flag is enabled on both.
     TfSetNoRipple = 0x00020000,
-    /// Disable the No Ripple flag, allowing rippling on this trust line.)
+    /// Disable the No Ripple flag, allowing rippling on this trust line.
     TfClearNoRipple = 0x00040000,
     /// Freeze the trust line.
     TfSetFreeze = 0x00100000,
@@ -90,6 +91,22 @@ impl<'a> Transaction<'a, TrustSetFlag> for TrustSet<'a> {
     }
 }
 
+impl<'a> Default for TrustSet<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::TrustSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::default(),
+            quality_in: None,
+            quality_out: None,
+        }
+    }
+}
+
 impl<'a> TrustSet<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -128,35 +145,102 @@ impl<'a> TrustSet<'a> {
             quality_out,
         }
     }
+
+    /// Set quality in
+    pub fn with_quality_in(mut self, quality_in: u32) -> Self {
+        self.quality_in = Some(quality_in);
+        self
+    }
+
+    /// Set quality out
+    pub fn with_quality_out(mut self, quality_out: u32) -> Self {
+        self.quality_out = Some(quality_out);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Add flag
+    pub fn with_flag(mut self, flag: TrustSetFlag) -> Self {
+        self.common_fields.flags.0.push(flag);
+        self
+    }
+
+    /// Set multiple flags
+    pub fn with_flags(mut self, flags: Vec<TrustSetFlag>) -> Self {
+        self.common_fields.flags = flags.into();
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use alloc::vec;
+
+    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = TrustSet::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            None,
-            Some("12".into()),
-            Some(vec![TrustSetFlag::TfClearNoRipple].into()),
-            Some(8007750),
-            None,
-            Some(12),
-            None,
-            None,
-            None,
-            IssuedCurrencyAmount::new(
+        let default_txn = TrustSet {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::TrustSet,
+                fee: Some("12".into()),
+                flags: vec![TrustSetFlag::TfClearNoRipple].into(),
+                last_ledger_sequence: Some(8007750),
+                sequence: Some(12),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            limit_amount: IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc".into(),
                 "100".into(),
             ),
-            None,
-            None,
-        );
+            quality_in: None,
+            quality_out: None,
+        };
+
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"TrustSet","Fee":"12","Flags":262144,"LastLedgerSequence":8007750,"Sequence":12,"SigningPubKey":"","LimitAmount":{"currency":"USD","issuer":"rsP3mgGb2tcYUrxiLFiHJiQXhsziegtwBc","value":"100"}}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

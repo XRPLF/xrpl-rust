@@ -95,28 +95,90 @@ impl<'a> AccountDelete<'a> {
             destination_tag,
         }
     }
+
+    /// Set destination tag
+    pub fn with_destination_tag(mut self, tag: u32) -> Self {
+        self.destination_tag = Some(tag);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
+}
+
+impl<'a> Default for AccountDelete<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::AccountDelete,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            destination: "".into(),
+            destination_tag: None,
+        }
+    }
 }
 
 #[cfg(test)]
-mod test_serde {
+mod tests {
     use super::*;
 
     #[test]
     fn test_serialize() {
-        let default_txn = AccountDelete::new(
-            "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
-            None,
-            Some("2000000".into()),
-            None,
-            None,
-            Some(2470665),
-            None,
-            None,
-            None,
-            "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
-            Some(13),
-        );
+        let default_txn = AccountDelete {
+            common_fields: CommonFields {
+                account: "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
+                transaction_type: TransactionType::AccountDelete,
+                fee: Some("2000000".into()),
+                sequence: Some(2470665),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
+            destination_tag: Some(13),
+        };
+
         let default_json_str = r#"{"Account":"rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm","TransactionType":"AccountDelete","Fee":"2000000","Flags":0,"Sequence":2470665,"SigningPubKey":"","Destination":"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe","DestinationTag":13}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

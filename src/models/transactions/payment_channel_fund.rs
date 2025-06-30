@@ -66,6 +66,22 @@ impl<'a> Transaction<'a, NoFlags> for PaymentChannelFund<'a> {
     }
 }
 
+impl<'a> Default for PaymentChannelFund<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::PaymentChannelFund,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            amount: XRPAmount::from("0"),
+            channel: "".into(),
+            expiration: None,
+        }
+    }
+}
+
 impl<'a> PaymentChannelFund<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -103,6 +119,52 @@ impl<'a> PaymentChannelFund<'a> {
             expiration,
         }
     }
+
+    /// Set expiration
+    pub fn with_expiration(mut self, expiration: u32) -> Self {
+        self.expiration = Some(expiration);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -113,21 +175,20 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = PaymentChannelFund::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            XRPAmount::from("200000"),
-            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
-            Some(543171558),
-        );
+        let default_txn = PaymentChannelFund {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::PaymentChannelFund,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            amount: XRPAmount::from("200000"),
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            expiration: Some(543171558),
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"PaymentChannelFund","Flags":0,"SigningPubKey":"","Amount":"200000","Channel":"C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198","Expiration":543171558}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

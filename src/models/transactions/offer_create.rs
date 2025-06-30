@@ -22,7 +22,7 @@ use super::{CommonFields, FlagCollection};
 /// See OfferCreate flags:
 /// `<https://xrpl.org/offercreate.html#offercreate-flags>`
 #[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+    Debug, Eq, PartialEq, Copy, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
 #[repr(u32)]
 pub enum OfferCreateFlag {
@@ -99,6 +99,23 @@ impl<'a> Transaction<'a, OfferCreateFlag> for OfferCreate<'a> {
     }
 }
 
+impl<'a> Default for OfferCreate<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::OfferCreate,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("0")),
+            taker_pays: Amount::XRPAmount(XRPAmount::from("0")),
+            expiration: None,
+            offer_sequence: None,
+        }
+    }
+}
+
 impl<'a> OfferCreate<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -139,98 +156,153 @@ impl<'a> OfferCreate<'a> {
             offer_sequence,
         }
     }
+
+    /// Set expiration
+    pub fn with_expiration(mut self, expiration: u32) -> Self {
+        self.expiration = Some(expiration);
+        self
+    }
+
+    /// Set offer sequence to cancel
+    pub fn with_offer_sequence(mut self, offer_sequence: u32) -> Self {
+        self.offer_sequence = Some(offer_sequence);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Add flag
+    pub fn with_flag(mut self, flag: OfferCreateFlag) -> Self {
+        self.common_fields.flags.0.push(flag);
+        self
+    }
+
+    /// Set multiple flags
+    pub fn with_flags(mut self, flags: Vec<OfferCreateFlag>) -> Self {
+        self.common_fields.flags = flags.into();
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
-mod test {
-    use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
+mod tests {
     use alloc::vec;
 
     use super::*;
+    use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
 
     #[test]
     fn test_has_flag() {
-        let txn: OfferCreate = OfferCreate::new(
-            "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
-            None,
-            Some("10".into()),
-            Some(vec![OfferCreateFlag::TfImmediateOrCancel].into()),
-            Some(72779837),
-            None,
-            Some(1),
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("1000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let txn = OfferCreate {
+            common_fields: CommonFields {
+                account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
+                transaction_type: TransactionType::OfferCreate,
+                fee: Some("10".into()),
+                flags: vec![OfferCreateFlag::TfImmediateOrCancel].into(),
+                last_ledger_sequence: Some(72779837),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
                 "0.3".into(),
             )),
-            None,
-            None,
-        );
+            ..Default::default()
+        };
+
         assert!(txn.has_flag(&OfferCreateFlag::TfImmediateOrCancel));
         assert!(!txn.has_flag(&OfferCreateFlag::TfPassive));
     }
 
     #[test]
     fn test_get_transaction_type() {
-        let txn: OfferCreate = OfferCreate::new(
-            "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
-            None,
-            Some("10".into()),
-            Some(vec![OfferCreateFlag::TfImmediateOrCancel].into()),
-            Some(72779837),
-            None,
-            Some(1),
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("1000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let txn = OfferCreate {
+            common_fields: CommonFields {
+                account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
+                transaction_type: TransactionType::OfferCreate,
+                fee: Some("10".into()),
+                flags: vec![OfferCreateFlag::TfImmediateOrCancel].into(),
+                last_ledger_sequence: Some(72779837),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
                 "0.3".into(),
             )),
-            None,
-            None,
-        );
+            ..Default::default()
+        };
+
         let actual = txn.get_transaction_type();
         let expect = TransactionType::OfferCreate;
         assert_eq!(actual, &expect)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
-
-    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = OfferCreate::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            None,
-            Some("12".into()),
-            None,
-            Some(7108682),
-            None,
-            Some(8),
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("6000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let default_txn = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                fee: Some("12".into()),
+                last_ledger_sequence: Some(7108682),
+                sequence: Some(8),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("6000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "GKO".into(),
                 "ruazs5h1qEsqpke88pcqnaseXdm6od2xc".into(),
                 "2".into(),
             )),
-            None,
-            None,
-        );
+            ..Default::default()
+        };
+
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"OfferCreate","Fee":"12","Flags":0,"LastLedgerSequence":7108682,"Sequence":8,"SigningPubKey":"","TakerGets":"6000000","TakerPays":{"currency":"GKO","issuer":"ruazs5h1qEsqpke88pcqnaseXdm6od2xc","value":"2"}}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

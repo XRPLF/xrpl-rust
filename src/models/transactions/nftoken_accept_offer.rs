@@ -77,6 +77,22 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenAcceptOffer<'a> {
     }
 }
 
+impl<'a> Default for NFTokenAcceptOffer<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::NFTokenAcceptOffer,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            nftoken_sell_offer: None,
+            nftoken_buy_offer: None,
+            nftoken_broker_fee: None,
+        }
+    }
+}
+
 impl<'a> NFTokenAcceptOfferError for NFTokenAcceptOffer<'a> {
     fn _get_brokered_mode_error(&self) -> XRPLModelResult<()> {
         if self.nftoken_broker_fee.is_some()
@@ -142,6 +158,64 @@ impl<'a> NFTokenAcceptOffer<'a> {
             nftoken_broker_fee,
         }
     }
+
+    /// Set sell offer
+    pub fn with_nftoken_sell_offer(mut self, offer: Cow<'a, str>) -> Self {
+        self.nftoken_sell_offer = Some(offer);
+        self
+    }
+
+    /// Set buy offer
+    pub fn with_nftoken_buy_offer(mut self, offer: Cow<'a, str>) -> Self {
+        self.nftoken_buy_offer = Some(offer);
+        self
+    }
+
+    /// Set broker fee
+    pub fn with_nftoken_broker_fee(mut self, fee: Amount<'a>) -> Self {
+        self.nftoken_broker_fee = Some(fee);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 pub trait NFTokenAcceptOfferError {
@@ -150,33 +224,27 @@ pub trait NFTokenAcceptOfferError {
 }
 
 #[cfg(test)]
-mod test_nftoken_accept_offer_error {
-
+mod tests {
     use alloc::string::ToString;
+    use alloc::vec;
 
+    use super::*;
     use crate::models::{
         amount::{Amount, XRPAmount},
         Model,
     };
 
-    use super::*;
-
     #[test]
     fn test_brokered_mode_error() {
-        let nftoken_accept_offer = NFTokenAcceptOffer::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(Amount::XRPAmount(XRPAmount::from("100"))),
-        );
+        let nftoken_accept_offer = NFTokenAcceptOffer {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::NFTokenAcceptOffer,
+                ..Default::default()
+            },
+            nftoken_broker_fee: Some(Amount::XRPAmount(XRPAmount::from("100"))),
+            ..Default::default()
+        };
 
         assert_eq!(
             nftoken_accept_offer
@@ -190,20 +258,16 @@ mod test_nftoken_accept_offer_error {
 
     #[test]
     fn test_broker_fee_error() {
-        let nftoken_accept_offer = NFTokenAcceptOffer::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some("".into()),
-            None,
-            Some(Amount::XRPAmount(XRPAmount::from("0"))),
-        );
+        let nftoken_accept_offer = NFTokenAcceptOffer {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::NFTokenAcceptOffer,
+                ..Default::default()
+            },
+            nftoken_sell_offer: Some("".into()),
+            nftoken_broker_fee: Some(Amount::XRPAmount(XRPAmount::from("0"))),
+            ..Default::default()
+        };
 
         assert_eq!(
             nftoken_accept_offer
@@ -214,39 +278,35 @@ mod test_nftoken_accept_offer_error {
             "The value of the field `\"nftoken_broker_fee\"` is not allowed to be zero"
         );
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use alloc::string::ToString;
-    use alloc::vec;
-
-    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = NFTokenAcceptOffer::new(
-            "r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG".into(),
-            None,
-            Some("12".into()),
-            Some(75447550),
-            Some(vec![Memo::new(
-                Some(
-                    "61356534373538372D633134322D346663382D616466362D393666383562356435386437"
-                        .to_string(),
-                ),
-                None,
-                None,
-            )]),
-            Some(68549302),
-            None,
-            None,
-            None,
-            Some("68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77".into()),
-            None,
-            None,
-        );
+        let default_txn = NFTokenAcceptOffer {
+            common_fields: CommonFields {
+                account: "r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG".into(),
+                transaction_type: TransactionType::NFTokenAcceptOffer,
+                fee: Some("12".into()),
+                last_ledger_sequence: Some(75447550),
+                memos: Some(vec![Memo::new(
+                    Some(
+                        "61356534373538372D633134322D346663382D616466362D393666383562356435386437"
+                            .to_string(),
+                    ),
+                    None,
+                    None,
+                )]),
+                sequence: Some(68549302),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            nftoken_sell_offer: Some(
+                "68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77".into(),
+            ),
+            ..Default::default()
+        };
+
         let default_json_str = r#"{"Account":"r9spUPhPBfB6kQeF6vPhwmtFwRhBh2JUCG","TransactionType":"NFTokenAcceptOffer","Fee":"12","Flags":0,"LastLedgerSequence":75447550,"Memos":[{"Memo":{"MemoData":"61356534373538372D633134322D346663382D616466362D393666383562356435386437","MemoFormat":null,"MemoType":null}}],"Sequence":68549302,"SigningPubKey":"","NFTokenSellOffer":"68CD1F6F906494EA08C9CB5CAFA64DFA90D4E834B7151899B73231DE5A0C3B77"}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

@@ -34,38 +34,47 @@ use super::FlagCollection;
 )]
 #[repr(u32)]
 pub enum AccountSetFlag {
+    /// Require a destination tag to send transactions to this account.
+    AsfRequireDest = 1,
+    /// Require authorization for users to hold balances issued by
+    /// this address. Can only be enabled if the address has no
+    /// trust lines connected to it.
+    AsfRequireAuth = 2,
+    /// XRP should not be sent to this account.
+    /// (Enforced by client applications, not by rippled)
+    AsfDisallowXRP = 3,
+    /// Disallow use of the master key pair. Can only be enabled if the
+    /// account has configured another way to sign transactions, such as
+    /// a Regular Key or a Signer List.
+    AsfDisableMaster = 4,
     /// Track the ID of this account's most recent transaction
     /// Required for AccountTxnID
     AsfAccountTxnID = 5,
-    /// Enable to allow another account to mint non-fungible tokens (NFTokens)
-    /// on this account's behalf. Specify the authorized account in the
-    /// NFTokenMinter field of the AccountRoot object. This is an experimental
-    /// field to enable behavior for NFToken support.
-    AsfAuthorizedNFTokenMinter = 10,
+    /// Permanently give up the ability to freeze individual
+    /// trust lines or disable Global Freeze. This flag can never
+    /// be disabled after being enabled.
+    AsfNoFreeze = 6,
+    /// Freeze all assets issued by this account.
+    AsfGlobalFreeze = 7,
     /// Enable rippling on this account's trust lines by default.
     AsfDefaultRipple = 8,
     /// Enable Deposit Authorization on this account.
     /// (Added by the DepositAuth amendment.)
     AsfDepositAuth = 9,
-    /// Disallow use of the master key pair. Can only be enabled if the
-    /// account has configured another way to sign transactions, such as
-    /// a Regular Key or a Signer List.
-    AsfDisableMaster = 4,
-    /// XRP should not be sent to this account.
-    /// (Enforced by client applications, not by rippled)
-    AsfDisallowXRP = 3,
-    /// Freeze all assets issued by this account.
-    AsfGlobalFreeze = 7,
-    /// Permanently give up the ability to freeze individual
-    /// trust lines or disable Global Freeze. This flag can never
-    /// be disabled after being enabled.
-    AsfNoFreeze = 6,
-    /// Require authorization for users to hold balances issued by
-    /// this address. Can only be enabled if the address has no
-    /// trust lines connected to it.
-    AsfRequireAuth = 2,
-    /// Require a destination tag to send transactions to this account.
-    AsfRequireDest = 1,
+    /// Enable to allow another account to mint non-fungible tokens (NFTokens)
+    /// on this account's behalf. Specify the authorized account in the
+    /// NFTokenMinter field of the AccountRoot object.
+    AsfAuthorizedNFTokenMinter = 10,
+    /// Disallow incoming Checks from other accounts.
+    AsfDisallowIncomingCheck = 11,
+    /// Disallow incoming Payment Channels from other accounts.
+    AsfDisallowIncomingPayChan = 12,
+    /// Disallow incoming trust lines from other accounts.
+    AsfDisallowIncomingTrustline = 13,
+    /// Disallow incoming NFToken offers from other accounts.
+    AsfDisallowIncomingNFTokenOffer = 14,
+    /// Allow other accounts to mint NFTokens with this account set as the issuer.
+    AsfAllowTrustLineClawback = 15,
 }
 
 /// An AccountSet transaction modifies the properties of an
@@ -301,7 +310,7 @@ impl<'a> AccountSet<'a> {
                 TransactionType::AccountSet,
                 account_txn_id,
                 fee,
-                Some(flags.unwrap_or_default()),
+                flags,
                 last_ledger_sequence,
                 memos,
                 None,
@@ -322,6 +331,120 @@ impl<'a> AccountSet<'a> {
             tick_size,
         }
     }
+
+    /// Set clear flag
+    pub fn with_clear_flag(mut self, flag: AccountSetFlag) -> Self {
+        self.clear_flag = Some(flag);
+        self
+    }
+
+    /// Set domain
+    pub fn with_domain(mut self, domain: Cow<'a, str>) -> Self {
+        self.domain = Some(domain);
+        self
+    }
+
+    /// Set email hash
+    pub fn with_email_hash(mut self, email_hash: Cow<'a, str>) -> Self {
+        self.email_hash = Some(email_hash);
+        self
+    }
+
+    /// Set message key
+    pub fn with_message_key(mut self, message_key: Cow<'a, str>) -> Self {
+        self.message_key = Some(message_key);
+        self
+    }
+
+    /// Set NFToken minter
+    pub fn with_nftoken_minter(mut self, nftoken_minter: Cow<'a, str>) -> Self {
+        self.nftoken_minter = Some(nftoken_minter);
+        self
+    }
+
+    /// Set flag to enable
+    pub fn with_set_flag(mut self, flag: AccountSetFlag) -> Self {
+        self.set_flag = Some(flag);
+        self
+    }
+
+    /// Set transfer rate
+    pub fn with_transfer_rate(mut self, transfer_rate: u32) -> Self {
+        self.transfer_rate = Some(transfer_rate);
+        self
+    }
+
+    /// Set tick size
+    pub fn with_tick_size(mut self, tick_size: u32) -> Self {
+        self.tick_size = Some(tick_size);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+}
+
+impl<'a> Default for AccountSet<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields::default(),
+            clear_flag: None,
+            domain: None,
+            email_hash: None,
+            message_key: None,
+            nftoken_minter: None,
+            set_flag: None,
+            transfer_rate: None,
+            tick_size: None,
+        }
+    }
+}
+
+impl FromStr for AccountSetFlag {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // See https://xrpl.org/docs/references/protocol/transactions/types/accountset
+        match s {
+            "asfRequireDest" => Ok(AccountSetFlag::AsfRequireDest),
+            "asfRequireAuth" => Ok(AccountSetFlag::AsfRequireAuth),
+            "asfDisallowXRP" => Ok(AccountSetFlag::AsfDisallowXRP),
+            "asfDisableMaster" => Ok(AccountSetFlag::AsfDisableMaster),
+            "asfAccountTxnID" => Ok(AccountSetFlag::AsfAccountTxnID),
+            "asfNoFreeze" => Ok(AccountSetFlag::AsfNoFreeze),
+            "asfGlobalFreeze" => Ok(AccountSetFlag::AsfGlobalFreeze),
+            "asfDefaultRipple" => Ok(AccountSetFlag::AsfDefaultRipple),
+            "asfDepositAuth" => Ok(AccountSetFlag::AsfDepositAuth),
+            "asfAuthorizedNFTokenMinter" => Ok(AccountSetFlag::AsfAuthorizedNFTokenMinter),
+            "asfDisallowIncomingCheck" => Ok(AccountSetFlag::AsfDisallowIncomingCheck),
+            "asfDisallowIncomingPayChan" => Ok(AccountSetFlag::AsfDisallowIncomingPayChan),
+            "asfDisallowIncomingTrustline" => Ok(AccountSetFlag::AsfDisallowIncomingTrustline),
+            "asfDisallowIncomingNFTokenOffer" => {
+                Ok(AccountSetFlag::AsfDisallowIncomingNFTokenOffer)
+            }
+            "asfAllowTrustLineClawback" => Ok(AccountSetFlag::AsfAllowTrustLineClawback),
+            _ => Err(()),
+        }
+    }
 }
 
 pub trait AccountSetError {
@@ -333,45 +456,30 @@ pub trait AccountSetError {
 }
 
 #[cfg(test)]
-mod test_account_set_errors {
-
-    use crate::models::Model;
+mod tests {
     use alloc::string::ToString;
 
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_tick_size_error() {
-        let mut account_set = AccountSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        let tick_size_too_low = Some(2);
-        account_set.tick_size = tick_size_too_low;
+        let mut account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            tick_size: Some(2), // Too low
+            ..Default::default()
+        };
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
             "The value of the field `\"tick_size\"` is defined below its minimum (min 3, found 2)"
         );
 
-        let tick_size_too_high = Some(16);
-        account_set.tick_size = tick_size_too_high;
+        account_set.tick_size = Some(16); // Too high
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -381,36 +489,22 @@ mod test_account_set_errors {
 
     #[test]
     fn test_transfer_rate_error() {
-        let mut account_set = AccountSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        let tick_size_too_low = Some(999999999);
-        account_set.transfer_rate = tick_size_too_low;
+        let mut account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            transfer_rate: Some(999999999), // Too low
+            ..Default::default()
+        };
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
             "The value of the field `\"transfer_rate\"` is defined below its minimum (min 1000000000, found 999999999)"
         );
 
-        let tick_size_too_high = Some(2000000001);
-        account_set.transfer_rate = tick_size_too_high;
+        account_set.transfer_rate = Some(2000000001); // Too high
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -420,36 +514,22 @@ mod test_account_set_errors {
 
     #[test]
     fn test_domain_error() {
-        let mut account_set = AccountSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        let domain_not_lowercase = Some("https://Example.com/".into());
-        account_set.domain = domain_not_lowercase;
+        let mut account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            domain: Some("https://Example.com/".into()), // Not lowercase
+            ..Default::default()
+        };
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
             "The value of the field `\"domain\"` does not have the correct format (expected \"lowercase\", found \"https://Example.com/\")"
         );
 
-        let domain_too_long = Some("https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into());
-        account_set.domain = domain_too_long;
+        account_set.domain = Some("https://example.com/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()); // Too long
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -459,26 +539,16 @@ mod test_account_set_errors {
 
     #[test]
     fn test_flag_error() {
-        let account_set = AccountSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(AccountSetFlag::AsfDisallowXRP),
-            None,
-            None,
-            None,
-            Some(AccountSetFlag::AsfDisallowXRP),
-            None,
-            None,
-            None,
-        );
+        let account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            clear_flag: Some(AccountSetFlag::AsfDisallowXRP),
+            set_flag: Some(AccountSetFlag::AsfDisallowXRP),
+            ..Default::default()
+        };
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -488,27 +558,15 @@ mod test_account_set_errors {
 
     #[test]
     fn test_asf_authorized_nftoken_minter_error() {
-        let mut account_set = AccountSet::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        account_set.nftoken_minter = Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into());
+        let mut account_set = AccountSet {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            nftoken_minter: Some("rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into()),
+            ..Default::default()
+        };
 
         assert_eq!(
             account_set.validate().unwrap_err().to_string().as_str(),
@@ -532,35 +590,27 @@ mod test_account_set_errors {
             "The field `\"nftoken_minter\"` cannot be defined if its required flag `AsfAuthorizedNFTokenMinter` is being unset"
         );
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = AccountSet::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            Some("12".into()),
-            None,
-            None,
-            None,
-            Some(5),
-            None,
-            None,
-            None,
-            None,
-            Some("6578616D706C652E636F6D".into()),
-            None,
-            Some("03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB".into()),
-            Some(AccountSetFlag::AsfAccountTxnID),
-            None,
-            None,
-            None,
-        );
+        let default_txn = AccountSet {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::AccountSet,
+                fee: Some("12".into()),
+                sequence: Some(5),
+                ..Default::default()
+            },
+            domain: Some("6578616D706C652E636F6D".into()),
+            message_key: Some(
+                "03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB".into(),
+            ),
+            set_flag: Some(AccountSetFlag::AsfAccountTxnID),
+            ..Default::default()
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"AccountSet","Fee":"12","Flags":0,"Sequence":5,"SigningPubKey":"","Domain":"6578616D706C652E636F6D","MessageKey":"03AB40A0490F9B7ED8DF29D246BF2D6269820A0EE7742ACDD457BEA7C7D0931EDB","SetFlag":5}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
@@ -570,26 +620,5 @@ mod tests {
         // Deserialize
         let deserialized: AccountSet = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
-    }
-}
-
-impl FromStr for AccountSetFlag {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // See https://xrpl.org/docs/references/protocol/transactions/types/accountset
-        match s {
-            "asfAccountTxnID" => Ok(AccountSetFlag::AsfAccountTxnID),
-            "asfAuthorizedNFTokenMinter" => Ok(AccountSetFlag::AsfAuthorizedNFTokenMinter),
-            "asfDefaultRipple" => Ok(AccountSetFlag::AsfDefaultRipple),
-            "asfDepositAuth" => Ok(AccountSetFlag::AsfDepositAuth),
-            "asfDisableMaster" => Ok(AccountSetFlag::AsfDisableMaster),
-            "asfDisallowXRP" => Ok(AccountSetFlag::AsfDisallowXRP),
-            "asfGlobalFreeze" => Ok(AccountSetFlag::AsfGlobalFreeze),
-            "asfNoFreeze" => Ok(AccountSetFlag::AsfNoFreeze),
-            "asfRequireAuth" => Ok(AccountSetFlag::AsfRequireAuth),
-            "asfRequireDest" => Ok(AccountSetFlag::AsfRequireDest),
-            _ => Err(()),
-        }
     }
 }

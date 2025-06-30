@@ -21,7 +21,7 @@ use super::{CommonFields, FlagCollection};
 /// See PaymentChannelClaim flags:
 /// `<https://xrpl.org/paymentchannelclaim.html#paymentchannelclaim-flags>`
 #[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+    Debug, Eq, PartialEq, Copy, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
 #[repr(u32)]
 pub enum PaymentChannelClaimFlag {
@@ -67,7 +67,7 @@ pub struct PaymentChannelClaim<'a> {
     // `<https://xrpl.org/paymentchannelclaim.html#paymentchannelclaim-fields>`
     /// The unique ID of the channel, as a 64-character hexadecimal string.
     pub channel: Cow<'a, str>,
-    /// otal amount of XRP, in drops, delivered by this channel after processing this claim.
+    /// Total amount of XRP, in drops, delivered by this channel after processing this claim.
     /// Required to deliver XRP. Must be more than the total amount delivered by the channel
     /// so far, but not greater than the Amount of the signed claim. Must be provided except
     /// when closing the channel.
@@ -105,6 +105,24 @@ impl<'a> Transaction<'a, PaymentChannelClaimFlag> for PaymentChannelClaim<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, PaymentChannelClaimFlag> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> Default for PaymentChannelClaim<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            channel: "".into(),
+            balance: None,
+            amount: None,
+            signature: None,
+            public_key: None,
+        }
     }
 }
 
@@ -150,6 +168,82 @@ impl<'a> PaymentChannelClaim<'a> {
             public_key,
         }
     }
+
+    /// Set balance
+    pub fn with_balance(mut self, balance: Cow<'a, str>) -> Self {
+        self.balance = Some(balance);
+        self
+    }
+
+    /// Set amount
+    pub fn with_amount(mut self, amount: Cow<'a, str>) -> Self {
+        self.amount = Some(amount);
+        self
+    }
+
+    /// Set signature
+    pub fn with_signature(mut self, signature: Cow<'a, str>) -> Self {
+        self.signature = Some(signature);
+        self
+    }
+
+    /// Set public key
+    pub fn with_public_key(mut self, public_key: Cow<'a, str>) -> Self {
+        self.public_key = Some(public_key);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Add flag
+    pub fn with_flag(mut self, flag: PaymentChannelClaimFlag) -> Self {
+        self.common_fields.flags.0.push(flag);
+        self
+    }
+
+    /// Set multiple flags
+    pub fn with_flags(mut self, flags: Vec<PaymentChannelClaimFlag>) -> Self {
+        self.common_fields.flags = flags.into();
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -158,24 +252,22 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = PaymentChannelClaim::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
-            Some("1000000".into()),
-            Some("1000000".into()),
-            Some("32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into()),
-            Some("30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B".into()),
-        );
+        let default_txn = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            balance: Some("1000000".into()),
+            amount: Some("1000000".into()),
+            signature: Some("30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B".into()),
+            public_key: Some("32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into()),
+        };
+
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"PaymentChannelClaim","Flags":0,"SigningPubKey":"","Channel":"C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198","Balance":"1000000","Amount":"1000000","Signature":"30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B","PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A"}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

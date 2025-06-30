@@ -42,7 +42,23 @@ serde for JSON handling and indexmap for dictionaries. The goal is to ensure
 this library can be used on devices without the ability to use a
 [std](https://doc.rust-lang.org/std) environment.
 
-> WIP - Help Welcome
+# Table of Contents
+
+- [Installation](#-installation)
+- [Documentation](#-documentation)
+- [Quickstart](#-quickstart)
+- [Feature Flags](#feature-flags)
+- [no_std Support](#-no_std)
+- [Command Line Interface](#command-line-interface)
+  - [Installation](#installation-1)
+  - [Basic Usage](#basic-usage)
+  - [Wallet Commands](#wallet-commands)
+  - [Account Commands](#account-commands)
+  - [Transaction Commands](#transaction-commands)
+  - [Server and Ledger Commands](#server-and-ledger-commands)
+- [Examples](#examples)
+- [Contributing](#contributing)
+- [License](#license)
 
 # 🛠 Installation [![rustc]][rust]
 
@@ -59,31 +75,65 @@ Documentation is available [here](https://docs.rs/xrpl-rust).
 
 ## ⛮ Quickstart
 
-TODO - Most core functionality is in place and working.
+### Basic Wallet Operations
 
-In Progress:
+```rust
+use xrpl::wallet::Wallet;
 
-- no_std examples
-- Benchmarks
+// Generate a new wallet
+let wallet = Wallet::create(None)?;
+println!("Address: {}", wallet.classic_address);
 
-# ⚐ Flags
+// Create wallet from seed
+let wallet = Wallet::from_seed("sEdV19BLfeQeKdEXyYA4NhjPJe6XBfG", None, false)?;
+```
 
-By default, the following features are enabled:
+### Making Requests
 
-- std
-- core
-- models
-- wallet
-- utils
-- websocket
-- json-rpc
-- helpers
-- tokio-rt
+```rust
+use xrpl::clients::XRPLSyncClient;
+use xrpl::models::requests::account_info::AccountInfo;
 
-When `helpers` is enabled you also need to specify a `*-rt` feature flag as it is needed for waiting between requests when using the `submit_and_wait` function.
+let client = XRPLSyncClient::new("https://xrplcluster.com/")?;
+let req = AccountInfo::new("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(), None, None, None);
+let response = client.request(req.into())?;
+```
 
-To operate in a `#![no_std]` environment simply disable the defaults
-and enable features manually:
+## Feature Flags
+
+### Default Features
+
+- `std` - Standard library support
+- `core` - Core XRPL functionality
+- `models` - XRPL data models
+- `wallet` - Wallet operations
+- `utils` - Utility functions
+- `websocket` - WebSocket client
+- `json-rpc` - JSON-RPC client
+- `helpers` - Helper functions (requires runtime)
+- `tokio-rt` - Tokio async runtime
+
+### Optional Features
+
+- `cli` - Command line interface
+- `embassy-rt` - Embassy async runtime (for no_std)
+- `serde` - Serialization support
+
+### Runtime Requirements
+
+When using `helpers`, you must specify a runtime:
+
+- `tokio-rt` - For std environments
+- `embassy-rt` - For no_std environments
+
+### no_std Usage
+
+```toml
+[dependencies.xrpl]
+version = "*"
+default-features = false
+features = ["core", "models", "wallet", "utils", "websocket", "json-rpc", "helpers", "embassy-rt"]
+```
 
 ```toml
 [dependencies.xrpl]
@@ -166,6 +216,10 @@ The CLI offers commands in several categories:
 | ------------- | ---------- | ------------------------------------------ |
 | `transaction` | `sign`     | Sign a transaction using your seed         |
 | `transaction` | `submit`   | Submit a signed transaction to the network |
+| `transaction` | `get`      | Get transaction details by hash            |
+| `transaction` | `nft-mint` | Create and sign an NFT mint transaction    |
+| `transaction` | `nft-burn` | Create and sign an NFT burn transaction    |
+| `transaction` | `payment`  | Create and sign a payment transaction      |
 
 ### Server and Ledger Commands
 
@@ -175,6 +229,31 @@ The CLI offers commands in several categories:
 | `server` | `info`      | Get information about a rippled server   |
 | `ledger` | `data`      | Get data about a specific ledger         |
 | `server` | `subscribe` | Subscribe to ledger events via WebSocket |
+
+### 2. **Advanced Query Commands**
+
+| Command       | Subcommand | Description                          |
+| ------------- | ---------- | ------------------------------------ |
+| `ledger`      | `entry`    | Get a specific ledger entry by index |
+| `transaction` | `get`      | Get transaction details by hash      |
+
+#### ledger entry
+
+Get a specific ledger entry by its index.
+
+```bash
+xrpl ledger entry --index 1A2B3C... --url https://xrplcluster.com/
+```
+
+### 3. **Account NFTs Command**
+
+#### account nfts
+
+Get NFTs owned by an account.
+
+```bash
+xrpl account nfts --address rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh --url https://xrplcluster.com/
+```
 
 ## Command Details
 
@@ -228,6 +307,18 @@ xrpl wallet validate --address rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh
 Parameters:
 
 - `--address`: The address to validate (required)
+
+#### wallet generate --mnemonic
+
+Generate a new wallet with a BIP39 mnemonic phrase.
+
+```bash
+# Generate with 12 words (default)
+xrpl wallet generate --mnemonic
+
+# Generate with 24 words
+xrpl wallet generate --mnemonic --words 24
+```
 
 ### Account Information
 
@@ -331,6 +422,7 @@ Parameters:
 - `--url`, `-u` (optional, default: https://xrplcluster.com/): The XRPL node URL
 
 **Example Output:**
+
 ```text
 Signed transaction blob: ...
 To submit, use: xrpl transaction submit --tx-blob ... --url ...
@@ -351,7 +443,37 @@ Parameters:
 - `--url`, `-u` (optional, default: https://xrplcluster.com/): The XRPL node URL
 
 **Example Output:**
+
 ```text
 Signed transaction blob: ...
 To submit, use: xrpl transaction submit --tx-blob ... --url ...
 ```
+
+## Examples
+
+### Library Usage
+
+## Contributing [![contributors_status]][contributors]
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/589labs/xrpl-rust.git
+cd xrpl-rust
+
+# Run tests
+cargo test
+
+# Run CLI tests
+cargo test --features cli,std
+
+# Build with all features
+cargo build --all-features
+```
+
+## License [![license_status]][license]
+
+This project is licensed under the [ISC License](LICENSE).

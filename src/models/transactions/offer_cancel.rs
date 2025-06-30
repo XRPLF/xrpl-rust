@@ -57,6 +57,20 @@ impl<'a> Transaction<'a, NoFlags> for OfferCancel<'a> {
     }
 }
 
+impl<'a> Default for OfferCancel<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::OfferCancel,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            offer_sequence: 0,
+        }
+    }
+}
+
 impl<'a> OfferCancel<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -90,6 +104,46 @@ impl<'a> OfferCancel<'a> {
             offer_sequence,
         }
     }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -98,19 +152,21 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = OfferCancel::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            None,
-            Some("12".into()),
-            Some(7108629),
-            None,
-            Some(7),
-            None,
-            None,
-            None,
-            6,
-        );
+        let default_txn = OfferCancel {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCancel,
+                fee: Some("12".into()),
+                last_ledger_sequence: Some(7108629),
+                sequence: Some(7),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            offer_sequence: 6,
+        };
+
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"OfferCancel","Fee":"12","Flags":0,"LastLedgerSequence":7108629,"Sequence":7,"SigningPubKey":"","OfferSequence":6}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();

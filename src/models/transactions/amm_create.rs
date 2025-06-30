@@ -6,7 +6,7 @@ use crate::models::{Amount, FlagCollection, Model, NoFlags, XRPAmount, XRPLModel
 
 use super::{
     exceptions::{XRPLAMMCreateException, XRPLTransactionException},
-    CommonFields, Memo, Signer, Transaction, TransactionType,
+    CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType,
 };
 
 pub const AMM_CREATE_MAX_FEE: u16 = 1000;
@@ -27,6 +27,9 @@ pub const AMM_CREATE_MAX_FEE: u16 = 1000;
 /// volatility (potential for imbalance) of the asset pair.
 /// The higher the trading fee, the more it offsets this risk,
 /// so it's best to set the trading fee based on the volatility of the asset pair.
+///
+/// See AMMCreate transaction:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/ammcreate>`
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
@@ -47,8 +50,7 @@ pub struct AMMCreate<'a> {
 
 impl Model for AMMCreate<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.get_tranding_fee_error()?;
-
+        self.get_trading_fee_error()?;
         Ok(())
     }
 }
@@ -64,6 +66,32 @@ impl<'a> Transaction<'a, NoFlags> for AMMCreate<'a> {
 
     fn get_transaction_type(&self) -> &super::TransactionType {
         self.common_fields.get_transaction_type()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for AMMCreate<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
+    }
+}
+
+impl<'a> Default for AMMCreate<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::AMMCreate,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            amount: Amount::default(),
+            amount2: Amount::default(),
+            trading_fee: 0,
+        }
     }
 }
 
@@ -105,7 +133,10 @@ impl<'a> AMMCreate<'a> {
         }
     }
 
-    fn get_tranding_fee_error(&self) -> XRPLModelResult<()> {
+    // All common builder methods (with_fee, with_sequence, etc.) now come from the trait!
+    // Only need transaction-specific methods here.
+
+    fn get_trading_fee_error(&self) -> XRPLModelResult<()> {
         if self.trading_fee > AMM_CREATE_MAX_FEE {
             Err(
                 XRPLTransactionException::from(XRPLAMMCreateException::TradingFeeOutOfRange {
@@ -121,68 +152,133 @@ impl<'a> AMMCreate<'a> {
 }
 
 #[cfg(test)]
-mod test_errors {
-    use crate::models::IssuedCurrencyAmount;
-
+mod tests {
     use super::*;
+    use crate::models::IssuedCurrencyAmount;
 
     #[test]
     fn test_trading_fee_error() {
-        let amm_create = AMMCreate::new(
-            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
-            None,
-            Some(XRPAmount::from("1000")),
-            Some(20),
-            None,
-            Some(1),
-            None,
-            None,
-            None,
-            IssuedCurrencyAmount::new(
+        let amm_create = AMMCreate {
+            common_fields: CommonFields {
+                account: "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                transaction_type: TransactionType::AMMCreate,
+                fee: Some(XRPAmount::from("1000")),
+                last_ledger_sequence: Some(20),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount: IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
                 "1000".into(),
             )
             .into(),
-            IssuedCurrencyAmount::new(
+            amount2: IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
                 "1000".into(),
             )
             .into(),
-            1001,
-        );
+            trading_fee: 1001,
+        };
 
         assert!(amm_create.get_errors().is_err());
     }
 
     #[test]
     fn test_no_error() {
-        let amm_create = AMMCreate::new(
-            Cow::Borrowed("rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY"),
-            None,
-            Some(XRPAmount::from("1000")),
-            Some(20),
-            None,
-            Some(1),
-            None,
-            None,
-            None,
-            IssuedCurrencyAmount::new(
+        let amm_create = AMMCreate {
+            common_fields: CommonFields {
+                account: "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
+                transaction_type: TransactionType::AMMCreate,
+                fee: Some(XRPAmount::from("1000")),
+                last_ledger_sequence: Some(20),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount: IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
                 "1000".into(),
             )
             .into(),
-            IssuedCurrencyAmount::new(
+            amount2: IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY".into(),
                 "1000".into(),
             )
             .into(),
-            1000,
-        );
+            trading_fee: 1000,
+        };
 
         assert!(amm_create.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_serde() {
+        let default_txn = AMMCreate {
+            common_fields: CommonFields {
+                account: "rJVUeRqDFNs2EQp4ikJUFMdUHURJ8rAqny".into(),
+                transaction_type: TransactionType::AMMCreate,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd".into(),
+                "1000".into(),
+            )),
+            trading_fee: 500,
+        };
+
+        let default_json_str = r#"{"Account":"rJVUeRqDFNs2EQp4ikJUFMdUHURJ8rAqny","TransactionType":"AMMCreate","Flags":0,"SigningPubKey":"","Amount":"1000000","Amount2":{"currency":"USD","issuer":"rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd","value":"1000"},"TradingFee":500}"#;
+
+        // Serialize
+        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&default_txn).unwrap();
+        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
+        assert_eq!(serialized_value, default_json_value);
+
+        // Deserialize
+        let deserialized: AMMCreate = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern_with_trait() {
+        let amm_create = AMMCreate {
+            common_fields: CommonFields {
+                account: "rJVUeRqDFNs2EQp4ikJUFMdUHURJ8rAqny".into(),
+                transaction_type: TransactionType::AMMCreate,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            amount2: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd".into(),
+                "1000".into(),
+            )),
+            trading_fee: 500,
+        }
+        .with_fee("12".into()) // From CommonTransactionBuilder trait
+        .with_sequence(123) // From CommonTransactionBuilder trait
+        .with_last_ledger_sequence(7108682) // From CommonTransactionBuilder trait
+        .with_source_tag(12345) // From CommonTransactionBuilder trait
+        .with_memo(Memo::default()) // From CommonTransactionBuilder trait
+        .with_account_txn_id("ABCD".into()) // From CommonTransactionBuilder trait
+        .with_ticket_sequence(456); // From CommonTransactionBuilder trait
+
+        assert_eq!(amm_create.trading_fee, 500);
+        assert_eq!(amm_create.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(amm_create.common_fields.sequence, Some(123));
+        assert_eq!(amm_create.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(amm_create.common_fields.source_tag, Some(12345));
+        assert_eq!(amm_create.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert_eq!(
+            amm_create.common_fields.account_txn_id.as_ref().unwrap(),
+            "ABCD"
+        );
+        assert_eq!(amm_create.common_fields.ticket_sequence, Some(456));
     }
 }

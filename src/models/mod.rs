@@ -47,6 +47,38 @@ pub struct PathStep<'a> {
     type_hex: Option<Cow<'a, str>>,
 }
 
+impl<'a> PathStep<'a> {
+    /// Set the account field
+    pub fn with_account(mut self, account: Cow<'a, str>) -> Self {
+        self.account = Some(account);
+        self
+    }
+
+    /// Set the currency field
+    pub fn with_currency(mut self, currency: Cow<'a, str>) -> Self {
+        self.currency = Some(currency);
+        self
+    }
+
+    /// Set the issuer field
+    pub fn with_issuer(mut self, issuer: Cow<'a, str>) -> Self {
+        self.issuer = Some(issuer);
+        self
+    }
+
+    /// Set the type field
+    pub fn with_type(mut self, r#type: u8) -> Self {
+        self.r#type = Some(r#type);
+        self
+    }
+
+    /// Set the type_hex field
+    pub fn with_type_hex(mut self, type_hex: Cow<'a, str>) -> Self {
+        self.type_hex = Some(type_hex);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, derive_new::new)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainBridge<'a> {

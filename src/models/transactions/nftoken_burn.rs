@@ -62,6 +62,21 @@ impl<'a> Transaction<'a, NoFlags> for NFTokenBurn<'a> {
     }
 }
 
+impl<'a> Default for NFTokenBurn<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                account: "".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            nftoken_id: "".into(),
+            owner: None,
+        }
+    }
+}
+
 impl<'a> NFTokenBurn<'a> {
     pub fn new(
         account: Cow<'a, str>,
@@ -97,6 +112,52 @@ impl<'a> NFTokenBurn<'a> {
             owner,
         }
     }
+
+    /// Set owner
+    pub fn with_owner(mut self, owner: Cow<'a, str>) -> Self {
+        self.owner = Some(owner);
+        self
+    }
+
+    /// Set fee
+    pub fn with_fee(mut self, fee: XRPAmount<'a>) -> Self {
+        self.common_fields.fee = Some(fee);
+        self
+    }
+
+    /// Set sequence
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    /// Set last ledger sequence
+    pub fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self {
+        self.common_fields.last_ledger_sequence = Some(last_ledger_sequence);
+        self
+    }
+
+    /// Add memo
+    pub fn with_memo(mut self, memo: Memo) -> Self {
+        if let Some(ref mut memos) = self.common_fields.memos {
+            memos.push(memo);
+        } else {
+            self.common_fields.memos = Some(vec![memo]);
+        }
+        self
+    }
+
+    /// Set source tag
+    pub fn with_source_tag(mut self, source_tag: u32) -> Self {
+        self.common_fields.source_tag = Some(source_tag);
+        self
+    }
+
+    /// Set ticket sequence
+    pub fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self {
+        self.common_fields.ticket_sequence = Some(ticket_sequence);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -105,20 +166,20 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = NFTokenBurn::new(
-            "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2".into(),
-            None,
-            Some("10".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
-            Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
-        );
+        let default_txn = NFTokenBurn {
+            common_fields: CommonFields {
+                account: "rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2".into(),
+                transaction_type: TransactionType::NFTokenBurn,
+                fee: Some("10".into()),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            nftoken_id: "000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65".into(),
+            owner: Some("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
+        };
+
         let default_json_str = r#"{"Account":"rNCFjv8Ek5oDrNiMJ3pw6eLLFtMjZLJnf2","TransactionType":"NFTokenBurn","Fee":"10","Flags":0,"SigningPubKey":"","NFTokenID":"000B013A95F14B0044F78A264E41713C64B5F89242540EE208C3098E00000D65","Owner":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
