@@ -281,7 +281,7 @@ impl<'a> Payment<'a> {
     pub fn add_path(mut self, path: Vec<PathStep<'a>>) -> Self {
         match &mut self.paths {
             Some(paths) => paths.push(path),
-            None => self.paths = Some(vec![path]),
+            None => self.paths = Some(alloc::vec![path]),
         }
         self
     }

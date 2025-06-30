@@ -274,7 +274,7 @@ where
         if let Some(ref mut memos) = self.memos {
             memos.push(memo);
         } else {
-            self.memos = Some(vec![memo]);
+            self.memos = Some(alloc::vec![memo]);
         }
         self
     }
@@ -302,7 +302,7 @@ where
         if let Some(ref mut signers) = self.signers {
             signers.push(signer);
         } else {
-            self.signers = Some(vec![signer]);
+            self.signers = Some(alloc::vec![signer]);
         }
         self
     }
@@ -446,7 +446,7 @@ where
         if let Some(ref mut memos) = common_fields.memos {
             memos.push(memo);
         } else {
-            common_fields.memos = Some(vec![memo]);
+            common_fields.memos = Some(alloc::vec![memo]);
         }
         self.into_self()
     }

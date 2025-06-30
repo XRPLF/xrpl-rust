@@ -218,7 +218,7 @@ impl<'a> SignerListSet<'a> {
         let entry = SignerEntry::new(account, weight);
         match &mut self.signer_entries {
             Some(entries) => entries.push(entry),
-            None => self.signer_entries = Some(vec![entry]),
+            None => self.signer_entries = Some(alloc::vec![entry]),
         }
         self
     }

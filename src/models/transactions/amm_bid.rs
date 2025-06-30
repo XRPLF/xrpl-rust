@@ -146,6 +146,8 @@ impl<'a> AMMBid<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
     use crate::models::{currency::XRP, IssuedCurrency};
 
