@@ -50,7 +50,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.xrpl]
-version = "0.5.0"
+version = "1.0.0"
 ```
 
 # 🕮 Documentation [![docs_status]][docs]
@@ -331,6 +331,7 @@ Parameters:
 - `--url`, `-u` (optional, default: https://xrplcluster.com/): The XRPL node URL
 
 **Example Output:**
+
 ```text
 Signed transaction blob: ...
 To submit, use: xrpl transaction submit --tx-blob ... --url ...
@@ -351,6 +352,7 @@ Parameters:
 - `--url`, `-u` (optional, default: https://xrplcluster.com/): The XRPL node URL
 
 **Example Output:**
+
 ```text
 Signed transaction blob: ...
 To submit, use: xrpl transaction submit --tx-blob ... --url ...

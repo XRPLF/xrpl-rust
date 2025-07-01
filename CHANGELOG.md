@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
+## [[v1.0.0]]
+
+- Initial production release
+- command line interface
+- automated market maker
+- utility functions
+- sidechain support
+
 ## [[v0.5.0]]
 
 - add missing NFT request models
