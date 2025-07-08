@@ -4,18 +4,29 @@ use serde_with::skip_serializing_none;
 
 use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::requests::LedgerIndex;
-use crate::models::{Amount, IssuedCurrencyAmount};
+use crate::models::{Amount, IssuedCurrencyAmount, Model, ValidateCurrencies};
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenMetadata<'a> {
     #[serde(rename = "NFToken")]
     pub nftoken: NFTokenMetadataFields<'a>,
 }
 
+impl Model for NFTokenMetadata<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()?;
+        Ok(())
+    }
+}
+
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenMetadataFields<'a> {
     #[serde(rename = "NFTokenID")]
@@ -23,8 +34,18 @@ pub struct NFTokenMetadataFields<'a> {
     #[serde(rename = "URI")]
     pub uri: Cow<'a, str>,
 }
+
+impl Model for NFTokenMetadataFields<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()?;
+        Ok(())
+    }
+}
+
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct Fields<'a> {
     pub account: Option<Cow<'a, str>>,
@@ -44,6 +65,13 @@ pub struct Fields<'a> {
     pub taker_gets: Option<Amount<'a>>,
     pub taker_pays: Option<Amount<'a>>,
     pub xchain_claim_id: Option<Cow<'a, str>>,
+}
+
+impl Model for Fields<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()?;
+        Ok(())
+    }
 }
 
 #[skip_serializing_none]
@@ -82,7 +110,9 @@ pub enum NodeType {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct TransactionMetadata<'a> {
     pub affected_nodes: Vec<AffectedNode<'a>>,
@@ -90,6 +120,13 @@ pub struct TransactionMetadata<'a> {
     pub transaction_result: Amount<'a>,
     #[serde(rename = "delivered_amount")]
     pub delivered_amount: Option<Amount<'a>>,
+}
+
+impl Model for TransactionMetadata<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

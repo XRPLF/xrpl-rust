@@ -7,7 +7,7 @@ use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
     transactions::{Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -21,7 +21,9 @@ use super::{Memo, Signer};
 /// See AccountDelete:
 /// `<https://xrpl.org/accountdelete.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountDelete<'a> {
     /// The base fields for all transaction models.
@@ -44,7 +46,11 @@ pub struct AccountDelete<'a> {
     pub destination_tag: Option<u32>,
 }
 
-impl<'a> Model for AccountDelete<'a> {}
+impl<'a> Model for AccountDelete<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for AccountDelete<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

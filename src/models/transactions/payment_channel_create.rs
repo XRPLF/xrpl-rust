@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -18,7 +18,9 @@ use super::CommonFields;
 /// See PaymentChannelCreate fields:
 /// `<https://xrpl.org/paymentchannelcreate.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct PaymentChannelCreate<'a> {
     // The base fields for all transaction models.
@@ -58,7 +60,11 @@ pub struct PaymentChannelCreate<'a> {
     pub destination_tag: Option<u32>,
 }
 
-impl<'a> Model for PaymentChannelCreate<'a> {}
+impl<'a> Model for PaymentChannelCreate<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for PaymentChannelCreate<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

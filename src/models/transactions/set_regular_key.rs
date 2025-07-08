@@ -7,7 +7,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -22,7 +22,9 @@ use super::CommonFields;
 /// See SetRegularKey:
 /// `<https://xrpl.org/setregularkey.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct SetRegularKey<'a> {
     // The base fields for all transaction models.
@@ -45,7 +47,11 @@ pub struct SetRegularKey<'a> {
     pub regular_key: Option<Cow<'a, str>>,
 }
 
-impl<'a> Model for SetRegularKey<'a> {}
+impl<'a> Model for SetRegularKey<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for SetRegularKey<'a> {
     fn get_transaction_type(&self) -> &TransactionType {
@@ -77,7 +83,7 @@ impl<'a> SetRegularKey<'a> {
         Self {
             common_fields: CommonFields::new(
                 account,
-                 TransactionType::SetRegularKey,
+                TransactionType::SetRegularKey,
                 account_txn_id,
                 fee,
                 Some(FlagCollection::default()),

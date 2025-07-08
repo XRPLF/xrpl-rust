@@ -64,6 +64,12 @@ pub enum XRPLModelException {
     ValueZero(String),
     #[error("If the field `{field1:?}` is defined, the field `{field2:?}` must also be defined")]
     FieldRequiresField { field1: String, field2: String },
+    #[error("The value of the field `{field:?}` is not a valid value (expected: {expected:?}, found: {found:?})")]
+    InvalidValue {
+        field: String,
+        expected: String,
+        found: String,
+    },
 
     #[error("Expected field `{0}` is missing")]
     MissingField(String),

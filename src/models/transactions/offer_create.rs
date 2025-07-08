@@ -9,7 +9,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 
 use crate::models::amount::XRPAmount;
@@ -52,7 +52,9 @@ pub enum OfferCreateFlag {
 /// See OfferCreate:
 /// `<https://xrpl.org/offercreate.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct OfferCreate<'a> {
     // The base fields for all transaction models.
@@ -79,7 +81,11 @@ pub struct OfferCreate<'a> {
     pub offer_sequence: Option<u32>,
 }
 
-impl<'a> Model for OfferCreate<'a> {}
+impl<'a> Model for OfferCreate<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, OfferCreateFlag> for OfferCreate<'a> {
     fn has_flag(&self, flag: &OfferCreateFlag) -> bool {

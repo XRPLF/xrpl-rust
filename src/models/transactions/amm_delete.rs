@@ -2,7 +2,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{Currency, FlagCollection, Model, NoFlags, XRPAmount};
+use crate::models::{Currency, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount};
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
@@ -18,7 +18,9 @@ use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 /// and the associated AMM. In all cases, the AMM ledger entry and AMM account are
 /// deleted by the last such transaction.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMDelete<'a> {
     #[serde(flatten)]
@@ -30,7 +32,11 @@ pub struct AMMDelete<'a> {
     pub asset2: Currency<'a>,
 }
 
-impl Model for AMMDelete<'_> {}
+impl Model for AMMDelete<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for AMMDelete<'a> {
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {

@@ -7,7 +7,7 @@ use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
@@ -16,7 +16,9 @@ use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult
 /// See EscrowCreate:
 /// `<https://xrpl.org/escrowcreate.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowCreate<'a> {
     /// The base fields for all transaction models.
@@ -57,8 +59,7 @@ pub struct EscrowCreate<'a> {
 impl<'a: 'static> Model for EscrowCreate<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_finish_after_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 

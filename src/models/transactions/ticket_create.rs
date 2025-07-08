@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, ValidateCurrencies,
 };
 use crate::models::{FlagCollection, NoFlags};
 
@@ -17,7 +17,9 @@ use super::CommonFields;
 /// See TicketCreate:
 /// `<https://xrpl.org/ticketcreate.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct TicketCreate<'a> {
     // The base fields for all transaction models.
@@ -39,7 +41,11 @@ pub struct TicketCreate<'a> {
     pub ticket_count: u32,
 }
 
-impl<'a> Model for TicketCreate<'a> {}
+impl<'a> Model for TicketCreate<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for TicketCreate<'a> {
     fn get_transaction_type(&self) -> &TransactionType {
