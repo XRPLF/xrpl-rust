@@ -73,7 +73,14 @@ pub enum AccountSetFlag {
 /// `<https://xrpl.org/accountset.html>`
 #[skip_serializing_none]
 #[derive(
-    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
 )]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountSet<'a> {

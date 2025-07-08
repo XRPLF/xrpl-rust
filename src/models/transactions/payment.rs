@@ -46,7 +46,14 @@ pub enum PaymentFlag {
 /// `<https://xrpl.org/payment.html>`
 #[skip_serializing_none]
 #[derive(
-    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
 )]
 #[serde(rename_all = "PascalCase")]
 pub struct Payment<'a> {

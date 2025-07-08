@@ -185,41 +185,42 @@ where
     feature = "tokio-rt"
 ))]
 #[cfg(test)]
-mod test_submit_and_wait {
+mod tests {
+    use core::time::Duration;
+
     use super::*;
     use crate::{
         asynch::{clients::AsyncJsonRpcClient, wallet::generate_faucet_wallet},
-        models::transactions::account_set::AccountSet,
+        models::transactions::{account_set::AccountSet, CommonFields, TransactionType},
     };
 
     #[tokio::test]
     async fn test_submit_and_wait() {
         let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
-        let wallet = generate_faucet_wallet(&client, None, None, None, None)
-            .await
-            .unwrap();
-        let mut tx = AccountSet::new(
-            Cow::from(wallet.classic_address.clone()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some("6578616d706c652e636f6d".into()), // "example.com"
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        submit_and_wait(&mut tx, &client, Some(&wallet), Some(true), Some(true))
-            .await
-            .unwrap();
+
+        // Add timeout and better error handling for wallet generation
+        let wallet = tokio::time::timeout(
+            Duration::from_secs(30),
+            generate_faucet_wallet(&client, None, None, None, None),
+        )
+        .await
+        .expect("Wallet generation timed out")
+        .expect("Failed to generate faucet wallet");
+
+        let mut tx = AccountSet {
+            common_fields: CommonFields::from_account(&wallet.classic_address)
+                .with_transaction_type(TransactionType::AccountSet),
+            domain: Some("6578616d706c652e636f6d".into()),
+            ..Default::default()
+        };
+
+        // Add timeout for submit_and_wait
+        tokio::time::timeout(
+            Duration::from_secs(60),
+            submit_and_wait(&mut tx, &client, Some(&wallet), Some(true), Some(true)),
+        )
+        .await
+        .expect("Submit and wait timed out")
+        .expect("Failed to submit and wait for transaction");
     }
 }
