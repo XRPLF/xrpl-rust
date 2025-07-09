@@ -6,7 +6,7 @@
 //! - Common test patterns
 //! - Timeout helpers
 
-#[cfg(test)]
+use alloc::string::{String, ToString};
 use core::time::Duration;
 
 /// Common network error patterns that should cause tests to skip rather than fail
@@ -83,7 +83,10 @@ macro_rules! handle_test_result {
         match $result {
             $crate::utils::testing::TestResult::Success(value) => value,
             $crate::utils::testing::TestResult::Skipped(reason) => {
-                println!("⏭️  {} skipped: {}", $test_name, reason);
+                // For no_std compatibility, we can't use println! directly
+                #[cfg(feature = "std")]
+                alloc::println!("⏭️  {} skipped: {}", $test_name, reason);
+
                 return;
             }
             $crate::utils::testing::TestResult::Failed(error) => {
@@ -116,7 +119,7 @@ impl<T> TestResult<T> {
             Err(error) => {
                 let error_msg = error.to_string();
                 if is_known_network_error(&error_msg) {
-                    Self::Skipped(format!("Known network error: {}", error_msg))
+                    Self::Skipped(alloc::format!("Known network error: {}", error_msg))
                 } else {
                     Self::Failed(error_msg)
                 }
@@ -129,7 +132,8 @@ impl<T> TestResult<T> {
         match self {
             Self::Success(_) => {}
             Self::Skipped(reason) => {
-                println!("⏭️  {} skipped: {}", test_name, reason);
+                #[cfg(feature = "std")]
+                alloc::println!("⏭️  {} skipped: {}", test_name, reason);
             }
             Self::Failed(error) => {
                 panic!("❌ {} failed: {}", test_name, error);
@@ -139,6 +143,7 @@ impl<T> TestResult<T> {
 }
 
 /// Helper for testing network operations with timeout and error handling
+#[cfg(feature = "tokio-rt")]
 pub async fn test_network_operation<F, T, E>(
     operation: F,
     timeout: Duration,
@@ -153,7 +158,7 @@ where
     match result {
         Ok(Ok(value)) => TestResult::Success(value),
         Ok(Err(error)) => TestResult::from_result(Err(error)),
-        Err(_) => TestResult::Skipped(format!("{} timed out", operation_name)),
+        Err(_) => TestResult::Skipped(alloc::format!("{} timed out", operation_name)),
     }
 }
 
@@ -189,13 +194,14 @@ pub mod test_constants {
 /// Assertion helpers for common test patterns
 pub mod assertions {
     use crate::models::transactions::Transaction;
+    use core::fmt::Debug;
     use strum::IntoEnumIterator;
 
     /// Assert that a transaction is properly signed
     pub fn assert_transaction_signed<'a, T, U>(tx: &T)
     where
         T: Transaction<'a, U>,
-        U: Clone + std::fmt::Debug + PartialEq + serde::Serialize + IntoEnumIterator,
+        U: Clone + Debug + PartialEq + serde::Serialize + IntoEnumIterator,
     {
         let common_fields = tx.get_common_fields();
         assert!(
@@ -212,7 +218,7 @@ pub mod assertions {
     pub fn assert_transaction_multisigned<'a, T, U>(tx: &T)
     where
         T: Transaction<'a, U>,
-        U: Clone + std::fmt::Debug + PartialEq + serde::Serialize + IntoEnumIterator,
+        U: Clone + Debug + PartialEq + serde::Serialize + IntoEnumIterator,
     {
         let common_fields = tx.get_common_fields();
         assert!(
@@ -229,7 +235,7 @@ pub mod assertions {
     pub fn assert_transaction_autofilled<'a, T, U>(tx: &T)
     where
         T: Transaction<'a, U>,
-        U: Clone + std::fmt::Debug + PartialEq + serde::Serialize + IntoEnumIterator,
+        U: Clone + Debug + PartialEq + serde::Serialize + IntoEnumIterator,
     {
         let common_fields = tx.get_common_fields();
         assert!(
