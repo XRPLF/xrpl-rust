@@ -2,8 +2,8 @@ use alloc::{string::ToString, vec};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::XRPLSerdeJsonError;
 use crate::models::results::XRPLResponse;
+use crate::XRPLSerdeJsonError;
 
 mod exceptions;
 pub use exceptions::XRPLJsonRpcException;
@@ -68,8 +68,13 @@ mod _std {
                 .await;
             match response {
                 Ok(response) => match response.text().await {
-                    Ok(response) => {
-                        Ok(serde_json::from_str::<XRPLResponse<'b>>(&response).unwrap())
+                    Ok(response_text) => {
+                        match serde_json::from_str::<XRPLResponse<'b>>(&response_text) {
+                            Ok(parsed_response) => Ok(parsed_response),
+                            Err(parse_error) => {
+                                Err(XRPLSerdeJsonError::SerdeJsonError(parse_error).into())
+                            }
+                        }
                     }
                     Err(error) => Err(error.into()),
                 },
@@ -91,7 +96,11 @@ mod _std {
         ) -> XRPLClientResult<()> {
             let faucet_url = self.get_faucet_url(url)?;
             let client = HttpClient::new();
-            let request_json_rpc = serde_json::to_value(&request).unwrap();
+            let request_json_rpc = match serde_json::to_value(&request) {
+                Ok(value) => value,
+                Err(error) => return Err(XRPLSerdeJsonError::SerdeJsonError(error).into()),
+            };
+
             let response = client
                 .post(faucet_url.to_string())
                 .json(&request_json_rpc)
@@ -102,7 +111,12 @@ mod _std {
                     if response.status().is_success() {
                         Ok(())
                     } else {
-                        todo!()
+                        // This todo!() should also be handled
+                        Err(XRPLJsonRpcException::RequestError(format!(
+                            "Faucet request failed with status: {}",
+                            response.status()
+                        ))
+                        .into())
                     }
                 }
                 Err(error) => Err(error.into()),
@@ -211,7 +225,11 @@ mod _no_std {
             request: FundFaucet<'_>,
         ) -> XRPLClientResult<()> {
             let faucet_url = self.get_faucet_url(url)?;
-            let request_json_rpc = serde_json::to_value(&request).unwrap();
+            let request_json_rpc = match serde_json::to_value(&request) {
+                Ok(value) => value,
+                Err(error) => return Err(XRPLSerdeJsonError::JsonError(error).into()),
+            };
+
             let request_string = request_json_rpc.to_string();
             let request_buf = request_string.as_bytes();
             let mut rx_buffer = [0; BUF];
@@ -230,8 +248,11 @@ mod _no_std {
                         if response.is_success() {
                             Ok(())
                         } else {
-                            todo!()
-                            // Err!(XRPLJsonRpcException::RequestError())
+                            // Fix this todo!()
+                            Err(XRPLJsonRpcException::RequestError(
+                                "Faucet request was not successful".to_string(),
+                            )
+                            .into())
                         }
                     }
                 }
