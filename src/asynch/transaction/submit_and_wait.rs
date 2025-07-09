@@ -1,7 +1,7 @@
 use core::fmt::Debug;
 
 use alloc::{borrow::Cow, format};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -17,10 +17,10 @@ use crate::{
         wait_seconds,
     },
     models::{
-        Model,
         requests::{self},
         results::tx::TxVersionMap,
         transactions::Transaction,
+        Model,
     },
     wallet::Wallet,
 };
@@ -186,118 +186,103 @@ where
 ))]
 #[cfg(test)]
 mod tests {
-    use core::time::Duration;
-
     use super::*;
-    use crate::models::transactions::account_set::AccountSetFlag;
     use crate::{
         asynch::{clients::AsyncJsonRpcClient, wallet::generate_faucet_wallet},
-        models::transactions::{CommonFields, TransactionType, account_set::AccountSet},
+        handle_test_result,
+        models::transactions::{account_set::AccountSet, CommonFields, TransactionType},
+        utils::testing::{
+            assertions, test_constants, test_network_operation, test_wallets, TestTimeouts,
+        },
     };
-
-    const TEST_DOMAIN: &str = "6578616d706c652e636f6d"; // "example.com"
-    // Common network error patterns
-    const COMMON_NETWORK_ERRORS: &[&str] = &["expected value"];
-
-    fn is_known_network_error(error_msg: &str) -> bool {
-        COMMON_NETWORK_ERRORS
-            .iter()
-            .any(|&pattern| error_msg.contains(pattern))
-    }
 
     #[tokio::test]
     async fn test_submit_and_wait() {
-        let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
+        let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());
 
         // First try to generate a faucet wallet with timeout and error handling
-        let wallet_result = tokio::time::timeout(
-            Duration::from_secs(60),
+        let wallet_result = test_network_operation(
             generate_faucet_wallet(&client, None, None, None, None),
+            TestTimeouts::FAUCET,
+            "faucet wallet generation for submit_and_wait test",
         )
         .await;
 
-        let wallet = match wallet_result {
-            Ok(Ok(w)) => w,
-            Ok(Err(e)) => {
-                let error_msg = e.to_string();
-                if is_known_network_error(&error_msg) {
-                    alloc::println!(
-                        "Known network error during wallet generation, skipping test: {}",
-                        error_msg
-                    );
-                    return;
-                } else {
-                    panic!("Unexpected wallet generation error: {}", e);
-                }
-            }
-            Err(_) => {
-                alloc::println!("Wallet generation timed out, skipping test");
-                return;
-            }
-        };
+        let wallet = handle_test_result!(wallet_result, "test_submit_and_wait - wallet generation");
 
+        // Create transaction using the new builder pattern
         let mut tx = AccountSet {
             common_fields: CommonFields::from_account(&wallet.classic_address)
                 .with_transaction_type(TransactionType::AccountSet),
-            domain: Some(TEST_DOMAIN.into()),
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
             ..Default::default()
         };
 
         // Try submit_and_wait with timeout and error handling
-        let submit_result = tokio::time::timeout(
-            Duration::from_secs(120),
+        let submit_result = test_network_operation(
             submit_and_wait(&mut tx, &client, Some(&wallet), Some(true), Some(true)),
+            TestTimeouts::TRANSACTION, // Longer timeout for transaction processing
+            "submit and wait",
         )
         .await;
 
-        match submit_result {
-            Ok(Ok(_)) => {
-                // Success case
-                assert!(tx.get_common_fields().sequence.is_some());
-                assert!(tx.get_common_fields().txn_signature.is_some());
-            }
-            Ok(Err(e)) => {
-                let error_msg = e.to_string();
-                if is_known_network_error(&error_msg) {
-                    alloc::println!(
-                        "Known network error during submit_and_wait, skipping test: {}",
-                        error_msg
-                    );
-                    return;
-                } else {
-                    panic!("Unexpected submit_and_wait error: {}", e);
-                }
-            }
-            Err(_) => {
-                alloc::println!("Submit and wait timed out, skipping test");
-                return;
-            }
-        }
+        handle_test_result!(submit_result, "test_submit_and_wait - submit operation");
+
+        // Verify the transaction was properly processed using generic assertions
+        assertions::assert_transaction_autofilled(&tx);
+        assertions::assert_transaction_signed(&tx);
     }
 
     #[test]
     fn test_transaction_creation() {
+        // Test the transaction builder pattern without network calls
+        let wallet = test_wallets::create_test_wallet_unwrap();
+
         let tx = AccountSet {
-            common_fields: CommonFields::<AccountSetFlag>::from_account("rTestAccount123")
+            common_fields: CommonFields::from_account(&wallet.classic_address)
                 .with_transaction_type(TransactionType::AccountSet)
                 .with_fee("12".into())
                 .with_sequence(100),
-            domain: Some(TEST_DOMAIN.into()),
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
             ..Default::default()
         };
 
-        assert_eq!(tx.common_fields.account, "rTestAccount123");
+        assert_eq!(tx.common_fields.account, wallet.classic_address);
         assert_eq!(
             tx.common_fields.transaction_type,
             TransactionType::AccountSet
         );
         assert_eq!(tx.common_fields.fee, Some("12".into()));
         assert_eq!(tx.common_fields.sequence, Some(100));
-        assert_eq!(tx.domain, Some(TEST_DOMAIN.into()));
+        assert_eq!(tx.domain, Some(test_constants::EXAMPLE_COM_HEX.into()));
 
         // Test that we can get common fields
         let common_fields = tx.get_common_fields();
-        assert_eq!(common_fields.account, "rTestAccount123");
+        assert_eq!(common_fields.account, wallet.classic_address);
         assert!(!common_fields.is_signed()); // Should not be signed yet
+    }
+
+    #[test]
+    fn test_submit_and_wait_parameters() {
+        // Test parameter validation without network calls
+        use crate::models::transactions::account_set::AccountSetFlag;
+
+        let wallet = test_wallets::create_test_wallet_unwrap();
+
+        // Test different parameter combinations
+        let tx1 = AccountSet {
+            common_fields: CommonFields::<AccountSetFlag>::from_account(&wallet.classic_address)
+                .with_transaction_type(TransactionType::AccountSet)
+                .with_fee("10".into())
+                .with_sequence(1),
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
+            ..Default::default()
+        };
+
+        // Verify transaction structure
+        assert_eq!(tx1.common_fields.account, wallet.classic_address);
+        assert_eq!(tx1.common_fields.fee, Some("10".into()));
+        assert_eq!(tx1.common_fields.sequence, Some(1));
+        assert_eq!(tx1.domain, Some(test_constants::EXAMPLE_COM_HEX.into()));
     }
 }

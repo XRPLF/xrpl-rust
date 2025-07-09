@@ -6,7 +6,7 @@ use url::Url;
 
 use crate::{
     asynch::{account::get_next_valid_seq_number, wait_seconds},
-    models::{XRPAmount, requests::FundFaucet},
+    models::{requests::FundFaucet, XRPAmount},
     wallet::Wallet,
 };
 
@@ -108,88 +108,43 @@ where
 #[cfg(all(feature = "json-rpc", feature = "std"))]
 #[cfg(test)]
 mod test_faucet_wallet_generation {
-    use std::time::Duration;
-
     use super::*;
-    use crate::asynch::clients::AsyncJsonRpcClient;
-
-    // Common network error patterns (expanded to include more cases)
-    const COMMON_NETWORK_ERRORS: &[&str] = &[
-        "expected value",
-        "network",
-        "connection",
-        "timeout",
-        "there is no reactor running",
-        "must be called from the context of a Tokio",
-        "EmptyResponse",
-        "HttpError",
-        "dns error",                         // DNS resolution failures
-        "failed to lookup address",          // DNS lookup failures
-        "Name or service not known",         // Linux DNS error
-        "nodename nor servname provided",    // Another DNS error
-        "Connection refused",                // Connection failures
-        "No route to host",                  // Network unreachable
-        "Network is unreachable",            // Network issues
-        "ConnectError",                      // Generic connection errors
-        "hyper_util::client::legacy::Error", // HTTP client errors
-    ];
-
-    fn is_known_network_error(error_msg: &str) -> bool {
-        COMMON_NETWORK_ERRORS
-            .iter()
-            .any(|&pattern| error_msg.contains(pattern))
-    }
+    use crate::{
+        asynch::clients::AsyncJsonRpcClient,
+        handle_test_result,
+        utils::testing::{
+            assertions, is_known_network_error, test_constants, test_network_operation,
+            TestTimeouts,
+        },
+    };
 
     #[tokio::test]
     async fn test_generate_faucet_wallet() {
-        let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
-        let result = tokio::time::timeout(
-            Duration::from_secs(60),
+        let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());
+
+        let result = test_network_operation(
             generate_faucet_wallet(&client, None, None, None, None),
+            TestTimeouts::FAUCET,
+            "faucet wallet generation",
         )
         .await;
 
-        match result {
-            Ok(Ok(wallet)) => {
-                // Success case - verify wallet is valid
-                assert!(!wallet.classic_address.is_empty());
-                assert!(!wallet.public_key.is_empty());
-                assert!(!wallet.private_key.is_empty());
-            }
-            Ok(Err(e)) => {
-                let error_msg = e.to_string();
-                if is_known_network_error(&error_msg) {
-                    alloc::println!("Known network error, skipping test: {}", error_msg);
-                    return; // Skip test due to known network issues
-                } else {
-                    panic!("Unexpected faucet wallet generation error: {}", e);
-                }
-            }
-            Err(_) => {
-                alloc::println!(
-                    "Faucet wallet generation timed out - likely network issues, skipping test"
-                );
-                return; // Skip test due to timeout
-            }
-        }
+        let wallet = handle_test_result!(result, "test_generate_faucet_wallet");
+        assertions::assert_valid_wallet(&wallet);
     }
 
     #[test]
     fn test_wallet_creation_parameters() {
         // Test that we can create wallets and URLs without network calls
         let wallet = Wallet::create(None).unwrap();
-        assert!(!wallet.classic_address.is_empty());
-        assert!(!wallet.public_key.is_empty());
-        assert!(!wallet.private_key.is_empty());
+        assertions::assert_valid_wallet(&wallet);
 
         // Test URL parsing
-        let url1 = "https://testnet.xrpl-labs.com/".parse::<Url>().unwrap();
+        let url1 = test_constants::TESTNET_URL.parse::<Url>().unwrap();
         assert_eq!(url1.scheme(), "https");
         assert_eq!(url1.host_str(), Some("testnet.xrpl-labs.com"));
 
-        let url2 = "https://faucet.altnet.rippletest.net:443"
-            .parse::<Url>()
-            .unwrap();
+        let url2 = test_constants::ALT_TESTNET_URL.parse::<Url>().unwrap();
         assert_eq!(url2.scheme(), "https");
         assert_eq!(url2.host_str(), Some("faucet.altnet.rippletest.net"));
         assert_eq!(url2.port_or_known_default(), Some(443));
@@ -209,6 +164,8 @@ mod test_faucet_wallet_generation {
         assert_eq!(url4.host_str(), Some("example.com"));
         assert_eq!(url4.port(), None); // Default port 80 for HTTP
         assert_eq!(url4.port_or_known_default(), Some(80));
+
+        println!("✅ test_wallet_creation_parameters passed");
     }
 
     #[test]

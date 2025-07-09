@@ -8,6 +8,8 @@ pub mod get_xchain_claim_id;
 #[cfg(feature = "models")]
 pub mod parse_nftoken_id;
 pub mod str_conversion;
+#[cfg(test)]
+pub mod testing;
 pub mod time_conversion;
 #[cfg(feature = "models")]
 pub(crate) mod transactions;
