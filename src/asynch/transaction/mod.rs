@@ -539,6 +539,7 @@ mod test_autofill {
 #[cfg(test)]
 mod test_sign {
     use alloc::borrow::Cow;
+    use core::time::Duration;
 
     use crate::{
         asynch::{
@@ -546,34 +547,26 @@ mod test_sign {
             transaction::{autofill_and_sign, sign},
             wallet::generate_faucet_wallet,
         },
-        models::transactions::{account_set::AccountSet, Transaction},
+        models::transactions::{
+            account_set::AccountSet, CommonFields, Transaction, TransactionType,
+        },
         wallet::Wallet,
     };
 
     #[tokio::test]
     async fn test_sign() {
         let wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
-        let mut tx = AccountSet::new(
-            Cow::from(wallet.classic_address.clone()),
-            None,
-            Some("10".into()),
-            None,
-            None,
-            None,
-            Some(227234),
-            None,
-            None,
-            None,
-            None,
-            Some("6578616d706c652e636f6d".into()), // "example.com"
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        let mut tx = AccountSet {
+            common_fields: CommonFields::from_account(&wallet.classic_address)
+                .with_transaction_type(TransactionType::AccountSet)
+                .with_fee("10".into())
+                .with_sequence(227234),
+            domain: Some("6578616d706c652e636f6d".into()), // "example.com"
+            ..Default::default()
+        };
+
         sign(&mut tx, &wallet, false).unwrap();
+
         let expected_signature: Cow<str> =
             "C3F435CFBFAE996FE297F3A71BEAB68FF5322CBF039E41A9615BC48A59FB4EC\
             5A55F8D4EC0225D47056E02ECCCDF7E8FF5F8B7FAA1EBBCBF7D0491FCB2D98807"
@@ -585,32 +578,31 @@ mod test_sign {
     #[tokio::test]
     async fn test_autofill_and_sign() {
         let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
-        let wallet = generate_faucet_wallet(&client, None, None, None, None)
-            .await
-            .unwrap();
-        let mut tx = AccountSet::new(
-            Cow::from(wallet.classic_address.clone()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some("6578616d706c652e636f6d".into()), // "example.com"
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        autofill_and_sign(&mut tx, &client, &wallet, true)
-            .await
-            .unwrap();
+        // Add timeout and better error handling for wallet generation
+        let wallet = tokio::time::timeout(
+            Duration::from_secs(30),
+            generate_faucet_wallet(&client, None, None, None, None),
+        )
+        .await
+        .expect("Wallet generation timed out")
+        .expect("Failed to generate faucet wallet");
+
+        let mut tx = AccountSet {
+            common_fields: CommonFields::from_account(&wallet.classic_address)
+                .with_transaction_type(TransactionType::AccountSet),
+            domain: Some("6578616d706c652e636f6d".into()),
+            ..Default::default()
+        };
+
+        // Add timeout for autofill_and_sign
+        tokio::time::timeout(
+            Duration::from_secs(30),
+            autofill_and_sign(&mut tx, &client, &wallet, true),
+        )
+        .await
+        .expect("Autofill and sign timed out")
+        .expect("Failed to autofill and sign transaction");
+
         assert!(tx.get_common_fields().sequence.is_some());
         assert!(tx.get_common_fields().txn_signature.is_some());
     }

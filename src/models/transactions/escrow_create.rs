@@ -5,11 +5,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
-use crate::models::{
-    transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
-};
 use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    Model, ValidateCurrencies,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+};
 
 use super::CommonTransactionBuilder;
 
@@ -18,7 +18,16 @@ use super::CommonTransactionBuilder;
 /// See EscrowCreate:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/escrowcreate>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowCreate<'a> {
     /// The base fields for all transaction models.
@@ -54,20 +63,8 @@ pub struct EscrowCreate<'a> {
 
 impl<'a> Model for EscrowCreate<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        if let (Some(finish_after), Some(cancel_after)) = (self.finish_after, self.cancel_after) {
-            if finish_after >= cancel_after {
-                Err(XRPLModelException::ValueBelowValue {
-                    field1: "cancel_after".into(),
-                    field2: "finish_after".into(),
-                    field1_val: cancel_after,
-                    field2_val: finish_after,
-                })
-            } else {
-                Ok(())
-            }
-        } else {
-            Ok(())
-        }
+        self._get_finish_after_error()?;
+        self.validate_currencies()
     }
 }
 
@@ -158,6 +155,29 @@ impl<'a> EscrowCreate<'a> {
         self.condition = Some(condition);
         self
     }
+}
+
+impl<'a> EscrowCreateError for EscrowCreate<'a> {
+    fn _get_finish_after_error(&self) -> XRPLModelResult<()> {
+        if let (Some(finish_after), Some(cancel_after)) = (self.finish_after, self.cancel_after) {
+            if finish_after >= cancel_after {
+                Err(XRPLModelException::ValueBelowValue {
+                    field1: "cancel_after".into(),
+                    field2: "finish_after".into(),
+                    field1_val: cancel_after,
+                    field2_val: finish_after,
+                })
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub trait EscrowCreateError {
+    fn _get_finish_after_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

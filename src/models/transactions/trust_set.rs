@@ -7,8 +7,8 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
+    Model, ValidateCurrencies,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
 
 use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
@@ -44,7 +44,16 @@ pub enum TrustSetFlag {
 /// See TrustSet:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/trustset>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct TrustSet<'a> {
     /// The base fields for all transaction models.
@@ -63,7 +72,11 @@ pub struct TrustSet<'a> {
     pub quality_out: Option<u32>,
 }
 
-impl<'a> Model for TrustSet<'a> {}
+impl<'a> Model for TrustSet<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, TrustSetFlag> for TrustSet<'a> {
     fn has_flag(&self, flag: &TrustSetFlag) -> bool {

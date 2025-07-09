@@ -6,11 +6,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 use crate::models::{
-    transactions::{Transaction, TransactionType},
     Model,
+    transactions::{Transaction, TransactionType},
 };
-use crate::models::{FlagCollection, NoFlags};
 
 use super::{CommonTransactionBuilder, Memo, Signer};
 
@@ -19,7 +19,16 @@ use super::{CommonTransactionBuilder, Memo, Signer};
 /// See EscrowCancel:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/escrowcancel>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowCancel<'a> {
     /// The base fields for all transaction models.
@@ -34,7 +43,11 @@ pub struct EscrowCancel<'a> {
     pub offer_sequence: u32,
 }
 
-impl<'a> Model for EscrowCancel<'a> {}
+impl<'a> Model for EscrowCancel<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for EscrowCancel<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

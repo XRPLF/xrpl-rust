@@ -5,11 +5,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 use crate::models::{
-    transactions::{Transaction, TransactionType},
     Model,
+    transactions::{Transaction, TransactionType},
 };
-use crate::models::{FlagCollection, NoFlags};
 
 use super::{CommonTransactionBuilder, Memo, Signer};
 
@@ -21,7 +21,16 @@ use super::{CommonTransactionBuilder, Memo, Signer};
 /// See CheckCancel:
 /// `<https://xrpl.org/checkcancel.html>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCancel<'a> {
     /// The base fields for all transaction models.
@@ -35,7 +44,11 @@ pub struct CheckCancel<'a> {
     pub check_id: Cow<'a, str>,
 }
 
-impl<'a> Model for CheckCancel<'a> {}
+impl<'a> Model for CheckCancel<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for CheckCancel<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

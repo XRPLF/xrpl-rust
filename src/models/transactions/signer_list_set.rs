@@ -4,17 +4,17 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use derive_new::new;
-use serde::{ser::SerializeMap, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeMap};
 use serde_with::skip_serializing_none;
 
-use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::FlagCollection;
 use crate::models::NoFlags;
 use crate::models::XRPLModelResult;
+use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::{
+    Model, ValidateCurrencies,
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
 use crate::serde_with_tag;
 
@@ -37,7 +37,16 @@ serde_with_tag! {
 /// See SignerListSet:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/signerlistset>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct SignerListSet<'a> {
     /// The base fields for all transaction models.
@@ -60,7 +69,7 @@ impl<'a> Model for SignerListSet<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_signer_entries_error()?;
         self._get_signer_quorum_error()?;
-        Ok(())
+        self.validate_currencies()
     }
 }
 

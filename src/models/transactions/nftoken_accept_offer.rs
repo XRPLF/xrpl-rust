@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
+use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 use crate::models::{
+    Model, ValidateCurrencies,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -20,7 +20,16 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// See NFTokenAcceptOffer:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/nftokenacceptoffer>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenAcceptOffer<'a> {
     /// The base fields for all transaction models.
@@ -50,8 +59,7 @@ impl<'a: 'static> Model for NFTokenAcceptOffer<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_brokered_mode_error()?;
         self._get_nftoken_broker_fee_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -177,8 +185,8 @@ mod tests {
 
     use super::*;
     use crate::models::{
-        amount::{Amount, IssuedCurrencyAmount, XRPAmount},
         Model,
+        amount::{Amount, IssuedCurrencyAmount, XRPAmount},
     };
 
     #[test]
@@ -408,11 +416,13 @@ mod tests {
         .with_sequence(111);
 
         assert!(currency_fee_accept.nftoken_broker_fee.is_some());
-        assert!(!currency_fee_accept
-            .nftoken_broker_fee
-            .as_ref()
-            .unwrap()
-            .is_xrp());
+        assert!(
+            !currency_fee_accept
+                .nftoken_broker_fee
+                .as_ref()
+                .unwrap()
+                .is_xrp()
+        );
         assert_eq!(currency_fee_accept.common_fields.sequence, Some(111));
         assert!(currency_fee_accept.validate().is_ok());
     }

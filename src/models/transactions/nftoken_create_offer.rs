@@ -8,8 +8,8 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
+    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, XRPLModelException, XRPLModelResult,
 };
 
 use crate::models::amount::{Amount, XRPAmount};
@@ -39,7 +39,16 @@ pub enum NFTokenCreateOfferFlag {
 /// See NFTokenCreateOffer:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/nftokencreateoffer>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenCreateOffer<'a> {
     /// The base fields for all transaction models.
@@ -75,8 +84,7 @@ impl<'a: 'static> Model for NFTokenCreateOffer<'a> {
         self._get_amount_error()?;
         self._get_destination_error()?;
         self._get_owner_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -247,8 +255,8 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::models::amount::{Amount, IssuedCurrencyAmount, XRPAmount};
     use crate::models::Model;
+    use crate::models::amount::{Amount, IssuedCurrencyAmount, XRPAmount};
 
     #[test]
     fn test_amount_error() {
@@ -288,7 +296,11 @@ mod tests {
         };
 
         assert_eq!(
-            nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
+            nftoken_create_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
             "The value of the field `\"destination\"` is not allowed to be the same as the value of the field `\"account\"`"
         );
     }
@@ -309,7 +321,11 @@ mod tests {
         };
 
         assert_eq!(
-            nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
+            nftoken_create_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
             "The optional field `\"owner\"` is not allowed to be defined for \"NFToken sell offers\""
         );
 
@@ -328,7 +344,11 @@ mod tests {
         nftoken_create_offer.owner = Some("rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into());
 
         assert_eq!(
-            nftoken_create_offer.validate().unwrap_err().to_string().as_str(),
+            nftoken_create_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
             "The value of the field `\"owner\"` is not allowed to be the same as the value of the field `\"account\"`"
         );
     }

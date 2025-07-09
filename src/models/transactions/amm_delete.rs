@@ -2,7 +2,7 @@ use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{Currency, FlagCollection, Model, NoFlags, XRPAmount};
+use crate::models::{Currency, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount};
 
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
@@ -21,7 +21,16 @@ use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, T
 /// See AMMDelete transaction:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/ammdelete>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMDelete<'a> {
     /// The base fields for all transaction models.
@@ -37,7 +46,11 @@ pub struct AMMDelete<'a> {
     pub asset2: Currency<'a>,
 }
 
-impl Model for AMMDelete<'_> {}
+impl Model for AMMDelete<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for AMMDelete<'a> {
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
@@ -105,7 +118,7 @@ impl<'a> AMMDelete<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{currency::XRP, IssuedCurrency};
+    use crate::models::{IssuedCurrency, currency::XRP};
 
     #[test]
     fn test_serde() {

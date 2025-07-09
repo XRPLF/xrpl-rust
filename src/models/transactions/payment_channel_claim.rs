@@ -7,8 +7,8 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
+    Model, ValidateCurrencies,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
 
 use crate::models::amount::XRPAmount;
@@ -48,7 +48,16 @@ pub enum PaymentChannelClaimFlag {
 /// See PaymentChannelClaim:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/paymentchannelclaim>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct PaymentChannelClaim<'a> {
     /// The base fields for all transaction models.
@@ -80,7 +89,11 @@ pub struct PaymentChannelClaim<'a> {
     pub public_key: Option<Cow<'a, str>>,
 }
 
-impl<'a> Model for PaymentChannelClaim<'a> {}
+impl<'a> Model for PaymentChannelClaim<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, PaymentChannelClaimFlag> for PaymentChannelClaim<'a> {
     fn has_flag(&self, flag: &PaymentChannelClaimFlag) -> bool {

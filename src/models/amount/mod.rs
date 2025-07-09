@@ -33,7 +33,14 @@ impl<'a> TryInto<BigDecimal> for Amount<'a> {
     }
 }
 
-impl<'a> Model for Amount<'a> {}
+impl<'a> Model for Amount<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        match self {
+            Amount::IssuedCurrencyAmount(amount) => amount.get_errors(),
+            Amount::XRPAmount(amount) => amount.get_errors(),
+        }
+    }
+}
 
 impl<'a> Default for Amount<'a> {
     fn default() -> Self {

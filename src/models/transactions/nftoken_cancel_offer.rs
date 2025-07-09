@@ -5,11 +5,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLNFTokenCancelOfferException;
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies, XRPLModelResult};
 use crate::models::{
-    transactions::{Memo, Signer, Transaction, TransactionType},
     Model,
+    transactions::{Memo, Signer, Transaction, TransactionType},
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -18,7 +18,16 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// See NFTokenCancelOffer:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/nftokencanceloffer>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenCancelOffer<'a> {
     /// The base fields for all transaction models.
@@ -39,8 +48,7 @@ pub struct NFTokenCancelOffer<'a> {
 impl<'a: 'static> Model for NFTokenCancelOffer<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_nftoken_offers_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -154,7 +162,11 @@ mod tests {
         };
 
         assert_eq!(
-            nftoken_cancel_offer.validate().unwrap_err().to_string().as_str(),
+            nftoken_cancel_offer
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .as_str(),
             "The value of the field `\"nftoken_offers\"` is not allowed to be empty (type `\"Vec\"`). If the field is optional, define it to be `None`"
         );
     }

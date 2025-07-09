@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    Currency, FlagCollection, Model, NoFlags, XRPAmount, XRPLModelException, XRPLModelResult,
+    Currency, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
+    XRPLModelResult,
 };
 
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
@@ -20,7 +21,9 @@ pub const AMM_VOTE_MAX_TRADING_FEE: u16 = 1000;
 /// See AMMVote transaction:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/ammvote>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMVote<'a> {
     #[serde(flatten)]
@@ -38,6 +41,7 @@ pub struct AMMVote<'a> {
 
 impl Model for AMMVote<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        self.validate_currencies()?;
         if let Some(trading_fee) = self.trading_fee {
             if trading_fee > AMM_VOTE_MAX_TRADING_FEE {
                 return Err(XRPLModelException::ValueTooHigh {

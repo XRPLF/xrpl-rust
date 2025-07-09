@@ -6,10 +6,12 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
-    transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    Model,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+};
 
 use super::CommonTransactionBuilder;
 
@@ -19,7 +21,16 @@ use super::CommonTransactionBuilder;
 /// See DepositPreauth:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/depositpreauth>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct DepositPreauth<'a> {
     /// The base fields for all transaction models.
@@ -36,16 +47,8 @@ pub struct DepositPreauth<'a> {
 
 impl<'a> Model for DepositPreauth<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        if (self.authorize.is_none() && self.unauthorize.is_none())
-            || (self.authorize.is_some() && self.unauthorize.is_some())
-        {
-            Err(XRPLModelException::InvalidFieldCombination {
-                field: "authorize",
-                other_fields: &["unauthorize"],
-            })
-        } else {
-            Ok(())
-        }
+        self._get_authorize_and_unauthorize_error()?;
+        self.validate_currencies()
     }
 }
 
@@ -118,6 +121,25 @@ impl<'a> DepositPreauth<'a> {
         self.unauthorize = Some(unauthorize);
         self
     }
+}
+
+impl<'a> DepositPreauthError for DepositPreauth<'a> {
+    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()> {
+        if (self.authorize.is_none() && self.unauthorize.is_none())
+            || (self.authorize.is_some() && self.unauthorize.is_some())
+        {
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "authorize",
+                other_fields: &["unauthorize"],
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub trait DepositPreauthError {
+    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

@@ -6,11 +6,13 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
+use crate::models::{
+    Model,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 use super::CommonTransactionBuilder;
 
@@ -20,7 +22,16 @@ use super::CommonTransactionBuilder;
 /// See CheckCash:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/checkcash>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCash<'a> {
     /// The base fields for all transaction models.
@@ -43,16 +54,8 @@ pub struct CheckCash<'a> {
 
 impl<'a> Model for CheckCash<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        if (self.amount.is_none() && self.deliver_min.is_none())
-            || (self.amount.is_some() && self.deliver_min.is_some())
-        {
-            Err(XRPLModelException::InvalidFieldCombination {
-                field: "amount",
-                other_fields: &["deliver_min"],
-            })
-        } else {
-            Ok(())
-        }
+        self._get_amount_and_deliver_min_error()?;
+        self.validate_currencies()
     }
 }
 
@@ -127,6 +130,25 @@ impl<'a> CheckCash<'a> {
         self.deliver_min = Some(deliver_min);
         self
     }
+}
+
+impl<'a> CheckCashError for CheckCash<'a> {
+    fn _get_amount_and_deliver_min_error(&self) -> XRPLModelResult<()> {
+        if (self.amount.is_none() && self.deliver_min.is_none())
+            || (self.amount.is_some() && self.deliver_min.is_some())
+        {
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "amount",
+                other_fields: &["deliver_min"],
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub trait CheckCashError {
+    fn _get_amount_and_deliver_min_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

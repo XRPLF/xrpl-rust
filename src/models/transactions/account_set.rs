@@ -9,16 +9,16 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{exceptions::XRPLAccountSetException, CommonFields};
-use crate::models::{XRPLModelException, XRPLModelResult};
+use crate::models::transactions::{CommonFields, exceptions::XRPLAccountSetException};
+use crate::models::{ValidateCurrencies, XRPLModelException, XRPLModelResult};
 use crate::{
     constants::{
         DISABLE_TICK_SIZE, MAX_DOMAIN_LENGTH, MAX_TICK_SIZE, MAX_TRANSFER_RATE, MIN_TICK_SIZE,
         MIN_TRANSFER_RATE, SPECIAL_CASE_TRANFER_RATE,
     },
     models::{
-        transactions::{Memo, Signer, Transaction, TransactionType},
         Model,
+        transactions::{Memo, Signer, Transaction, TransactionType},
     },
 };
 
@@ -83,7 +83,16 @@ pub enum AccountSetFlag {
 /// See AccountSet:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/accountset>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AccountSet<'a> {
     /// The base fields for all transaction models.
@@ -133,6 +142,7 @@ pub struct AccountSet<'a> {
 
 impl<'a> Model for AccountSet<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        self.validate_currencies()?;
         self._get_tick_size_error()?;
         self._get_transfer_rate_error()?;
         self._get_domain_error()?;

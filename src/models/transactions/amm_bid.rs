@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::TransactionType, Currency, FlagCollection, IssuedCurrencyAmount, Model, NoFlags,
-    XRPAmount,
+    Currency, FlagCollection, IssuedCurrencyAmount, Model, NoFlags, ValidateCurrencies, XRPAmount,
+    transactions::TransactionType,
 };
 
 use super::{AuthAccount, CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction};
@@ -20,7 +20,16 @@ use super::{AuthAccount, CommonFields, CommonTransactionBuilder, Memo, Signer, T
 /// the AMM's LP Tokens; the amount of a winning bid is returned to the AMM, decreasing
 /// the outstanding balance of LP Tokens.
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMBid<'a> {
     /// The base fields for all transaction models.
@@ -47,7 +56,11 @@ pub struct AMMBid<'a> {
     pub auth_accounts: Option<Vec<AuthAccount>>,
 }
 
-impl<'a> Model for AMMBid<'a> {}
+impl Model for AMMBid<'_> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for AMMBid<'a> {
     fn get_transaction_type(&self) -> &TransactionType {
@@ -149,7 +162,7 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::models::{currency::XRP, IssuedCurrency};
+    use crate::models::{IssuedCurrency, currency::XRP};
 
     #[test]
     fn test_serde() {

@@ -6,9 +6,9 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
+    Model, PathStep, ValidateCurrencies, XRPLModelResult,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, PathStep, XRPLModelResult,
 };
 
 use crate::models::amount::XRPAmount;
@@ -56,7 +56,16 @@ pub enum PaymentFlag {
 /// See Payment:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/payment>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct Payment<'a> {
     /// The base fields for all transaction models.
@@ -95,8 +104,7 @@ impl<'a: 'static> Model for Payment<'a> {
         self._get_xrp_transaction_error()?;
         self._get_partial_payment_error()?;
         self._get_exchange_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -358,7 +366,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
             paths: Some(vec![vec![
-                PathStep::default().with_account("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into())
+                PathStep::default().with_account("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
             ]]),
             ..Default::default()
         };

@@ -92,3 +92,10 @@ pub struct XChainBridge<'a> {
 fn default_false() -> Option<bool> {
     Some(false)
 }
+
+/// Trait for validating currencies in models. This is needed to use xrpl-rust-macros for deriving validation methods.
+/// This trait is implemented by models that contain fields of type `Amount`, `XRPAmount`, `IssuedCurrencyAmount`, `Currency`, `XRP`, or `IssuedCurrency`.
+/// It provides a method `validate_currencies` that checks if the provided values are valid according to the XRPL specifications.
+pub trait ValidateCurrencies {
+    fn validate_currencies(&self) -> crate::models::XRPLModelResult<()>;
+}

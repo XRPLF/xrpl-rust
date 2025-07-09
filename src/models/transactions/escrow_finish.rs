@@ -3,12 +3,12 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::models::{FlagCollection, NoFlags};
 use crate::models::{
+    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, XRPLModelException, XRPLModelResult,
 };
-use crate::models::{FlagCollection, NoFlags};
 
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -17,7 +17,16 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// See EscrowFinish:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/escrowfinish>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowFinish<'a> {
     /// The base fields for all transaction models.
@@ -38,16 +47,8 @@ pub struct EscrowFinish<'a> {
 
 impl<'a> Model for EscrowFinish<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        if (self.condition.is_some() && self.fulfillment.is_none())
-            || (self.condition.is_none() && self.fulfillment.is_some())
-        {
-            Err(XRPLModelException::FieldRequiresField {
-                field1: "condition".into(),
-                field2: "fulfillment".into(),
-            })
-        } else {
-            Ok(())
-        }
+        self._get_condition_and_fulfillment_error()?;
+        self.validate_currencies()
     }
 }
 
@@ -134,6 +135,25 @@ impl<'a> EscrowFinish<'a> {
         self.fulfillment = Some(fulfillment);
         self
     }
+}
+
+impl<'a> EscrowFinishError for EscrowFinish<'a> {
+    fn _get_condition_and_fulfillment_error(&self) -> XRPLModelResult<()> {
+        if (self.condition.is_some() && self.fulfillment.is_none())
+            || (self.condition.is_none() && self.fulfillment.is_some())
+        {
+            Err(XRPLModelException::FieldRequiresField {
+                field1: "condition".into(),
+                field2: "fulfillment".into(),
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub trait EscrowFinishError {
+    fn _get_condition_and_fulfillment_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]

@@ -2,11 +2,13 @@ use alloc::{borrow::Cow, vec::Vec};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{Amount, FlagCollection, Model, NoFlags, XRPAmount, XRPLModelResult};
+use crate::models::{
+    Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelResult,
+};
 
 use super::{
-    exceptions::{XRPLAMMCreateException, XRPLTransactionException},
     CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType,
+    exceptions::{XRPLAMMCreateException, XRPLTransactionException},
 };
 
 pub const AMM_CREATE_MAX_FEE: u16 = 1000;
@@ -31,7 +33,16 @@ pub const AMM_CREATE_MAX_FEE: u16 = 1000;
 /// See AMMCreate transaction:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/ammcreate>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMCreate<'a> {
     /// The base fields for all transaction models.
@@ -55,13 +66,13 @@ pub struct AMMCreate<'a> {
 impl Model for AMMCreate<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.get_trading_fee_error()?;
-        Ok(())
+        self.validate_currencies()
     }
 }
 
 impl<'a> Transaction<'a, NoFlags> for AMMCreate<'a> {
     fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
-        &self.common_fields
+        &self.common_fields /*  */
     }
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {

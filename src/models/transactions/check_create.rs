@@ -6,12 +6,12 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 use crate::models::{
+    Model,
     amount::Amount,
     transactions::{Transaction, TransactionType},
-    Model,
 };
-use crate::models::{FlagCollection, NoFlags};
 
 use super::{CommonTransactionBuilder, Memo, Signer};
 
@@ -21,7 +21,16 @@ use super::{CommonTransactionBuilder, Memo, Signer};
 /// See CheckCreate:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/checkcreate>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCreate<'a> {
     /// The base fields for all transaction models.
@@ -46,7 +55,11 @@ pub struct CheckCreate<'a> {
     pub invoice_id: Option<Cow<'a, str>>,
 }
 
-impl<'a> Model for CheckCreate<'a> {}
+impl<'a> Model for CheckCreate<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for CheckCreate<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

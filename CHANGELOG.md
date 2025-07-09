@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [[v.0.6.0]]
 
 - Added CLI interface
+- missing network_id member added to server info response
+- server_state_duration_us in server info type changed to str
 
 ## [[v0.5.0]]
 

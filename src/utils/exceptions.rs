@@ -23,6 +23,10 @@ pub enum XRPLUtilsException {
     #[cfg(feature = "models")]
     #[error("XRPL Model error: {0}")]
     XRPLModelError(#[from] XRPLModelException),
+    #[error("XRPL Txn Parser error: {0}")]
+    XRPLTxnParserError(#[from] XRPLTxnParserException),
+    #[error("XRPL XChain Claim ID error: {0}")]
+    XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
@@ -35,6 +39,8 @@ pub enum XRPLUtilsException {
     FromHexError(#[from] hex::FromHexError),
     #[error("ParseInt error: {0}")]
     ParseIntError(#[from] core::num::ParseIntError),
+    #[error("Invalid UTF-8")]
+    Utf8Error,
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -82,6 +88,26 @@ pub enum XRPLNFTIdException {
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
+pub enum XRPLXChainClaimIdException {
+    #[error("No XChainOwnedClaimID created")]
+    NoXChainOwnedClaimID,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLXChainClaimIdException {}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum XRPLTxnParserException {
+    #[error("Missing field: {0}")]
+    MissingField(&'static str),
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLTxnParserException {}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
 pub enum ISOCodeException {
     #[error("Invalid ISO code")]
     InvalidISOCode,
@@ -91,13 +117,11 @@ pub enum ISOCodeException {
     InvalidXRPBytes,
     #[error("Invalid Currency representation")]
     UnsupportedCurrencyRepresentation,
-    #[error("Invalid UTF-8")]
-    Utf8Error,
 }
 
-impl From<core::str::Utf8Error> for ISOCodeException {
+impl From<core::str::Utf8Error> for XRPLUtilsException {
     fn from(_: core::str::Utf8Error) -> Self {
-        ISOCodeException::Utf8Error
+        XRPLUtilsException::Utf8Error
     }
 }
 

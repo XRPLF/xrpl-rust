@@ -5,11 +5,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{
-    transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
-};
 use crate::models::{FlagCollection, NoFlags};
+use crate::models::{
+    Model, ValidateCurrencies,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+};
 
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -22,7 +22,16 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// See SetRegularKey:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/setregularkey>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct SetRegularKey<'a> {
     /// The base fields for all transaction models.
@@ -37,7 +46,11 @@ pub struct SetRegularKey<'a> {
     pub regular_key: Option<Cow<'a, str>>,
 }
 
-impl<'a> Model for SetRegularKey<'a> {}
+impl<'a> Model for SetRegularKey<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, NoFlags> for SetRegularKey<'a> {
     fn get_transaction_type(&self) -> &TransactionType {

@@ -5,8 +5,8 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    Amount, Currency, FlagCollection, IssuedCurrencyAmount, Model, XRPAmount, XRPLModelException,
-    XRPLModelResult,
+    Amount, Currency, FlagCollection, IssuedCurrencyAmount, Model, ValidateCurrencies, XRPAmount,
+    XRPLModelException,
 };
 
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
@@ -33,7 +33,16 @@ pub enum AMMWithdrawFlag {
 /// See AMMWithdraw transaction:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/ammwithdraw>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Default)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct AMMWithdraw<'a> {
     #[serde(flatten)]
@@ -60,7 +69,8 @@ pub struct AMMWithdraw<'a> {
 }
 
 impl Model for AMMWithdraw<'_> {
-    fn get_errors(&self) -> XRPLModelResult<()> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()?;
         if self.amount2.is_some() && self.amount.is_none() {
             Err(XRPLModelException::FieldRequiresField {
                 field1: "amount2".into(),
@@ -175,7 +185,7 @@ impl<'a> AMMWithdraw<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{currency::XRP, IssuedCurrency};
+    use crate::models::{IssuedCurrency, currency::XRP};
 
     #[test]
     fn test_serde() {
