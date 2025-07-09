@@ -227,7 +227,7 @@ mod _no_std {
             let faucet_url = self.get_faucet_url(url)?;
             let request_json_rpc = match serde_json::to_value(&request) {
                 Ok(value) => value,
-                Err(error) => return Err(XRPLSerdeJsonError::JsonError(error).into()),
+                Err(error) => return Err(XRPLSerdeJsonError::SerdeJsonError(error).into()),
             };
 
             let request_string = request_json_rpc.to_string();
