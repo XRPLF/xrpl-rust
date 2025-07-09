@@ -2,7 +2,8 @@ use alloc::{string::ToString, vec};
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::{models::results::XRPLResponse, XRPLSerdeJsonError};
+use crate::XRPLSerdeJsonError;
+use crate::models::results::XRPLResponse;
 
 mod exceptions;
 pub use exceptions::XRPLJsonRpcException;
