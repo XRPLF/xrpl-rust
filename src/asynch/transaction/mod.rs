@@ -539,7 +539,6 @@ mod test_autofill {
 #[cfg(test)]
 mod test_sign {
     use alloc::borrow::Cow;
-    use core::time::Duration;
 
     use crate::{
         asynch::{
@@ -547,21 +546,24 @@ mod test_sign {
             transaction::{autofill_and_sign, sign},
             wallet::generate_faucet_wallet,
         },
+        handle_test_result,
         models::transactions::{
             account_set::AccountSet, CommonFields, Transaction, TransactionType,
         },
-        wallet::Wallet,
+        utils::testing::{
+            assertions, test_constants, test_network_operation, test_wallets, TestTimeouts,
+        },
     };
 
-    #[tokio::test]
-    async fn test_sign() {
-        let wallet = Wallet::new("sEdT7wHTCLzDG7ueaw4hroSTBvH7Mk5", 0).unwrap();
+    #[test]
+    fn test_sign() {
+        let wallet = test_wallets::create_test_wallet_unwrap();
         let mut tx = AccountSet {
             common_fields: CommonFields::from_account(&wallet.classic_address)
                 .with_transaction_type(TransactionType::AccountSet)
                 .with_fee("10".into())
                 .with_sequence(227234),
-            domain: Some("6578616d706c652e636f6d".into()), // "example.com"
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
             ..Default::default()
         };
 
@@ -573,37 +575,88 @@ mod test_sign {
                 .into();
         let actual_signature = tx.get_common_fields().txn_signature.as_ref().unwrap();
         assert_eq!(expected_signature, *actual_signature);
+
+        assertions::assert_transaction_signed(&tx);
+    }
+
+    #[test]
+    fn test_multisign() {
+        let wallet = test_wallets::create_test_wallet_unwrap();
+        let mut tx = AccountSet {
+            common_fields: CommonFields::from_account(&wallet.classic_address)
+                .with_transaction_type(TransactionType::AccountSet)
+                .with_fee("10".into())
+                .with_sequence(227234),
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
+            ..Default::default()
+        };
+
+        sign(&mut tx, &wallet, true).unwrap();
+        assertions::assert_transaction_multisigned(&tx);
     }
 
     #[tokio::test]
     async fn test_autofill_and_sign() {
-        let client = AsyncJsonRpcClient::connect("https://testnet.xrpl-labs.com/".parse().unwrap());
-        // Add timeout and better error handling for wallet generation
-        let wallet = tokio::time::timeout(
-            Duration::from_secs(30),
+        let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());
+        let wallet_result = test_network_operation(
             generate_faucet_wallet(&client, None, None, None, None),
+            TestTimeouts::FAUCET,
+            "faucet wallet generation for autofill test",
         )
-        .await
-        .expect("Wallet generation timed out")
-        .expect("Failed to generate faucet wallet");
+        .await;
 
+        let wallet =
+            handle_test_result!(wallet_result, "test_autofill_and_sign - wallet generation");
         let mut tx = AccountSet {
             common_fields: CommonFields::from_account(&wallet.classic_address)
                 .with_transaction_type(TransactionType::AccountSet),
-            domain: Some("6578616d706c652e636f6d".into()),
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
             ..Default::default()
         };
 
-        // Add timeout for autofill_and_sign
-        tokio::time::timeout(
-            Duration::from_secs(30),
+        // Try autofill_and_sign with timeout and error handling
+        let autofill_result = test_network_operation(
             autofill_and_sign(&mut tx, &client, &wallet, true),
+            TestTimeouts::NETWORK,
+            "autofill and sign",
         )
-        .await
-        .expect("Autofill and sign timed out")
-        .expect("Failed to autofill and sign transaction");
+        .await;
 
-        assert!(tx.get_common_fields().sequence.is_some());
-        assert!(tx.get_common_fields().txn_signature.is_some());
+        handle_test_result!(
+            autofill_result,
+            "test_autofill_and_sign - autofill operation"
+        );
+
+        // Verify the transaction was properly filled and signed
+        assertions::assert_transaction_autofilled(&tx);
+        assertions::assert_transaction_signed(&tx);
+    }
+
+    #[test]
+    fn test_transaction_creation() {
+        // Test the transaction builder pattern without network calls
+        let wallet = test_wallets::create_test_wallet_unwrap();
+        let tx = AccountSet {
+            common_fields: CommonFields::from_account(&wallet.classic_address)
+                .with_transaction_type(TransactionType::AccountSet)
+                .with_fee("12".into())
+                .with_sequence(100),
+            domain: Some(test_constants::EXAMPLE_COM_HEX.into()),
+            ..Default::default()
+        };
+
+        assert_eq!(tx.common_fields.account, wallet.classic_address);
+        assert_eq!(
+            tx.common_fields.transaction_type,
+            TransactionType::AccountSet
+        );
+        assert_eq!(tx.common_fields.fee, Some("12".into()));
+        assert_eq!(tx.common_fields.sequence, Some(100));
+        assert_eq!(tx.domain, Some(test_constants::EXAMPLE_COM_HEX.into()));
+
+        // Test that we can get common fields
+        let common_fields = tx.get_common_fields();
+        assert_eq!(common_fields.account, wallet.classic_address);
+        assert!(!common_fields.is_signed()); // Should not be signed yet
     }
 }

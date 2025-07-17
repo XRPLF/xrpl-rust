@@ -63,7 +63,7 @@ use strum_macros::{AsRefStr, Display};
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
 /// Enum containing the different Transaction types.
-#[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq, Default)]
 pub enum TransactionType {
     AccountDelete,
     AccountSet,
@@ -87,6 +87,7 @@ pub enum TransactionType {
     NFTokenMint,
     OfferCancel,
     OfferCreate,
+    #[default]
     Payment,
     PaymentChannelClaim,
     PaymentChannelCreate,
@@ -238,6 +239,28 @@ where
             txn_signature,
         }
     }
+
+    /// Add a flag
+    pub fn with_flag(mut self, flag: T) -> Self {
+        self.flags.0.push(flag);
+        self
+    }
+
+    /// Set multiple flags
+    pub fn with_flags(mut self, flags: Vec<T>) -> Self {
+        self.flags = flags.into();
+        self
+    }
+
+    /// Add a signer
+    pub fn with_signer(mut self, signer: Signer) -> Self {
+        if let Some(ref mut signers) = self.signers {
+            signers.push(signer);
+        } else {
+            self.signers = Some(alloc::vec![signer]);
+        }
+        self
+    }
 }
 
 impl<T> CommonFields<'_, T>
@@ -297,6 +320,87 @@ where
             ticket_sequence: None,
             txn_signature: None,
         }
+    }
+}
+
+/// A trait providing common builder methods for all transaction types.
+/// This eliminates code duplication across transaction implementations.
+pub trait CommonTransactionBuilder<'a, F>
+where
+    F: IntoEnumIterator + Serialize + core::fmt::Debug,
+{
+    /// Get mutable reference to common fields
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, F>;
+
+    /// Return self after modification (for method chaining)
+    fn into_self(self) -> Self;
+
+    /// Set fee
+    fn with_fee(mut self, fee: XRPAmount<'a>) -> Self
+    where
+        Self: Sized,
+    {
+        self.get_mut_common_fields().fee = Some(fee);
+        self.into_self()
+    }
+
+    /// Set sequence
+    fn with_sequence(mut self, sequence: u32) -> Self
+    where
+        Self: Sized,
+    {
+        self.get_mut_common_fields().sequence = Some(sequence);
+        self.into_self()
+    }
+
+    /// Set last ledger sequence
+    fn with_last_ledger_sequence(mut self, last_ledger_sequence: u32) -> Self
+    where
+        Self: Sized,
+    {
+        self.get_mut_common_fields().last_ledger_sequence = Some(last_ledger_sequence);
+        self.into_self()
+    }
+
+    /// Add memo
+    fn with_memo(mut self, memo: Memo) -> Self
+    where
+        Self: Sized,
+    {
+        let common_fields = self.get_mut_common_fields();
+        if let Some(ref mut memos) = common_fields.memos {
+            memos.push(memo);
+        } else {
+            common_fields.memos = Some(alloc::vec![memo]);
+        }
+        self.into_self()
+    }
+
+    /// Set source tag
+    fn with_source_tag(mut self, source_tag: u32) -> Self
+    where
+        Self: Sized,
+    {
+        self.get_mut_common_fields().source_tag = Some(source_tag);
+        self.into_self()
+    }
+
+    /// Set ticket sequence
+    fn with_ticket_sequence(mut self, ticket_sequence: u32) -> Self
+    where
+        Self: Sized,
+    {
+        self.get_mut_common_fields().ticket_sequence = Some(ticket_sequence);
+        self.into_self()
+    }
+
+    /// Set account transaction ID
+    fn with_account_txn_id(mut self, account_txn_id: Cow<'a, str>) -> Self
+    where
+        Self: Sized,
+    {
+        self.get_mut_common_fields().account_txn_id = Some(account_txn_id);
+        self.into_self()
     }
 }
 

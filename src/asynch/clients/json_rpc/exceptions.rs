@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use thiserror_no_std::Error;
 
 #[derive(Debug, Error)]
@@ -8,4 +10,6 @@ pub enum XRPLJsonRpcException {
     #[cfg(feature = "std")]
     #[error("Reqwest error: {0:?}")]
     ReqwestError(#[from] reqwest::Error),
+    #[error("Request error: {0}")]
+    RequestError(String),
 }

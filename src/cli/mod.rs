@@ -432,7 +432,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     let seed = mnemonic.to_seed(""); // Returns [u8; 64]
                     let phrase = mnemonic.words().collect::<Vec<_>>().join(" ");
 
-                    println!(
+                    alloc::println!(
                         "Generated wallet with mnemonic:\nMnemonic: {}\nSeed: {}",
                         phrase,
                         hex::encode(seed)
@@ -569,7 +569,10 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     match AccountObjectType::from_str(filter) {
                         Ok(obj_type) => Some(obj_type),
                         Err(_) => {
-                            return Err(CliError::Other(format!("Invalid object type: {}", filter)))
+                            return Err(CliError::Other(format!(
+                                "Invalid object type: {}",
+                                filter
+                            )));
                         }
                     }
                 } else {
@@ -671,16 +674,12 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 use crate::models::requests::account_nfts::AccountNfts;
 
                 let client = create_json_rpc_client(url)?;
-
                 let req = AccountNfts::new(
                     None,                   // id
                     address.clone().into(), // account
                     None,                   // limit
                     None,                   // marker
                 );
-
-                let json = serde_json::to_string(&req).unwrap();
-                println!("Sending JSON: {}", json);
 
                 handle_response(client.request(req.into()), "Account NFTs")
             }
@@ -858,8 +857,8 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             } => {
                 use alloc::borrow::Cow;
 
-                use crate::models::transactions::trust_set::TrustSet;
                 use crate::models::IssuedCurrencyAmount;
+                use crate::models::transactions::trust_set::TrustSet;
                 use crate::wallet::Wallet;
 
                 // Create wallet from seed
@@ -992,7 +991,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
         Commands::Server(server_cmd) => match server_cmd {
             #[cfg(feature = "std")]
             ServerCommands::Fee { url } => {
-                use crate::ledger::{get_fee, FeeType};
+                use crate::ledger::{FeeType, get_fee};
 
                 // Create a runtime and client
                 let rt = get_or_create_runtime()?;

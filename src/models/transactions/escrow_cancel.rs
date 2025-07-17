@@ -6,21 +6,28 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
-use crate::models::{
-    transactions::{Transaction, TransactionType},
-    Model,
-};
 use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
+use crate::models::{
+    Model,
+    transactions::{Transaction, TransactionType},
+};
 
-use super::{Memo, Signer};
+use super::{CommonTransactionBuilder, Memo, Signer};
 
 /// Cancels an Escrow and returns escrowed XRP to the sender.
 ///
 /// See EscrowCancel:
-/// `<https://xrpl.org/escrowcancel.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/escrowcancel>`
 #[skip_serializing_none]
 #[derive(
-    Debug, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
 )]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowCancel<'a> {
@@ -30,10 +37,6 @@ pub struct EscrowCancel<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the EscrowCancel model.
-    //
-    // See EscrowCancel fields:
-    // `<https://xrpl.org/escrowcancel.html#escrowcancel-flags>`
     /// Address of the source account that funded the escrow payment.
     pub owner: Cow<'a, str>,
     /// Transaction sequence (or Ticket number) of EscrowCreate transaction that created the escrow to cancel.
@@ -57,6 +60,16 @@ impl<'a> Transaction<'a, NoFlags> for EscrowCancel<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for EscrowCancel<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -103,28 +116,76 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        let default_txn = EscrowCancel::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            7,
-        );
+        let default_txn = EscrowCancel {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::EscrowCancel,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            offer_sequence: 7,
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowCancel","Flags":0,"SigningPubKey":"","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: EscrowCancel = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let escrow_cancel = EscrowCancel {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::EscrowCancel,
+                ..Default::default()
+            },
+            owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            offer_sequence: 7,
+        }
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345);
+
+        assert_eq!(escrow_cancel.owner, "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
+        assert_eq!(escrow_cancel.offer_sequence, 7);
+        assert_eq!(escrow_cancel.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(escrow_cancel.common_fields.sequence, Some(123));
+        assert_eq!(
+            escrow_cancel.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(escrow_cancel.common_fields.source_tag, Some(12345));
+    }
+
+    #[test]
+    fn test_default() {
+        let escrow_cancel = EscrowCancel {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::EscrowCancel,
+                ..Default::default()
+            },
+            owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            offer_sequence: 7,
+        };
+
+        assert_eq!(
+            escrow_cancel.common_fields.account,
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"
+        );
+        assert_eq!(
+            escrow_cancel.common_fields.transaction_type,
+            TransactionType::EscrowCancel
+        );
+        assert_eq!(escrow_cancel.owner, "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
+        assert_eq!(escrow_cancel.offer_sequence, 7);
     }
 }
