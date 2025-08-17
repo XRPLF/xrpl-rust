@@ -7,22 +7,22 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
+    Model, ValidateCurrencies,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
 
 use crate::models::amount::XRPAmount;
 
-use super::{CommonFields, FlagCollection};
+use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the OfferCreate type support additional values
 /// in the Flags field. This enum represents those options.
 ///
 /// See OfferCreate flags:
-/// `<https://xrpl.org/offercreate.html#offercreate-flags>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/offercreate>`
 #[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+    Debug, Eq, PartialEq, Copy, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
 #[repr(u32)]
 pub enum OfferCreateFlag {
@@ -50,25 +50,26 @@ pub enum OfferCreateFlag {
 /// Places an Offer in the decentralized exchange.
 ///
 /// See OfferCreate:
-/// `<https://xrpl.org/offercreate.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/offercreate>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct OfferCreate<'a> {
-    // The base fields for all transaction models.
-    //
-    // See Transaction Types:
-    // `<https://xrpl.org/transaction-types.html>`
-    //
-    // See Transaction Common Fields:
-    // `<https://xrpl.org/transaction-common-fields.html>`
-    /// The type of transaction.
+    /// The base fields for all transaction models.
+    ///
+    /// See Transaction Common Fields:
+    /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, OfferCreateFlag>,
-    // The custom fields for the OfferCreate model.
-    //
-    // See OfferCreate fields:
-    // `<https://xrpl.org/offercreate.html#offercreate-fields>`
     /// The amount and type of currency being sold.
     pub taker_gets: Amount<'a>,
     /// The amount and type of currency being bought.
@@ -79,7 +80,11 @@ pub struct OfferCreate<'a> {
     pub offer_sequence: Option<u32>,
 }
 
-impl<'a> Model for OfferCreate<'a> {}
+impl<'a> Model for OfferCreate<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self.validate_currencies()
+    }
+}
 
 impl<'a> Transaction<'a, OfferCreateFlag> for OfferCreate<'a> {
     fn has_flag(&self, flag: &OfferCreateFlag) -> bool {
@@ -96,6 +101,16 @@ impl<'a> Transaction<'a, OfferCreateFlag> for OfferCreate<'a> {
 
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, OfferCreateFlag> {
         self.common_fields.get_mut_common_fields()
+    }
+}
+
+impl<'a> CommonTransactionBuilder<'a, OfferCreateFlag> for OfferCreate<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, OfferCreateFlag> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -139,98 +154,113 @@ impl<'a> OfferCreate<'a> {
             offer_sequence,
         }
     }
+
+    /// Set expiration
+    pub fn with_expiration(mut self, expiration: u32) -> Self {
+        self.expiration = Some(expiration);
+        self
+    }
+
+    /// Set offer sequence to cancel
+    pub fn with_offer_sequence(mut self, offer_sequence: u32) -> Self {
+        self.offer_sequence = Some(offer_sequence);
+        self
+    }
+
+    /// Add flag
+    pub fn with_flag(mut self, flag: OfferCreateFlag) -> Self {
+        self.common_fields.flags.0.push(flag);
+        self
+    }
+
+    /// Set multiple flags
+    pub fn with_flags(mut self, flags: Vec<OfferCreateFlag>) -> Self {
+        self.common_fields.flags = flags.into();
+        self
+    }
 }
 
 #[cfg(test)]
-mod test {
-    use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
+mod tests {
     use alloc::vec;
 
     use super::*;
+    use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
 
     #[test]
     fn test_has_flag() {
-        let txn: OfferCreate = OfferCreate::new(
-            "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
-            None,
-            Some("10".into()),
-            Some(vec![OfferCreateFlag::TfImmediateOrCancel].into()),
-            Some(72779837),
-            None,
-            Some(1),
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("1000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let txn = OfferCreate {
+            common_fields: CommonFields {
+                account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
+                transaction_type: TransactionType::OfferCreate,
+                fee: Some("10".into()),
+                flags: vec![OfferCreateFlag::TfImmediateOrCancel].into(),
+                last_ledger_sequence: Some(72779837),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
                 "0.3".into(),
             )),
-            None,
-            None,
-        );
+            ..Default::default()
+        };
+
         assert!(txn.has_flag(&OfferCreateFlag::TfImmediateOrCancel));
         assert!(!txn.has_flag(&OfferCreateFlag::TfPassive));
     }
 
     #[test]
     fn test_get_transaction_type() {
-        let txn: OfferCreate = OfferCreate::new(
-            "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
-            None,
-            Some("10".into()),
-            Some(vec![OfferCreateFlag::TfImmediateOrCancel].into()),
-            Some(72779837),
-            None,
-            Some(1),
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("1000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let txn = OfferCreate {
+            common_fields: CommonFields {
+                account: "rpXhhWmCvDwkzNtRbm7mmD1vZqdfatQNEe".into(),
+                transaction_type: TransactionType::OfferCreate,
+                fee: Some("10".into()),
+                flags: vec![OfferCreateFlag::TfImmediateOrCancel].into(),
+                last_ledger_sequence: Some(72779837),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
                 "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
                 "0.3".into(),
             )),
-            None,
-            None,
-        );
+            ..Default::default()
+        };
+
         let actual = txn.get_transaction_type();
         let expect = TransactionType::OfferCreate;
         assert_eq!(actual, &expect)
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::models::amount::{IssuedCurrencyAmount, XRPAmount};
-
-    use super::*;
 
     #[test]
     fn test_serde() {
-        let default_txn = OfferCreate::new(
-            "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
-            None,
-            Some("12".into()),
-            None,
-            Some(7108682),
-            None,
-            Some(8),
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("6000000")),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+        let default_txn = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                fee: Some("12".into()),
+                last_ledger_sequence: Some(7108682),
+                sequence: Some(8),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("6000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "GKO".into(),
                 "ruazs5h1qEsqpke88pcqnaseXdm6od2xc".into(),
                 "2".into(),
             )),
-            None,
-            None,
-        );
+            ..Default::default()
+        };
+
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"OfferCreate","Fee":"12","Flags":0,"LastLedgerSequence":7108682,"Sequence":8,"SigningPubKey":"","TakerGets":"6000000","TakerPays":{"currency":"GKO","issuer":"ruazs5h1qEsqpke88pcqnaseXdm6od2xc","value":"2"}}"#;
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
@@ -240,5 +270,174 @@ mod tests {
         // Deserialize
         let deserialized: OfferCreate = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let offer_create = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("6000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "GKO".into(),
+                "ruazs5h1qEsqpke88pcqnaseXdm6od2xc".into(),
+                "2".into(),
+            )),
+            ..Default::default()
+        }
+        .with_expiration(1640995200) // Some future timestamp
+        .with_offer_sequence(123) // Cancel previous offer
+        .with_flag(OfferCreateFlag::TfPassive)
+        .with_fee("12".into())
+        .with_sequence(8)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_memo(Memo {
+            memo_data: Some("creating offer".into()),
+            memo_format: None,
+            memo_type: Some("text".into()),
+        });
+
+        assert!(offer_create.taker_gets.is_xrp());
+        assert!(!offer_create.taker_pays.is_xrp());
+        assert_eq!(offer_create.expiration, Some(1640995200));
+        assert_eq!(offer_create.offer_sequence, Some(123));
+        assert!(offer_create.has_flag(&OfferCreateFlag::TfPassive));
+        assert_eq!(offer_create.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(offer_create.common_fields.sequence, Some(8));
+        assert_eq!(
+            offer_create.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(offer_create.common_fields.source_tag, Some(12345));
+        assert_eq!(offer_create.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_immediate_or_cancel() {
+        let ioc_offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "1".into(),
+            )),
+            ..Default::default()
+        }
+        .with_flag(OfferCreateFlag::TfImmediateOrCancel)
+        .with_fee("12".into())
+        .with_sequence(8);
+
+        assert!(ioc_offer.has_flag(&OfferCreateFlag::TfImmediateOrCancel));
+        assert!(!ioc_offer.has_flag(&OfferCreateFlag::TfPassive));
+        assert!(ioc_offer.expiration.is_none()); // IOC doesn't need expiration
+    }
+
+    #[test]
+    fn test_fill_or_kill() {
+        let fok_offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "EUR".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "100".into(),
+            )),
+            taker_pays: Amount::XRPAmount(XRPAmount::from("50000000")),
+            ..Default::default()
+        }
+        .with_flag(OfferCreateFlag::TfFillOrKill)
+        .with_fee("12".into())
+        .with_sequence(9);
+
+        assert!(fok_offer.has_flag(&OfferCreateFlag::TfFillOrKill));
+        assert!(!fok_offer.taker_gets.is_xrp());
+        assert!(fok_offer.taker_pays.is_xrp());
+    }
+
+    #[test]
+    fn test_sell_flag() {
+        let sell_offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "1".into(),
+            )),
+            ..Default::default()
+        }
+        .with_flags(vec![OfferCreateFlag::TfSell, OfferCreateFlag::TfPassive])
+        .with_fee("12".into())
+        .with_sequence(10);
+
+        assert!(sell_offer.has_flag(&OfferCreateFlag::TfSell));
+        assert!(sell_offer.has_flag(&OfferCreateFlag::TfPassive));
+        assert!(!sell_offer.has_flag(&OfferCreateFlag::TfImmediateOrCancel));
+    }
+
+    #[test]
+    fn test_replace_offer() {
+        let replace_offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("2000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "GKO".into(),
+                "ruazs5h1qEsqpke88pcqnaseXdm6od2xc".into(),
+                "3".into(),
+            )),
+            ..Default::default()
+        }
+        .with_offer_sequence(456) // Cancel offer with sequence 456
+        .with_expiration(1672531200) // New expiration
+        .with_fee("12".into())
+        .with_sequence(11);
+
+        assert_eq!(replace_offer.offer_sequence, Some(456));
+        assert_eq!(replace_offer.expiration, Some(1672531200));
+        assert_eq!(replace_offer.common_fields.sequence, Some(11));
+    }
+
+    #[test]
+    fn test_ticket_sequence() {
+        let ticket_offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "1".into(),
+            )),
+            ..Default::default()
+        }
+        .with_ticket_sequence(789)
+        .with_fee("12".into());
+
+        assert_eq!(ticket_offer.common_fields.ticket_sequence, Some(789));
+        // When using tickets, sequence should be None or 0
+        assert!(ticket_offer.common_fields.sequence.is_none());
     }
 }

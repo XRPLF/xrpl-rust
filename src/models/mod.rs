@@ -47,6 +47,38 @@ pub struct PathStep<'a> {
     type_hex: Option<Cow<'a, str>>,
 }
 
+impl<'a> PathStep<'a> {
+    /// Set the account field
+    pub fn with_account(mut self, account: Cow<'a, str>) -> Self {
+        self.account = Some(account);
+        self
+    }
+
+    /// Set the currency field
+    pub fn with_currency(mut self, currency: Cow<'a, str>) -> Self {
+        self.currency = Some(currency);
+        self
+    }
+
+    /// Set the issuer field
+    pub fn with_issuer(mut self, issuer: Cow<'a, str>) -> Self {
+        self.issuer = Some(issuer);
+        self
+    }
+
+    /// Set the type field
+    pub fn with_type(mut self, r#type: u8) -> Self {
+        self.r#type = Some(r#type);
+        self
+    }
+
+    /// Set the type_hex field
+    pub fn with_type_hex(mut self, type_hex: Cow<'a, str>) -> Self {
+        self.type_hex = Some(type_hex);
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, derive_new::new)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainBridge<'a> {
@@ -59,4 +91,11 @@ pub struct XChainBridge<'a> {
 /// For use with serde defaults.
 fn default_false() -> Option<bool> {
     Some(false)
+}
+
+/// Trait for validating currencies in models. This is needed to use xrpl-rust-macros for deriving validation methods.
+/// This trait is implemented by models that contain fields of type `Amount`, `XRPAmount`, `IssuedCurrencyAmount`, `Currency`, `XRP`, or `IssuedCurrency`.
+/// It provides a method `validate_currencies` that checks if the provided values are valid according to the XRPL specifications.
+pub trait ValidateCurrencies {
+    fn validate_currencies(&self) -> crate::models::XRPLModelResult<()>;
 }

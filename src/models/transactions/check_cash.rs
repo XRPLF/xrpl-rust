@@ -6,21 +6,32 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
+use crate::models::{
+    Model,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
-/// Cancels an unredeemed Check, removing it from the ledger without
-/// sending any money. The source or the destination of the check can
-/// cancel a Check at any time using this transaction type. If the Check
-/// has expired, any address can cancel it.
+use super::CommonTransactionBuilder;
+
+/// Attempt to redeem a Check object in the ledger to receive up to the amount
+/// authorized by a corresponding CheckCreate transaction.
 ///
 /// See CheckCash:
-/// `<https://xrpl.org/checkcash.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/checkcash>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct CheckCash<'a> {
     /// The base fields for all transaction models.
@@ -29,10 +40,6 @@ pub struct CheckCash<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the CheckCash model.
-    //
-    // See CheckCash fields:
-    // `<https://xrpl.org/checkcash.html#checkcash-fields>`
     /// The ID of the Check ledger object to cash, as a 64-character hexadecimal string.
     #[serde(rename = "CheckID")]
     pub check_id: Cow<'a, str>,
@@ -45,11 +52,10 @@ pub struct CheckCash<'a> {
     pub deliver_min: Option<Amount<'a>>,
 }
 
-impl<'a: 'static> Model for CheckCash<'a> {
+impl<'a> Model for CheckCash<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_amount_and_deliver_min_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -67,18 +73,13 @@ impl<'a> Transaction<'a, NoFlags> for CheckCash<'a> {
     }
 }
 
-impl<'a> CheckCashError for CheckCash<'a> {
-    fn _get_amount_and_deliver_min_error(&self) -> XRPLModelResult<()> {
-        if (self.amount.is_none() && self.deliver_min.is_none())
-            || (self.amount.is_some() && self.deliver_min.is_some())
-        {
-            Err(XRPLModelException::InvalidFieldCombination {
-                field: "amount",
-                other_fields: &["deliver_min"],
-            })
-        } else {
-            Ok(())
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for CheckCash<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -119,6 +120,31 @@ impl<'a> CheckCash<'a> {
             deliver_min,
         }
     }
+
+    pub fn with_amount(mut self, amount: Amount<'a>) -> Self {
+        self.amount = Some(amount);
+        self
+    }
+
+    pub fn with_deliver_min(mut self, deliver_min: Amount<'a>) -> Self {
+        self.deliver_min = Some(deliver_min);
+        self
+    }
+}
+
+impl<'a> CheckCashError for CheckCash<'a> {
+    fn _get_amount_and_deliver_min_error(&self) -> XRPLModelResult<()> {
+        if (self.amount.is_none() && self.deliver_min.is_none())
+            || (self.amount.is_some() && self.deliver_min.is_some())
+        {
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "amount",
+                other_fields: &["deliver_min"],
+            })
+        } else {
+            Ok(())
+        }
+    }
 }
 
 pub trait CheckCashError {
@@ -126,65 +152,126 @@ pub trait CheckCashError {
 }
 
 #[cfg(test)]
-mod test_check_cash_error {
-    use crate::models::Model;
-    use alloc::string::ToString;
-
+mod tests {
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_amount_and_deliver_min_error() {
-        let check_cash = CheckCash::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "".into(),
-            None,
-            None,
-        );
+        let check_cash = CheckCash {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::CheckCash,
+                ..Default::default()
+            },
+            check_id: "".into(),
+            amount: None,
+            deliver_min: None,
+        };
 
-        assert_eq!(
-            check_cash.validate().unwrap_err().to_string().as_str(),
-            "Invalid field combination: amount with [\"deliver_min\"]"
-        );
+        assert!(check_cash.get_errors().is_err());
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    #[test]
+    fn test_both_amount_and_deliver_min_error() {
+        let check_cash = CheckCash {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::CheckCash,
+                ..Default::default()
+            },
+            check_id: "".into(),
+            amount: Some(Amount::XRPAmount("100000000".into())),
+            deliver_min: Some(Amount::XRPAmount("50000000".into())),
+        };
+
+        assert!(check_cash.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_valid_with_amount() {
+        let check_cash = CheckCash {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::CheckCash,
+                ..Default::default()
+            },
+            check_id: "838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334".into(),
+            amount: Some(Amount::XRPAmount("100000000".into())),
+            deliver_min: None,
+        };
+
+        assert!(check_cash.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_with_deliver_min() {
+        let check_cash = CheckCash {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::CheckCash,
+                ..Default::default()
+            },
+            check_id: "838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334".into(),
+            amount: None,
+            deliver_min: Some(Amount::XRPAmount("50000000".into())),
+        };
+
+        assert!(check_cash.get_errors().is_ok());
+    }
 
     #[test]
     fn test_serde() {
-        let default_txn = CheckCash::new(
-            "rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy".into(),
-            None,
-            Some("12".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334".into(),
-            Some("100000000".into()),
-            None,
-        );
+        let default_txn = CheckCash {
+            common_fields: CommonFields {
+                account: "rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy".into(),
+                transaction_type: TransactionType::CheckCash,
+                fee: Some("12".into()),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            check_id: "838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334".into(),
+            amount: Some("100000000".into()),
+            deliver_min: None,
+        };
+
         let default_json_str = r#"{"Account":"rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy","TransactionType":"CheckCash","Fee":"12","Flags":0,"SigningPubKey":"","CheckID":"838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334","Amount":"100000000"}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: CheckCash = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let check_cash = CheckCash {
+            common_fields: CommonFields {
+                account: "rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy".into(),
+                transaction_type: TransactionType::CheckCash,
+                ..Default::default()
+            },
+            check_id: "838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334".into(),
+            ..Default::default()
+        }
+        .with_amount(Amount::XRPAmount("100000000".into()))
+        .with_fee("12".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345);
+
+        assert_eq!(
+            check_cash.check_id,
+            "838766BA2B995C00744175F69A1B11E32C3DBC40E64801A4056FCBD657F57334"
+        );
+        assert!(check_cash.amount.is_some());
+        assert_eq!(check_cash.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(check_cash.common_fields.sequence, Some(123));
+        assert_eq!(check_cash.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(check_cash.common_fields.source_tag, Some(12345));
+        assert!(check_cash.get_errors().is_ok());
     }
 }

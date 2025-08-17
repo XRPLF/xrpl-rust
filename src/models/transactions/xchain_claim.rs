@@ -4,13 +4,13 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{
     transactions::exceptions::XRPLXChainClaimException, Amount, Currency, FlagCollection, Model,
-    NoFlags, XChainBridge, XRPLModelResult,
+    NoFlags, ValidateCurrencies, XChainBridge, XRPLModelResult,
 };
 
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, xrpl_rust_macros::ValidateCurrencies)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainClaim<'a> {
     #[serde(flatten)]
@@ -27,6 +27,7 @@ pub struct XChainClaim<'a> {
 
 impl Model for XChainClaim<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        self.validate_currencies()?;
         self.get_amount_mismatch_error()
     }
 }

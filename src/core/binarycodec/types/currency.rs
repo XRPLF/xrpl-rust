@@ -16,6 +16,7 @@ use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::convert::TryInto;
 use core::fmt::Display;
+use exceptions::XRPLUtilsException;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
@@ -28,11 +29,13 @@ pub const NATIVE_CODE: &str = "XRP";
 #[serde(try_from = "&str")]
 pub struct Currency(Hash160);
 
-fn _iso_code_from_hex(value: &[u8]) -> Result<Option<String>, ISOCodeException> {
+fn _iso_code_from_hex(value: &[u8]) -> Result<Option<String>, XRPLUtilsException> {
     let candidate_iso = alloc::str::from_utf8(&value[12..15])?;
 
     if candidate_iso == NATIVE_CODE {
-        Err(ISOCodeException::InvalidXRPBytes)
+        Err(XRPLUtilsException::ISOCodeError(
+            ISOCodeException::InvalidXRPBytes,
+        ))
     } else if is_iso_code(candidate_iso) {
         Ok(Some(candidate_iso.to_string()))
     } else {

@@ -26,10 +26,11 @@ pub const MAX_URI_LENGTH: usize = 512;
 pub const MAX_DOMAIN_LENGTH: usize = 256;
 
 /// Represents the supported cryptography algorithms.
-#[derive(Debug, PartialEq, Eq, Clone, EnumIter, Display, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Eq, Clone, EnumIter, Display, Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
 pub enum CryptoAlgorithm {
+    #[default]
     ED25519,
     SECP256K1,
 }

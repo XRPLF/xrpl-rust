@@ -6,18 +6,31 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
-    transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    Model,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+};
+
+use super::CommonTransactionBuilder;
 
 /// A DepositPreauth transaction gives another account pre-approval
 /// to deliver payments to the sender of this transaction.
 ///
 /// See DepositPreauth:
-/// `<https://xrpl.org/depositpreauth.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/depositpreauth>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct DepositPreauth<'a> {
     /// The base fields for all transaction models.
@@ -26,21 +39,16 @@ pub struct DepositPreauth<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the DepositPreauth model.
-    //
-    // See DepositPreauth fields:
-    // `<https://xrpl.org/depositpreauth.html#depositpreauth-fields>`
     /// The XRP Ledger address of the sender to preauthorize.
     pub authorize: Option<Cow<'a, str>>,
     /// The XRP Ledger address of a sender whose preauthorization should be revoked.
     pub unauthorize: Option<Cow<'a, str>>,
 }
 
-impl<'a: 'static> Model for DepositPreauth<'a> {
+impl<'a> Model for DepositPreauth<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_authorize_and_unauthorize_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -58,18 +66,13 @@ impl<'a> Transaction<'a, NoFlags> for DepositPreauth<'a> {
     }
 }
 
-impl<'a> DepositPreauthError for DepositPreauth<'a> {
-    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()> {
-        if (self.authorize.is_none() && self.unauthorize.is_none())
-            || (self.authorize.is_some() && self.unauthorize.is_some())
-        {
-            Err(XRPLModelException::InvalidFieldCombination {
-                field: "authorize",
-                other_fields: &["unauthorize"],
-            })
-        } else {
-            Ok(())
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for DepositPreauth<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -108,6 +111,31 @@ impl<'a> DepositPreauth<'a> {
             unauthorize,
         }
     }
+
+    pub fn with_authorize(mut self, authorize: Cow<'a, str>) -> Self {
+        self.authorize = Some(authorize);
+        self
+    }
+
+    pub fn with_unauthorize(mut self, unauthorize: Cow<'a, str>) -> Self {
+        self.unauthorize = Some(unauthorize);
+        self
+    }
+}
+
+impl<'a> DepositPreauthError for DepositPreauth<'a> {
+    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()> {
+        if (self.authorize.is_none() && self.unauthorize.is_none())
+            || (self.authorize.is_some() && self.unauthorize.is_some())
+        {
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "authorize",
+                other_fields: &["unauthorize"],
+            })
+        } else {
+            Ok(())
+        }
+    }
 }
 
 pub trait DepositPreauthError {
@@ -115,64 +143,148 @@ pub trait DepositPreauthError {
 }
 
 #[cfg(test)]
-mod test_deposit_preauth_exception {
-
-    use crate::models::Model;
-    use alloc::string::ToString;
-
+mod tests {
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_authorize_and_unauthorize_error() {
-        let deposit_preauth = DepositPreauth::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            unauthorize: None,
+        };
 
-        assert_eq!(
-            deposit_preauth.validate().unwrap_err().to_string().as_str(),
-            "Invalid field combination: authorize with [\"unauthorize\"]"
-        );
+        assert!(deposit_preauth.get_errors().is_err());
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    #[test]
+    fn test_both_authorize_and_unauthorize_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            unauthorize: Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()),
+        };
+
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_valid_with_authorize() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            unauthorize: None,
+        };
+
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_with_unauthorize() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            unauthorize: Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()),
+        };
+
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
 
     #[test]
     fn test_serde() {
-        let default_txn = DepositPreauth::new(
-            "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
-            None,
-            Some("10".into()),
-            None,
-            None,
-            Some(2),
-            None,
-            None,
-            None,
-            Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
-            None,
-        );
+        let default_txn = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                fee: Some("10".into()),
+                sequence: Some(2),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            unauthorize: None,
+        };
+
         let default_json_str = r#"{"Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","TransactionType":"DepositPreauth","Fee":"10","Flags":0,"Sequence":2,"SigningPubKey":"","Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: DepositPreauth = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_authorize("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into())
+        .with_fee("10".into())
+        .with_sequence(123)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345);
+
+        assert_eq!(
+            deposit_preauth.authorize.as_ref().unwrap(),
+            "rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"
+        );
+        assert!(deposit_preauth.unauthorize.is_none());
+        assert_eq!(deposit_preauth.common_fields.fee.as_ref().unwrap().0, "10");
+        assert_eq!(deposit_preauth.common_fields.sequence, Some(123));
+        assert_eq!(
+            deposit_preauth.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
+        assert_eq!(deposit_preauth.common_fields.source_tag, Some(12345));
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_builder_with_unauthorize() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_unauthorize("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into())
+        .with_fee("10".into())
+        .with_sequence(123);
+
+        assert!(deposit_preauth.authorize.is_none());
+        assert_eq!(
+            deposit_preauth.unauthorize.as_ref().unwrap(),
+            "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        );
+        assert_eq!(deposit_preauth.common_fields.fee.as_ref().unwrap().0, "10");
+        assert_eq!(deposit_preauth.common_fields.sequence, Some(123));
+        assert!(deposit_preauth.get_errors().is_ok());
     }
 }

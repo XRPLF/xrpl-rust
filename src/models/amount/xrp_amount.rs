@@ -16,7 +16,13 @@ use serde_json::Value;
 #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
 pub struct XRPAmount<'a>(pub Cow<'a, str>);
 
-impl<'a> Model for XRPAmount<'a> {}
+impl<'a> Model for XRPAmount<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self.0.parse::<u32>()?;
+
+        Ok(())
+    }
+}
 
 impl Default for XRPAmount<'_> {
     fn default() -> Self {

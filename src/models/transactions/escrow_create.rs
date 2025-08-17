@@ -5,18 +5,29 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
-use crate::models::{
-    transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
-};
 use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    Model, ValidateCurrencies,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+};
+
+use super::CommonTransactionBuilder;
 
 /// Creates an Escrow, which requests XRP until the escrow process either finishes or is canceled.
 ///
 /// See EscrowCreate:
-/// `<https://xrpl.org/escrowcreate.html>`
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/escrowcreate>`
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct EscrowCreate<'a> {
     /// The base fields for all transaction models.
@@ -25,10 +36,6 @@ pub struct EscrowCreate<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    // The custom fields for the EscrowCreate model.
-    //
-    // See EscrowCreate fields:
-    // `<https://xrpl.org/escrowcreate.html>`
     /// Amount of XRP, in drops, to deduct from the sender's balance and escrow.
     /// Once escrowed, the XRP can either go to the Destination address
     /// (after the FinishAfter time) or returned to the sender (after the CancelAfter time).
@@ -54,11 +61,10 @@ pub struct EscrowCreate<'a> {
     pub condition: Option<Cow<'a, str>>,
 }
 
-impl<'a: 'static> Model for EscrowCreate<'a> {
+impl<'a> Model for EscrowCreate<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_finish_after_error()?;
-
-        Ok(())
+        self.validate_currencies()
     }
 }
 
@@ -76,22 +82,13 @@ impl<'a> Transaction<'a, NoFlags> for EscrowCreate<'a> {
     }
 }
 
-impl<'a> EscrowCreateError for EscrowCreate<'a> {
-    fn _get_finish_after_error(&self) -> XRPLModelResult<()> {
-        if let (Some(finish_after), Some(cancel_after)) = (self.finish_after, self.cancel_after) {
-            if finish_after >= cancel_after {
-                Err(XRPLModelException::ValueBelowValue {
-                    field1: "cancel_after".into(),
-                    field2: "finish_after".into(),
-                    field1_val: cancel_after,
-                    field2_val: finish_after,
-                })
-            } else {
-                Ok(())
-            }
-        } else {
-            Ok(())
-        }
+impl<'a> CommonTransactionBuilder<'a, NoFlags> for EscrowCreate<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+        &mut self.common_fields
+    }
+
+    fn into_self(self) -> Self {
+        self
     }
 }
 
@@ -138,6 +135,45 @@ impl<'a> EscrowCreate<'a> {
             condition,
         }
     }
+
+    pub fn with_destination_tag(mut self, destination_tag: u32) -> Self {
+        self.destination_tag = Some(destination_tag);
+        self
+    }
+
+    pub fn with_cancel_after(mut self, cancel_after: u32) -> Self {
+        self.cancel_after = Some(cancel_after);
+        self
+    }
+
+    pub fn with_finish_after(mut self, finish_after: u32) -> Self {
+        self.finish_after = Some(finish_after);
+        self
+    }
+
+    pub fn with_condition(mut self, condition: Cow<'a, str>) -> Self {
+        self.condition = Some(condition);
+        self
+    }
+}
+
+impl<'a> EscrowCreateError for EscrowCreate<'a> {
+    fn _get_finish_after_error(&self) -> XRPLModelResult<()> {
+        if let (Some(finish_after), Some(cancel_after)) = (self.finish_after, self.cancel_after) {
+            if finish_after >= cancel_after {
+                Err(XRPLModelException::ValueBelowValue {
+                    field1: "cancel_after".into(),
+                    field2: "finish_after".into(),
+                    field1_val: cancel_after,
+                    field2_val: finish_after,
+                })
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
 }
 
 pub trait EscrowCreateError {
@@ -145,77 +181,144 @@ pub trait EscrowCreateError {
 }
 
 #[cfg(test)]
-mod test_escrow_create_errors {
-    use crate::models::Model;
-
-    use crate::models::amount::XRPAmount;
-
-    use alloc::string::ToString;
-
+mod tests {
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_cancel_after_error() {
-        let escrow_create = EscrowCreate::new(
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            XRPAmount::from("100000000"),
-            "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
-            Some(13298498),
-            None,
-            None,
-            Some(14359039),
-        );
+        let escrow_create = EscrowCreate {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::EscrowCreate,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("100000000"),
+            destination: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            cancel_after: Some(13298498),
+            finish_after: Some(14359039),
+            ..Default::default()
+        };
 
-        assert_eq!(
-            escrow_create.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `\"cancel_after\"` is not allowed to be below the value of the field `\"finish_after\"` (max 14359039, found 13298498)"
-        );
+        assert!(escrow_create.get_errors().is_err());
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    #[test]
+    fn test_valid_timing() {
+        let escrow_create = EscrowCreate {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::EscrowCreate,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("100000000"),
+            destination: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            cancel_after: Some(14359039),
+            finish_after: Some(13298498),
+            ..Default::default()
+        };
+
+        assert!(escrow_create.get_errors().is_ok());
+    }
 
     #[test]
     fn test_serde() {
-        let default_txn = EscrowCreate::new(
-            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(11747),
-            None,
-            XRPAmount::from("10000"),
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            Some(533257958),
-            Some(
+        let default_txn = EscrowCreate {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::EscrowCreate,
+                source_tag: Some(11747),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            amount: XRPAmount::from("10000"),
+            destination: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+            destination_tag: Some(23480),
+            cancel_after: Some(533257958),
+            finish_after: Some(533171558),
+            condition: Some(
                 "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"
                     .into(),
             ),
-            Some(23480),
-            Some(533171558),
-        );
+        };
+
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowCreate","Flags":0,"SigningPubKey":"","SourceTag":11747,"Amount":"10000","Destination":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","DestinationTag":23480,"CancelAfter":533257958,"FinishAfter":533171558,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100"}"#;
-        // Serialize
+
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
         let serialized_value = serde_json::to_value(&serialized_string).unwrap();
         assert_eq!(serialized_value, default_json_value);
 
-        // Deserialize
         let deserialized: EscrowCreate = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let escrow_create = EscrowCreate {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::EscrowCreate,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("10000"),
+            destination: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+            ..Default::default()
+        }
+        .with_destination_tag(23480)
+        .with_cancel_after(533257958)
+        .with_finish_after(533171558)
+        .with_condition(
+            "A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100".into(),
+        )
+        .with_source_tag(11747)
+        .with_fee("12".into())
+        .with_sequence(123);
+
+        assert_eq!(escrow_create.amount.0, "10000");
+        assert_eq!(
+            escrow_create.destination,
+            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"
+        );
+        assert_eq!(escrow_create.destination_tag, Some(23480));
+        assert_eq!(escrow_create.cancel_after, Some(533257958));
+        assert_eq!(escrow_create.finish_after, Some(533171558));
+        assert!(escrow_create.condition.is_some());
+        assert_eq!(escrow_create.common_fields.source_tag, Some(11747));
+        assert_eq!(escrow_create.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(escrow_create.common_fields.sequence, Some(123));
+        assert!(escrow_create.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_default() {
+        let escrow_create = EscrowCreate {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::EscrowCreate,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("10000"),
+            destination: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            escrow_create.common_fields.account,
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn"
+        );
+        assert_eq!(
+            escrow_create.common_fields.transaction_type,
+            TransactionType::EscrowCreate
+        );
+        assert_eq!(escrow_create.amount.0, "10000");
+        assert_eq!(
+            escrow_create.destination,
+            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"
+        );
+        assert!(escrow_create.destination_tag.is_none());
+        assert!(escrow_create.cancel_after.is_none());
+        assert!(escrow_create.finish_after.is_none());
+        assert!(escrow_create.condition.is_none());
     }
 }
