@@ -25,7 +25,7 @@ name = "xrpl"
 crate-type = ["lib"]
 
 [dependencies]
-xrpl-rust-macros = { path = "xrpl-rust-macros" }
+xrpl-rust-macros = { version = "0.1.0", path = "xrpl-rust-macros" }
 
 lazy_static = "1.4.0"
 sha2 = { version = "0.10.2", default-features = false }
