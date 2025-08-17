@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
+## [[v1.0.0]]
+
+- Initial production release
+- command line interface
+- automated market maker
+- utility functions
+- sidechain support
+
 ## [[v.0.6.0]]
 
 - Added CLI interface

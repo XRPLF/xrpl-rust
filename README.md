@@ -25,7 +25,7 @@
 </picture>
 
 > [!WARNING]
-> This repository is under active development. All releases before v1.0.0 can be considered as **beta-releases**
+> This repository is under active development.
 
 A Rust library to interact with the XRPL.
 Based off of the [xrpl-py](https://github.com/XRPLF/xrpl-py) library.
@@ -66,7 +66,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.xrpl]
-version = "0.5.0"
+version = "1.0.0"
 ```
 
 # Documentation [![docs_status]][docs]
