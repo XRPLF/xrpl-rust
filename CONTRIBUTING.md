@@ -122,11 +122,14 @@ match derive_keypair(seed, validator) {
 
 1. Create a processing branch `process/[VERSION]`
 2. Brach management:
+
 - If this is a new version, increment the version in the `Cargo.toml` and target `main`.
 - If this a patch release, chery-pick commits being released and target `versions/v[major]`.
+
 3. Collect required merge approvals.
 4. Merge release PR.
-5. [TODO automate] Run `cargo publish`.
+5. Tag release.
+6. [TODO automate] Run `cargo publish`.
 
 ### Editing the Code
 
@@ -137,7 +140,3 @@ match derive_keypair(seed, validator) {
 - Open a PR against `main` and ensure that all CI passes.
 - Get a full code review from one of the maintainers.
 - Merge your changes.
-
-### Release
-
-TODO

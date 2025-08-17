@@ -1,10 +1,12 @@
-[lib]
-proc-macro = true
-
 [package]
 name = "xrpl-rust-macros"
 version = "0.1.0"
 edition = "2024"
+description = "XRPL Rust Macros"
+license = "ISC"
+
+[lib]
+proc-macro = true
 
 [dependencies]
 syn = "2.0"
