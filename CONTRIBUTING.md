@@ -2,19 +2,19 @@
 
 ## Setup Your Development Environment
 
-If you want to contribute code to `xrpl-rust`, the following sections describe 
+If you want to contribute code to `xrpl-rust`, the following sections describe
 how to set up your developer environment.
 
 ### Setup the Rust/Cargo Environment
 
-Getting started with Rust and `xrpl-rust` is easy. To install `rust` and 
+Getting started with Rust and `xrpl-rust` is easy. To install `rust` and
 `cargo` follow these steps:
 
-* Install [`rust`](https://doc.rust-lang.org/cargo/getting-started/installation.html):
+- Install [`rust`](https://doc.rust-lang.org/cargo/getting-started/installation.html):
 
         curl https://sh.rustup.rs -sSf | sh
 
-* Update rust using `rustup` and install a few development dependencies:
+- Update rust using `rustup` and install a few development dependencies:
 
         // Rustup
         rustup update
@@ -26,11 +26,11 @@ Getting started with Rust and `xrpl-rust` is easy. To install `rust` and
 
 ### Git `pre-commit` Hooks
 
-To run linting and other checks, `xrpl-rust` uses 
+To run linting and other checks, `xrpl-rust` uses
 [`pre-commit`](https://pre-commit.com/).
 
-> This should already be setup thanks to 
-[`cargo-husky`](https://github.com/rhysd/cargo-husky)
+> This should already be setup thanks to
+> [`cargo-husky`](https://github.com/rhysd/cargo-husky)
 
 ### Run the Formatter
 
@@ -67,8 +67,8 @@ cargo test --all-features
 
 ### Generate Documentation
 
-You can see the complete reference documentation at 
-[`xrpl-rust` docs](https://docs.rs/xrpl). 
+You can see the complete reference documentation at
+[`xrpl-rust` docs](https://docs.rs/xrpl).
 
 You can also generate them locally using `cargo`:
 
@@ -87,7 +87,7 @@ cargo audit
 ### Submitting Bugs
 
 Bug reports are welcome. Please create an issue using the default issue
-template. Fill in *all* information including a minimal reproducible 
+template. Fill in _all_ information including a minimal reproducible
 code example. Every function in the library comes with such an example
 and can adapted to look like the following for an issue report:
 
@@ -115,19 +115,28 @@ match derive_keypair(seed, validator) {
     },
 };
 ```
+
 > This format makes it easy for maintainers to replicate and test against.
 
 ## Release Process
 
+1. Create a processing branch `process/[VERSION]`
+2. Brach management:
+- If this is a new version, increment the version in the `Cargo.toml` and target `main`.
+- If this a patch release, chery-pick commits being released and target `versions/v[major]`.
+3. Collect required merge approvals.
+4. Merge release PR.
+5. [TODO automate] Run `cargo publish`.
+
 ### Editing the Code
 
-* Your changes should have unit and/or integration tests.
-* New functionality should include a minimal reproducible sample.
-* Your changes should pass the linter.
-* Your code should pass all the actions on GitHub.
-* Open a PR against `main` and ensure that all CI passes.
-* Get a full code review from one of the maintainers.
-* Merge your changes.
+- Your changes should have unit and/or integration tests.
+- New functionality should include a minimal reproducible sample.
+- Your changes should pass the linter.
+- Your code should pass all the actions on GitHub.
+- Open a PR against `main` and ensure that all CI passes.
+- Get a full code review from one of the maintainers.
+- Merge your changes.
 
 ### Release
 
