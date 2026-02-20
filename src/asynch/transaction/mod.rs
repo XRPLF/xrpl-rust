@@ -435,10 +435,7 @@ where
     };
 
     if is_valid_xaddress(&account_address) {
-        let (address, tag, _) = match xaddress_to_classic_address(&account_address) {
-            Ok(t) => t,
-            Err(error) => return Err(error.into()),
-        };
+        let (address, tag, _) = xaddress_to_classic_address(&account_address)?;
         validate_transaction_has_field(prepared_transaction, account_field_name)?;
         set_transaction_field_value(prepared_transaction, account_field_name, address)?;
 

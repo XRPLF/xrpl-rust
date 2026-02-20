@@ -251,15 +251,12 @@ impl<'a> AccountSetError for AccountSet<'a> {
     }
 
     fn _get_clear_flag_error(&self) -> Result<(), XRPLModelException> {
-        if self.clear_flag.is_some() && self.set_flag.is_some() && self.clear_flag == self.set_flag
-        {
-            Err(XRPLAccountSetException::SetAndUnsetSameFlag {
-                found: self.clear_flag.unwrap(),
+        if let (Some(clear), Some(_set)) = (self.clear_flag, self.set_flag) {
+            if self.clear_flag == self.set_flag {
+                return Err(XRPLAccountSetException::SetAndUnsetSameFlag { found: clear }.into());
             }
-            .into())
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 
     fn _get_nftoken_minter_error(&self) -> Result<(), XRPLModelException> {

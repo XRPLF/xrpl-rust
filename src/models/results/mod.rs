@@ -41,6 +41,8 @@ pub mod tx;
 pub mod unsubscribe;
 
 use super::{requests::XRPLRequest, Amount, XRPLModelException, XRPLModelResult};
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
