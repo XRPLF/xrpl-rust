@@ -1,4 +1,4 @@
-on: 
+on:
   push:
     branches:
       - dev
@@ -9,12 +9,14 @@ on:
 name: Quality
 
 jobs:
-  clippy_check:
+  quality_check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - run: rustup component add clippy
-      - uses: actions-rs/clippy-check@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: cargo fmt -- --check
+      - name: Clippy lint
+        run: cargo clippy --all-features -- -D warnings
