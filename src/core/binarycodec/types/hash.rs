@@ -505,11 +505,13 @@ mod test {
     fn accept_hash_invalid_length_errors() {
         let hash128 = Hash128::try_from("1000000000200000000030000000001234");
         let hash160 = Hash160::try_from("100000000020000000003000000000400000000012");
+        let hash192 = Hash192::try_from("10000000002000000000300000000040000000005000000012");
         let hash256 =
             Hash256::try_from("100000000020000000003000000000400000000050000000006000000000123456");
 
         assert!(hash128.is_err());
         assert!(hash160.is_err());
+        assert!(hash192.is_err());
         assert!(hash256.is_err());
     }
 
