@@ -159,6 +159,8 @@ impl<'a> MPTokenIssuanceSet<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use crate::models::Model;
 
     use super::*;
