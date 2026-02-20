@@ -61,9 +61,9 @@ where
         let serialized_bytes = hex::decode(serialized_for_signing)?;
         let signature = keypairs_sign(&serialized_bytes, &wallet.private_key)?;
         let signer = Signer::new(
-            wallet.classic_address.clone().into(),
-            signature.into(),
-            wallet.public_key.clone().into(),
+            wallet.classic_address.clone(),
+            signature,
+            wallet.public_key.clone(),
         );
         transaction.get_mut_common_fields().signers = Some(vec![signer]);
 

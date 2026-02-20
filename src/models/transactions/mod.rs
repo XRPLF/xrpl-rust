@@ -271,7 +271,7 @@ where
         if let Some(signers) = &self.signers {
             signers
                 .iter()
-                .all(|signer| signer.txn_signature.len() > 0 && signer.signing_pub_key.len() > 0)
+                .all(|signer| !signer.txn_signature.is_empty() && !signer.signing_pub_key.is_empty())
         } else {
             self.txn_signature.is_some() && self.signing_pub_key.is_some()
         }
@@ -602,7 +602,7 @@ where
 
     /// Hashes the Transaction object as the ledger does. Only valid for signed
     /// Transaction objects.
-    fn get_hash(&self) -> XRPLModelResult<Cow<str>>
+    fn get_hash(&self) -> XRPLModelResult<Cow<'_, str>>
     where
         Self: Serialize + DeserializeOwned + Debug + Clone,
     {
