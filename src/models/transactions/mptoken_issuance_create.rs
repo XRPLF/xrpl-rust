@@ -205,7 +205,7 @@ impl<'a> MPTokenIssuanceCreate<'a> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::string::ToString;
+    use alloc::{string::ToString, vec};
 
     use crate::models::Model;
 
