@@ -142,8 +142,8 @@ pub enum XRPLResult<'a> {
     PathFind(path_find::PathFind<'a>),
     Random(random::Random<'a>),
     RipplePathFind(ripple_path_find::RipplePathFind<'a>),
-    ServerInfo(server_info::ServerInfo<'a>),
-    ServerState(server_state::ServerState<'a>),
+    ServerInfo(Box<server_info::ServerInfo<'a>>),
+    ServerState(Box<server_state::ServerState<'a>>),
     Submit(submit::Submit<'a>),
     SubmitMultisigned(submit_multisigned::SubmitMultisigned<'a>),
     TransactionEntry(transaction_entry::TransactionEntry<'a>),
@@ -194,8 +194,16 @@ impl_from_result!(no_ripple_check, NoRippleCheck);
 impl_from_result!(path_find, PathFind);
 impl_from_result!(random, Random);
 impl_from_result!(ripple_path_find, RipplePathFind);
-impl_from_result!(server_info, ServerInfo);
-impl_from_result!(server_state, ServerState);
+impl<'a> From<server_info::ServerInfo<'a>> for XRPLResult<'a> {
+    fn from(value: server_info::ServerInfo<'a>) -> Self {
+        XRPLResult::ServerInfo(Box::new(value))
+    }
+}
+impl<'a> From<server_state::ServerState<'a>> for XRPLResult<'a> {
+    fn from(value: server_state::ServerState<'a>) -> Self {
+        XRPLResult::ServerState(Box::new(value))
+    }
+}
 impl_from_result!(submit, Submit);
 impl_from_result!(submit_multisigned, SubmitMultisigned);
 impl_from_result!(transaction_entry, TransactionEntry);
@@ -319,8 +327,34 @@ impl_try_from_result!(no_ripple_check, NoRippleCheck, NoRippleCheck);
 impl_try_from_result!(path_find, PathFind, PathFind);
 impl_try_from_result!(random, Random, Random);
 impl_try_from_result!(ripple_path_find, RipplePathFind, RipplePathFind);
-impl_try_from_result!(server_info, ServerInfo, ServerInfo);
-impl_try_from_result!(server_state, ServerState, ServerState);
+impl<'a> TryFrom<XRPLResult<'a>> for server_info::ServerInfo<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::ServerInfo(value) => Ok(*value),
+            res => Err(XRPLResultException::UnexpectedResultType(
+                "ServerInfo".to_string(),
+                res.get_name(),
+            )
+            .into()),
+        }
+    }
+}
+impl<'a> TryFrom<XRPLResult<'a>> for server_state::ServerState<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::ServerState(value) => Ok(*value),
+            res => Err(XRPLResultException::UnexpectedResultType(
+                "ServerState".to_string(),
+                res.get_name(),
+            )
+            .into()),
+        }
+    }
+}
 impl_try_from_result!(submit, Submit, Submit);
 impl_try_from_result!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
 impl_try_from_result!(transaction_entry, TransactionEntry, TransactionEntry);
@@ -545,8 +579,40 @@ impl_try_from_response!(path_find, PathFind, PathFind);
 impl_try_from_response!(ping, Ping, Ping);
 impl_try_from_response!(random, Random, Random);
 impl_try_from_response!(ripple_path_find, RipplePathFind, RipplePathFind);
-impl_try_from_response!(server_info, ServerInfo, ServerInfo);
-impl_try_from_response!(server_state, ServerState, ServerState);
+impl<'a> TryFrom<XRPLResponse<'a>> for server_info::ServerInfo<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => match result {
+                XRPLResult::ServerInfo(value) => Ok(*value),
+                res => Err(XRPLResultException::UnexpectedResultType(
+                    "ServerInfo".to_string(),
+                    res.get_name(),
+                )
+                .into()),
+            },
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+impl<'a> TryFrom<XRPLResponse<'a>> for server_state::ServerState<'a> {
+    type Error = XRPLModelException;
+
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => match result {
+                XRPLResult::ServerState(value) => Ok(*value),
+                res => Err(XRPLResultException::UnexpectedResultType(
+                    "ServerState".to_string(),
+                    res.get_name(),
+                )
+                .into()),
+            },
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(submit, Submit, Submit);
 impl_try_from_response!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
 impl_try_from_response!(transaction_entry, TransactionEntry, TransactionEntry);

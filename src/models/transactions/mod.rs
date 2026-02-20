@@ -269,9 +269,9 @@ where
 {
     pub fn is_signed(&self) -> bool {
         if let Some(signers) = &self.signers {
-            signers.iter().all(|signer| {
-                !signer.txn_signature.is_empty() && !signer.signing_pub_key.is_empty()
-            })
+            signers
+                .iter()
+                .all(|signer| !signer.txn_signature.is_empty() && !signer.signing_pub_key.is_empty())
         } else {
             self.txn_signature.is_some() && self.signing_pub_key.is_some()
         }
