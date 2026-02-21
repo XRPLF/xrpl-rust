@@ -27,8 +27,17 @@ async fn wait_seconds(_seconds: u64) {
     }
     #[cfg(feature = "async-std-rt")]
     {
-        use core::time::Duration;
-        async_std::task::sleep(Duration::from_secs(_seconds)).await;
+        #[deprecated(
+            since = "1.1.0",
+            note = "async-std has been discontinued (RUSTSEC-2025-0052). Use the smol-rt feature instead."
+        )]
+        fn async_std_sleep_deprecated() {}
+        #[allow(deprecated)]
+        async_std_sleep_deprecated();
+        panic!(
+            "The async-std-rt feature is deprecated. async-std has been discontinued \
+             (RUSTSEC-2025-0052). Use the smol-rt feature instead."
+        );
     }
     #[cfg(feature = "futures-rt")]
     {
