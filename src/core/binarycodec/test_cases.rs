@@ -81,3 +81,31 @@ pub fn load_data_tests(test_type: Option<&str>) -> Vec<ValueTest> {
         defintions.values_tests.clone()
     }
 }
+
+/// Transaction fixture test case from xrpl.js
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TxFixture {
+    pub name: String,
+    pub binary: String,
+    pub json: Value,
+}
+
+/// Transaction fixtures collection from xrpl.js
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TxFixtures {
+    pub description: String,
+    pub transactions: Vec<TxFixture>,
+}
+
+/// Load additional transaction encoding fixtures from xrpl.js.
+pub fn load_additional_tx_fixtures() -> &'static TxFixtures {
+    pub const ADDITIONAL_TX_FIXTURES: &str =
+        include_str!("./test_data/additional-tx-fixtures.json");
+
+    lazy_static! {
+        static ref FIXTURES: TxFixtures =
+            serde_json::from_str(ADDITIONAL_TX_FIXTURES).expect("load_additional_tx_fixtures");
+    }
+
+    &FIXTURES
+}
