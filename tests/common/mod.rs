@@ -2,6 +2,7 @@
 
 pub mod amm;
 pub mod constants;
+pub mod xchain;
 
 use anyhow::Result;
 #[cfg(feature = "std")]
