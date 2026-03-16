@@ -1,5 +1,10 @@
 pub mod account_delete;
 pub mod account_set;
+pub mod amm_bid;
+pub mod amm_create;
+pub mod amm_deposit;
+pub mod amm_vote;
+pub mod amm_withdraw;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
