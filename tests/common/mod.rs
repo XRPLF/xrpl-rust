@@ -107,6 +107,41 @@ pub async fn ledger_accept() {
     //   get_client().await.request(LedgerAccept::new()).await.expect("ledger_accept failed");
 }
 
+/// Return the `close_time` of the most-recent validated ledger in Ripple epoch seconds.
+#[cfg(feature = "std")]
+pub async fn get_ledger_close_time() -> u64 {
+    use xrpl::asynch::clients::XRPLAsyncClient;
+    use xrpl::models::{requests::ledger::Ledger, results};
+    let client = get_client().await;
+    let response = client
+        .request(
+            Ledger::new(
+                None, None, None, None, None, None,
+                Some("validated".into()),
+                None, None, None,
+            )
+            .into(),
+        )
+        .await
+        .expect("Failed to get validated ledger");
+    let ledger_result: results::ledger::Ledger<'_> = response
+        .try_into()
+        .expect("Failed to parse ledger result");
+    ledger_result.ledger.close_time
+}
+
+/// Poll the validated ledger until `close_time >= target`, sleeping 4 s between polls.
+/// On testnet ledgers close automatically; on Docker standalone ledger_accept() drives time.
+#[cfg(feature = "std")]
+pub async fn wait_for_ledger_close_time(target: u64) {
+    loop {
+        if get_ledger_close_time().await >= target {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(4)).await;
+    }
+}
+
 /// Serialize all blockchain-mutating tests to prevent sequence number conflicts.
 #[cfg(feature = "std")]
 pub async fn with_blockchain_lock<F, Fut, T>(f: F) -> T
