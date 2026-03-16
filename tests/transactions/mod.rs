@@ -15,5 +15,8 @@ pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
 pub mod payment;
+pub mod payment_channel_claim;
+pub mod payment_channel_create;
+pub mod payment_channel_fund;
 pub mod signer_list_set;
 pub mod trust_set;
