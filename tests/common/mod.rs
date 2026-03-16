@@ -88,16 +88,32 @@ pub async fn get_wallet() -> &'static Wallet {
         .await
 }
 
-// Helper function to run blockchain tests serially
+/// Generate a fresh funded wallet on every call via the testnet faucet.
+/// Use this for tests that modify wallet state (flags, trust lines, signers, balances).
+/// Prefer `get_wallet()` only for simple read-only or non-state-mutating submissions.
+#[cfg(feature = "std")]
+pub async fn generate_funded_wallet() -> Wallet {
+    generate_faucet_wallet(get_client().await, None, None, None, None)
+        .await
+        .expect("Failed to generate and fund wallet")
+}
+
+/// Advance the ledger by one close.
+/// No-op on testnet — ledgers close automatically every ~3–4 seconds.
+/// Will be replaced with an actual `ledger_accept` RPC call when switching to Docker standalone mode.
+#[cfg(feature = "std")]
+pub async fn ledger_accept() {
+    // Intentional no-op for testnet. Docker standalone mode requires:
+    //   get_client().await.request(LedgerAccept::new()).await.expect("ledger_accept failed");
+}
+
+/// Serialize all blockchain-mutating tests to prevent sequence number conflicts.
 #[cfg(feature = "std")]
 pub async fn with_blockchain_lock<F, Fut, T>(f: F) -> T
 where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = T>,
 {
-    // Acquire the mutex to ensure exclusive access
     let _guard = TEST_MUTEX.lock().await;
-
-    // Run the test function
     f().await
 }
