@@ -11,13 +11,13 @@ mod tests {
         models::XRPAmount,
     };
 
-    use crate::common::{constants::XRPL_TEST_NET, get_client, get_wallet, with_blockchain_lock};
+    use crate::common::{constants::XRPL_TEST_NET, generate_funded_wallet, get_client, with_blockchain_lock};
 
     #[tokio::test]
     async fn test_wallet_generation_and_funding() {
         with_blockchain_lock(|| async {
             let client = get_client().await;
-            let wallet = get_wallet().await;
+            let wallet = generate_funded_wallet().await;
             let address: String = wallet.classic_address.clone();
 
             // Verify wallet properties

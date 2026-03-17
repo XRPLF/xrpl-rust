@@ -4,14 +4,12 @@
 //   - add:    set a signer list with two signers and quorum 2
 //   - remove: clear the signer list by setting SignerQuorum to 0
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
-use xrpl::asynch::transaction::submit_and_wait;
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::signer_list_set::{SignerEntry, SignerListSet};
 
 #[tokio::test]
 async fn test_signer_list_set_add() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         let wallet = generate_funded_wallet().await;
 
         let mut tx = SignerListSet::new(
@@ -31,19 +29,7 @@ async fn test_signer_list_set_add() {
             ]),
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit SignerListSet (add)");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }
@@ -51,7 +37,6 @@ async fn test_signer_list_set_add() {
 #[tokio::test]
 async fn test_signer_list_set_remove() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         // Use a fresh wallet that hasn't had a signer list set so this test is self-contained.
         // Setting SignerQuorum = 0 with no SignerEntries deletes any existing signer list.
         let wallet = generate_funded_wallet().await;
@@ -70,19 +55,7 @@ async fn test_signer_list_set_remove() {
             None, // no signer_entries
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit SignerListSet (remove)");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }

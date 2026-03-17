@@ -3,18 +3,14 @@
 // Scenarios:
 //   - base: mint an NFT with a URI
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
-use xrpl::{
-    asynch::transaction::submit_and_wait,
-    models::transactions::nftoken_mint::NFTokenMint,
-};
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
+use xrpl::models::transactions::nftoken_mint::NFTokenMint;
 
 const TEST_NFT_URL: &str = "https://example.com/nft.json";
 
 #[tokio::test]
 async fn test_nftoken_mint_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         // Fresh wallet: NFTokenMint modifies the account's NFToken page objects.
         let wallet = generate_funded_wallet().await;
 
@@ -35,19 +31,7 @@ async fn test_nftoken_mint_base() {
             Some(hex::encode(TEST_NFT_URL).into()),
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit NFTokenMint");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }

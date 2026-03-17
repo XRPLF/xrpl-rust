@@ -6,9 +6,8 @@
 // NOTE: XChainCommit has NO flags; standard 9 common-field order.
 // xchain_claim_id is Cow<str> even though it is semantically a number.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::models::transactions::xchain_commit::XChainCommit;
 use xrpl::models::{Amount, XRPAmount};
 
@@ -16,7 +15,6 @@ use xrpl::models::{Amount, XRPAmount};
 async fn test_xchain_commit_base() {
     with_blockchain_lock(|| async {
         let bridge = setup_bridge().await;
-        let client = get_client().await;
 
         // Committer — a separate funded wallet on the locking chain.
         let committer = generate_funded_wallet().await;
@@ -37,25 +35,7 @@ async fn test_xchain_commit_base() {
             None,        // other_chain_destination
         );
 
-        let result = submit_and_wait(
-            &mut tx,
-            client,
-            Some(&committer),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit XChainCommit");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &committer).await;
     })
     .await;
 }

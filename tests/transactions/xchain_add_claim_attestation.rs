@@ -13,9 +13,9 @@
 //   3. Hex-decode to bytes.
 //   4. Sign bytes with xrpl::core::keypairs::sign using the witness private key.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
-use xrpl::asynch::transaction::submit_and_wait;
+use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::core::binarycodec::encode;
 use xrpl::core::keypairs::sign;
 use xrpl::models::transactions::xchain_add_claim_attestation::XChainAddClaimAttestation;
@@ -52,7 +52,7 @@ async fn test_xchain_add_claim_attestation_base() {
         let holder = generate_funded_wallet().await;
 
         // Source on the "other" (locking) chain — unfunded, just needs a valid address
-        let other_seed = xrpl::core::keypairs::generate_seed(None).expect("seed");
+        let other_seed = xrpl::core::keypairs::generate_seed(None, None).expect("seed");
         let other_wallet = Wallet::new(&other_seed, 0).expect("wallet");
 
         // Step 1: XChainCreateClaimID — reserves claim ID 1
@@ -60,18 +60,20 @@ async fn test_xchain_add_claim_attestation_base() {
             holder.classic_address.clone().into(),
             None, None, None, None, None, None, None, None,
             other_wallet.classic_address.clone().into(),
-            XRPAmount::from(&bridge_setup.signature_reward),
+            XRPAmount::from(bridge_setup.signature_reward.as_str()),
             bridge_setup.bridge(),
         );
-        submit_and_wait(
+        sign_and_submit(
             &mut claim_id_tx,
             client,
-            Some(&holder),
-            Some(true),
-            Some(true),
+            &holder,
+            true,
+            true,
         )
         .await
         .expect("XChainCreateClaimID failed");
+
+        ledger_accept().await;
 
         // Step 2: Build + sign the attestation payload
         let attestation = ClaimAttestation {
@@ -109,25 +111,7 @@ async fn test_xchain_add_claim_attestation_base() {
             None,       // destination (not included in base test)
         );
 
-        let result = submit_and_wait(
-            &mut tx,
-            client,
-            Some(&bridge_setup.witness_wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit XChainAddClaimAttestation");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &bridge_setup.witness_wallet).await;
     })
     .await;
 }

@@ -3,15 +3,13 @@
 // Scenarios:
 //   - base: create a payment channel from sender to destination with 100 drops and 86400s settle delay
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
-use xrpl::asynch::transaction::submit_and_wait;
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::payment_channel_create::PaymentChannelCreate;
 use xrpl::models::XRPAmount;
 
 #[tokio::test]
 async fn test_payment_channel_create_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         let wallet = generate_funded_wallet().await;
         let destination = generate_funded_wallet().await;
 
@@ -33,19 +31,7 @@ async fn test_payment_channel_create_base() {
             None,                                               // destination_tag
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit PaymentChannelCreate");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }

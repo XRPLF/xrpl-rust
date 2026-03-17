@@ -6,11 +6,12 @@
 
 use std::borrow::Cow;
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
 use xrpl::{
-    asynch::transaction::submit_and_wait,
+    asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit},
     models::{
-        results::nftoken::{NFTokenCreateOfferResult, NFTokenMintResult},
+        requests::{account_nfts::AccountNfts, nft_sell_offers::NftSellOffers},
+        results,
         transactions::{
             nftoken_cancel_offer::NFTokenCancelOffer,
             nftoken_create_offer::{NFTokenCreateOffer, NFTokenCreateOfferFlag},
@@ -46,16 +47,30 @@ async fn test_nftoken_cancel_offer_base() {
             Some(hex::encode(TEST_NFT_URL).into()),
         );
 
-        let mint_result = submit_and_wait(&mut mint, client, Some(&wallet), Some(true), Some(true))
+        sign_and_submit(&mut mint, client, &wallet, true, true)
             .await
             .expect("Failed to mint NFT");
 
-        let nftoken_id = NFTokenMintResult::try_from(mint_result)
-            .expect("Failed to extract NFTokenID")
-            .nftoken_id
-            .to_string();
-
         ledger_accept().await;
+
+        // Get the NFT ID from account_nfts
+        let nfts_response = client
+            .request(
+                AccountNfts::new(
+                    None,
+                    wallet.classic_address.clone().into(),
+                    None,
+                    None,
+                )
+                .into(),
+            )
+            .await
+            .expect("Failed to query account_nfts");
+        let nfts_result: results::account_nfts::AccountNfts<'_> =
+            nfts_response.try_into().expect("Failed to parse account_nfts");
+
+        assert_eq!(nfts_result.nfts.len(), 1, "Expected one NFT after mint");
+        let nftoken_id = nfts_result.nfts[0].nft_id.to_string();
 
         // Step 2: create a sell offer for the minted NFT.
         let mut create_offer = NFTokenCreateOffer::new(
@@ -70,28 +85,34 @@ async fn test_nftoken_cancel_offer_base() {
             None,
             None,
             Amount::XRPAmount(XRPAmount::from("10000000")), // 10 XRP
-            nftoken_id.into(),
+            nftoken_id.clone().into(),
             None,
             None,
             None,
         );
 
-        let offer_result =
-            submit_and_wait(&mut create_offer, client, Some(&wallet), Some(true), Some(true))
-                .await
-                .expect("Failed to create NFT sell offer");
-
-        let offer_id = NFTokenCreateOfferResult::try_from(offer_result)
-            .expect("Failed to extract OfferID")
-            .offer_id
-            .to_string();
+        sign_and_submit(&mut create_offer, client, &wallet, true, true)
+            .await
+            .expect("Failed to create NFT sell offer");
 
         ledger_accept().await;
 
+        // Get the offer ID via nft_sell_offers.
+        // NOTE: account_objects has a parsing bug in the SDK (UnexpectedResultType) for NFT-related
+        // objects; nft_sell_offers avoids that path entirely.
+        let offers_response = client
+            .request(NftSellOffers::new(None, nftoken_id.clone().into()).into())
+            .await
+            .expect("Failed to query nft_sell_offers");
+        let offers_result: results::nft_sell_offers::NFTSellOffers<'_> =
+            offers_response.try_into().expect("Failed to parse nft_sell_offers");
+
+        assert_eq!(offers_result.offers.len(), 1, "Expected one sell offer");
+        let offer_id = offers_result.offers[0].nft_offer_index.to_string();
+
         // Step 3: cancel the sell offer.
         // NOTE: Vec<Cow<'a, str>> fields require Cow::Owned(string) instead of .into()
-        // so that the inferred lifetime is 'static, satisfying submit_and_wait's
-        // `for<'de> Deserialize<'de>` bound.
+        // so that the inferred lifetime is 'static.
         let mut cancel = NFTokenCancelOffer::new(
             wallet.classic_address.clone().into(),
             None,
@@ -105,19 +126,7 @@ async fn test_nftoken_cancel_offer_base() {
             vec![Cow::Owned(offer_id)],
         );
 
-        let result = submit_and_wait(&mut cancel, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit NFTokenCancelOffer");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut cancel, &wallet).await;
     })
     .await;
 }

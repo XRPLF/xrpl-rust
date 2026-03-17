@@ -8,15 +8,13 @@
 // scenarios (which require waiting for time to advance) live in their own test files.
 
 use crate::common::{
-    generate_funded_wallet, get_client, get_ledger_close_time, ledger_accept, with_blockchain_lock,
+    generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
 };
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::models::transactions::escrow_create::EscrowCreate;
 
 #[tokio::test]
 async fn test_escrow_create_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         let wallet = generate_funded_wallet().await;
         let destination = generate_funded_wallet().await;
 
@@ -41,19 +39,7 @@ async fn test_escrow_create_base() {
             Some(finish_after), // finish_after
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit EscrowCreate");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }

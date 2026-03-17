@@ -4,17 +4,13 @@
 //   - base: set domain field with hex-encoded value
 //   - with_memo: attach a memo to the transaction
 
-use crate::common::{get_client, get_wallet, ledger_accept, with_blockchain_lock};
-use xrpl::{
-    asynch::transaction::submit_and_wait,
-    models::transactions::{account_set::AccountSet, Memo},
-};
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
+use xrpl::models::transactions::{account_set::AccountSet, Memo};
 
 #[tokio::test]
 async fn test_account_set_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
-        let wallet = get_wallet().await;
+        let wallet = generate_funded_wallet().await;
 
         let mut tx = AccountSet::new(
             wallet.classic_address.clone().into(),
@@ -37,19 +33,7 @@ async fn test_account_set_base() {
             None,
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit AccountSet");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }
@@ -57,8 +41,7 @@ async fn test_account_set_base() {
 #[tokio::test]
 async fn test_account_set_with_memo() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
-        let wallet = get_wallet().await;
+        let wallet = generate_funded_wallet().await;
 
         let mut tx = AccountSet::new(
             wallet.classic_address.clone().into(),
@@ -85,19 +68,7 @@ async fn test_account_set_with_memo() {
             None,
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit AccountSet with memo");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }

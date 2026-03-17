@@ -4,21 +4,23 @@
 //   - base: create a time-locked XRP escrow then cancel it once CancelAfter has passed
 //
 // NOTE: CancelAfter is set to close_time + 3 and FinishAfter to close_time + 2.
-// The test waits until the validated ledger close_time exceeds CancelAfter before
-// submitting EscrowCancel. An escrow can only be cancelled after CancelAfter passes.
+// After EscrowCreate the test:
+//   1. Queries account_objects to confirm the escrow exists on-chain
+//   2. Looks up the creating tx to get the validated Sequence (OfferSequence)
+//   3. Waits for close_time >= CancelAfter, then one more ledger_accept
+// This mirrors the xrpl.js pattern exactly (account_objects → tx lookup).
+// An escrow can only be cancelled after CancelAfter passes.
 
 use crate::common::{
-    generate_funded_wallet, get_client, get_ledger_close_time, ledger_accept,
-    wait_for_ledger_close_time, with_blockchain_lock,
+    generate_funded_wallet, get_escrow_offer_sequence, get_ledger_close_time, ledger_accept,
+    test_transaction, wait_for_ledger_close_time, with_blockchain_lock,
 };
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::models::transactions::escrow_cancel::EscrowCancel;
 use xrpl::models::transactions::escrow_create::EscrowCreate;
 
 #[tokio::test]
 async fn test_escrow_cancel_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         let wallet = generate_funded_wallet().await;
         let destination = generate_funded_wallet().await;
 
@@ -44,27 +46,21 @@ async fn test_escrow_cancel_base() {
             Some(finish_after), // finish_after
         );
 
-        submit_and_wait(
-            &mut create_tx,
-            client,
-            Some(&wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit EscrowCreate");
+        // test_transaction signs, submits, asserts tesSUCCESS, and calls ledger_accept.
+        test_transaction(&mut create_tx, &wallet).await;
 
-        // offer_sequence = the sequence autofilled into the EscrowCreate transaction
-        let offer_sequence = create_tx
-            .common_fields
-            .sequence
-            .expect("Sequence should be autofilled by submit_and_wait");
+        // Mirroring xrpl.js: look up the validated Sequence via account_objects → tx query
+        // instead of reading the autofilled value from the tx struct.  This confirms the
+        // escrow actually exists on-chain before we try to cancel it.
+        let offer_sequence =
+            get_escrow_offer_sequence(&wallet.classic_address).await;
 
-        // Wait for the validated ledger close_time to surpass cancel_after.
+        // Wait for the validated ledger close_time to reach CancelAfter (mirrors
+        // xrpl.js waitForAndForceProgressLedgerTime(CLOSE_TIME + 3)).
+        wait_for_ledger_close_time(cancel_after as u64).await;
         // rippled validates a cancel using the *previous* ledger's close_time,
-        // so we wait for close_time > cancel_after (not just equal).
-        wait_for_ledger_close_time(cancel_after as u64 + 1).await;
-        ledger_accept().await; // no-op on testnet; advances ledger on Docker standalone
+        // so one more ledger_accept ensures that previous close_time > CancelAfter.
+        ledger_accept().await;
 
         let mut cancel_tx = EscrowCancel::new(
             wallet.classic_address.clone().into(),
@@ -80,25 +76,7 @@ async fn test_escrow_cancel_base() {
             offer_sequence,                        // offer_sequence
         );
 
-        let result = submit_and_wait(
-            &mut cancel_tx,
-            client,
-            Some(&wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit EscrowCancel");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut cancel_tx, &wallet).await;
     })
     .await;
 }

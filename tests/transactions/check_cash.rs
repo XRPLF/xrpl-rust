@@ -4,10 +4,9 @@
 //   - base: create a Check for 500 drops, then cash it for the exact amount
 
 use crate::common::{
-    generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock,
+    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
 };
-use xrpl::asynch::clients::XRPLAsyncClient;
-use xrpl::asynch::transaction::submit_and_wait;
+use xrpl::asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit};
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
 use xrpl::models::transactions::check_cash::CheckCash;
@@ -41,9 +40,11 @@ async fn test_check_cash_base() {
             None,
         );
 
-        submit_and_wait(&mut create_tx, client, Some(&wallet), Some(true), Some(true))
+        sign_and_submit(&mut create_tx, client, &wallet, true, true)
             .await
             .expect("Failed to submit CheckCreate");
+
+        ledger_accept().await;
 
         // Step 2: get the check ID from account_objects
         let ao_response = client
@@ -88,23 +89,7 @@ async fn test_check_cash_base() {
             None,                                              // deliver_min
         );
 
-        let result = submit_and_wait(
-            &mut cash_tx,
-            client,
-            Some(&destination),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit CheckCash");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
+        test_transaction(&mut cash_tx, &destination).await;
 
         // Confirm the check was consumed
         let ao_response2 = client
@@ -131,8 +116,6 @@ async fn test_check_cash_base() {
             0,
             "Check should be gone after cashing"
         );
-
-        ledger_accept().await;
     })
     .await;
 }

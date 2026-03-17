@@ -3,22 +3,22 @@
 // Scenarios:
 //   - base: create a time-locked XRP escrow then finish it once FinishAfter has passed
 //
-// NOTE: After EscrowCreate is submitted the test polls `get_ledger_close_time()` until
-// the validated ledger's close_time advances past FinishAfter, then submits EscrowFinish.
-// The `offer_sequence` is read from the EscrowCreate tx after autofill mutates it in place.
+// NOTE: After EscrowCreate is submitted the test:
+//   1. Queries account_objects to confirm the escrow exists on-chain
+//   2. Looks up the creating tx to get the validated Sequence (OfferSequence)
+//   3. Waits for close_time >= FinishAfter, then one more ledger_accept
+// This mirrors the xrpl.js pattern exactly (account_objects → tx lookup).
 
 use crate::common::{
-    generate_funded_wallet, get_client, get_ledger_close_time, ledger_accept,
-    wait_for_ledger_close_time, with_blockchain_lock,
+    generate_funded_wallet, get_escrow_offer_sequence, get_ledger_close_time, ledger_accept,
+    test_transaction, wait_for_ledger_close_time, with_blockchain_lock,
 };
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::models::transactions::escrow_create::EscrowCreate;
 use xrpl::models::transactions::escrow_finish::EscrowFinish;
 
 #[tokio::test]
 async fn test_escrow_finish_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         let wallet = generate_funded_wallet().await;
         let destination = generate_funded_wallet().await;
 
@@ -43,27 +43,21 @@ async fn test_escrow_finish_base() {
             Some(finish_after), // finish_after
         );
 
-        submit_and_wait(
-            &mut create_tx,
-            client,
-            Some(&wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit EscrowCreate");
+        // test_transaction signs, submits, asserts tesSUCCESS, and calls ledger_accept.
+        test_transaction(&mut create_tx, &wallet).await;
 
-        // offer_sequence = the sequence autofilled into the EscrowCreate transaction
-        let offer_sequence = create_tx
-            .common_fields
-            .sequence
-            .expect("Sequence should be autofilled by submit_and_wait");
+        // Mirroring xrpl.js: look up the validated Sequence via account_objects → tx query
+        // instead of reading the autofilled value from the tx struct.  This confirms the
+        // escrow actually exists on-chain before we try to finish it.
+        let offer_sequence =
+            get_escrow_offer_sequence(&wallet.classic_address).await;
 
-        // Wait for the validated ledger close_time to surpass finish_after.
+        // Wait for the validated ledger close_time to reach FinishAfter (mirrors
+        // xrpl.js waitForAndForceProgressLedgerTime(CLOSE_TIME + 2)).
+        wait_for_ledger_close_time(finish_after as u64).await;
         // rippled validates a finish using the *previous* ledger's close_time,
-        // so we wait for close_time > finish_after (not just equal).
-        wait_for_ledger_close_time(finish_after as u64 + 1).await;
-        ledger_accept().await; // no-op on testnet; advances ledger on Docker standalone
+        // so one more ledger_accept ensures that previous close_time > FinishAfter.
+        ledger_accept().await;
 
         let mut finish_tx = EscrowFinish::new(
             wallet.classic_address.clone().into(),
@@ -81,25 +75,7 @@ async fn test_escrow_finish_base() {
             None,                                  // fulfillment
         );
 
-        let result = submit_and_wait(
-            &mut finish_tx,
-            client,
-            Some(&wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit EscrowFinish");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut finish_tx, &wallet).await;
     })
     .await;
 }

@@ -10,8 +10,7 @@
 // The returned `XChainBridgeSetup` carries both wallets.  Individual tests construct
 // the `XChainBridge` definition inline via `setup.bridge()`, which borrows from the struct.
 
-use super::{constants::GENESIS_ACCOUNT, generate_funded_wallet, get_client};
-use xrpl::asynch::transaction::submit_and_wait;
+use super::{constants::GENESIS_ACCOUNT, generate_funded_wallet, test_transaction};
 use xrpl::models::transactions::signer_list_set::{SignerEntry, SignerListSet};
 use xrpl::models::transactions::xchain_create_bridge::XChainCreateBridge;
 use xrpl::models::{Amount, Currency, XChainBridge, XRPAmount, XRP};
@@ -46,7 +45,6 @@ impl XChainBridgeSetup {
 /// Runs XChainCreateBridge + SignerListSet against the live client.
 #[cfg(feature = "std")]
 pub async fn setup_bridge() -> XChainBridgeSetup {
-    let client = get_client().await;
     let door_wallet = generate_funded_wallet().await;
     let witness_wallet = generate_funded_wallet().await;
     let signature_reward = "200".to_string();
@@ -72,15 +70,7 @@ pub async fn setup_bridge() -> XChainBridgeSetup {
         },
         Some(XRPAmount::from("10000000")), // min_account_create_amount (10 XRP)
     );
-    submit_and_wait(
-        &mut bridge_tx,
-        client,
-        Some(&door_wallet),
-        Some(true),
-        Some(true),
-    )
-    .await
-    .expect("XChain setup: XChainCreateBridge failed");
+    test_transaction(&mut bridge_tx, &door_wallet).await;
 
     // Step 2: SignerListSet — register witness_wallet as the sole signer (quorum = 1)
     let mut signer_tx = SignerListSet::new(
@@ -99,15 +89,7 @@ pub async fn setup_bridge() -> XChainBridgeSetup {
             1, // signer_weight
         )]),
     );
-    submit_and_wait(
-        &mut signer_tx,
-        client,
-        Some(&door_wallet),
-        Some(true),
-        Some(true),
-    )
-    .await
-    .expect("XChain setup: SignerListSet failed");
+    test_transaction(&mut signer_tx, &door_wallet).await;
 
     XChainBridgeSetup {
         door_wallet,

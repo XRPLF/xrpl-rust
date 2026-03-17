@@ -5,9 +5,8 @@
 //
 // NOTE: XChainModifyBridge has `flags` at position 4 (custom flags enum).
 
-use crate::common::{get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::models::transactions::xchain_modify_bridge::XChainModifyBridge;
 use xrpl::models::{Amount, XRPAmount};
 
@@ -15,7 +14,6 @@ use xrpl::models::{Amount, XRPAmount};
 async fn test_xchain_modify_bridge_base() {
     with_blockchain_lock(|| async {
         let bridge = setup_bridge().await;
-        let client = get_client().await;
 
         // Modify the signature_reward from 200 → 300 drops.
         // XChainModifyBridge has flags at position 4.
@@ -35,25 +33,7 @@ async fn test_xchain_modify_bridge_base() {
             Some(Amount::XRPAmount(XRPAmount::from("300"))), // signature_reward
         );
 
-        let result = submit_and_wait(
-            &mut tx,
-            client,
-            Some(&bridge.door_wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit XChainModifyBridge");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &bridge.door_wallet).await;
     })
     .await;
 }

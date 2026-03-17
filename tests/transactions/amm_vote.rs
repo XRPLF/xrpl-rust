@@ -6,8 +6,7 @@
 // NOTE: AMMVote has no flags; uses standard 9 common-field parameter order.
 
 use crate::common::amm::setup_amm_pool;
-use crate::common::{get_client, ledger_accept, with_blockchain_lock};
-use xrpl::asynch::transaction::submit_and_wait;
+use crate::common::{test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::amm_vote::AMMVote;
 use xrpl::models::{Currency, IssuedCurrency, XRP};
 
@@ -15,7 +14,6 @@ use xrpl::models::{Currency, IssuedCurrency, XRP};
 async fn test_amm_vote_base() {
     with_blockchain_lock(|| async {
         let pool = setup_amm_pool().await;
-        let client = get_client().await;
 
         let mut tx = AMMVote::new(
             pool.lp_wallet.classic_address.clone().into(),
@@ -35,25 +33,7 @@ async fn test_amm_vote_base() {
             Some(150), // trading_fee: 150 / 100_000
         );
 
-        let result = submit_and_wait(
-            &mut tx,
-            client,
-            Some(&pool.lp_wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit AMMVote");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &pool.lp_wallet).await;
     })
     .await;
 }

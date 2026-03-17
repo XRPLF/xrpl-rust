@@ -4,11 +4,12 @@
 // Scenarios:
 //   - base: mint an NFT then burn it
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
 use xrpl::{
-    asynch::transaction::submit_and_wait,
+    asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit},
     models::{
-        results::nftoken::NFTokenMintResult,
+        requests::account_nfts::AccountNfts,
+        results,
         transactions::{nftoken_burn::NFTokenBurn, nftoken_mint::NFTokenMint},
     },
 };
@@ -39,16 +40,30 @@ async fn test_nftoken_burn_base() {
             Some(hex::encode(TEST_NFT_URL).into()),
         );
 
-        let mint_result = submit_and_wait(&mut mint, client, Some(&wallet), Some(true), Some(true))
+        sign_and_submit(&mut mint, client, &wallet, true, true)
             .await
             .expect("Failed to mint NFT");
 
-        let nftoken_id = NFTokenMintResult::try_from(mint_result)
-            .expect("Failed to extract NFTokenID")
-            .nftoken_id
-            .to_string();
-
         ledger_accept().await;
+
+        // Get the NFT ID from account_nfts
+        let nfts_response = client
+            .request(
+                AccountNfts::new(
+                    None,
+                    wallet.classic_address.clone().into(),
+                    None,
+                    None,
+                )
+                .into(),
+            )
+            .await
+            .expect("Failed to query account_nfts");
+        let nfts_result: results::account_nfts::AccountNfts<'_> =
+            nfts_response.try_into().expect("Failed to parse account_nfts");
+
+        assert_eq!(nfts_result.nfts.len(), 1, "Expected one NFT after mint");
+        let nftoken_id = nfts_result.nfts[0].nft_id.to_string();
 
         // Step 2: burn the minted NFT.
         let mut burn = NFTokenBurn::new(
@@ -65,19 +80,7 @@ async fn test_nftoken_burn_base() {
             None, // owner: None because the burner is the issuer/owner
         );
 
-        let result = submit_and_wait(&mut burn, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit NFTokenBurn");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut burn, &wallet).await;
     })
     .await;
 }

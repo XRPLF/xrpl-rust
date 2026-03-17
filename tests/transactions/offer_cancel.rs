@@ -3,9 +3,9 @@
 // Scenarios:
 //   - base: create an offer then cancel it by sequence number
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
 use xrpl::{
-    asynch::transaction::submit_and_wait,
+    asynch::transaction::sign_and_submit,
     models::{
         transactions::{offer_cancel::OfferCancel, offer_create::OfferCreate, Transaction},
         Amount, IssuedCurrencyAmount, XRPAmount,
@@ -41,7 +41,7 @@ async fn test_offer_cancel_base() {
             None,
         );
 
-        submit_and_wait(&mut create, client, Some(&wallet), Some(true), Some(true))
+        sign_and_submit(&mut create, client, &wallet, true, true)
             .await
             .expect("Failed to submit OfferCreate");
 
@@ -66,19 +66,7 @@ async fn test_offer_cancel_base() {
             offer_sequence,
         );
 
-        let result = submit_and_wait(&mut cancel, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit OfferCancel");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut cancel, &wallet).await;
     })
     .await;
 }
