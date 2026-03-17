@@ -28,7 +28,7 @@ pub struct Fee<'a> {
     pub levels: Levels<'a>,
     /// The maximum number of transactions that the transaction queue can
     /// currently hold.
-    pub max_queue_size: Cow<'a, str>,
+    pub max_queue_size: Option<Cow<'a, str>>,
 }
 
 /// Information about transaction costs in drops of XRP
@@ -98,7 +98,7 @@ mod tests {
         assert_eq!(fee.current_queue_size, "0");
         assert_eq!(fee.expected_ledger_size, "24");
         assert_eq!(fee.ledger_current_index, 26575101);
-        assert_eq!(fee.max_queue_size, "480");
+        assert_eq!(fee.max_queue_size, Some("480".into()));
 
         // Test drops
         assert_eq!(fee.drops.base_fee, XRPAmount::from("10"));
@@ -132,7 +132,7 @@ mod tests {
                 open_ledger_level: "256".into(),
                 reference_level: "256".into(),
             },
-            max_queue_size: "480".into(),
+            max_queue_size: Some("480".into()),
         };
 
         let serialized = serde_json::to_string(&fee).unwrap();

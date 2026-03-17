@@ -7,8 +7,7 @@
 // PaymentChannelClaim, AccountSet, TrustSet, Payment).
 
 use crate::common::amm::setup_amm_pool;
-use crate::common::{get_client, ledger_accept, with_blockchain_lock};
-use xrpl::asynch::transaction::submit_and_wait;
+use crate::common::{test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::amm_deposit::{AMMDeposit, AMMDepositFlag};
 use xrpl::models::{Amount, Currency, IssuedCurrency, XRPAmount, XRP};
 
@@ -16,7 +15,6 @@ use xrpl::models::{Amount, Currency, IssuedCurrency, XRPAmount, XRP};
 async fn test_amm_deposit_single_asset() {
     with_blockchain_lock(|| async {
         let pool = setup_amm_pool().await;
-        let client = get_client().await;
 
         // Deposit 1000 XRP drops into the XRP side of the pool (TfSingleAsset).
         // flags is at parameter position 4.
@@ -42,25 +40,7 @@ async fn test_amm_deposit_single_asset() {
             None, // lp_token_out
         );
 
-        let result = submit_and_wait(
-            &mut tx,
-            client,
-            Some(&pool.lp_wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit AMMDeposit");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &pool.lp_wallet).await;
     })
     .await;
 }

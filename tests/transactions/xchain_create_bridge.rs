@@ -8,15 +8,13 @@
 // locking_chain_door == account, issuing_chain_door == GENESIS_ACCOUNT
 
 use crate::common::constants::GENESIS_ACCOUNT;
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
-use xrpl::asynch::transaction::submit_and_wait;
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::xchain_create_bridge::XChainCreateBridge;
 use xrpl::models::{Amount, Currency, XChainBridge, XRPAmount, XRP};
 
 #[tokio::test]
 async fn test_xchain_create_bridge_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
         let door_wallet = generate_funded_wallet().await;
 
         let mut tx = XChainCreateBridge::new(
@@ -39,19 +37,7 @@ async fn test_xchain_create_bridge_base() {
             Some(XRPAmount::from("10000000")), // min_account_create_amount (10 XRP)
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&door_wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit XChainCreateBridge");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &door_wallet).await;
     })
     .await;
 }

@@ -192,8 +192,9 @@ where
                     .get_field_value("fulfillment")?
                     .map(|fulfillment| fulfillment.into()),
             )?,
-            // TODO: same for TransactionType::AMMCreate
-            TransactionType::AccountDelete => get_owner_reserve_from_response(client).await?,
+            TransactionType::AMMCreate | TransactionType::AccountDelete => {
+                get_owner_reserve_from_response(client).await?
+            }
             _ => net_fee.clone(),
         };
     } else {
@@ -204,8 +205,9 @@ where
                     .get_field_value("fulfillment")?
                     .map(|fulfillment| fulfillment.into()),
             )?,
-            // TODO: same for TransactionType::AMMCreate
-            TransactionType::AccountDelete => XRPAmount::from(OWNER_RESERVE),
+            TransactionType::AMMCreate | TransactionType::AccountDelete => {
+                XRPAmount::from(OWNER_RESERVE)
+            }
             _ => net_fee.clone(),
         };
     }

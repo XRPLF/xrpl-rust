@@ -147,10 +147,13 @@ pub enum XRPLResult<'a> {
     SubmitMultisigned(submit_multisigned::SubmitMultisigned<'a>),
     TransactionEntry(transaction_entry::TransactionEntry<'a>),
     Tx(tx::TxVersionMap<'a>),
+    // Other must come before Subscribe/Unsubscribe/Ping so that unrecognized
+    // JSON objects fall into Other(Value) — where the raw data is recoverable —
+    // rather than into Subscribe (empty PhantomData struct, data unrecoverable).
+    Other(XRPLOtherResult),
     Subscribe(subscribe::Subscribe<'a>),
     Unsubscribe(unsubscribe::Unsubscribe<'a>),
     Ping(ping::Ping<'a>),
-    Other(XRPLOtherResult),
 }
 
 macro_rules! impl_from_result {
@@ -233,7 +236,26 @@ macro_rules! impl_try_from_result {
 impl_try_from_result!(account_channels, AccountChannels, AccountChannels);
 impl_try_from_result!(account_currencies, AccountCurrencies, AccountCurrencies);
 impl_try_from_result!(account_lines, AccountLines, AccountLines);
-impl_try_from_result!(account_objects, AccountObjects, AccountObjects);
+// AccountObjects: also accepts Other(Value) as a fallback because serde's
+// ContentDeserializer (used by untagged enums) may fail to match AccountObjects
+// when the rippled response omits ledger_index (standalone/current-ledger mode).
+// In that case the JSON lands in Other(Value) and we re-parse it here.
+impl<'a> TryFrom<XRPLResult<'a>> for account_objects::AccountObjects<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::AccountObjects(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            res => Err(XRPLResultException::UnexpectedResultType(
+                "AccountObjects".to_string(),
+                res.get_name(),
+            )
+            .into()),
+        }
+    }
+}
 impl_try_from_result!(account_nfts, AccountNfts, AccountNfts);
 impl_try_from_result!(account_offers, AccountOffers, AccountOffers);
 impl_try_from_result!(amm_info, AMMInfo, AMMInfo);
@@ -249,8 +271,48 @@ impl_try_from_result!(ledger_current, LedgerCurrent, LedgerCurrent);
 impl_try_from_result!(ledger_data, LedgerData, LedgerData);
 impl_try_from_result!(ledger_entry, LedgerEntry, LedgerEntry);
 impl_try_from_result!(manifest, Manifest, Manifest);
-impl_try_from_result!(nft_buy_offers, NFTBuyOffers, NFTBuyOffers);
-impl_try_from_result!(nft_sell_offers, NFTSellOffers, NFTSellOffers);
+// NFTBuyOffers and NFTSellOffers are structurally identical; the untagged enum
+// always picks the first matching variant (NFTBuyOffers). Both TryFrom impls
+// accept either variant so that nft_sell_offers and nft_buy_offers responses
+// both parse correctly regardless of which variant serde selects.
+impl<'a> TryFrom<XRPLResult<'a>> for nft_buy_offers::NFTBuyOffers<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::NFTBuyOffers(value) => Ok(value),
+            XRPLResult::NFTSellOffers(value) => Ok(nft_buy_offers::NFTBuyOffers {
+                nft_id: value.nft_id,
+                offers: value.offers,
+                limit: value.limit,
+                marker: value.marker,
+            }),
+            res => Err(XRPLResultException::UnexpectedResultType(
+                "NFTBuyOffers".to_string(),
+                res.get_name(),
+            )
+            .into()),
+        }
+    }
+}
+impl<'a> TryFrom<XRPLResult<'a>> for nft_sell_offers::NFTSellOffers<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::NFTSellOffers(value) => Ok(value),
+            XRPLResult::NFTBuyOffers(value) => Ok(nft_sell_offers::NFTSellOffers {
+                nft_id: value.nft_id,
+                offers: value.offers,
+                limit: value.limit,
+                marker: value.marker,
+            }),
+            res => Err(XRPLResultException::UnexpectedResultType(
+                "NFTSellOffers".to_string(),
+                res.get_name(),
+            )
+            .into()),
+        }
+    }
+}
 impl_try_from_result!(nftoken, NFTokenMintResult, NFTokenMintResult);
 impl_try_from_result!(no_ripple_check, NoRippleCheck, NoRippleCheck);
 impl_try_from_result!(path_find, PathFind, PathFind);
@@ -382,7 +444,32 @@ macro_rules! impl_try_from_response {
 impl_try_from_response!(account_channels, AccountChannels, AccountChannels);
 impl_try_from_response!(account_currencies, AccountCurrencies, AccountCurrencies);
 impl_try_from_response!(account_lines, AccountLines, AccountLines);
-impl_try_from_response!(account_objects, AccountObjects, AccountObjects);
+// AccountObjects: fallback to Other(Value) for the same reason as above.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for account_objects::AccountObjects<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => match result {
+                XRPLResult::AccountObjects(value) => Ok(value),
+                XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                    serde_json::from_value(value.clone()).map_err(Into::into)
+                }
+                res => {
+                    Err(XRPLResultException::UnexpectedResultType(
+                        "AccountObjects".to_string(),
+                        res.get_name(),
+                    )
+                    .into())
+                }
+            },
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(account_nfts, AccountNfts, AccountNfts);
 impl_try_from_response!(account_offers, AccountOffers, AccountOffers);
 impl_try_from_response!(amm_info, AMMInfo, AMMInfo);
@@ -399,8 +486,60 @@ impl_try_from_response!(ledger_data, LedgerData, LedgerData);
 impl_try_from_response!(ledger_entry, LedgerEntry, LedgerEntry);
 impl_try_from_response!(manifest, Manifest, Manifest);
 impl_try_from_response!(nft_info, NFTInfo, NFTInfo);
-impl_try_from_response!(nft_buy_offers, NFTBuyOffers, NFTBuyOffers);
-impl_try_from_response!(nft_sell_offers, NFTSellOffers, NFTSellOffers);
+// NFTBuyOffers and NFTSellOffers are structurally identical; the untagged enum
+// always picks NFTBuyOffers first. Both TryFrom impls accept either variant.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for nft_buy_offers::NFTBuyOffers<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => match result {
+                XRPLResult::NFTBuyOffers(value) => Ok(value),
+                XRPLResult::NFTSellOffers(value) => Ok(nft_buy_offers::NFTBuyOffers {
+                    nft_id: value.nft_id,
+                    offers: value.offers,
+                    limit: value.limit,
+                    marker: value.marker,
+                }),
+                res => Err(XRPLResultException::UnexpectedResultType(
+                    "NFTBuyOffers".to_string(),
+                    res.get_name(),
+                )
+                .into()),
+            },
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for nft_sell_offers::NFTSellOffers<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        match response.result {
+            Some(result) => match result {
+                XRPLResult::NFTSellOffers(value) => Ok(value),
+                XRPLResult::NFTBuyOffers(value) => Ok(nft_sell_offers::NFTSellOffers {
+                    nft_id: value.nft_id,
+                    offers: value.offers,
+                    limit: value.limit,
+                    marker: value.marker,
+                }),
+                res => Err(XRPLResultException::UnexpectedResultType(
+                    "NFTSellOffers".to_string(),
+                    res.get_name(),
+                )
+                .into()),
+            },
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(nftoken, NFTokenMintResult, NFTokenMintResult);
 impl_try_from_response!(no_ripple_check, NoRippleCheck, NoRippleCheck);
 impl_try_from_response!(path_find, PathFind, PathFind);

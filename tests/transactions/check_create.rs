@@ -4,10 +4,9 @@
 //   - base: create a Check for 50 drops and verify one check object exists on the ledger
 
 use crate::common::{
-    generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock,
+    generate_funded_wallet, get_client, test_transaction, with_blockchain_lock,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
 use xrpl::models::transactions::check_create::CheckCreate;
@@ -37,17 +36,7 @@ async fn test_check_create_base() {
             None,           // invoice_id
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit CheckCreate");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
+        test_transaction(&mut tx, &wallet).await;
 
         // Verify the check ledger object was created
         let ao_response = client
@@ -74,8 +63,6 @@ async fn test_check_create_base() {
             1,
             "Should be exactly one check on the ledger"
         );
-
-        ledger_accept().await;
     })
     .await;
 }

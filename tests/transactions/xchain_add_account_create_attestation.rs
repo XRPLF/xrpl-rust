@@ -9,9 +9,8 @@
 // The attestation payload differs from XChainAddClaimAttestation:
 //   it includes XChainAccountCreateCount and SignatureReward instead of XChainClaimID.
 
-use crate::common::{get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
-use xrpl::asynch::transaction::submit_and_wait;
 use xrpl::core::binarycodec::encode;
 use xrpl::core::keypairs::sign;
 use xrpl::models::transactions::xchain_add_account_create_attestation::XChainAddAccountCreateAttestation;
@@ -44,15 +43,14 @@ struct AccountCreateAttestation<'a> {
 async fn test_xchain_add_account_create_attestation_base() {
     with_blockchain_lock(|| async {
         let bridge_setup = setup_bridge().await;
-        let client = get_client().await;
         let amount_drops = "300000000"; // 300 XRP in drops (xrpToDrops(300))
 
         // Source on the "other" (locking) chain — unfunded
-        let other_seed = xrpl::core::keypairs::generate_seed(None).expect("seed");
+        let other_seed = xrpl::core::keypairs::generate_seed(None, None).expect("seed");
         let other_wallet = Wallet::new(&other_seed, 0).expect("wallet");
 
         // Destination — a new account to be created on the issuing chain (unfunded)
-        let dest_seed = xrpl::core::keypairs::generate_seed(None).expect("seed");
+        let dest_seed = xrpl::core::keypairs::generate_seed(None, None).expect("seed");
         let dest_wallet = Wallet::new(&dest_seed, 0).expect("wallet");
 
         // Build + sign the attestation payload
@@ -88,31 +86,13 @@ async fn test_xchain_add_account_create_attestation_base() {
             other_wallet.classic_address.clone().into(),                // other_chain_source
             bridge_setup.witness_wallet.public_key.clone().into(),      // public_key
             attestation_sig.into(),                                     // signature
-            Amount::XRPAmount(XRPAmount::from(&bridge_setup.signature_reward)), // signature_reward
+            Amount::XRPAmount(XRPAmount::from(bridge_setup.signature_reward.as_str())), // signature_reward
             0,                                                           // was_locking_chain_send
             "1".into(),                                                  // xchain_account_create_count
             bridge_setup.bridge(),
         );
 
-        let result = submit_and_wait(
-            &mut tx,
-            client,
-            Some(&bridge_setup.witness_wallet),
-            Some(true),
-            Some(true),
-        )
-        .await
-        .expect("Failed to submit XChainAddAccountCreateAttestation");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &bridge_setup.witness_wallet).await;
     })
     .await;
 }

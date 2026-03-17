@@ -2,18 +2,19 @@
 //
 // Scenarios:
 //   - base: place an XRP/USD offer on the DEX
+//
+// NOTE: Bitstamp (rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B) does not exist in standalone Docker mode.
+// A fresh issuer wallet is funded from genesis to act as the IOU issuer.
+// rippled requires the issuer account to exist (tecNO_ISSUER otherwise).
 
-use crate::common::{get_client, get_wallet, ledger_accept, with_blockchain_lock};
-use xrpl::{
-    asynch::transaction::submit_and_wait,
-    models::{transactions::offer_create::OfferCreate, Amount, IssuedCurrencyAmount, XRPAmount},
-};
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
+use xrpl::models::{transactions::offer_create::OfferCreate, Amount, IssuedCurrencyAmount, XRPAmount};
 
 #[tokio::test]
 async fn test_offer_create_base() {
     with_blockchain_lock(|| async {
-        let client = get_client().await;
-        let wallet = get_wallet().await;
+        let wallet = generate_funded_wallet().await;
+        let issuer = generate_funded_wallet().await;
 
         let mut tx = OfferCreate::new(
             wallet.classic_address.clone().into(),
@@ -29,26 +30,14 @@ async fn test_offer_create_base() {
             Amount::XRPAmount(XRPAmount::from("100")), // taker_pays: 100 XRP drops
             Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
                 "USD".into(),
-                "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(), // Bitstamp issuer
+                issuer.classic_address.clone().into(), // locally funded issuer
                 "10".into(),
             )),
             None,
             None,
         );
 
-        let result = submit_and_wait(&mut tx, client, Some(wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit OfferCreate");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut tx, &wallet).await;
     })
     .await;
 }

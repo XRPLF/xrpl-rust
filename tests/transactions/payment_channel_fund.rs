@@ -7,9 +7,8 @@
 // xrpl-rust has no equivalent utility, so we read the channel ID from account_objects
 // after the PaymentChannelCreate is validated.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
-use xrpl::asynch::clients::XRPLAsyncClient;
-use xrpl::asynch::transaction::submit_and_wait;
+use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
+use xrpl::asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit};
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
 use xrpl::models::transactions::payment_channel_create::PaymentChannelCreate;
@@ -42,9 +41,11 @@ async fn test_payment_channel_fund_base() {
             None,
         );
 
-        submit_and_wait(&mut create_tx, client, Some(&wallet), Some(true), Some(true))
+        sign_and_submit(&mut create_tx, client, &wallet, true, true)
             .await
             .expect("Failed to submit PaymentChannelCreate");
+
+        ledger_accept().await;
 
         // Step 2: get the channel ID from account_objects
         let ao_response = client
@@ -89,19 +90,7 @@ async fn test_payment_channel_fund_base() {
             None,                   // expiration
         );
 
-        let result = submit_and_wait(&mut fund_tx, client, Some(&wallet), Some(true), Some(true))
-            .await
-            .expect("Failed to submit PaymentChannelFund");
-
-        assert_eq!(
-            result
-                .get_transaction_metadata()
-                .expect("Expected metadata")
-                .transaction_result,
-            "tesSUCCESS"
-        );
-
-        ledger_accept().await;
+        test_transaction(&mut fund_tx, &wallet).await;
     })
     .await;
 }
