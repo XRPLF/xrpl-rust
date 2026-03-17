@@ -60,8 +60,6 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Run integration tests
-        env:
-          XRPL_STANDALONE: "true"
         run: cargo test --features std,json-rpc,helpers --test integration_test
 
       - name: Stop rippled

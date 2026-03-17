@@ -102,6 +102,31 @@ Breaking down the `docker run` command:
 - Integration tests are serialized via a global mutex — they do not run in
   parallel, so it is safe to run the whole suite at once.
 
+### Coverage
+
+Coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov).
+
+Install the tool and run a coverage report locally:
+
+```bash
+cargo install cargo-llvm-cov --locked
+cargo llvm-cov --all-features --summary-only
+```
+
+The CI enforces the following minimum thresholds (current baseline is ~85% lines / ~78% regions / ~85% functions):
+
+| Metric    | Minimum |
+|-----------|---------|
+| Lines     | 80%     |
+| Regions   | 75%     |
+| Functions | 80%     |
+
+To generate an HTML report and open it in a browser:
+
+```bash
+cargo llvm-cov --all-features --open
+```
+
 ### Generate Documentation
 
 You can see the complete reference documentation at
