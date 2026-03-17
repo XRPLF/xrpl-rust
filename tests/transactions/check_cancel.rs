@@ -31,8 +31,8 @@ async fn test_check_cancel_base() {
             None,
             None,
             None,
-            destination.classic_address.clone().into(),       // destination
-            Amount::XRPAmount(XRPAmount::from("50")), // send_max: 50 drops
+            destination.classic_address.clone().into(), // destination
+            Amount::XRPAmount(XRPAmount::from("50")),   // send_max: 50 drops
             None,
             None,
             None,
@@ -61,8 +61,9 @@ async fn test_check_cancel_base() {
             )
             .await
             .expect("Failed to query account_objects");
-        let ao_result: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("Failed to parse account_objects");
+        let ao_result: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("Failed to parse account_objects");
 
         assert_eq!(ao_result.account_objects.len(), 1, "Expected one check");
 
@@ -104,8 +105,9 @@ async fn test_check_cancel_base() {
             )
             .await
             .expect("Failed to query account_objects after cancel");
-        let ao_result2: results::account_objects::AccountObjects<'_> =
-            ao_response2.try_into().expect("Failed to parse account_objects");
+        let ao_result2: results::account_objects::AccountObjects<'_> = ao_response2
+            .try_into()
+            .expect("Failed to parse account_objects");
 
         assert_eq!(
             ao_result2.account_objects.len(),

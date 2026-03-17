@@ -17,22 +17,22 @@ async fn test_amm_bid_base() {
 
         let mut tx = AMMBid::new(
             pool.lp_wallet.classic_address.clone().into(),
-            None, // account_txn_id
-            None, // fee
-            None, // last_ledger_sequence
-            None, // memos
-            None, // sequence
-            None, // signers
-            None, // source_tag
-            None, // ticket_sequence
+            None,                      // account_txn_id
+            None,                      // fee
+            None,                      // last_ledger_sequence
+            None,                      // memos
+            None,                      // sequence
+            None,                      // signers
+            None,                      // source_tag
+            None,                      // ticket_sequence
             Currency::XRP(XRP::new()), // asset
             Currency::IssuedCurrency(IssuedCurrency::new(
                 "USD".into(),
                 pool.issuer_wallet.classic_address.clone().into(),
             )), // asset2
-            None, // bid_min
-            None, // bid_max
-            None, // auth_accounts
+            None,                      // bid_min
+            None,                      // bid_max
+            None,                      // auth_accounts
         );
 
         test_transaction(&mut tx, &pool.lp_wallet).await;

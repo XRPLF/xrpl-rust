@@ -3,9 +3,7 @@
 // Scenarios:
 //   - base: create a Check for 50 drops and verify one check object exists on the ledger
 
-use crate::common::{
-    generate_funded_wallet, get_client, test_transaction, with_blockchain_lock,
-};
+use crate::common::{generate_funded_wallet, get_client, test_transaction, with_blockchain_lock};
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
@@ -21,19 +19,19 @@ async fn test_check_create_base() {
 
         let mut tx = CheckCreate::new(
             wallet.classic_address.clone().into(),
-            None,           // account_txn_id
-            None,           // fee
-            None,           // last_ledger_sequence
-            None,           // memos
-            None,           // sequence
-            None,           // signers
-            None,           // source_tag
-            None,           // ticket_sequence
-            destination.classic_address.clone().into(),       // destination
-            Amount::XRPAmount(XRPAmount::from("50")), // send_max: 50 drops
-            None,           // destination_tag
-            None,           // expiration
-            None,           // invoice_id
+            None,                                       // account_txn_id
+            None,                                       // fee
+            None,                                       // last_ledger_sequence
+            None,                                       // memos
+            None,                                       // sequence
+            None,                                       // signers
+            None,                                       // source_tag
+            None,                                       // ticket_sequence
+            destination.classic_address.clone().into(), // destination
+            Amount::XRPAmount(XRPAmount::from("50")),   // send_max: 50 drops
+            None,                                       // destination_tag
+            None,                                       // expiration
+            None,                                       // invoice_id
         );
 
         test_transaction(&mut tx, &wallet).await;
@@ -55,8 +53,9 @@ async fn test_check_create_base() {
             )
             .await
             .expect("Failed to query account_objects");
-        let ao_result: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("Failed to parse account_objects");
+        let ao_result: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("Failed to parse account_objects");
 
         assert_eq!(
             ao_result.account_objects.len(),

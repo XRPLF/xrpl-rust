@@ -6,9 +6,9 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    Model, PathStep, ValidateCurrencies, XRPLModelResult,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, PathStep, ValidateCurrencies, XRPLModelResult,
 };
 
 use crate::models::amount::XRPAmount;
@@ -366,7 +366,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
             paths: Some(vec![vec![
-                PathStep::default().with_account("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into()),
+                PathStep::default().with_account("rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into())
             ]]),
             ..Default::default()
         };

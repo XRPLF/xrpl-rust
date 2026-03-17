@@ -15,20 +15,20 @@ async fn test_payment_channel_create_base() {
 
         let mut tx = PaymentChannelCreate::new(
             wallet.classic_address.clone().into(),
-            None,                                               // account_txn_id
-            None,                                               // fee
-            None,                                               // last_ledger_sequence
-            None,                                               // memos
-            None,                                               // sequence
-            None,                                               // signers
-            None,                                               // source_tag
-            None,                                               // ticket_sequence
-            XRPAmount::from("100"),                             // amount: 100 drops
-            destination.classic_address.clone().into(),         // destination
-            wallet.public_key.clone().into(),                   // public_key (hex)
-            86400,                                              // settle_delay: 1 day
-            None,                                               // cancel_after
-            None,                                               // destination_tag
+            None,                                       // account_txn_id
+            None,                                       // fee
+            None,                                       // last_ledger_sequence
+            None,                                       // memos
+            None,                                       // sequence
+            None,                                       // signers
+            None,                                       // source_tag
+            None,                                       // ticket_sequence
+            XRPAmount::from("100"),                     // amount: 100 drops
+            destination.classic_address.clone().into(), // destination
+            wallet.public_key.clone().into(),           // public_key (hex)
+            86400,                                      // settle_delay: 1 day
+            None,                                       // cancel_after
+            None,                                       // destination_tag
         );
 
         test_transaction(&mut tx, &wallet).await;

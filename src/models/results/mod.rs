@@ -458,13 +458,11 @@ where
                 XRPLResult::Other(XRPLOtherResult(ref value)) => {
                     serde_json::from_value(value.clone()).map_err(Into::into)
                 }
-                res => {
-                    Err(XRPLResultException::UnexpectedResultType(
-                        "AccountObjects".to_string(),
-                        res.get_name(),
-                    )
-                    .into())
-                }
+                res => Err(XRPLResultException::UnexpectedResultType(
+                    "AccountObjects".to_string(),
+                    res.get_name(),
+                )
+                .into()),
             },
             None => Err(XRPLModelException::MissingField("result".to_string())),
         }

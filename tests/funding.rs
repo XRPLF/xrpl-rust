@@ -11,7 +11,9 @@ mod tests {
         models::XRPAmount,
     };
 
-    use crate::common::{constants::XRPL_TEST_NET, generate_funded_wallet, get_client, with_blockchain_lock};
+    use crate::common::{
+        constants::XRPL_TEST_NET, generate_funded_wallet, get_client, with_blockchain_lock,
+    };
 
     #[tokio::test]
     async fn test_wallet_generation_and_funding() {

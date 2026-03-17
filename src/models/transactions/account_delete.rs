@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{FlagCollection, NoFlags};
 use crate::models::{
-    Model, ValidateCurrencies,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::{CommonFields, CommonTransactionBuilder};
 

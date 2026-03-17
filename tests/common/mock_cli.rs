@@ -44,8 +44,11 @@ impl MockJsonRpcClient {
     pub fn connect(_url: url::Url) -> Self {
         MockJsonRpcClient
     }
-    
-    pub fn request(&self, _request: xrpl::models::Request) -> Result<xrpl::models::Response, xrpl::clients::exceptions::XRPLClientException> {
+
+    pub fn request(
+        &self,
+        _request: xrpl::models::Request,
+    ) -> Result<xrpl::models::Response, xrpl::clients::exceptions::XRPLClientException> {
         // Return a mock response
         Ok(xrpl::models::Response::default())
     }

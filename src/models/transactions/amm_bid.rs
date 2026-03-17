@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    Currency, FlagCollection, IssuedCurrencyAmount, Model, NoFlags, ValidateCurrencies, XRPAmount,
-    transactions::TransactionType,
+    transactions::TransactionType, Currency, FlagCollection, IssuedCurrencyAmount, Model, NoFlags,
+    ValidateCurrencies, XRPAmount,
 };
 
 use super::{AuthAccount, CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction};
@@ -162,7 +162,7 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::models::{IssuedCurrency, currency::XRP};
+    use crate::models::{currency::XRP, IssuedCurrency};
 
     #[test]
     fn test_serde() {

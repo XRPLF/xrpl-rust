@@ -7,8 +7,8 @@
 // NOTE: XChainAccountCreateCommit has NO flags; standard 9 common-field order.
 // The `destination` address does not need to be funded (it will be created on the issuing chain).
 
-use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::xchain_account_create_commit::XChainAccountCreateCommit;
 use xrpl::models::{Amount, XRPAmount};
 use xrpl::wallet::Wallet;
@@ -27,18 +27,20 @@ async fn test_xchain_account_create_commit_base() {
 
         let mut tx = XChainAccountCreateCommit::new(
             committer.classic_address.clone().into(),
-            None,                                             // account_txn_id
-            None,                                             // fee
-            None,                                             // last_ledger_sequence
-            None,                                             // memos
-            None,                                             // sequence
-            None,                                             // signers
-            None,                                             // source_tag
-            None,                                             // ticket_sequence
-            Amount::XRPAmount(XRPAmount::from("10000000")),   // amount: 10 XRP drops
-            dest_wallet.classic_address.clone().into(),       // destination
+            None,                                           // account_txn_id
+            None,                                           // fee
+            None,                                           // last_ledger_sequence
+            None,                                           // memos
+            None,                                           // sequence
+            None,                                           // signers
+            None,                                           // source_tag
+            None,                                           // ticket_sequence
+            Amount::XRPAmount(XRPAmount::from("10000000")), // amount: 10 XRP drops
+            dest_wallet.classic_address.clone().into(),     // destination
             bridge.bridge(),
-            Some(Amount::XRPAmount(XRPAmount::from(bridge.signature_reward.as_str()))), // signature_reward
+            Some(Amount::XRPAmount(XRPAmount::from(
+                bridge.signature_reward.as_str(),
+            ))), // signature_reward
         );
 
         test_transaction(&mut tx, &committer).await;
