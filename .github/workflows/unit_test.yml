@@ -73,3 +73,18 @@ jobs:
         with:
           command: test
           args: --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate coverage report
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+      - name: Check coverage thresholds
+        run: |
+          cargo llvm-cov --all-features --summary-only \
+            --fail-under-lines 80 \
+            --fail-under-regions 75 \
+            --fail-under-functions 80
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: lcov-report
+          path: lcov.info
