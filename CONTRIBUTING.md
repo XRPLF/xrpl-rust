@@ -54,7 +54,9 @@ cargo clippy
 
 ### Running Tests
 
-To run tests:
+For integration tests, we use a `rippled` node in standalone mode to test xrpl-rust code against. To set this up, you can either configure and run `rippled` locally, or set up the Docker container `rippleci/rippled` by [following these instructions](#integration-tests). The latter will require you to [install Docker](https://docs.docker.com/get-docker/).
+
+#### Unit Tests
 
 ```bash
 # Test the core feature for no_std
@@ -64,6 +66,41 @@ cargo test --all-features
 ```
 
 > Note that the tests will automatically run via pre-commit hook
+
+#### Integration Tests
+
+From the `xrpl-rust` folder, run the following commands:
+
+```bash
+# Sets up the rippled standalone Docker container — skip if you already have it running
+docker run -p 5005:5005 -p 6006:6006 --rm -it --name rippled_standalone \
+  --volume $PWD/.ci-config:/etc/opt/ripple/ \
+  --entrypoint bash rippleci/rippled:develop \
+  -c 'mkdir -p /var/lib/rippled/db/ && rippled -a'
+cargo test --features std --test integration_test
+```
+
+To run a specific group of tests (e.g. escrow):
+
+```bash
+cargo test --features std --test integration_test escrow
+```
+
+Breaking down the `docker run` command:
+
+- `-p 5005:5005 -p 6006:6006` exposes the HTTP JSON-RPC and WebSocket admin ports.
+- `--rm` closes the container automatically when it exits.
+- `-it` keeps stdin open so you can stop the node with Ctrl-C.
+- `--name rippled_standalone` is an instance name for clarity.
+- `--volume $PWD/.ci-config:/etc/opt/ripple/` mounts `rippled.cfg` so the node binds on `0.0.0.0` and is reachable from the host. It must be an absolute path, so we use `$PWD` instead of `./`.
+- `rippleci/rippled` is an image that is regularly updated with the latest `rippled` releases.
+- `--entrypoint bash rippleci/rippled:develop` manually overrides the entrypoint (for the latest version of rippled on the `develop` branch).
+- `-c 'mkdir -p /var/lib/rippled/db/ && rippled -a'` starts `rippled` in standalone mode, where ledgers only close on demand.
+
+**Notes**
+
+- Integration tests are serialized via a global mutex — they do not run in
+  parallel, so it is safe to run the whole suite at once.
 
 ### Generate Documentation
 

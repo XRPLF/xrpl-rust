@@ -10,8 +10,6 @@ use once_cell::sync::Lazy;
 #[cfg(feature = "std")]
 use tokio::sync::{Mutex, OnceCell};
 
-#[cfg(feature = "std")]
-use constants::XRPL_TEST_NET;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 use embedded_io_adapters::tokio_1::FromTokio;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
@@ -35,21 +33,6 @@ const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
 #[cfg(feature = "std")]
 const STANDALONE_URL: &str = "http://localhost:5005";
 
-/// Returns true when the XRPL_STANDALONE env var is set (Docker standalone mode).
-#[cfg(feature = "std")]
-fn is_standalone() -> bool {
-    std::env::var("XRPL_STANDALONE").is_ok()
-}
-
-/// Returns the active endpoint URL — standalone localhost or public testnet.
-#[cfg(feature = "std")]
-fn get_endpoint() -> &'static str {
-    if is_standalone() {
-        STANDALONE_URL
-    } else {
-        XRPL_TEST_NET
-    }
-}
 
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub async fn open_websocket(
@@ -99,71 +82,59 @@ static TEST_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 pub async fn get_client() -> &'static AsyncJsonRpcClient {
     CLIENT
         .get_or_init(|| async {
-            AsyncJsonRpcClient::connect(Url::parse(get_endpoint()).unwrap())
+            AsyncJsonRpcClient::connect(Url::parse(STANDALONE_URL).unwrap())
         })
         .await
 }
 
-/// Generate a fresh funded wallet on every call.
-/// - Testnet: uses the faucet.
-/// - Standalone (XRPL_STANDALONE set): sends 400 XRP from the genesis account.
+/// Generate a fresh funded wallet by sending 400 XRP from the genesis account.
 #[cfg(feature = "std")]
 pub async fn generate_funded_wallet() -> Wallet {
     use xrpl::asynch::transaction::sign_and_submit;
     use xrpl::models::transactions::payment::Payment;
     use xrpl::models::{Amount, XRPAmount};
 
-    if is_standalone() {
-        let genesis = Wallet::new(GENESIS_SEED, 0).expect("genesis wallet");
-        let seed = xrpl::core::keypairs::generate_seed(None, None).expect("seed");
-        let new_wallet = Wallet::new(&seed, 0).expect("new wallet");
+    let genesis = Wallet::new(GENESIS_SEED, 0).expect("genesis wallet");
+    let seed = xrpl::core::keypairs::generate_seed(None, None).expect("seed");
+    let new_wallet = Wallet::new(&seed, 0).expect("new wallet");
 
-        let mut payment = Payment::new(
-            genesis.classic_address.clone().into(),
-            None, // account_txn_id
-            None, // fee
-            None, // flags
-            None, // last_ledger_sequence
-            None, // memos
-            None, // sequence
-            None, // signers
-            None, // source_tag
-            None, // ticket_sequence
-            Amount::XRPAmount(XRPAmount::from("400000000")), // 400 XRP
-            new_wallet.classic_address.clone().into(),
-            None, // deliver_min
-            None, // destination_tag
-            None, // invoice_id
-            None, // paths
-            None, // send_max
-        );
+    let mut payment = Payment::new(
+        genesis.classic_address.clone().into(),
+        None, // account_txn_id
+        None, // fee
+        None, // flags
+        None, // last_ledger_sequence
+        None, // memos
+        None, // sequence
+        None, // signers
+        None, // source_tag
+        None, // ticket_sequence
+        Amount::XRPAmount(XRPAmount::from("400000000")), // 400 XRP
+        new_wallet.classic_address.clone().into(),
+        None, // deliver_min
+        None, // destination_tag
+        None, // invoice_id
+        None, // paths
+        None, // send_max
+    );
 
-        let client = get_client().await;
-        sign_and_submit(&mut payment, client, &genesis, true, true)
-            .await
-            .expect("generate_funded_wallet: funding payment failed");
+    let client = get_client().await;
+    sign_and_submit(&mut payment, client, &genesis, true, true)
+        .await
+        .expect("generate_funded_wallet: funding payment failed");
 
-        ledger_accept().await;
-        new_wallet
-    } else {
-        xrpl::asynch::wallet::generate_faucet_wallet(get_client().await, None, None, None, None)
-            .await
-            .expect("Failed to generate and fund wallet")
-    }
+    ledger_accept().await;
+    new_wallet
 }
 
 /// Advance the ledger by one close.
-/// - Standalone: calls `ledger_accept` on the local rippled node.
-/// - Testnet: no-op (ledgers close automatically every ~3–4 seconds).
 #[cfg(feature = "std")]
 pub async fn ledger_accept() {
-    if is_standalone() {
-        let _ = reqwest::Client::new()
-            .post(STANDALONE_URL)
-            .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
-            .send()
-            .await;
-    }
+    let _ = reqwest::Client::new()
+        .post(STANDALONE_URL)
+        .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
+        .send()
+        .await;
 }
 
 /// Return the `close_time` of the most-recent validated ledger in Ripple epoch seconds.
@@ -189,20 +160,14 @@ pub async fn get_ledger_close_time() -> u64 {
     ledger_result.ledger.close_time
 }
 
-/// Poll until `close_time >= target`.
-/// - Standalone: drives progress by calling `ledger_accept` each iteration.
-/// - Testnet: sleeps 4 s between polls (ledgers close automatically).
+/// Poll until `close_time >= target`, calling `ledger_accept` each iteration.
 #[cfg(feature = "std")]
 pub async fn wait_for_ledger_close_time(target: u64) {
     loop {
         if get_ledger_close_time().await >= target {
             return;
         }
-        if is_standalone() {
-            ledger_accept().await;
-        } else {
-            tokio::time::sleep(std::time::Duration::from_secs(4)).await;
-        }
+        ledger_accept().await;
     }
 }
 
