@@ -33,7 +33,7 @@ async fn test_check_cash_base() {
             None,
             None,
             None,
-            destination.classic_address.clone().into(),       // destination
+            destination.classic_address.clone().into(), // destination
             Amount::XRPAmount(XRPAmount::from(amount)), // send_max
             None,
             None,
@@ -63,8 +63,9 @@ async fn test_check_cash_base() {
             )
             .await
             .expect("Failed to query account_objects");
-        let ao_result: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("Failed to parse account_objects");
+        let ao_result: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("Failed to parse account_objects");
 
         assert_eq!(ao_result.account_objects.len(), 1, "Expected one check");
 
@@ -84,9 +85,9 @@ async fn test_check_cash_base() {
             None,
             None,
             None,
-            check_id.into(),                                   // check_id
+            check_id.into(),                                  // check_id
             Some(Amount::XRPAmount(XRPAmount::from(amount))), // amount (exact)
-            None,                                              // deliver_min
+            None,                                             // deliver_min
         );
 
         test_transaction(&mut cash_tx, &destination).await;
@@ -108,8 +109,9 @@ async fn test_check_cash_base() {
             )
             .await
             .expect("Failed to query account_objects after cash");
-        let ao_result2: results::account_objects::AccountObjects<'_> =
-            ao_response2.try_into().expect("Failed to parse account_objects");
+        let ao_result2: results::account_objects::AccountObjects<'_> = ao_response2
+            .try_into()
+            .expect("Failed to parse account_objects");
 
         assert_eq!(
             ao_result2.account_objects.len(),

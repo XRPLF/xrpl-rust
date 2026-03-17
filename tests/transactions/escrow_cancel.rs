@@ -30,20 +30,20 @@ async fn test_escrow_cancel_base() {
 
         let mut create_tx = EscrowCreate::new(
             wallet.classic_address.clone().into(),
-            None,           // account_txn_id
-            None,           // fee
-            None,           // last_ledger_sequence
-            None,           // memos
-            None,           // sequence
-            None,           // signers
-            None,           // source_tag
-            None,           // ticket_sequence
-            "10000".into(), // amount: 10 000 drops
+            None,                                       // account_txn_id
+            None,                                       // fee
+            None,                                       // last_ledger_sequence
+            None,                                       // memos
+            None,                                       // sequence
+            None,                                       // signers
+            None,                                       // source_tag
+            None,                                       // ticket_sequence
+            "10000".into(),                             // amount: 10 000 drops
             destination.classic_address.clone().into(), // destination
-            Some(cancel_after), // cancel_after
-            None,               // condition
-            None,               // destination_tag
-            Some(finish_after), // finish_after
+            Some(cancel_after),                         // cancel_after
+            None,                                       // condition
+            None,                                       // destination_tag
+            Some(finish_after),                         // finish_after
         );
 
         // test_transaction signs, submits, asserts tesSUCCESS, and calls ledger_accept.
@@ -52,8 +52,7 @@ async fn test_escrow_cancel_base() {
         // Mirroring xrpl.js: look up the validated Sequence via account_objects → tx query
         // instead of reading the autofilled value from the tx struct.  This confirms the
         // escrow actually exists on-chain before we try to cancel it.
-        let offer_sequence =
-            get_escrow_offer_sequence(&wallet.classic_address).await;
+        let offer_sequence = get_escrow_offer_sequence(&wallet.classic_address).await;
 
         // Wait for the validated ledger close_time to reach CancelAfter (mirrors
         // xrpl.js waitForAndForceProgressLedgerTime(CLOSE_TIME + 3)).

@@ -3,7 +3,9 @@
 // Scenarios:
 //   - base: create an offer then cancel it by sequence number
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
+};
 use xrpl::{
     asynch::transaction::sign_and_submit,
     models::{

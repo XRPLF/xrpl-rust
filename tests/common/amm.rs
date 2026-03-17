@@ -35,23 +35,23 @@ pub async fn setup_amm_pool() -> AmmPool {
     // AccountSet has flags at position 4; set_flag is at position 15.
     let mut set_tx = AccountSet::new(
         issuer_wallet.classic_address.clone().into(),
-        None, // account_txn_id
-        None, // fee
-        None, // flags (position 4)
-        None, // last_ledger_sequence
-        None, // memos
-        None, // sequence
-        None, // signers
-        None, // source_tag
-        None, // ticket_sequence
-        None, // clear_flag
-        None, // domain
-        None, // email_hash
-        None, // message_key
+        None,                                   // account_txn_id
+        None,                                   // fee
+        None,                                   // flags (position 4)
+        None,                                   // last_ledger_sequence
+        None,                                   // memos
+        None,                                   // sequence
+        None,                                   // signers
+        None,                                   // source_tag
+        None,                                   // ticket_sequence
+        None,                                   // clear_flag
+        None,                                   // domain
+        None,                                   // email_hash
+        None,                                   // message_key
         Some(AccountSetFlag::AsfDefaultRipple), // set_flag
-        None, // transfer_rate
-        None, // tick_size
-        None, // nftoken_minter
+        None,                                   // transfer_rate
+        None,                                   // tick_size
+        None,                                   // nftoken_minter
     );
     test_transaction(&mut set_tx, &issuer_wallet).await;
 
@@ -59,15 +59,15 @@ pub async fn setup_amm_pool() -> AmmPool {
     // TrustSet has flags at position 4.
     let mut trust_tx = TrustSet::new(
         lp_wallet.classic_address.clone().into(),
-        None, // account_txn_id
-        None, // fee
+        None,                                             // account_txn_id
+        None,                                             // fee
         Some(vec![TrustSetFlag::TfClearNoRipple].into()), // flags (position 4)
-        None, // last_ledger_sequence
-        None, // memos
-        None, // sequence
-        None, // signers
-        None, // source_tag
-        None, // ticket_sequence
+        None,                                             // last_ledger_sequence
+        None,                                             // memos
+        None,                                             // sequence
+        None,                                             // signers
+        None,                                             // source_tag
+        None,                                             // ticket_sequence
         IssuedCurrencyAmount::new(
             "USD".into(),
             issuer_wallet.classic_address.clone().into(),
@@ -97,11 +97,11 @@ pub async fn setup_amm_pool() -> AmmPool {
             "500".into(),
         )),
         lp_wallet.classic_address.clone().into(), // destination
-        None, // destination_tag
-        None, // invoice_id
-        None, // paths
-        None, // send_max
-        None, // deliver_min
+        None,                                     // destination_tag
+        None,                                     // invoice_id
+        None,                                     // paths
+        None,                                     // send_max
+        None,                                     // deliver_min
     );
     test_transaction(&mut pay_tx, &issuer_wallet).await;
 
@@ -112,7 +112,7 @@ pub async fn setup_amm_pool() -> AmmPool {
     // calculate_fee_per_transaction_type which returns get_owner_reserve for AMMCreate.
     let mut amm_tx = AMMCreate::new(
         lp_wallet.classic_address.clone().into(),
-        None, // account_txn_id
+        None,                                      // account_txn_id
         None, // fee: autofill computes inc_reserve (5 XRP) for AMMCreate
         None, // last_ledger_sequence
         None, // memos
@@ -126,7 +126,7 @@ pub async fn setup_amm_pool() -> AmmPool {
             issuer_wallet.classic_address.clone().into(),
             "250".into(),
         )), // amount2: 250 USD
-        12, // trading_fee (12 / 100_000)
+        12,   // trading_fee (12 / 100_000)
     );
     test_transaction(&mut amm_tx, &lp_wallet).await;
 
@@ -135,24 +135,24 @@ pub async fn setup_amm_pool() -> AmmPool {
     // Mirrors xrpl.js setupAMMPool testWallet deposit.
     let mut deposit_tx = AMMDeposit::new(
         lp_wallet.classic_address.clone().into(),
-        None, // account_txn_id
-        None, // fee
+        None,                                             // account_txn_id
+        None,                                             // fee
         Some(vec![AMMDepositFlag::TfSingleAsset].into()), // flags
-        None, // last_ledger_sequence
-        None, // memos
-        None, // sequence
-        None, // signers
-        None, // source_tag
-        None, // ticket_sequence
+        None,                                             // last_ledger_sequence
+        None,                                             // memos
+        None,                                             // sequence
+        None,                                             // signers
+        None,                                             // source_tag
+        None,                                             // ticket_sequence
         Currency::XRP(XRP::new()),
         Currency::IssuedCurrency(xrpl::models::IssuedCurrency::new(
             "USD".into(),
             issuer_wallet.classic_address.clone().into(),
         )),
         Some(Amount::XRPAmount(XRPAmount::from("1000"))), // amount: 1000 XRP drops
-        None, // amount2
-        None, // e_price
-        None, // lp_token_out
+        None,                                             // amount2
+        None,                                             // e_price
+        None,                                             // lp_token_out
     );
     test_transaction(&mut deposit_tx, &lp_wallet).await;
 

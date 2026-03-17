@@ -20,24 +20,24 @@ async fn test_amm_deposit_single_asset() {
         // flags is at parameter position 4.
         let mut tx = AMMDeposit::new(
             pool.lp_wallet.classic_address.clone().into(),
-            None, // account_txn_id
-            None, // fee
+            None,                                             // account_txn_id
+            None,                                             // fee
             Some(vec![AMMDepositFlag::TfSingleAsset].into()), // flags (position 4)
-            None, // last_ledger_sequence
-            None, // memos
-            None, // sequence
-            None, // signers
-            None, // source_tag
-            None, // ticket_sequence
-            Currency::XRP(XRP::new()), // asset
+            None,                                             // last_ledger_sequence
+            None,                                             // memos
+            None,                                             // sequence
+            None,                                             // signers
+            None,                                             // source_tag
+            None,                                             // ticket_sequence
+            Currency::XRP(XRP::new()),                        // asset
             Currency::IssuedCurrency(IssuedCurrency::new(
                 "USD".into(),
                 pool.issuer_wallet.classic_address.clone().into(),
             )), // asset2
             Some(Amount::XRPAmount(XRPAmount::from("1000"))), // amount: 1000 drops
-            None, // amount2
-            None, // e_price
-            None, // lp_token_out
+            None,                                             // amount2
+            None,                                             // e_price
+            None,                                             // lp_token_out
         );
 
         test_transaction(&mut tx, &pool.lp_wallet).await;

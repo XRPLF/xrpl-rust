@@ -4,7 +4,9 @@
 // Scenarios:
 //   - sell_offer: seller mints a transferable NFT, creates a sell offer, buyer accepts it
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
+};
 use xrpl::{
     asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit},
     models::{
@@ -31,19 +33,19 @@ async fn test_nftoken_accept_offer_sell() {
         // Step 1: seller mints an NFT with TfTransferable so it can change hands.
         let mut mint = NFTokenMint::new(
             seller.classic_address.clone().into(),
-            None,                                                             // account_txn_id
-            None,                                                             // fee
-            Some(vec![NFTokenMintFlag::TfTransferable].into()),               // flags (position 4!)
-            None,                                                             // last_ledger_sequence
-            None,                                                             // memos
-            None,                                                             // sequence
-            None,                                                             // signers
-            None,                                                             // source_tag
-            None,                                                             // ticket_sequence
-            0,                                                                // nftoken_taxon
-            None,                                                             // issuer
-            None,                                                             // transfer_fee
-            Some(hex::encode(TEST_NFT_URL).into()),                           // uri
+            None,                                               // account_txn_id
+            None,                                               // fee
+            Some(vec![NFTokenMintFlag::TfTransferable].into()), // flags (position 4!)
+            None,                                               // last_ledger_sequence
+            None,                                               // memos
+            None,                                               // sequence
+            None,                                               // signers
+            None,                                               // source_tag
+            None,                                               // ticket_sequence
+            0,                                                  // nftoken_taxon
+            None,                                               // issuer
+            None,                                               // transfer_fee
+            Some(hex::encode(TEST_NFT_URL).into()),             // uri
         );
 
         sign_and_submit(&mut mint, client, &seller, true, true)
@@ -55,18 +57,13 @@ async fn test_nftoken_accept_offer_sell() {
         // Get the NFT ID from account_nfts
         let nfts_response = client
             .request(
-                AccountNfts::new(
-                    None,
-                    seller.classic_address.clone().into(),
-                    None,
-                    None,
-                )
-                .into(),
+                AccountNfts::new(None, seller.classic_address.clone().into(), None, None).into(),
             )
             .await
             .expect("Failed to query account_nfts");
-        let nfts_result: results::account_nfts::AccountNfts<'_> =
-            nfts_response.try_into().expect("Failed to parse account_nfts");
+        let nfts_result: results::account_nfts::AccountNfts<'_> = nfts_response
+            .try_into()
+            .expect("Failed to parse account_nfts");
 
         assert_eq!(nfts_result.nfts.len(), 1, "Expected one NFT after mint");
         let nftoken_id = nfts_result.nfts[0].nft_id.to_string();
@@ -103,8 +100,9 @@ async fn test_nftoken_accept_offer_sell() {
             .request(NftSellOffers::new(None, nftoken_id.clone().into()).into())
             .await
             .expect("Failed to query nft_sell_offers");
-        let offers_result: results::nft_sell_offers::NFTSellOffers<'_> =
-            offers_response.try_into().expect("Failed to parse nft_sell_offers");
+        let offers_result: results::nft_sell_offers::NFTSellOffers<'_> = offers_response
+            .try_into()
+            .expect("Failed to parse nft_sell_offers");
 
         assert_eq!(offers_result.offers.len(), 1, "Expected one sell offer");
         let offer_id = offers_result.offers[0].nft_offer_index.to_string();

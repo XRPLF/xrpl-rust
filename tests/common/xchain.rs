@@ -53,14 +53,14 @@ pub async fn setup_bridge() -> XChainBridgeSetup {
     // No flags; standard 9 common-field order.
     let mut bridge_tx = XChainCreateBridge::new(
         door_wallet.classic_address.clone().into(),
-        None, // account_txn_id
-        None, // fee
-        None, // last_ledger_sequence
-        None, // memos
-        None, // sequence
-        None, // signers
-        None, // source_tag
-        None, // ticket_sequence
+        None,                                      // account_txn_id
+        None,                                      // fee
+        None,                                      // last_ledger_sequence
+        None,                                      // memos
+        None,                                      // sequence
+        None,                                      // signers
+        None,                                      // source_tag
+        None,                                      // ticket_sequence
         Amount::XRPAmount(XRPAmount::from("200")), // signature_reward
         XChainBridge {
             issuing_chain_door: GENESIS_ACCOUNT.into(),

@@ -8,7 +8,9 @@
 // rippled requires the issuer account to exist (tecNO_ISSUER otherwise).
 
 use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
-use xrpl::models::{transactions::offer_create::OfferCreate, Amount, IssuedCurrencyAmount, XRPAmount};
+use xrpl::models::{
+    transactions::offer_create::OfferCreate, Amount, IssuedCurrencyAmount, XRPAmount,
+};
 
 #[tokio::test]
 async fn test_offer_create_base() {

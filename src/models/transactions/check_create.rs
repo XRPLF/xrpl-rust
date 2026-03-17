@@ -6,12 +6,12 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
-use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 use crate::models::{
-    Model,
     amount::Amount,
     transactions::{Transaction, TransactionType},
+    Model,
 };
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 
 use super::{CommonTransactionBuilder, Memo, Signer};
 

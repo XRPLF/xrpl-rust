@@ -9,14 +9,14 @@
 // The attestation payload differs from XChainAddClaimAttestation:
 //   it includes XChainAccountCreateCount and SignatureReward instead of XChainClaimID.
 
-use crate::common::{test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
+use crate::common::{test_transaction, with_blockchain_lock};
+use serde::Serialize;
 use xrpl::core::binarycodec::encode;
 use xrpl::core::keypairs::sign;
 use xrpl::models::transactions::xchain_add_account_create_attestation::XChainAddAccountCreateAttestation;
 use xrpl::models::{Amount, Currency, XChainBridge, XRPAmount, XRP};
 use xrpl::wallet::Wallet;
-use serde::Serialize;
 
 /// Attestation payload for XChainAddAccountCreateAttestation.
 #[derive(Serialize)]
@@ -78,8 +78,15 @@ async fn test_xchain_add_account_create_attestation_base() {
         // XChainAddAccountCreateAttestation — witness submits the signed attestation
         let mut tx = XChainAddAccountCreateAttestation::new(
             bridge_setup.witness_wallet.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
-            Amount::XRPAmount(XRPAmount::from(amount_drops)),           // amount
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Amount::XRPAmount(XRPAmount::from(amount_drops)), // amount
             bridge_setup.witness_wallet.classic_address.clone().into(), // attestation_reward_account
             bridge_setup.witness_wallet.classic_address.clone().into(), // attestation_signer_account
             dest_wallet.classic_address.clone().into(),                 // destination
@@ -87,8 +94,8 @@ async fn test_xchain_add_account_create_attestation_base() {
             bridge_setup.witness_wallet.public_key.clone().into(),      // public_key
             attestation_sig.into(),                                     // signature
             Amount::XRPAmount(XRPAmount::from(bridge_setup.signature_reward.as_str())), // signature_reward
-            0,                                                           // was_locking_chain_send
-            "1".into(),                                                  // xchain_account_create_count
+            0,          // was_locking_chain_send
+            "1".into(), // xchain_account_create_count
             bridge_setup.bridge(),
         );
 

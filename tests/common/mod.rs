@@ -19,10 +19,7 @@ use tokio::net::TcpStream;
 use url::Url;
 #[cfg(feature = "websocket")]
 use xrpl::asynch::clients::{AsyncWebSocketClient, SingleExecutorMutex, WebSocketOpen};
-use xrpl::{
-    asynch::clients::AsyncJsonRpcClient,
-    wallet::Wallet,
-};
+use xrpl::{asynch::clients::AsyncJsonRpcClient, wallet::Wallet};
 
 /// Genesis account seed (standalone rippled only).
 /// Address: rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh
@@ -32,7 +29,6 @@ const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
 /// HTTP JSON-RPC endpoint for local Docker standalone mode.
 #[cfg(feature = "std")]
 const STANDALONE_URL: &str = "http://localhost:5005";
-
 
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub async fn open_websocket(
@@ -81,9 +77,7 @@ static TEST_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 #[cfg(feature = "std")]
 pub async fn get_client() -> &'static AsyncJsonRpcClient {
     CLIENT
-        .get_or_init(|| async {
-            AsyncJsonRpcClient::connect(Url::parse(STANDALONE_URL).unwrap())
-        })
+        .get_or_init(|| async { AsyncJsonRpcClient::connect(Url::parse(STANDALONE_URL).unwrap()) })
         .await
 }
 
@@ -100,15 +94,15 @@ pub async fn generate_funded_wallet() -> Wallet {
 
     let mut payment = Payment::new(
         genesis.classic_address.clone().into(),
-        None, // account_txn_id
-        None, // fee
-        None, // flags
-        None, // last_ledger_sequence
-        None, // memos
-        None, // sequence
-        None, // signers
-        None, // source_tag
-        None, // ticket_sequence
+        None,                                            // account_txn_id
+        None,                                            // fee
+        None,                                            // flags
+        None,                                            // last_ledger_sequence
+        None,                                            // memos
+        None,                                            // sequence
+        None,                                            // signers
+        None,                                            // source_tag
+        None,                                            // ticket_sequence
         Amount::XRPAmount(XRPAmount::from("400000000")), // 400 XRP
         new_wallet.classic_address.clone().into(),
         None, // deliver_min
@@ -146,17 +140,23 @@ pub async fn get_ledger_close_time() -> u64 {
     let response = client
         .request(
             Ledger::new(
-                None, None, None, None, None, None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
                 Some("validated".into()),
-                None, None, None,
+                None,
+                None,
+                None,
             )
             .into(),
         )
         .await
         .expect("Failed to get validated ledger");
-    let ledger_result: results::ledger::Ledger<'_> = response
-        .try_into()
-        .expect("Failed to parse ledger result");
+    let ledger_result: results::ledger::Ledger<'_> =
+        response.try_into().expect("Failed to parse ledger result");
     ledger_result.ledger.close_time
 }
 
@@ -243,10 +243,12 @@ pub async fn get_escrow_offer_sequence(account: &str) -> u32 {
     match tx_result {
         results::tx::TxVersionMap::Default(tx) => tx.tx_json["Sequence"]
             .as_u64()
-            .expect("Sequence missing in tx_json") as u32,
+            .expect("Sequence missing in tx_json")
+            as u32,
         results::tx::TxVersionMap::V1(tx) => tx.tx_json["Sequence"]
             .as_u64()
-            .expect("Sequence missing in tx_json (V1)") as u32,
+            .expect("Sequence missing in tx_json (V1)")
+            as u32,
     }
 }
 
@@ -261,12 +263,7 @@ where
         + serde::de::DeserializeOwned
         + Clone
         + core::fmt::Debug,
-    F: strum::IntoEnumIterator
-        + serde::Serialize
-        + core::fmt::Debug
-        + PartialEq
-        + Clone
-        + 'a,
+    F: strum::IntoEnumIterator + serde::Serialize + core::fmt::Debug + PartialEq + Clone + 'a,
 {
     use xrpl::asynch::transaction::sign_and_submit;
     let client = get_client().await;

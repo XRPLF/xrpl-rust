@@ -5,8 +5,8 @@
 //
 // NOTE: XChainModifyBridge has `flags` at position 4 (custom flags enum).
 
-use crate::common::{test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
+use crate::common::{test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::xchain_modify_bridge::XChainModifyBridge;
 use xrpl::models::{Amount, XRPAmount};
 
@@ -19,17 +19,17 @@ async fn test_xchain_modify_bridge_base() {
         // XChainModifyBridge has flags at position 4.
         let mut tx = XChainModifyBridge::new(
             bridge.door_wallet.classic_address.clone().into(),
-            None,         // account_txn_id
-            None,         // fee
-            None,         // flags (position 4)
-            None,         // last_ledger_sequence
-            None,         // memos
-            None,         // sequence
-            None,         // signers
-            None,         // source_tag
-            None,         // ticket_sequence
+            None, // account_txn_id
+            None, // fee
+            None, // flags (position 4)
+            None, // last_ledger_sequence
+            None, // memos
+            None, // sequence
+            None, // signers
+            None, // source_tag
+            None, // ticket_sequence
             bridge.bridge(),
-            None,                                      // min_account_create_amount
+            None,                                            // min_account_create_amount
             Some(Amount::XRPAmount(XRPAmount::from("300"))), // signature_reward
         );
 

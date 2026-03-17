@@ -6,8 +6,8 @@
 // NOTE: XChainCreateClaimID has NO flags; standard 9 common-field order.
 // Requires a bridge to already exist (uses setup_bridge helper).
 
-use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
+use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::xchain_create_claim_id::XChainCreateClaimID;
 use xrpl::models::XRPAmount;
 use xrpl::wallet::Wallet;
@@ -27,16 +27,16 @@ async fn test_xchain_create_claim_id_base() {
 
         let mut tx = XChainCreateClaimID::new(
             holder.classic_address.clone().into(),
-            None, // account_txn_id
-            None, // fee
-            None, // last_ledger_sequence
-            None, // memos
-            None, // sequence
-            None, // signers
-            None, // source_tag
-            None, // ticket_sequence
-            other_wallet.classic_address.clone().into(),        // other_chain_source
-            XRPAmount::from(bridge.signature_reward.as_str()),  // signature_reward
+            None,                                              // account_txn_id
+            None,                                              // fee
+            None,                                              // last_ledger_sequence
+            None,                                              // memos
+            None,                                              // sequence
+            None,                                              // signers
+            None,                                              // source_tag
+            None,                                              // ticket_sequence
+            other_wallet.classic_address.clone().into(),       // other_chain_source
+            XRPAmount::from(bridge.signature_reward.as_str()), // signature_reward
             bridge.bridge(),
         );
 

@@ -12,7 +12,9 @@
 // NOTE: xrpl.js computes the channel ID via hashPaymentChannel(). We read it from
 // account_objects instead since xrpl-rust has no equivalent utility.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
+};
 use xrpl::asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit};
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
@@ -69,8 +71,9 @@ async fn test_payment_channel_claim_base() {
             )
             .await
             .expect("Failed to query account_objects");
-        let ao_result: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("Failed to parse account_objects");
+        let ao_result: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("Failed to parse account_objects");
 
         assert_eq!(ao_result.account_objects.len(), 1, "Expected one channel");
 

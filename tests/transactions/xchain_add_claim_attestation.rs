@@ -13,8 +13,11 @@
 //   3. Hex-decode to bytes.
 //   4. Sign bytes with xrpl::core::keypairs::sign using the witness private key.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock};
 use crate::common::xchain::setup_bridge;
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
+};
+use serde::Serialize;
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::core::binarycodec::encode;
 use xrpl::core::keypairs::sign;
@@ -22,7 +25,6 @@ use xrpl::models::transactions::xchain_add_claim_attestation::XChainAddClaimAtte
 use xrpl::models::transactions::xchain_create_claim_id::XChainCreateClaimID;
 use xrpl::models::{Amount, Currency, XChainBridge, XRPAmount, XRP};
 use xrpl::wallet::Wallet;
-use serde::Serialize;
 
 /// Partial attestation payload that gets binary-encoded and signed.
 /// Field names are explicitly renamed to match XRPL canonical names.
@@ -58,20 +60,21 @@ async fn test_xchain_add_claim_attestation_base() {
         // Step 1: XChainCreateClaimID — reserves claim ID 1
         let mut claim_id_tx = XChainCreateClaimID::new(
             holder.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             other_wallet.classic_address.clone().into(),
             XRPAmount::from(bridge_setup.signature_reward.as_str()),
             bridge_setup.bridge(),
         );
-        sign_and_submit(
-            &mut claim_id_tx,
-            client,
-            &holder,
-            true,
-            true,
-        )
-        .await
-        .expect("XChainCreateClaimID failed");
+        sign_and_submit(&mut claim_id_tx, client, &holder, true, true)
+            .await
+            .expect("XChainCreateClaimID failed");
 
         ledger_accept().await;
 
@@ -98,14 +101,21 @@ async fn test_xchain_add_claim_attestation_base() {
         // Step 3: XChainAddClaimAttestation — witness submits the signed attestation
         let mut tx = XChainAddClaimAttestation::new(
             bridge_setup.witness_wallet.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             Amount::XRPAmount(XRPAmount::from("10000000")), // amount
             bridge_setup.witness_wallet.classic_address.clone().into(), // attestation_reward_account
             bridge_setup.witness_wallet.classic_address.clone().into(), // attestation_signer_account
             other_wallet.classic_address.clone().into(),                // other_chain_source
             bridge_setup.witness_wallet.public_key.clone().into(),      // public_key
             attestation_sig.into(),                                     // signature
-            0,                                                           // was_locking_chain_send
+            0,                                                          // was_locking_chain_send
             bridge_setup.bridge(),
             "1".into(), // xchain_claim_id
             None,       // destination (not included in base test)
