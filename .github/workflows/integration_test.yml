@@ -55,12 +55,14 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-integration-
 
       - name: Run integration tests
-        run: cargo test --features std,json-rpc,helpers --test integration_test
+        run: cargo test --release --features std,json-rpc,helpers,integration --test integration_test -- --test-threads=1
+        env:
+          RUST_BACKTRACE: 1
 
       - name: Stop rippled
         if: always()
