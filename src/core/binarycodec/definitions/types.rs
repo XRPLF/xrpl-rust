@@ -384,6 +384,21 @@ pub struct TransactionTypes {
     #[serde(rename = "XChainModifyBridge")]
     pub xchain_modify_bridge: i16,
 
+    pub set_hook: i16,
+    pub clawback: i16,
+    #[serde(rename = "AMMCreate")]
+    pub amm_create: i16,
+    #[serde(rename = "AMMDeposit")]
+    pub amm_deposit: i16,
+    #[serde(rename = "AMMWithdraw")]
+    pub amm_withdraw: i16,
+    #[serde(rename = "AMMVote")]
+    pub amm_vote: i16,
+    #[serde(rename = "AMMBid")]
+    pub amm_bid: i16,
+    #[serde(rename = "AMMDelete")]
+    pub amm_delete: i16,
+
     pub enable_amendment: i16,
     pub set_fee: i16,
     #[serde(rename = "UNLModify")]
