@@ -17,15 +17,15 @@ async fn test_set_regular_key_base() {
 
         let mut tx = SetRegularKey::new(
             wallet.classic_address.clone().into(),
-            None,                                                      // account_txn_id
-            None,                                                      // fee
-            None,                                                      // last_ledger_sequence
-            None,                                                      // memos
-            None,                                                      // sequence
-            None,                                                      // signers
-            None,                                                      // source_tag
-            None,                                                      // ticket_sequence
-            Some(key_wallet.classic_address.clone().into()),           // regular_key
+            None,                                            // account_txn_id
+            None,                                            // fee
+            None,                                            // last_ledger_sequence
+            None,                                            // memos
+            None,                                            // sequence
+            None,                                            // signers
+            None,                                            // source_tag
+            None,                                            // ticket_sequence
+            Some(key_wallet.classic_address.clone().into()), // regular_key
         );
 
         test_transaction(&mut tx, &wallet).await;
