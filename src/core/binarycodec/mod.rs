@@ -89,7 +89,7 @@ where
     Ok(hex_string)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
     use super::*;
     use crate::core::binarycodec::test_cases::load_additional_tx_fixtures;
