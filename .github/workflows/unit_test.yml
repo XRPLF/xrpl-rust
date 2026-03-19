@@ -7,47 +7,68 @@ on:
       - main
       - dev
 
-name: Unit
+name: Unit Test
 
 jobs:
-  build_and_test:
-    name: xrpl-rust
+  test:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build with default features
-        run: cargo build --release
-      - name: Build with no default features
-        run: cargo build --release --no-default-features
-      - name: Build for no_std
-        run: cargo build --release --no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc
-      - name: Build only core
-        run: cargo build --release --no-default-features --features core
-      - name: Build only wallet
-        run: cargo build --release --no-default-features --features wallet
-      - name: Build only models
-        run: cargo build --release --no-default-features --features models
-      - name: Build only helpers
-        run: cargo build --release --no-default-features --features websocket,json-rpc,helpers,tokio-rt
-      - name: Build only websocket
-        run: cargo build --release --no-default-features --features websocket
-      - name: Build only json-rpc
-        run: cargo build --release --no-default-features --features json-rpc
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
       - name: Test with default features
         run: cargo test --release
+        env:
+          RUST_BACKTRACE: 1
+
       - name: Test for no_std
         run: cargo test --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
+        env:
+          RUST_BACKTRACE: 1
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-coverage-
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
+
       - name: Generate coverage report
         run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+
       - name: Check coverage thresholds
         run: |
           cargo llvm-cov --all-features --summary-only \
             --fail-under-lines 80 \
             --fail-under-regions 75 \
             --fail-under-functions 80
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
