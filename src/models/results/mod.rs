@@ -111,6 +111,7 @@ impl XRPLOtherResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum XRPLResult<'a> {
     AccountChannels(account_channels::AccountChannels<'a>),
     AccountInfo(account_info::AccountInfoVersionMap<'a>),

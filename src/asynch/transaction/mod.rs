@@ -61,9 +61,9 @@ where
         let serialized_bytes = hex::decode(serialized_for_signing)?;
         let signature = keypairs_sign(&serialized_bytes, &wallet.private_key)?;
         let signer = Signer::new(
-            wallet.classic_address.clone().into(),
-            signature.into(),
-            wallet.public_key.clone().into(),
+            wallet.classic_address.clone(),
+            signature,
+            wallet.public_key.clone(),
         );
         transaction.get_mut_common_fields().signers = Some(vec![signer]);
 
@@ -437,10 +437,7 @@ where
     };
 
     if is_valid_xaddress(&account_address) {
-        let (address, tag, _) = match xaddress_to_classic_address(&account_address) {
-            Ok(t) => t,
-            Err(error) => return Err(error.into()),
-        };
+        let (address, tag, _) = xaddress_to_classic_address(&account_address)?;
         validate_transaction_has_field(prepared_transaction, account_field_name)?;
         set_transaction_field_value(prepared_transaction, account_field_name, address)?;
 
