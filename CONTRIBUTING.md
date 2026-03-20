@@ -59,10 +59,10 @@ For integration tests, we use a `rippled` node in standalone mode to test xrpl-r
 #### Unit Tests
 
 ```bash
-# Test the core feature for no_std
-cargo test --no-default-features --features core,models,utils
-# Test all features enabled
-cargo test --all-features
+# Test with default features
+cargo test --release
+# Test for no_std
+cargo test --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
 ```
 
 > Note that the tests will automatically run via pre-commit hook
@@ -74,16 +74,15 @@ From the `xrpl-rust` folder, run the following commands:
 ```bash
 # Sets up the rippled standalone Docker container — skip if you already have it running
 docker run -p 5005:5005 -p 6006:6006 --rm -it --name rippled_standalone \
-  --volume $PWD/.ci-config:/etc/opt/ripple/ \
   --entrypoint bash rippleci/rippled:develop \
   -c 'mkdir -p /var/lib/rippled/db/ && rippled -a'
-cargo test --features std --test integration_test
+cargo test --release --features integration,std,json-rpc,helpers
 ```
 
 To run a specific group of tests (e.g. escrow):
 
 ```bash
-cargo test --features std --test integration_test escrow
+cargo test --release --features integration,std,json-rpc,helpers escrow
 ```
 
 Breaking down the `docker run` command:
@@ -110,21 +109,21 @@ Install the tool and run a coverage report locally:
 
 ```bash
 cargo install cargo-llvm-cov --locked
-cargo llvm-cov --all-features --summary-only
+cargo llvm-cov --summary-only
 ```
 
-The CI enforces the following minimum thresholds (current baseline is ~85% lines / ~78% regions / ~85% functions):
+The CI enforces the following minimum thresholds (current baseline is ~78% lines / ~68% regions / ~75% functions, measured with default features only — integration tests are excluded from coverage):
 
 | Metric    | Minimum |
 |-----------|---------|
-| Lines     | 80%     |
-| Regions   | 75%     |
-| Functions | 80%     |
+| Lines     | 75%     |
+| Regions   | 65%     |
+| Functions | 72%     |
 
 To generate an HTML report and open it in a browser:
 
 ```bash
-cargo llvm-cov --all-features --open
+cargo llvm-cov --open
 ```
 
 ### Generate Documentation
