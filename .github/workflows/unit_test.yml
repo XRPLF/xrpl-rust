@@ -65,9 +65,9 @@ jobs:
       - name: Check coverage thresholds
         run: |
           cargo llvm-cov --summary-only \
-            --fail-under-lines 75 \
-            --fail-under-regions 65 \
-            --fail-under-functions 72
+            --fail-under-lines 73 \
+            --fail-under-regions 75 \
+            --fail-under-functions 67
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
