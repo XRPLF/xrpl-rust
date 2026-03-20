@@ -14,6 +14,7 @@ pub mod wallet;
 #[allow(unused_imports)]
 #[allow(clippy::needless_return)]
 #[allow(unused_variables)]
+#[allow(unreachable_code)]
 async fn wait_seconds(seconds: u64) {
     use core::time::Duration;
 

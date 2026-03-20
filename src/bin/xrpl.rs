@@ -1,4 +1,5 @@
 #[cfg(feature = "cli")]
+#[allow(clippy::result_large_err)]
 fn main() -> Result<(), xrpl::cli::CliError> {
     xrpl::cli::run()
 }

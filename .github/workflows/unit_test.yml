@@ -60,11 +60,11 @@ jobs:
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Generate coverage report
-        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+        run: cargo llvm-cov --lcov --output-path lcov.info
 
       - name: Check coverage thresholds
         run: |
-          cargo llvm-cov --all-features --summary-only \
+          cargo llvm-cov --summary-only \
             --fail-under-lines 80 \
             --fail-under-regions 75 \
             --fail-under-functions 80

@@ -26,7 +26,7 @@ fn compute_final_balance(node: &NormalizedNode) -> XRPLUtilsResult<Option<BigDec
             value = get_value(&balance.clone().into())?;
         }
     }
-    if value == BigDecimal::from(0) {
+    if value == 0 {
         return Ok(None);
     }
     Ok(Some(value))
