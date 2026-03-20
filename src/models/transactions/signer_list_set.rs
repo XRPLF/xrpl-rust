@@ -363,7 +363,7 @@ mod tests {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`"
+            "The field `signer_quorum` (10) must be below or equal to the sum of `signer_weight` in `signer_entries` (3)"
         );
 
         signer_list_set.signer_entries = Some(vec![
