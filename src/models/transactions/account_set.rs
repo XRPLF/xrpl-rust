@@ -253,8 +253,9 @@ impl<'a> AccountSetError for AccountSet<'a> {
     fn _get_clear_flag_error(&self) -> Result<(), XRPLModelException> {
         if let Some(clear_flag) = self.clear_flag {
             if self.set_flag.is_some() && self.clear_flag == self.set_flag {
-                return Err(XRPLAccountSetException::SetAndUnsetSameFlag { found: clear_flag }
-                    .into());
+                return Err(
+                    XRPLAccountSetException::SetAndUnsetSameFlag { found: clear_flag }.into(),
+                );
             }
         }
         Ok(())
