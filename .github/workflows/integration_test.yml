@@ -8,14 +8,14 @@ on:
       - main
       - dev
 
-name: Integration
+name: Integration Test
 
 env:
   RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop
 
 jobs:
-  integration:
-    name: xrpl-rust integration
+  integration_test:
+    name: Integration Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

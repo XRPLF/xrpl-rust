@@ -1,20 +1,24 @@
-on: 
+on:
   push:
     branches:
       - dev
   pull_request:
     branches:
       - main
+      - dev
+  schedule:
+    - cron: '0 0 * * *'
 
-name: Quality
+name: Quality Check
 
 jobs:
-  clippy_check:
+  quality_check:
+    name: Quality Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - run: rustup component add clippy
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Audit dependencies
+        run: cargo audit
