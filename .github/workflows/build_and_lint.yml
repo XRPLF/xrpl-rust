@@ -10,8 +10,8 @@ on:
 name: Build & Lint
 
 jobs:
-  lint:
-    name: Lint
+  build_and_lint:
+    name: Build & Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,9 +26,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-lint-
+            ${{ runner.os }}-cargo-build-lint-
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -36,47 +36,29 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-features -- -D warnings
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: default
-            features: ""
-          - name: no-default
-            features: "--no-default-features"
-          - name: no_std
-            features: "--no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc"
-          - name: core-only
-            features: "--no-default-features --features core"
-          - name: wallet-only
-            features: "--no-default-features --features wallet"
-          - name: models-only
-            features: "--no-default-features --features models"
-          - name: helpers-only
-            features: "--no-default-features --features websocket,json-rpc,helpers,tokio-rt"
-          - name: websocket-only
-            features: "--no-default-features --features websocket"
-          - name: json-rpc-only
-            features: "--no-default-features --features json-rpc"
+      - name: Build (default)
+        run: cargo build --release
 
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Build (no-default)
+        run: cargo build --release --no-default-features
 
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-build-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-build-${{ matrix.name }}-
+      - name: Build (no_std)
+        run: cargo build --release --no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc
 
-      - name: Build (${{ matrix.name }})
-        run: cargo build --release ${{ matrix.features }}
+      - name: Build (core-only)
+        run: cargo build --release --no-default-features --features core
 
+      - name: Build (wallet-only)
+        run: cargo build --release --no-default-features --features wallet
+
+      - name: Build (models-only)
+        run: cargo build --release --no-default-features --features models
+
+      - name: Build (helpers-only)
+        run: cargo build --release --no-default-features --features websocket,json-rpc,helpers,tokio-rt
+
+      - name: Build (websocket-only)
+        run: cargo build --release --no-default-features --features websocket
+
+      - name: Build (json-rpc-only)
+        run: cargo build --release --no-default-features --features json-rpc
