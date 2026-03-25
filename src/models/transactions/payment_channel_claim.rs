@@ -7,8 +7,8 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    Model, ValidateCurrencies,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies,
 };
 
 use crate::models::amount::XRPAmount;

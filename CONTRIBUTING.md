@@ -54,16 +54,77 @@ cargo clippy
 
 ### Running Tests
 
-To run tests:
+For integration tests, we use a `rippled` node in standalone mode to test xrpl-rust code against. To set this up, you can either configure and run `rippled` locally, or set up the Docker container `rippleci/rippled` by [following these instructions](#integration-tests). The latter will require you to [install Docker](https://docs.docker.com/get-docker/).
+
+#### Unit Tests
 
 ```bash
-# Test the core feature for no_std
-cargo test --no-default-features --features core,models,utils
-# Test all features enabled
-cargo test --all-features
+# Test with default features
+cargo test --release
+# Test for no_std
+cargo test --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
 ```
 
 > Note that the tests will automatically run via pre-commit hook
+
+#### Integration Tests
+
+From the `xrpl-rust` folder, run the following commands:
+
+```bash
+# Sets up the rippled standalone Docker container — skip if you already have it running
+docker run -p 5005:5005 -p 6006:6006 --rm -it --name rippled_standalone \
+  --entrypoint bash rippleci/rippled:develop \
+  -c 'mkdir -p /var/lib/rippled/db/ && rippled -a'
+cargo test --release --features integration,std,json-rpc,helpers
+```
+
+To run a specific group of tests (e.g. escrow):
+
+```bash
+cargo test --release --features integration,std,json-rpc,helpers escrow
+```
+
+Breaking down the `docker run` command:
+
+- `-p 5005:5005 -p 6006:6006` exposes the HTTP JSON-RPC and WebSocket admin ports.
+- `--rm` closes the container automatically when it exits.
+- `-it` keeps stdin open so you can stop the node with Ctrl-C.
+- `--name rippled_standalone` is an instance name for clarity.
+- `--volume $PWD/.ci-config:/etc/opt/ripple/` mounts `rippled.cfg` so the node binds on `0.0.0.0` and is reachable from the host. It must be an absolute path, so we use `$PWD` instead of `./`.
+- `rippleci/rippled` is an image that is regularly updated with the latest `rippled` releases.
+- `--entrypoint bash rippleci/rippled:develop` manually overrides the entrypoint (for the latest version of rippled on the `develop` branch).
+- `-c 'mkdir -p /var/lib/rippled/db/ && rippled -a'` starts `rippled` in standalone mode, where ledgers only close on demand.
+
+**Notes**
+
+- Integration tests are serialized via a global mutex — they do not run in
+  parallel, so it is safe to run the whole suite at once.
+
+### Coverage
+
+Coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov).
+
+Install the tool and run a coverage report locally:
+
+```bash
+cargo install cargo-llvm-cov --locked
+cargo llvm-cov --summary-only
+```
+
+The CI enforces the following minimum thresholds (current baseline is ~78% lines / ~68% regions / ~75% functions, measured with default features only — integration tests are excluded from coverage):
+
+| Metric    | Minimum |
+|-----------|---------|
+| Lines     | 75%     |
+| Regions   | 65%     |
+| Functions | 72%     |
+
+To generate an HTML report and open it in a browser:
+
+```bash
+cargo llvm-cov --open
+```
 
 ### Generate Documentation
 

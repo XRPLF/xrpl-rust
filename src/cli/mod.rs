@@ -480,15 +480,15 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             WalletCommands::Validate { address } => {
                 use crate::core::addresscodec::{is_valid_classic_address, is_valid_xaddress};
 
-                let is_valid_classic = is_valid_classic_address(&address);
-                let is_valid_x = is_valid_xaddress(&address);
+                let is_valid_classic = is_valid_classic_address(address);
+                let is_valid_x = is_valid_xaddress(address);
 
                 if is_valid_classic {
                     alloc::println!("Valid classic address: {}", address);
                     Ok(())
                 } else if is_valid_x {
                     use crate::core::addresscodec::xaddress_to_classic_address;
-                    let (classic_address, tag, is_test) = xaddress_to_classic_address(&address)?;
+                    let (classic_address, tag, is_test) = xaddress_to_classic_address(address)?;
                     alloc::println!("Valid X-address: {}", address);
                     alloc::println!("  Classic address: {}", classic_address);
                     alloc::println!("  Destination tag: {:?}", tag);
@@ -786,10 +786,10 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                 use crate::wallet::Wallet;
 
                 // Create wallet from seed
-                let wallet = Wallet::new(&seed, 0)?;
+                let wallet = Wallet::new(seed, 0)?;
 
                 // Parse the JSON
-                let json_value: Value = serde_json::from_str(&json)?;
+                let json_value: Value = serde_json::from_str(json)?;
 
                 use crate::asynch::transaction::sign;
 
@@ -857,8 +857,8 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             } => {
                 use alloc::borrow::Cow;
 
-                use crate::models::IssuedCurrencyAmount;
                 use crate::models::transactions::trust_set::TrustSet;
+                use crate::models::IssuedCurrencyAmount;
                 use crate::wallet::Wallet;
 
                 // Create wallet from seed
@@ -991,7 +991,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
         Commands::Server(server_cmd) => match server_cmd {
             #[cfg(feature = "std")]
             ServerCommands::Fee { url } => {
-                use crate::ledger::{FeeType, get_fee};
+                use crate::ledger::{get_fee, FeeType};
 
                 // Create a runtime and client
                 let rt = get_or_create_runtime()?;

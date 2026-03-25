@@ -1,4 +1,10 @@
-#[cfg(all(feature = "std", feature = "cli"))]
+//! CLI integration tests.
+//!
+//! Most tests run against Docker standalone rippled (localhost:5005).
+//! Genesis account is used for testing since it has unlimited XRP in standalone mode.
+//! Faucet tests use the public testnet since Docker standalone doesn't have a faucet.
+
+#[cfg(all(feature = "integration", feature = "std", feature = "cli"))]
 mod cli_tests {
     use std::io::{self};
     use std::process::{Command, Stdio};
@@ -6,16 +12,21 @@ mod cli_tests {
 
     /// Test-specific constants
     mod constants {
-        // Test URLs
-        pub const TEST_URL: &str = "https://s.altnet.rippletest.net:51234";
+        // Docker standalone JSON-RPC endpoint
+        pub const TEST_URL: &str = "http://localhost:5005";
 
-        // Test accounts
-        pub const TEST_SEED: &str = "sEdTM1uX8pu2do5XvTnutH6HsouMaM2";
+        // Public testnet for faucet tests only
+        pub const TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234";
+
+        // Genesis account (has unlimited XRP in standalone mode)
+        pub const TEST_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
         pub const TEST_CLASSIC_ADDRESS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // Genesis account
-        pub const TEST_FAUCET_ADDRESS: &str = "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe"; // Testnet faucet
         pub const TEST_X_ADDRESS: &str = "X7AcgcsBL6XDcUb289X4mJ8djcdyKaB5hJDWMArnXr61cqZ";
 
-        // Test transaction
+        // Test payment destination
+        pub const TEST_DESTINATION: &str = "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe";
+
+        // Test transaction using genesis account
         pub const TEST_PAYMENT_JSON: &str = r#"{
             "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
             "Amount": "1000000",
@@ -204,9 +215,11 @@ mod cli_tests {
         assert_wallet_output(&output);
     }
 
+    /// This test uses the public testnet since Docker standalone doesn't have a faucet.
     #[test]
     fn test_generate_faucet_wallet() {
-        let result = run_cli_command(&["wallet", "faucet", "--url", constants::TEST_URL]);
+        // Faucet tests must use public testnet - Docker standalone has no faucet
+        let result = run_cli_command(&["wallet", "faucet", "--url", constants::TESTNET_URL]);
 
         assert!(
             result.is_ok(),
@@ -249,14 +262,14 @@ mod cli_tests {
         let args = address_command_args(
             "account",
             "info",
-            constants::TEST_FAUCET_ADDRESS,
+            constants::TEST_CLASSIC_ADDRESS, // Genesis account in standalone
             Some(constants::TEST_URL),
             None,
         );
 
         let result = run_cli_command(&args);
 
-        // The account should exist since it's a known testnet account
+        // The account should exist since it's the genesis account
         assert!(
             result.is_ok(),
             "Failed to get account info: {:?}",
@@ -426,14 +439,14 @@ mod cli_tests {
 
     #[test]
     fn test_trustset_command() {
-        // Use testnet seed and issuer for safety
+        // Use genesis seed and a test destination as issuer
         let args = [
             "transaction",
             "trust-set",
             "--seed",
             constants::TEST_SEED,
             "--issuer",
-            constants::TEST_FAUCET_ADDRESS,
+            constants::TEST_DESTINATION,
             "--currency",
             "USD",
             "--limit",
