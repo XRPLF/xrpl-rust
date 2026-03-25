@@ -111,4 +111,3 @@ fn test_encode_invalid_fee_throws() {
     });
     assert!(encode(&tx).is_err());
 }
-

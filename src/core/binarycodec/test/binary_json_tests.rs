@@ -116,4 +116,3 @@ fn test_codec_fixtures_ledger_data() {
         );
     }
 }
-
