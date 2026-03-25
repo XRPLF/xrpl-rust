@@ -9,7 +9,7 @@ use crate::models::{
 use super::{CommonFields, Memo, Signer, Transaction, TransactionType};
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, xrpl_rust_macros::ValidateCurrencies)]
+#[derive(Debug, Clone, Serialize, Deserialize, xrpl_rust_macros::ValidateCurrencies)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainAddAccountCreateAttestation<'a> {
     #[serde(flatten)]

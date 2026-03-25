@@ -1,0 +1,17 @@
+version: "3"
+
+services:
+  rippled:
+    image: rippleci/rippled:develop
+    volumes:
+      - ./.ci-config:/etc/opt/ripple
+    ports:
+      - "5005:5005"
+      - "6006:6006"
+    entrypoint: bash
+    command: -c "mkdir -p /var/lib/rippled/db/ && rippled -a"
+    healthcheck:
+      test: ["CMD", "rippled", "server_info"]
+      interval: 5s
+      timeout: 2s
+      retries: 10

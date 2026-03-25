@@ -3,12 +3,12 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{FlagCollection, NoFlags};
 use crate::models::{
-    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
+use crate::models::{FlagCollection, NoFlags};
 
 use super::{CommonFields, CommonTransactionBuilder};
 

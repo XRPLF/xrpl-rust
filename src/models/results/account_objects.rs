@@ -23,8 +23,8 @@ pub struct AccountObjects<'a> {
     /// response. May be omitted.
     pub ledger_hash: Option<Cow<'a, str>>,
     /// The ledger index of the ledger version that was used to generate
-    /// this response. May be omitted if ledger_current_index is provided.
-    pub ledger_index: u32,
+    /// this response. Omitted if ledger_current_index is provided instead.
+    pub ledger_index: Option<u32>,
     /// The ledger index of the current in-progress ledger version, which was
     /// used to generate this response. May be omitted if ledger_hash or
     /// ledger_index is provided.
@@ -37,7 +37,8 @@ pub struct AccountObjects<'a> {
     pub marker: Option<Marker<'a>>,
     /// If true, the information in this response comes from a validated
     /// ledger version. Otherwise, the information is subject to change.
-    pub validated: bool,
+    /// Omitted for in-progress ledger responses.
+    pub validated: Option<bool>,
 }
 
 #[cfg(test)]
@@ -92,9 +93,9 @@ mod tests {
             account_objects.ledger_hash.unwrap(),
             "4C99E5F63C0D0B1C2283B4F5DCE2239F80CE92E8B1A6AED1E110C198FC96E659"
         );
-        assert_eq!(account_objects.ledger_index, 14380380);
+        assert_eq!(account_objects.ledger_index, Some(14380380));
         assert_eq!(account_objects.limit.unwrap(), 10);
-        assert!(account_objects.validated);
+        assert_eq!(account_objects.validated, Some(true));
 
         // Test account objects array
         assert_eq!(account_objects.account_objects.len(), 1);

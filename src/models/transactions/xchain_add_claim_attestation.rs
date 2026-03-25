@@ -7,7 +7,7 @@ use crate::models::{Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, 
 use super::{CommonFields, Transaction, TransactionType};
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, xrpl_rust_macros::ValidateCurrencies)]
+#[derive(Debug, Clone, Serialize, Deserialize, xrpl_rust_macros::ValidateCurrencies)]
 #[serde(rename_all = "PascalCase")]
 pub struct XChainAddClaimAttestation<'a> {
     #[serde(flatten)]
