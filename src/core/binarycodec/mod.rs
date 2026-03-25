@@ -88,3 +88,55 @@ where
 
     Ok(hex_string)
 }
+
+#[cfg(all(test, feature = "std"))]
+mod test {
+    use super::*;
+    use crate::core::binarycodec::test_cases::load_additional_tx_fixtures;
+
+    /// Test that transaction encoding matches expected binary from xrpl.js fixtures.
+    #[test]
+    fn test_encode_additional_fixtures() {
+        let fixtures = load_additional_tx_fixtures();
+        let total = fixtures.transactions.len();
+
+        println!(
+            "\n=== Running {} xrpl.js transaction fixture tests ===\n",
+            total
+        );
+
+        let mut passed = 0;
+        let mut failed = 0;
+
+        for (i, fixture) in fixtures.transactions.iter().enumerate() {
+            let result = encode(&fixture.json);
+
+            match result {
+                Ok(encoded) => {
+                    if encoded.to_uppercase() == fixture.binary.to_uppercase() {
+                        println!("  ✓ [{}/{}] {} passed", i + 1, total, fixture.name);
+                        passed += 1;
+                    } else {
+                        println!("  ✗ [{}/{}] {} MISMATCH", i + 1, total, fixture.name);
+                        println!("    Expected: {}", fixture.binary);
+                        println!("    Got:      {}", encoded);
+                        failed += 1;
+                    }
+                }
+                Err(e) => {
+                    println!("  ✗ [{}/{}] {} FAILED: {:?}", i + 1, total, fixture.name, e);
+                    failed += 1;
+                }
+            }
+        }
+
+        println!(
+            "\n=== Results: {} passed, {} failed out of {} ===\n",
+            passed, failed, total
+        );
+
+        if failed > 0 {
+            panic!("{} out of {} tests failed", failed, total);
+        }
+    }
+}

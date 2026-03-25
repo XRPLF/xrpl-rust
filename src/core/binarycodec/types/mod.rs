@@ -142,6 +142,9 @@ impl XRPLTypes {
                 "Amount" => Ok(Some(XRPLTypes::Amount(Self::amount_from_map(
                     value.to_owned(),
                 )?))),
+                "Issue" => Ok(Some(XRPLTypes::Issue(Issue::try_from(Value::Object(
+                    value.to_owned(),
+                ))?))),
                 "STObject" => Ok(Some(XRPLTypes::STObject(STObject::try_from_value(
                     Value::Object(value.to_owned()),
                     false,
@@ -157,6 +160,41 @@ impl XRPLTypes {
                 "STArray" => Ok(Some(XRPLTypes::STArray(STArray::try_from_value(
                     Value::Array(value.to_owned()),
                 )?))),
+                "PathSet" => {
+                    let cleaned_paths: Vec<Vec<Map<String, Value>>> = value
+                        .iter()
+                        .filter_map(|path| path.as_array())
+                        .map(|path| {
+                            path.iter()
+                                .filter_map(|step| step.as_object())
+                                .map(|step| {
+                                    let mut cleaned_step = Map::new();
+                                    for (key, val) in step.iter() {
+                                        // Only keep account, currency, and issuer fields
+                                        if key == "account" || key == "currency" || key == "issuer"
+                                        {
+                                            cleaned_step.insert(key.clone(), val.clone());
+                                        }
+                                    }
+                                    cleaned_step
+                                })
+                                .collect()
+                        })
+                        .collect();
+
+                    let json_str = serde_json::to_string(&cleaned_paths)
+                        .map_err(|_| exceptions::XRPLTypeException::UnknownXRPLType)?;
+                    Ok(Some(XRPLTypes::PathSet(PathSet::try_from(
+                        json_str.as_str(),
+                    )?)))
+                }
+                "Vector256" => {
+                    let hash_strings: Vec<&str> = value.iter().filter_map(|v| v.as_str()).collect();
+
+                    Ok(Some(XRPLTypes::Vector256(Vector256::try_from(
+                        hash_strings,
+                    )?)))
+                }
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else {
