@@ -1,15 +1,24 @@
 use super::definitions::*;
 use super::types::TryFromParser;
+use super::types::{
+    AccountId, Amount, Blob, Hash128, Hash160, Hash256, Issue, PathSet, STObject, Vector256,
+    XChainBridge,
+};
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::utils::*;
 use crate::core::exceptions::XRPLCoreException;
 use crate::core::exceptions::XRPLCoreResult;
 use crate::utils::ToBytes;
+use crate::XRPLSerdeJsonError;
 use alloc::borrow::ToOwned;
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::convert::TryInto;
+use hex::ToHex;
+use serde::Serialize;
+use serde_json::{Map, Value};
 
 /// Serializes JSON to XRPL binary format.
 pub type BinarySerializer = Vec<u8>;
@@ -672,6 +681,273 @@ impl Iterator for BinaryParser {
             Some(self.read_uint8().expect("BinaryParser::next"))
         }
     }
+}
+
+// =========================================================================
+// Internal serialization/deserialization functions
+// (mirrors xrpl.js binary.ts — not part of the public API)
+// =========================================================================
+
+pub(crate) const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
+pub(crate) const TRANSACTION_MULTISIG_PREFIX: [u8; 4] = (0x534D5400u32).to_be_bytes();
+
+/// UInt64 fields that should be decoded as base-10 strings instead of hex.
+const BASE10_UINT64_FIELDS: &[&str] = &[
+    "MaximumAmount",
+    "OutstandingAmount",
+    "MPTAmount",
+    "LockedAmount",
+];
+
+/// Serialize a JSON transaction to hex-encoded binary.
+pub(crate) fn serialize_json<T>(
+    prepared_transaction: &T,
+    prefix: Option<&[u8]>,
+    suffix: Option<&[u8]>,
+    signing_only: bool,
+) -> XRPLCoreResult<String>
+where
+    T: Serialize,
+{
+    let mut buffer = Vec::new();
+    if let Some(p) = prefix {
+        buffer.extend(p);
+    }
+
+    let json_value =
+        serde_json::to_value(prepared_transaction).map_err(XRPLSerdeJsonError::from)?;
+    let st_object = STObject::try_from_value(json_value, signing_only)?;
+    buffer.extend(st_object.as_ref());
+
+    if let Some(s) = suffix {
+        buffer.extend(s);
+    }
+    let hex_string = buffer.encode_hex_upper::<String>();
+
+    Ok(hex_string)
+}
+
+/// Decode a single field value from a BinaryParser based on the field's type.
+/// Returns the JSON value for the field.
+fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLCoreResult<Value> {
+    let type_name = field.associated_type.as_str();
+
+    // Handle VL prefix for variable-length encoded fields
+    let length = if field.is_vl_encoded {
+        Some(parser.read_length_prefix()?)
+    } else {
+        None
+    };
+
+    match type_name {
+        "AccountID" => {
+            let account = AccountId::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&account).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Amount" => {
+            let amount = Amount::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&amount).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Blob" => {
+            let blob = Blob::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&blob).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Hash128" => {
+            let hash = Hash128::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&hash).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Hash160" => {
+            let hash = Hash160::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&hash).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Hash256" => {
+            let hash = Hash256::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&hash).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "UInt8" => {
+            let val = parser.read_uint8()?;
+            if field.name == "TransactionResult" {
+                let code = val as i16;
+                if let Some(name) = get_transaction_result_name(&code) {
+                    return Ok(Value::String(name.clone()));
+                }
+            }
+            Ok(Value::Number(val.into()))
+        }
+        "UInt16" => {
+            let val = parser.read_uint16()?;
+            if field.name == "TransactionType" {
+                let code = val as i16;
+                if let Some(name) = get_transaction_type_name(&code) {
+                    return Ok(Value::String(name.clone()));
+                }
+            } else if field.name == "LedgerEntryType" {
+                let code = val as i16;
+                if let Some(name) = get_ledger_entry_type_name(&code) {
+                    return Ok(Value::String(name.clone()));
+                }
+            } else if field.name == "TransactionResult" {
+                let code = val as i16;
+                if let Some(name) = get_transaction_result_name(&code) {
+                    return Ok(Value::String(name.clone()));
+                }
+            }
+            Ok(Value::Number(val.into()))
+        }
+        "UInt32" => {
+            let val = parser.read_uint32()?;
+            if field.name == "PermissionValue" {
+                let code = val as i32;
+                if let Some(name) = get_delegatable_permission_name(&code) {
+                    return Ok(Value::String(name.clone()));
+                }
+            }
+            Ok(Value::Number(val.into()))
+        }
+        "UInt64" => {
+            let bytes = parser.read(8)?;
+            if BASE10_UINT64_FIELDS.contains(&field.name.as_str()) {
+                let val = u64::from_be_bytes(
+                    bytes
+                        .as_slice()
+                        .try_into()
+                        .map_err(|_| XRPLBinaryCodecException::InvalidReadFromBytesValue)?,
+                );
+                Ok(Value::String(val.to_string()))
+            } else {
+                Ok(Value::String(hex::encode_upper(&bytes)))
+            }
+        }
+        "STObject" => decode_st_object(parser, true),
+        "STArray" => decode_st_array(parser),
+        "PathSet" => {
+            let path_set = PathSet::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&path_set).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Vector256" => {
+            let vector = Vector256::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&vector).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Currency" => {
+            let currency = crate::core::binarycodec::types::Currency::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&currency).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Issue" => {
+            let issue = Issue::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&issue).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "XChainBridge" => {
+            let bridge = XChainBridge::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&bridge).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Number" => {
+            let number = crate::core::binarycodec::types::Number::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&number).map_err(XRPLSerdeJsonError::from)?)
+        }
+        _ => {
+            if let Some(len) = length {
+                let bytes = parser.read(len)?;
+                Ok(Value::String(hex::encode_upper(&bytes)))
+            } else {
+                Ok(Value::Null)
+            }
+        }
+    }
+}
+
+/// Decode an STObject from the parser. Reads fields until ObjectEndMarker (0xE1)
+/// or end of parser data.
+pub(crate) fn decode_st_object(
+    parser: &mut BinaryParser,
+    _is_inner: bool,
+) -> XRPLCoreResult<Value> {
+    let mut accumulator = Map::new();
+
+    while !parser.is_end(None) {
+        let field = parser.read_field()?;
+
+        if field.name == "ObjectEndMarker" {
+            break;
+        }
+
+        let value = decode_field_value(parser, &field)?;
+        accumulator.insert(field.name, value);
+    }
+
+    Ok(Value::Object(accumulator))
+}
+
+/// Decode an STArray from the parser. Reads wrapper objects until
+/// ArrayEndMarker (0xF1) or end of parser data.
+fn decode_st_array(parser: &mut BinaryParser) -> XRPLCoreResult<Value> {
+    let mut result: Vec<Value> = Vec::new();
+
+    while !parser.is_end(None) {
+        let field = parser.read_field()?;
+
+        if field.name == "ArrayEndMarker" {
+            break;
+        }
+
+        let inner = decode_st_object(parser, true)?;
+        let mut wrapper = Map::new();
+        wrapper.insert(field.name, inner);
+        result.push(Value::Object(wrapper));
+    }
+
+    Ok(Value::Array(result))
+}
+
+/// Decode a serialized ledger header from hex into JSON.
+pub(crate) fn decode_ledger_data_inner(hex_string: &str) -> XRPLCoreResult<Value> {
+    let mut parser = BinaryParser::try_from(hex_string)?;
+
+    let ledger_index = parser.read_uint32()?;
+
+    let coins_bytes = parser.read(8)?;
+    let total_coins = u64::from_be_bytes(
+        coins_bytes
+            .as_slice()
+            .try_into()
+            .map_err(|_| XRPLBinaryCodecException::InvalidReadFromBytesValue)?,
+    );
+
+    let parent_hash_bytes = parser.read(32)?;
+    let transaction_hash_bytes = parser.read(32)?;
+    let account_hash_bytes = parser.read(32)?;
+
+    let parent_close_time = parser.read_uint32()?;
+    let close_time = parser.read_uint32()?;
+    let close_time_resolution = parser.read_uint8()?;
+    let close_flags = parser.read_uint8()?;
+
+    let mut map = Map::new();
+    map.insert("ledger_index".into(), Value::Number(ledger_index.into()));
+    map.insert("total_coins".into(), Value::String(total_coins.to_string()));
+    map.insert(
+        "parent_hash".into(),
+        Value::String(hex::encode_upper(&parent_hash_bytes)),
+    );
+    map.insert(
+        "transaction_hash".into(),
+        Value::String(hex::encode_upper(&transaction_hash_bytes)),
+    );
+    map.insert(
+        "account_hash".into(),
+        Value::String(hex::encode_upper(&account_hash_bytes)),
+    );
+    map.insert(
+        "parent_close_time".into(),
+        Value::Number(parent_close_time.into()),
+    );
+    map.insert("close_time".into(), Value::Number(close_time.into()));
+    map.insert(
+        "close_time_resolution".into(),
+        Value::Number(close_time_resolution.into()),
+    );
+    map.insert("close_flags".into(), Value::Number(close_flags.into()));
+
+    Ok(Value::Object(map))
 }
 
 #[cfg(test)]
