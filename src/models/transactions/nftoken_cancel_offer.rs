@@ -5,11 +5,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLNFTokenCancelOfferException;
-use crate::models::{FlagCollection, NoFlags, ValidateCurrencies, XRPLModelResult};
 use crate::models::{
-    Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -40,7 +40,10 @@ pub struct NFTokenCancelOffer<'a> {
     /// objects, but the IDs of the NFTokenOffer objects). Each entry must be a
     /// different object ID of an NFTokenOffer object; the transaction is invalid
     /// if the array contains duplicate entries.
-    #[serde(borrow)]
+    ///
+    /// Note: `#[serde(borrow)]` is intentionally omitted here so that this field
+    /// deserializes as owned Strings (Cow::Owned), satisfying the `DeserializeOwned`
+    /// bound required by `submit_and_wait` and related helpers.
     #[serde(rename = "NFTokenOffers")]
     pub nftoken_offers: Vec<Cow<'a, str>>,
 }

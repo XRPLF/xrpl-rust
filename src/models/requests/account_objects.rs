@@ -12,7 +12,6 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display, EnumString)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[serde(tag = "type")]
 pub enum AccountObjectType {
     Check,
     DepositPreauth,

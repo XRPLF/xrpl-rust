@@ -66,7 +66,7 @@ impl Serialize for Vector256 {
     where
         S: Serializer,
     {
-        if self.0.len() % _HASH_LENGTH_BYTES != 0 {
+        if !self.0.len().is_multiple_of(_HASH_LENGTH_BYTES) {
             Err(S::Error::custom(XRPLVectorException::InvalidVector256Bytes))
         } else {
             let mut sequence = serializer.serialize_seq(None)?;

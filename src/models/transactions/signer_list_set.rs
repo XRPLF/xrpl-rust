@@ -4,17 +4,17 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use derive_new::new;
-use serde::{Deserialize, Serialize, ser::SerializeMap};
+use serde::{ser::SerializeMap, Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::FlagCollection;
 use crate::models::NoFlags;
 use crate::models::XRPLModelResult;
-use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::{
-    Model, ValidateCurrencies,
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies,
 };
 use crate::serde_with_tag;
 
@@ -131,8 +131,8 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
     fn _get_signer_quorum_error(&self) -> XRPLModelResult<()> {
         let mut accounts = Vec::new();
         let mut signer_weight_sum: u32 = 0;
-        if self.signer_entries.is_some() {
-            for signer_entry in self.signer_entries.as_ref().unwrap() {
+        if let Some(signer_entries) = &self.signer_entries {
+            for signer_entry in signer_entries {
                 accounts.push(&signer_entry.account);
                 let weight: u32 = signer_entry.signer_weight.into();
                 signer_weight_sum += weight;
@@ -363,7 +363,7 @@ mod tests {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`"
+            "The field `signer_quorum` (10) must be below or equal to the sum of `signer_weight` in `signer_entries` (3)"
         );
 
         signer_list_set.signer_entries = Some(vec![
