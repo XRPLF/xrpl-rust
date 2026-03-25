@@ -7,6 +7,7 @@ pub mod currency;
 pub mod exceptions;
 pub mod hash;
 pub mod issue;
+pub mod number;
 pub mod paths;
 pub(crate) mod test_cases;
 pub mod utils;
@@ -28,6 +29,7 @@ pub use self::hash::Hash128;
 pub use self::hash::Hash160;
 pub use self::hash::Hash256;
 pub use self::issue::Issue;
+pub use self::number::Number;
 pub use self::paths::Path;
 pub use self::paths::PathSet;
 pub use self::paths::PathStep;
@@ -35,7 +37,9 @@ pub use self::vector256::Vector256;
 pub use self::xchain_bridge::XChainBridge;
 
 use crate::core::binarycodec::binary_wrappers::Serialization;
+use crate::core::binarycodec::definitions::get_delegatable_permission_code;
 use crate::core::binarycodec::definitions::get_field_instance;
+use crate::core::binarycodec::definitions::get_ledger_entry_type_code;
 use crate::core::binarycodec::definitions::get_transaction_result_code;
 use crate::core::binarycodec::definitions::get_transaction_type_code;
 use crate::core::binarycodec::definitions::FieldInstance;
@@ -76,6 +80,7 @@ pub enum XRPLTypes {
     Hash160(Hash160),
     Hash256(Hash256),
     Issue(Issue),
+    Number(Number),
     Path(Path),
     PathSet(PathSet),
     PathStep(PathStep),
@@ -121,10 +126,9 @@ impl XRPLTypes {
                         .map_err(XRPLTypeException::ParseIntError)?,
                 ))),
                 "UInt64" => Ok(Some(XRPLTypes::UInt64(
-                    value
-                        .parse::<u64>()
-                        .map_err(XRPLTypeException::ParseIntError)?,
+                    u64::from_str_radix(value, 16).map_err(XRPLTypeException::ParseIntError)?,
                 ))),
+                "Number" => Ok(Some(XRPLTypes::Number(Number::try_from(value)?))),
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_u64() {
@@ -249,6 +253,7 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::UInt64(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::XChainBridge(x_chain_bridge) => SerializedType::from(x_chain_bridge),
             XRPLTypes::Issue(issue) => SerializedType::from(issue),
+            XRPLTypes::Number(number) => SerializedType::from(number.as_ref().to_vec()),
             XRPLTypes::Unknown => SerializedType(vec![]),
         }
     }
@@ -438,7 +443,7 @@ impl STObject {
                         Value::Number(transaction_result_code.to_owned().into()),
                     );
                 } else if field == "LedgerEntryType" {
-                    let ledger_entry_type_code = match get_transaction_type_code(value) {
+                    let ledger_entry_type_code = match get_ledger_entry_type_code(value) {
                         Some(code) => code,
                         None => {
                             return Err(
@@ -453,6 +458,20 @@ impl STObject {
                         field.to_owned(),
                         Value::Number(ledger_entry_type_code.to_owned().into()),
                     );
+                } else if field == "PermissionValue" {
+                    let permission_code = match get_delegatable_permission_code(value) {
+                        Some(code) => code,
+                        None => {
+                            return Err(
+                                exceptions::XRPLSerializeMapException::UnknownTransactionType(
+                                    value.to_string(),
+                                )
+                                .into(),
+                            )
+                        }
+                    };
+                    value_xaddress_handled
+                        .insert(field.to_owned(), Value::Number((*permission_code).into()));
                 } else {
                     value_xaddress_handled
                         .insert(field.to_owned(), Value::String(value.to_owned()));

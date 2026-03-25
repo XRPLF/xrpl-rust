@@ -16,7 +16,7 @@ use crate::core::Parser;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::fmt::Display;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 
 /// Codec for serializing and deserializing a hash field
 /// with a width of 128 bits (16 bytes).
@@ -303,6 +303,33 @@ impl Display for Hash256 {
     /// Get the hex representation of the Hash256 bytes.
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{}", hex::encode_upper(self.as_ref()))
+    }
+}
+
+impl Serialize for Hash128 {
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode_upper(self.as_ref()))
+    }
+}
+
+impl Serialize for Hash160 {
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode_upper(self.as_ref()))
+    }
+}
+
+impl Serialize for Hash256 {
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode_upper(self.as_ref()))
     }
 }
 

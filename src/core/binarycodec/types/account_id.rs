@@ -42,10 +42,15 @@ impl TryFromParser for AccountId {
     type Error = XRPLCoreException;
 
     /// Build AccountId from a BinaryParser.
+    /// When length is Some(0), returns the zero account (20 zero bytes),
+    /// matching xrpl.js behavior for pseudo-transactions like UNLModify.
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
     ) -> Result<AccountId, Self::Error> {
+        if length == Some(0) {
+            return AccountId::new(Some(&[0u8; ACCOUNT_ID_LENGTH]));
+        }
         Ok(AccountId(Hash160::from_parser(parser, length)?))
     }
 }
@@ -78,7 +83,12 @@ impl TryFrom<&str> for AccountId {
         } else if is_valid_classic_address(value) {
             Self::new(Some(&decode_classic_address(value)?))
         } else if is_valid_xaddress(value) {
-            let (classic_address, _, _) = xaddress_to_classic_address(value)?;
+            let (classic_address, tag, _) = xaddress_to_classic_address(value)?;
+            if tag.is_some() {
+                return Err(XRPLCoreException::XRPLAddressCodecError(
+                    XRPLAddressCodecException::InvalidClassicAddressValue,
+                ));
+            }
             Self::new(Some(&decode_classic_address(&classic_address)?))
         } else {
             Err(XRPLCoreException::XRPLAddressCodecError(
