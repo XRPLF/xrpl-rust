@@ -50,16 +50,16 @@ impl TryFromParser for Number {
 fn extract_parts(val: &str) -> Result<(i128, i32, bool), XRPLCoreException> {
     // Regex-like manual parsing: [+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?
     let val = val.trim();
-    let (sign, rest) = if val.starts_with('-') {
-        (true, &val[1..])
-    } else if val.starts_with('+') {
-        (false, &val[1..])
+    let (sign, rest) = if let Some(stripped) = val.strip_prefix('-') {
+        (true, stripped)
+    } else if let Some(stripped) = val.strip_prefix('+') {
+        (false, stripped)
     } else {
         (false, val)
     };
 
     // Split on 'e' or 'E'
-    let (num_part, exp_part) = if let Some(pos) = rest.find(|c| c == 'e' || c == 'E') {
+    let (num_part, exp_part) = if let Some(pos) = rest.find(['e', 'E']) {
         (&rest[..pos], Some(&rest[pos + 1..]))
     } else {
         (rest, None)
