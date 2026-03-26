@@ -91,7 +91,6 @@ pub struct CodecFixtureEntry {
     pub json: Value,
 }
 
-/// The top-level codec-fixtures.json structure matching xrpl.js.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CodecFixtures {
     #[serde(rename = "accountState")]
@@ -101,7 +100,7 @@ pub struct CodecFixtures {
     pub ledger_data: Vec<CodecFixtureEntry>,
 }
 
-/// Load codec-fixtures.json (the primary xrpl.js test fixture file).
+/// Load codec-fixtures.json.
 pub fn load_codec_fixtures() -> &'static CodecFixtures {
     pub const CODEC_FIXTURES: &str = include_str!("./test_data/codec-fixtures.json");
 
@@ -126,7 +125,6 @@ pub struct XCodecFixtureEntry {
     pub xjson: Value,
 }
 
-/// The top-level x-codec-fixtures.json structure matching xrpl.js.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct XCodecFixtures {
     pub transactions: Vec<XCodecFixtureEntry>,

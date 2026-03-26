@@ -1,4 +1,4 @@
-//! X-Address tests (mirrors xrpl.js x-address.test.ts)
+//! X-Address tests
 
 use super::*;
 use crate::core::binarycodec::test_cases::load_x_codec_fixtures;

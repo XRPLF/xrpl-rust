@@ -1,9 +1,8 @@
 //! Functions for encoding objects into the XRP Ledger's
 //! canonical binary format and decoding them.
 //!
-//! This module is the public API entry point (mirrors xrpl.js `index.ts`).
+//! This module is the public API entry point.
 //! Internal serialization/deserialization logic lives in `binary_wrappers`
-//! (mirrors xrpl.js `binary.ts`).
 
 pub mod definitions;
 pub mod types;

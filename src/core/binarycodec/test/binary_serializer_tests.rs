@@ -1,4 +1,4 @@
-//! Binary Serializer tests (mirrors xrpl.js binary-serializer.test.ts)
+//! Binary Serializer tests
 
 use super::*;
 use crate::core::binarycodec::test_cases::load_whole_objects;

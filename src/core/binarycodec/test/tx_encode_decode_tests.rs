@@ -1,4 +1,4 @@
-//! Round-trip tests (mirrors xrpl.js tx-encode-decode.test.ts)
+//! Round-trip tests
 
 use super::*;
 

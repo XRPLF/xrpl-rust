@@ -42,8 +42,7 @@ impl TryFromParser for AccountId {
     type Error = XRPLCoreException;
 
     /// Build AccountId from a BinaryParser.
-    /// When length is Some(0), returns the zero account (20 zero bytes),
-    /// matching xrpl.js behavior for pseudo-transactions like UNLModify.
+    /// When length is Some(0), returns the zero account (20 zero bytes).
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,

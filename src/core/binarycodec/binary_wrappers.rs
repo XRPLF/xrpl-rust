@@ -686,7 +686,7 @@ impl Iterator for BinaryParser {
 
 // =========================================================================
 // Internal serialization/deserialization functions
-// (mirrors xrpl.js binary.ts — not part of the public API)
+// (not part of the public API)
 // =========================================================================
 
 pub(crate) const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;

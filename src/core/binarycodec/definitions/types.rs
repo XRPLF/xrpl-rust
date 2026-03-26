@@ -178,7 +178,7 @@ impl DefinitionHandler for DefinitionMap {
 
         // Build delegatable permissions map: granular permissions + transaction types (value + 1)
         let mut delegatable_permissions_value_map = DelegatablePermissionsValueMap::default();
-        // Granular permissions (hardcoded, matching xrpl.js)
+        // Granular permissions (hardcoded)
         let granular_permissions: &[(&str, i32)] = &[
             ("TrustlineAuthorize", 65537),
             ("TrustlineFreeze", 65538),

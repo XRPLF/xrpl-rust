@@ -1,4 +1,4 @@
-//! Codec-fixtures tests (mirrors xrpl.js binary-json.test.ts)
+//! Codec-fixtures tests
 
 use super::*;
 use crate::core::binarycodec::test_cases::{self, load_codec_fixtures};
