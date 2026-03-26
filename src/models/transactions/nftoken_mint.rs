@@ -366,7 +366,7 @@ mod tests {
                 fee: Some("10".into()),
                 flags: vec![NFTokenMintFlag::TfTransferable].into(),
                 memos: Some(vec![Memo::new(
-                    Some("72656E74".to_string()), 
+                    Some("72656E74".to_string()),
                     None,
                     Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963".to_string())
                 )]),

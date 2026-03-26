@@ -146,7 +146,7 @@ pub enum XRPLSignerListSetException {
     /// A collection contains an invalid value.
     #[error("The field `{field:?}` contains an invalid value (found {found:?})")]
     CollectionInvalidItem { field: String, found: String },
-    #[error("The field `signer_quorum` ({found:?}) must be below or equal to the sum of `signer_weight` in `signer_entries` ({max:?})")]
+    #[error("The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries` (max {max}, found {found})")]
     SignerQuorumExceedsSignerWeight { max: u32, found: u32 },
 }
 
