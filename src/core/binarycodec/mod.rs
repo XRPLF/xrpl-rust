@@ -23,8 +23,8 @@ pub mod utils;
 pub use binary_wrappers::*;
 
 use self::binary_wrappers::{
-    decode_ledger_data_inner, decode_st_object, serialize_json, TRANSACTION_MULTISIG_PREFIX,
-    TRANSACTION_SIGNATURE_PREFIX,
+    decode_ledger_data_inner, decode_st_object, serialize_json, PAYMENT_CHANNEL_CLAIM_PREFIX,
+    TRANSACTION_MULTISIG_PREFIX, TRANSACTION_SIGNATURE_PREFIX,
 };
 
 use super::exceptions::XRPLCoreResult;
@@ -67,6 +67,46 @@ where
         Some(signing_account_id.as_ref()),
         true,
     )
+}
+
+/// Encode a payment channel claim for signing.
+///
+/// This produces the serialized data that must be signed to authorize
+/// a claim against a payment channel. The format is:
+/// - 4 bytes: HashPrefix `0x434C4D00` ("CLM\0")
+/// - 32 bytes: channel ID (Hash256)
+/// - 8 bytes: amount in drops (UInt64, big-endian)
+///
+/// See Payment Channel Claim:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/paymentchannelclaim>`
+pub fn encode_for_signing_claim(channel: &str, amount: &str) -> XRPLCoreResult<String> {
+    let channel_bytes = hex::decode(channel).map_err(|_| {
+        super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+            exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                expected: 64,
+                found: channel.len(),
+            },
+        )
+    })?;
+    if channel_bytes.len() != 32 {
+        return Err(super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+            exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                expected: 32,
+                found: channel_bytes.len(),
+            },
+        ));
+    }
+    let amount_val: u64 = amount.parse().map_err(|e| {
+        super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+            exceptions::XRPLBinaryCodecException::ParseIntError(e),
+        )
+    })?;
+
+    let mut buf = alloc::vec::Vec::with_capacity(44);
+    buf.extend_from_slice(&PAYMENT_CHANNEL_CLAIM_PREFIX);
+    buf.extend_from_slice(&channel_bytes);
+    buf.extend_from_slice(&amount_val.to_be_bytes());
+    Ok(hex::encode_upper(&buf))
 }
 
 /// Decode a hex-encoded XRPL binary blob into a JSON object.

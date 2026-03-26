@@ -812,3 +812,21 @@ fn test_quality_encode() {
     // Should match last 16 chars of the book directory
     assert_eq!(hex, &book_directory[book_directory.len() - 16..]);
 }
+
+#[test]
+fn test_encode_for_signing_claim() {
+    let channel = "43904CBFCDCEC530B4037871F86EE90BF799DF8D2E0EA564BC8A3F332E4F5FB1";
+    let amount = "1000";
+    let actual =
+        encode_for_signing_claim(channel, amount).expect("encode_for_signing_claim failed");
+    let expected = [
+        // hash prefix
+        "434C4D00",
+        // channel ID
+        "43904CBFCDCEC530B4037871F86EE90BF799DF8D2E0EA564BC8A3F332E4F5FB1",
+        // amount as a uint64
+        "00000000000003E8",
+    ]
+    .join("");
+    assert_eq!(actual, expected);
+}
