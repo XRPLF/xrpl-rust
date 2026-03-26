@@ -6,6 +6,7 @@
 use super::exceptions::XRPLHashException;
 use super::utils::HASH128_LENGTH;
 use super::utils::HASH160_LENGTH;
+use super::utils::HASH192_LENGTH;
 use super::utils::HASH256_LENGTH;
 use super::TryFromParser;
 use super::XRPLType;
@@ -35,6 +36,15 @@ pub struct Hash128(Vec<u8>);
 #[derive(Debug, Deserialize, Clone)]
 #[serde(try_from = "&str")]
 pub struct Hash160(Vec<u8>);
+
+/// Codec for serializing and deserializing a hash field
+/// with a width of 192 bits (24 bytes).
+///
+/// See Hash Fields:
+/// `<https://xrpl.org/serialization.html#hash-fields>`
+#[derive(Debug, Deserialize, Clone)]
+#[serde(try_from = "&str")]
+pub struct Hash192(Vec<u8>);
 
 /// Codec for serializing and deserializing a hash field
 /// with a width of 256 bits (32 bytes).
@@ -192,6 +202,12 @@ impl Hash for Hash160 {
     }
 }
 
+impl Hash for Hash192 {
+    fn get_length() -> usize {
+        HASH192_LENGTH
+    }
+}
+
 impl Hash for Hash256 {
     fn get_length() -> usize {
         HASH256_LENGTH
@@ -211,6 +227,14 @@ impl XRPLType for Hash160 {
 
     fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
         Ok(Hash160(<dyn Hash>::make::<Hash160>(buffer)?))
+    }
+}
+
+impl XRPLType for Hash192 {
+    type Error = XRPLCoreException;
+
+    fn new(buffer: Option<&[u8]>) -> XRPLCoreResult<Self, Self::Error> {
+        Ok(Hash192(<dyn Hash>::make::<Hash192>(buffer)?))
     }
 }
 
@@ -246,6 +270,18 @@ impl TryFromParser for Hash160 {
     }
 }
 
+impl TryFromParser for Hash192 {
+    type Error = XRPLCoreException;
+
+    /// Build Hash192 from a BinaryParser.
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> XRPLCoreResult<Hash192, Self::Error> {
+        Ok(Hash192(<dyn Hash>::parse::<Hash192>(parser, length)?))
+    }
+}
+
 impl TryFromParser for Hash256 {
     type Error = XRPLCoreException;
 
@@ -276,6 +312,15 @@ impl TryFrom<&str> for Hash160 {
     }
 }
 
+impl TryFrom<&str> for Hash192 {
+    type Error = XRPLCoreException;
+
+    /// Construct a Hash object from a hex string.
+    fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
+        Hash192::new(Some(&hex::decode(value)?))
+    }
+}
+
 impl TryFrom<&str> for Hash256 {
     type Error = XRPLCoreException;
 
@@ -299,6 +344,13 @@ impl Display for Hash160 {
     }
 }
 
+impl Display for Hash192 {
+    /// Get the hex representation of the Hash192 bytes.
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(f, "{}", hex::encode_upper(self.as_ref()))
+    }
+}
+
 impl Display for Hash256 {
     /// Get the hex representation of the Hash256 bytes.
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
@@ -316,6 +368,15 @@ impl Serialize for Hash128 {
 }
 
 impl Serialize for Hash160 {
+    fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode_upper(self.as_ref()))
+    }
+}
+
+impl Serialize for Hash192 {
     fn serialize<S>(&self, serializer: S) -> XRPLCoreResult<S::Ok, S::Error>
     where
         S: Serializer,
@@ -347,6 +408,13 @@ impl AsRef<[u8]> for Hash128 {
     }
 }
 
+impl AsRef<[u8]> for Hash192 {
+    /// Get a reference of the byte representation.
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl AsRef<[u8]> for Hash256 {
     /// Get a reference of the byte representation.
     fn as_ref(&self) -> &[u8] {
@@ -362,6 +430,7 @@ mod test {
 
     const HASH128_HEX_TEST: &str = "10000000002000000000300000000012";
     const HASH160_HEX_TEST: &str = "1000000000200000000030000000004000000000";
+    const HASH192_HEX_TEST: &str = "100000000020000000003000000000400000000050000000";
     const HASH256_HEX_TEST: &str =
         "1000000000200000000030000000004000000000500000000060000000001234";
 
@@ -369,10 +438,12 @@ mod test {
     fn test_hash_new() {
         let hex128 = hex::decode(HASH128_HEX_TEST).unwrap();
         let hex160 = hex::decode(HASH160_HEX_TEST).unwrap();
+        let hex192 = hex::decode(HASH192_HEX_TEST).unwrap();
         let hex256 = hex::decode(HASH256_HEX_TEST).unwrap();
 
         assert_eq!(HASH128_HEX_TEST, Hash128(hex128).to_string());
         assert_eq!(HASH160_HEX_TEST, Hash160(hex160).to_string());
+        assert_eq!(HASH192_HEX_TEST, Hash192(hex192).to_string());
         assert_eq!(HASH256_HEX_TEST, Hash256(hex256).to_string());
     }
 
@@ -391,6 +462,13 @@ mod test {
 
         assert!(result.is_ok());
         assert_eq!(HASH160_HEX_TEST, result.unwrap().to_string());
+
+        let hex = hex::decode(HASH192_HEX_TEST).expect("");
+        let mut parser = BinaryParser::from(hex);
+        let result = Hash192::from_parser(&mut parser, None);
+
+        assert!(result.is_ok());
+        assert_eq!(HASH192_HEX_TEST, result.unwrap().to_string());
 
         let hex = hex::decode(HASH256_HEX_TEST).expect("");
         let mut parser = BinaryParser::from(hex);
@@ -412,6 +490,11 @@ mod test {
         assert!(result.is_ok());
         assert_eq!(HASH160_HEX_TEST, result.unwrap().to_string());
 
+        let result = Hash192::try_from(HASH192_HEX_TEST);
+
+        assert!(result.is_ok());
+        assert_eq!(HASH192_HEX_TEST, result.unwrap().to_string());
+
         let result = Hash256::try_from(HASH256_HEX_TEST);
 
         assert!(result.is_ok());
@@ -428,5 +511,55 @@ mod test {
         assert!(hash128.is_err());
         assert!(hash160.is_err());
         assert!(hash256.is_err());
+    }
+
+    // ── Hash192 tests (mirrors xrpl.js hash.test.ts) ──────────────────────
+
+    #[test]
+    fn test_hash192_has_width_24() {
+        // xrpl.js: expect(Hash192.width).toBe(24)
+        assert_eq!(Hash192::get_length(), 24);
+    }
+
+    #[test]
+    fn test_hash192_zero() {
+        // xrpl.js: expect(Hash192.ZERO_192.toJSON()).toBe('000000000000000000000000000000000000000000000000')
+        let zero = Hash192::new(Some(&[0u8; 24])).unwrap();
+        assert_eq!(
+            zero.to_string(),
+            "000000000000000000000000000000000000000000000000"
+        );
+    }
+
+    #[test]
+    fn test_hash192_can_be_compared() {
+        // xrpl.js: h1 < h2, h3 < h2
+        let h1 = Hash192::try_from("100000000000000000000000000000000000000000000000").unwrap();
+        let h2 = Hash192::try_from("200000000000000000000000000000000000000000000000").unwrap();
+        let h3 = Hash192::try_from("000000000000000000000000000000000000000000000003").unwrap();
+        assert!(h1.as_ref() < h2.as_ref());
+        assert!(h3.as_ref() < h2.as_ref());
+    }
+
+    #[test]
+    fn test_hash192_invalid_length_too_short() {
+        // xrpl.js: Hash192.from('10000000000000000000000000000000000000000000000') -> Invalid Hash length 23
+        let result = Hash192::try_from("10000000000000000000000000000000000000000000000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hash192_invalid_length_too_long() {
+        // xrpl.js: Hash192.from('10000000000000000000000000000000000000000000000000') -> Invalid Hash length 25
+        let result = Hash192::try_from("10000000000000000000000000000000000000000000000000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_hash192_non_hex_string() {
+        // xrpl.js: Hash192.from('Z'.repeat(48)) -> throws
+        let z48 = "Z".repeat(48);
+        let result = Hash192::try_from(z48.as_str());
+        assert!(result.is_err());
     }
 }

@@ -1,8 +1,8 @@
 use super::definitions::*;
 use super::types::TryFromParser;
 use super::types::{
-    AccountId, Amount, Blob, Hash128, Hash160, Hash256, Issue, PathSet, STObject, Vector256,
-    XChainBridge,
+    AccountId, Amount, Blob, Hash128, Hash160, Hash192, Hash256, Issue, PathSet, STObject,
+    Vector256, XChainBridge,
 };
 use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
 use crate::core::binarycodec::utils::*;
@@ -692,8 +692,8 @@ impl Iterator for BinaryParser {
 pub(crate) const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
 pub(crate) const TRANSACTION_MULTISIG_PREFIX: [u8; 4] = (0x534D5400u32).to_be_bytes();
 
-/// UInt64 fields that should be decoded as base-10 strings instead of hex.
-const BASE10_UINT64_FIELDS: &[&str] = &[
+/// UInt64 fields that should be encoded/decoded as base-10 strings instead of hex.
+pub(crate) const BASE10_UINT64_FIELDS: &[&str] = &[
     "MaximumAmount",
     "OutstandingAmount",
     "MPTAmount",
@@ -759,6 +759,10 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
         }
         "Hash160" => {
             let hash = Hash160::from_parser(parser, length)?;
+            Ok(serde_json::to_value(&hash).map_err(XRPLSerdeJsonError::from)?)
+        }
+        "Hash192" => {
+            let hash = Hash192::from_parser(parser, length)?;
             Ok(serde_json::to_value(&hash).map_err(XRPLSerdeJsonError::from)?)
         }
         "Hash256" => {

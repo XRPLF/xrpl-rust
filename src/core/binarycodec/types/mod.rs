@@ -27,6 +27,7 @@ pub use self::currency::Currency;
 pub use self::hash::Hash;
 pub use self::hash::Hash128;
 pub use self::hash::Hash160;
+pub use self::hash::Hash192;
 pub use self::hash::Hash256;
 pub use self::issue::Issue;
 pub use self::number::Number;
@@ -37,6 +38,7 @@ pub use self::vector256::Vector256;
 pub use self::xchain_bridge::XChainBridge;
 
 use crate::core::binarycodec::binary_wrappers::Serialization;
+use crate::core::binarycodec::binary_wrappers::BASE10_UINT64_FIELDS;
 use crate::core::binarycodec::definitions::get_delegatable_permission_code;
 use crate::core::binarycodec::definitions::get_field_instance;
 use crate::core::binarycodec::definitions::get_ledger_entry_type_code;
@@ -78,6 +80,7 @@ pub enum XRPLTypes {
     Currency(Currency),
     Hash128(Hash128),
     Hash160(Hash160),
+    Hash192(Hash192),
     Hash256(Hash256),
     Issue(Issue),
     Number(Number),
@@ -108,6 +111,7 @@ impl XRPLTypes {
                 "Currency" => Ok(Some(XRPLTypes::Currency(Self::type_from_str(value)?))),
                 "Hash128" => Ok(Some(XRPLTypes::Hash128(Self::type_from_str(value)?))),
                 "Hash160" => Ok(Some(XRPLTypes::Hash160(Self::type_from_str(value)?))),
+                "Hash192" => Ok(Some(XRPLTypes::Hash192(Self::type_from_str(value)?))),
                 "Hash256" => Ok(Some(XRPLTypes::Hash256(Self::type_from_str(value)?))),
                 "XChainClaimID" => Ok(Some(XRPLTypes::Hash256(Self::type_from_str(value)?))),
                 "UInt8" => Ok(Some(XRPLTypes::UInt8(
@@ -240,6 +244,7 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::Currency(currency) => SerializedType::from(currency),
             XRPLTypes::Hash128(hash128) => SerializedType::from(hash128),
             XRPLTypes::Hash160(hash160) => SerializedType::from(hash160),
+            XRPLTypes::Hash192(hash192) => SerializedType::from(hash192),
             XRPLTypes::Hash256(hash256) => SerializedType::from(hash256),
             XRPLTypes::Path(path) => SerializedType::from(path),
             XRPLTypes::PathSet(path_set) => SerializedType::from(path_set),
@@ -472,6 +477,16 @@ impl STObject {
                     };
                     value_xaddress_handled
                         .insert(field.to_owned(), Value::Number((*permission_code).into()));
+                } else if BASE10_UINT64_FIELDS.contains(&field.as_str()) {
+                    // BASE10 UInt64 fields: convert decimal string to hex for encoding
+                    // (mirrors xrpl.js UInt64.from() which does BigInt(val).toString(16))
+                    let decimal_val: u64 = value.parse().map_err(|_| {
+                        exceptions::XRPLSerializeMapException::UnknownTransactionType(
+                            alloc::format!("{} {} is not a valid base 10 string", field, value),
+                        )
+                    })?;
+                    let hex_str = alloc::format!("{:016X}", decimal_val);
+                    value_xaddress_handled.insert(field.to_owned(), Value::String(hex_str));
                 } else {
                     value_xaddress_handled
                         .insert(field.to_owned(), Value::String(value.to_owned()));
