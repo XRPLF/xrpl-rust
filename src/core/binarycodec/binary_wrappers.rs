@@ -823,6 +823,16 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
                 Ok(Value::String(hex::encode_upper(&bytes)))
             }
         }
+        "Int32" => {
+            let bytes = parser.read(4)?;
+            let val = i32::from_be_bytes(
+                bytes
+                    .as_slice()
+                    .try_into()
+                    .map_err(|_| XRPLBinaryCodecException::InvalidReadFromBytesValue)?,
+            );
+            Ok(Value::Number(val.into()))
+        }
         "STObject" => decode_st_object(parser, true),
         "STArray" => decode_st_array(parser),
         "PathSet" => {

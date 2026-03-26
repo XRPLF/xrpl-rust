@@ -82,6 +82,7 @@ pub enum XRPLTypes {
     Hash160(Hash160),
     Hash192(Hash192),
     Hash256(Hash256),
+    Int32(i32),
     Issue(Issue),
     Number(Number),
     Path(Path),
@@ -138,10 +139,81 @@ impl XRPLTypes {
         } else if let Some(value) = value.as_u64() {
             // dbg!("is u64");
             match name {
-                "UInt8" => Ok(Some(XRPLTypes::UInt8(value as u8))),
-                "UInt16" => Ok(Some(XRPLTypes::UInt16(value as u16))),
-                "UInt32" => Ok(Some(XRPLTypes::UInt32(value as u32))),
+                "UInt8" => {
+                    if value > u8::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::UIntOutOfRange {
+                            type_name: "UInt8".into(),
+                            value,
+                            max: u8::MAX as u64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::UInt8(value as u8)))
+                    }
+                }
+                "UInt16" => {
+                    if value > u16::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::UIntOutOfRange {
+                            type_name: "UInt16".into(),
+                            value,
+                            max: u16::MAX as u64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::UInt16(value as u16)))
+                    }
+                }
+                "UInt32" => {
+                    if value > u32::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::UIntOutOfRange {
+                            type_name: "UInt32".into(),
+                            value,
+                            max: u32::MAX as u64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::UInt32(value as u32)))
+                    }
+                }
                 "UInt64" => Ok(Some(XRPLTypes::UInt64(value))),
+                "Int32" => {
+                    // Positive integer that fits in i32
+                    if value > i32::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::Int32OutOfRange {
+                            value: value as i64,
+                            min: i32::MIN as i64,
+                            max: i32::MAX as i64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::Int32(value as i32)))
+                    }
+                }
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
+            }
+        } else if value.is_f64() {
+            // Decimal values are not allowed for any integer type
+            match name {
+                "UInt8" | "UInt16" | "UInt32" | "UInt64" | "Int32" => {
+                    Err(exceptions::XRPLTypeException::DecimalNotAllowed(name.into()).into())
+                }
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
+            }
+        } else if let Some(value) = value.as_i64() {
+            // Negative integer values — only valid for Int32
+            match name {
+                "Int32" => {
+                    if value < i32::MIN as i64 || value > i32::MAX as i64 {
+                        Err(exceptions::XRPLTypeException::Int32OutOfRange {
+                            value,
+                            min: i32::MIN as i64,
+                            max: i32::MAX as i64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::Int32(value as i32)))
+                    }
+                }
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_object() {
@@ -246,6 +318,7 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::Hash160(hash160) => SerializedType::from(hash160),
             XRPLTypes::Hash192(hash192) => SerializedType::from(hash192),
             XRPLTypes::Hash256(hash256) => SerializedType::from(hash256),
+            XRPLTypes::Int32(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::Path(path) => SerializedType::from(path),
             XRPLTypes::PathSet(path_set) => SerializedType::from(path_set),
             XRPLTypes::PathStep(path_step) => SerializedType::from(path_step),
@@ -479,7 +552,6 @@ impl STObject {
                         .insert(field.to_owned(), Value::Number((*permission_code).into()));
                 } else if BASE10_UINT64_FIELDS.contains(&field.as_str()) {
                     // BASE10 UInt64 fields: convert decimal string to hex for encoding
-                    // (mirrors xrpl.js UInt64.from() which does BigInt(val).toString(16))
                     let decimal_val: u64 = value.parse().map_err(|_| {
                         exceptions::XRPLSerializeMapException::UnknownTransactionType(
                             alloc::format!("{} {} is not a valid base 10 string", field, value),
@@ -505,6 +577,8 @@ impl STObject {
                 {
                     sorted_keys.push(field_instance);
                 }
+            } else {
+                return Err(exceptions::XRPLTypeException::UnknownField(field.clone()).into());
             }
         }
         sorted_keys.sort_by_key(|k| k.ordinal);

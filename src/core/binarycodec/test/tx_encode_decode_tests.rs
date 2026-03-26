@@ -275,3 +275,177 @@ fn test_lowercase_hex_re_decodes_to_uppercase() {
     let decoded = decode(&encoded).expect("decode failed");
     assert_eq!(decoded, json_upper);
 }
+
+// ============================================================
+// UInt range checking tests (mirrors xrpl.js uint.test.ts)
+// ============================================================
+
+#[test]
+fn test_uint8_range_overflow() {
+    // 300 > u8::MAX (255) should error, not silently truncate
+    // AssetScale is a UInt8 field
+    let tx = serde_json::json!({
+        "Flags": 0,
+        "Issuer": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "AssetScale": 300u64,
+        "LedgerEntryType": "MPTokenIssuance"
+    });
+    assert!(encode(&tx).is_err());
+}
+
+#[test]
+fn test_uint8_max_valid() {
+    let tx = serde_json::json!({
+        "Flags": 0,
+        "Issuer": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "AssetScale": 255,
+        "LedgerEntryType": "MPTokenIssuance"
+    });
+    assert!(encode(&tx).is_ok());
+}
+
+#[test]
+fn test_uint32_range_overflow() {
+    // 5000000000 > u32::MAX (4294967295) should error
+    let tx = serde_json::json!({
+        "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "TransactionType": "Payment",
+        "Sequence": 5000000000u64
+    });
+    assert!(encode(&tx).is_err());
+}
+
+// ============================================================
+// Int32 tests (mirrors xrpl.js int.test.ts)
+// ============================================================
+
+#[test]
+fn test_int32_encode_decode_negative() {
+    // Loan object with negative LoanScale — mirrors xrpl.js int.test.ts
+    let loan = serde_json::json!({
+        "Borrower": "rs5fUokF7Y5bxNkstM4p4JYHgqzYkFamCg",
+        "GracePeriod": 60,
+        "LoanBrokerID": "18F91BD8009DAF09B5E4663BE7A395F5F193D0657B12F8D1E781EB3D449E8151",
+        "LoanScale": -11,
+        "LoanSequence": 1,
+        "NextPaymentDueDate": 822779431,
+        "PaymentInterval": 400,
+        "PaymentRemaining": 1,
+        "PeriodicPayment": "10000",
+        "PrincipalOutstanding": "10000",
+        "StartDate": 822779031,
+        "TotalValueOutstanding": "10000",
+        "LedgerEntryType": "Loan"
+    });
+    let encoded = encode(&loan).expect("encode negative LoanScale failed");
+    let decoded = decode(&encoded).expect("decode negative LoanScale failed");
+    assert_eq!(decoded, loan);
+}
+
+#[test]
+fn test_int32_encode_decode_positive() {
+    let loan = serde_json::json!({
+        "Borrower": "rs5fUokF7Y5bxNkstM4p4JYHgqzYkFamCg",
+        "GracePeriod": 60,
+        "LoanBrokerID": "18F91BD8009DAF09B5E4663BE7A395F5F193D0657B12F8D1E781EB3D449E8151",
+        "LoanScale": 5,
+        "LoanSequence": 1,
+        "NextPaymentDueDate": 822779431,
+        "PaymentInterval": 400,
+        "PaymentRemaining": 1,
+        "PeriodicPayment": "10000",
+        "PrincipalOutstanding": "10000",
+        "StartDate": 822779031,
+        "TotalValueOutstanding": "10000",
+        "LedgerEntryType": "Loan"
+    });
+    let encoded = encode(&loan).expect("encode positive LoanScale failed");
+    let decoded = decode(&encoded).expect("decode positive LoanScale failed");
+    assert_eq!(decoded, loan);
+}
+
+// ============================================================
+// Pseudo-transaction ACCOUNT_ZERO tests (mirrors xrpl.js pseudo-transaction.test.ts)
+// ============================================================
+
+#[test]
+fn test_pseudo_transaction_encode() {
+    let json = serde_json::json!({
+        "Account": "rrrrrrrrrrrrrrrrrrrrrhoLvTp",
+        "Sequence": 0,
+        "Fee": "0",
+        "SigningPubKey": "",
+        "Signature": ""
+    });
+    let expected_binary =
+        "24000000006840000000000000007300760081140000000000000000000000000000000000000000";
+    let encoded = encode(&json).expect("encode pseudo-transaction failed");
+    assert_eq!(encoded, expected_binary);
+}
+
+#[test]
+fn test_pseudo_transaction_roundtrip() {
+    let json = serde_json::json!({
+        "Account": "rrrrrrrrrrrrrrrrrrrrrhoLvTp",
+        "Sequence": 0,
+        "Fee": "0",
+        "SigningPubKey": "",
+        "Signature": ""
+    });
+    let encoded = encode(&json).expect("encode failed");
+    let decoded = decode(&encoded).expect("decode failed");
+    assert_eq!(decoded, json);
+}
+
+#[test]
+fn test_blank_account_is_account_zero() {
+    let json_blank = serde_json::json!({
+        "Account": "",
+        "Sequence": 0,
+        "Fee": "0",
+        "SigningPubKey": "",
+        "Signature": ""
+    });
+    let expected_binary =
+        "24000000006840000000000000007300760081140000000000000000000000000000000000000000";
+    let encoded = encode(&json_blank).expect("encode blank account failed");
+    assert_eq!(encoded, expected_binary);
+}
+
+#[test]
+fn test_blank_account_decodes_to_account_zero() {
+    let json_blank = serde_json::json!({
+        "Account": "",
+        "Sequence": 0,
+        "Fee": "0",
+        "SigningPubKey": "",
+        "Signature": ""
+    });
+    let json_expected = serde_json::json!({
+        "Account": "rrrrrrrrrrrrrrrrrrrrrhoLvTp",
+        "Sequence": 0,
+        "Fee": "0",
+        "SigningPubKey": "",
+        "Signature": ""
+    });
+    let encoded = encode(&json_blank).expect("encode failed");
+    let decoded = decode(&encoded).expect("decode failed");
+    assert_eq!(decoded, json_expected);
+}
+
+// ============================================================
+// Unknown field rejection test (mirrors xrpl.js tx-encode-decode.test.ts)
+// ============================================================
+
+#[test]
+fn test_throws_on_unknown_field() {
+    let tx = serde_json::json!({
+        "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "TransactionType": "Payment",
+        "Sequence": 1,
+        "BadField": 1
+    });
+    assert!(encode(&tx).is_err());
+}
