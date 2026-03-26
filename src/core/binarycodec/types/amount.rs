@@ -379,14 +379,17 @@ impl Serialize for Amount {
         } else if self.is_mpt() {
             // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id
             let bytes = self.as_ref();
-            let _leading = bytes[0];
+            let leading = bytes[0];
+            let is_positive = leading & 0x40 != 0;
+            let sign = if is_positive { "" } else { "-" };
             let mut amount_bytes = [0u8; 8];
             amount_bytes.copy_from_slice(&bytes[1..9]);
             let amount_val = u64::from_be_bytes(amount_bytes);
             let mpt_id = hex::encode_upper(&bytes[9..33]);
 
+            let value_str = alloc::format!("{}{}", sign, amount_val);
             let mut builder = serializer.serialize_map(Some(2))?;
-            builder.serialize_entry("value", &amount_val.to_string())?;
+            builder.serialize_entry("value", &value_str)?;
             builder.serialize_entry("mpt_issuance_id", &mpt_id)?;
             builder.end()
         } else {
