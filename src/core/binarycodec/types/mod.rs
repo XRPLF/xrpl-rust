@@ -9,6 +9,7 @@ pub mod hash;
 pub mod issue;
 pub mod number;
 pub mod paths;
+pub mod quality;
 pub(crate) mod test_cases;
 pub mod utils;
 pub mod vector256;
@@ -578,7 +579,9 @@ impl STObject {
                     sorted_keys.push(field_instance);
                 }
             } else {
-                return Err(exceptions::XRPLTypeException::UnknownField(field.clone()).into());
+                // Skip fields not in the XRPL definitions (e.g. "meta", "date", "hash").
+                // This matches xrpl.js STObject.from() which silently filters unknown fields.
+                continue;
             }
         }
         sorted_keys.sort_by_key(|k| k.ordinal);

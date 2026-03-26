@@ -102,12 +102,14 @@ impl TryFrom<Value> for Issue {
                 Ok(Issue(SerializedType::from(result)))
             } else {
                 // IOU Issue
-                let cur = obj["currency"]
-                    .as_str()
+                let cur = obj
+                    .get("currency")
+                    .and_then(|v| v.as_str())
                     .ok_or(XRPLTypeException::MissingField("currency".to_string()))?;
                 let currency = Currency::try_from(cur)?;
-                let issuer = obj["issuer"]
-                    .as_str()
+                let issuer = obj
+                    .get("issuer")
+                    .and_then(|v| v.as_str())
                     .ok_or(XRPLTypeException::MissingField("issuer".to_string()))?;
                 let account = AccountId::try_from(issuer)?;
                 let mut currency_bytes = currency.as_ref().to_vec();

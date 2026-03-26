@@ -435,17 +435,380 @@ fn test_blank_account_decodes_to_account_zero() {
 }
 
 // ============================================================
-// Unknown field rejection test (mirrors xrpl.js tx-encode-decode.test.ts)
+// Unknown field handling test (mirrors xrpl.js STObject.from() behavior)
 // ============================================================
 
 #[test]
-fn test_throws_on_unknown_field() {
-    let tx = serde_json::json!({
+fn test_skips_unknown_fields() {
+    // xrpl.js silently skips fields not in the definitions (e.g. "meta", "date", "hash").
+    // Encoding should succeed and produce the same result as without the unknown field.
+    let tx_with_unknown = serde_json::json!({
         "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
         "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
         "TransactionType": "Payment",
         "Sequence": 1,
         "BadField": 1
     });
-    assert!(encode(&tx).is_err());
+    let tx_without_unknown = serde_json::json!({
+        "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "TransactionType": "Payment",
+        "Sequence": 1
+    });
+    let encoded_with = encode(&tx_with_unknown).expect("should skip unknown fields");
+    let encoded_without = encode(&tx_without_unknown).expect("encode failed");
+    assert_eq!(encoded_with, encoded_without);
+}
+
+// ============================================================
+// Issue type tests (mirrors xrpl.js issue.test.ts)
+// ============================================================
+
+#[test]
+fn test_issue_from_value_xrp() {
+    use types::Issue;
+    let xrp_json = serde_json::json!({"currency": "XRP"});
+    let issue = Issue::try_from(xrp_json.clone()).expect("Issue::try_from XRP failed");
+    let result: serde_json::Value = serde_json::to_value(&issue).expect("Issue serialize failed");
+    assert_eq!(result, xrp_json);
+}
+
+#[test]
+fn test_issue_from_value_issued_currency() {
+    use types::Issue;
+    let iou_json = serde_json::json!({
+        "currency": "USD",
+        "issuer": "rG1QQv2nh2gr7RCZ1P8YYcBUKCCN633jCn"
+    });
+    let issue = Issue::try_from(iou_json.clone()).expect("Issue::try_from IOU failed");
+    let result: serde_json::Value = serde_json::to_value(&issue).expect("Issue serialize failed");
+    assert_eq!(result, iou_json);
+}
+
+#[test]
+fn test_issue_from_value_non_standard_currency() {
+    use types::Issue;
+    let iou_json = serde_json::json!({
+        "currency": "0123456789ABCDEF0123456789ABCDEF01234567",
+        "issuer": "rG1QQv2nh2gr7RCZ1P8YYcBUKCCN633jCn"
+    });
+    let issue = Issue::try_from(iou_json.clone()).expect("Issue::try_from non-standard failed");
+    let result: serde_json::Value = serde_json::to_value(&issue).expect("Issue serialize failed");
+    assert_eq!(result, iou_json);
+}
+
+#[test]
+fn test_issue_from_value_mpt() {
+    use types::Issue;
+    let mpt_json = serde_json::json!({
+        "mpt_issuance_id": "BAADF00DBAADF00DBAADF00DBAADF00DBAADF00DBAADF00D"
+    });
+    let issue = Issue::try_from(mpt_json.clone()).expect("Issue::try_from MPT failed");
+    let result: serde_json::Value = serde_json::to_value(&issue).expect("Issue serialize failed");
+    assert_eq!(result, mpt_json);
+}
+
+#[test]
+fn test_issue_from_parser_xrp() {
+    use types::{Issue, TryFromParser};
+    let xrp_json = serde_json::json!({"currency": "XRP"});
+    let issue = Issue::try_from(xrp_json.clone()).expect("Issue::try_from XRP failed");
+    let hex = hex::encode_upper(issue.as_ref());
+    let mut parser = BinaryParser::from(hex::decode(&hex).unwrap().as_slice());
+    let parsed = Issue::from_parser(&mut parser, None).expect("from_parser failed");
+    let result: serde_json::Value = serde_json::to_value(&parsed).expect("serialize failed");
+    assert_eq!(result, xrp_json);
+}
+
+#[test]
+fn test_issue_from_parser_issued_currency() {
+    use types::{Issue, TryFromParser};
+    let iou_json = serde_json::json!({
+        "currency": "EUR",
+        "issuer": "rLUEXYuLiQptky37CqLcm9USQpPiz5rkpD"
+    });
+    let issue = Issue::try_from(iou_json.clone()).expect("Issue::try_from IOU failed");
+    let hex = hex::encode_upper(issue.as_ref());
+    let mut parser = BinaryParser::from(hex::decode(&hex).unwrap().as_slice());
+    let parsed = Issue::from_parser(&mut parser, None).expect("from_parser failed");
+    let result: serde_json::Value = serde_json::to_value(&parsed).expect("serialize failed");
+    assert_eq!(result, iou_json);
+}
+
+#[test]
+fn test_issue_from_parser_non_standard_currency() {
+    use types::{Issue, TryFromParser};
+    let iou_json = serde_json::json!({
+        "currency": "0123456789ABCDEF0123456789ABCDEF01234567",
+        "issuer": "rLUEXYuLiQptky37CqLcm9USQpPiz5rkpD"
+    });
+    let issue = Issue::try_from(iou_json.clone()).expect("Issue::try_from failed");
+    let hex = hex::encode_upper(issue.as_ref());
+    let mut parser = BinaryParser::from(hex::decode(&hex).unwrap().as_slice());
+    let parsed = Issue::from_parser(&mut parser, None).expect("from_parser failed");
+    let result: serde_json::Value = serde_json::to_value(&parsed).expect("serialize failed");
+    assert_eq!(result, iou_json);
+}
+
+#[test]
+fn test_issue_from_parser_mpt() {
+    use types::{Issue, TryFromParser};
+    let mpt_json = serde_json::json!({
+        "mpt_issuance_id": "BAADF00DBAADF00DBAADF00DBAADF00DBAADF00DBAADF00D"
+    });
+    let issue = Issue::try_from(mpt_json.clone()).expect("Issue::try_from MPT failed");
+    let hex = hex::encode_upper(issue.as_ref());
+    let mut parser = BinaryParser::from(hex::decode(&hex).unwrap().as_slice());
+    let parsed = Issue::from_parser(&mut parser, None).expect("from_parser failed");
+    let result: serde_json::Value = serde_json::to_value(&parsed).expect("serialize failed");
+    assert_eq!(result, mpt_json);
+}
+
+#[test]
+fn test_issue_invalid_input() {
+    use types::Issue;
+    let invalid = serde_json::json!({"random": 123});
+    assert!(Issue::try_from(invalid).is_err());
+}
+
+// ============================================================
+// STNumber type tests (mirrors xrpl.js st-number.test.ts)
+// ============================================================
+
+/// Helper: encode a string as STNumber and return its toJSON output.
+fn stnumber_roundtrip(input: &str) -> String {
+    use types::Number;
+    let num = Number::try_from(input)
+        .unwrap_or_else(|e| panic!("STNumber::try_from({}) failed: {}", input, e));
+    let s: String = serde_json::to_value(&num)
+        .expect("serialize failed")
+        .as_str()
+        .expect("expected string")
+        .to_string();
+    s
+}
+
+#[test]
+fn test_stnumber_positive_normal() {
+    assert_eq!(stnumber_roundtrip("99"), "99");
+}
+
+#[test]
+fn test_stnumber_positive_very_large() {
+    assert_eq!(stnumber_roundtrip("100000000000"), "1e11");
+}
+
+#[test]
+fn test_stnumber_positive_large() {
+    assert_eq!(stnumber_roundtrip("10000000000"), "10000000000");
+}
+
+#[test]
+fn test_stnumber_negative_normal() {
+    assert_eq!(stnumber_roundtrip("-123"), "-123");
+}
+
+#[test]
+fn test_stnumber_negative_very_large() {
+    assert_eq!(stnumber_roundtrip("-100000000000"), "-1e11");
+}
+
+#[test]
+fn test_stnumber_negative_large() {
+    assert_eq!(stnumber_roundtrip("-10000000000"), "-10000000000");
+}
+
+#[test]
+fn test_stnumber_positive_very_small() {
+    assert_eq!(stnumber_roundtrip("0.00000000001"), "1e-11");
+}
+
+#[test]
+fn test_stnumber_positive_small() {
+    assert_eq!(stnumber_roundtrip("0.0001"), "0.0001");
+}
+
+#[test]
+fn test_stnumber_zero() {
+    assert_eq!(stnumber_roundtrip("0"), "0");
+}
+
+#[test]
+fn test_stnumber_roundtrip_decimal() {
+    assert_eq!(stnumber_roundtrip("123.456"), "123.456");
+}
+
+#[test]
+fn test_stnumber_scientific_notation_positive() {
+    assert_eq!(stnumber_roundtrip("1.23e5"), "123000");
+}
+
+#[test]
+fn test_stnumber_scientific_notation_negative() {
+    assert_eq!(stnumber_roundtrip("-4.56e-7"), "-0.000000456");
+}
+
+#[test]
+fn test_stnumber_negative_medium() {
+    assert_eq!(stnumber_roundtrip("-987654321"), "-987654321");
+}
+
+#[test]
+fn test_stnumber_positive_medium() {
+    assert_eq!(stnumber_roundtrip("987654321"), "987654321");
+}
+
+#[test]
+fn test_stnumber_parser_roundtrip() {
+    use types::{Number, TryFromParser};
+    let num = Number::try_from("123456.789").expect("try_from failed");
+    let bytes = num.as_ref().to_vec();
+    let mut parser = BinaryParser::from(bytes.as_slice());
+    let parsed = Number::from_parser(&mut parser, None).expect("from_parser failed");
+    let original: String = serde_json::to_value(&num)
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+    let reparsed: String = serde_json::to_value(&parsed)
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(original, reparsed);
+}
+
+#[test]
+fn test_stnumber_zero_via_parser() {
+    use types::{Number, TryFromParser};
+    let num = Number::try_from("0").expect("try_from failed");
+    let bytes = num.as_ref().to_vec();
+    let mut parser = BinaryParser::from(bytes.as_slice());
+    let parsed = Number::from_parser(&mut parser, None).expect("from_parser failed");
+    let s: String = serde_json::to_value(&parsed)
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(s, "0");
+}
+
+#[test]
+fn test_stnumber_trailing_zeros() {
+    assert_eq!(stnumber_roundtrip("123.45000"), "123.45");
+}
+
+#[test]
+fn test_stnumber_leading_zeros() {
+    assert_eq!(stnumber_roundtrip("0000123.45"), "123.45");
+}
+
+#[test]
+fn test_stnumber_integer_with_exponent() {
+    assert_eq!(stnumber_roundtrip("123e2"), "12300");
+}
+
+#[test]
+fn test_stnumber_negative_decimal_with_exponent() {
+    assert_eq!(stnumber_roundtrip("-1.2e2"), "-120");
+}
+
+#[test]
+fn test_stnumber_decimal_via_parser() {
+    use types::{Number, TryFromParser};
+    let num = Number::try_from("0.5").expect("try_from failed");
+    let bytes = num.as_ref().to_vec();
+    let mut parser = BinaryParser::from(bytes.as_slice());
+    let parsed = Number::from_parser(&mut parser, None).expect("from_parser failed");
+    let s: String = serde_json::to_value(&parsed)
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(s, "0.5");
+}
+
+#[test]
+fn test_stnumber_rounds_up_mantissa() {
+    assert_eq!(
+        stnumber_roundtrip("9223372036854775895"),
+        "9223372036854775900"
+    );
+}
+
+#[test]
+fn test_stnumber_rounds_down_mantissa() {
+    assert_eq!(
+        stnumber_roundtrip("9323372036854775804"),
+        "9323372036854775800"
+    );
+}
+
+#[test]
+fn test_stnumber_small_value_trailing_zeros() {
+    assert_eq!(stnumber_roundtrip("0.002500"), "0.0025");
+}
+
+#[test]
+fn test_stnumber_large_value_trailing_zeros() {
+    assert_eq!(stnumber_roundtrip("9900000000000000000000"), "99e20");
+}
+
+#[test]
+fn test_stnumber_small_value_leading_zeros() {
+    assert_eq!(stnumber_roundtrip("0.0000000000000000000099"), "99e-22");
+}
+
+#[test]
+fn test_stnumber_mantissa_exceeds_max() {
+    assert_eq!(stnumber_roundtrip("9999999999999999999999"), "1e22");
+}
+
+#[test]
+fn test_stnumber_mantissa_exceeds_max_int64() {
+    assert_eq!(
+        stnumber_roundtrip("92233720368547758079"),
+        "922337203685477581e2"
+    );
+}
+
+#[test]
+fn test_stnumber_exponent_overflow() {
+    use types::Number;
+    assert!(Number::try_from("1e40000").is_err());
+}
+
+#[test]
+fn test_stnumber_underflow() {
+    use types::Number;
+    assert!(Number::try_from("1e-40000").is_err());
+}
+
+#[test]
+fn test_stnumber_invalid_input() {
+    use types::Number;
+    assert!(Number::try_from("abc123").is_err());
+}
+
+// ============================================================
+// Quality encode/decode tests (mirrors xrpl.js quality.test.ts)
+// ============================================================
+
+#[test]
+fn test_quality_decode() {
+    use types::quality::decode_quality;
+    let book_directory = "4627DFFCFF8B5A265EDBD8AE8C14A52325DBFEDAF4F5C32E5D06F4C3362FE1D0";
+    let result = decode_quality(book_directory).expect("decode failed");
+    assert_eq!(result, "195796912.5171664");
+}
+
+#[test]
+fn test_quality_encode() {
+    use types::quality::encode_quality;
+    let book_directory = "4627DFFCFF8B5A265EDBD8AE8C14A52325DBFEDAF4F5C32E5D06F4C3362FE1D0";
+    let expected_quality = "195796912.5171664";
+    let bytes = encode_quality(expected_quality).expect("encode failed");
+    let hex = hex::encode_upper(&bytes);
+    // Should match last 16 chars of the book directory
+    assert_eq!(hex, &book_directory[book_directory.len() - 16..]);
 }
