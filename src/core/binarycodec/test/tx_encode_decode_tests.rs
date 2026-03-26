@@ -167,7 +167,6 @@ fn test_base10_uint64_mpt_issuance_roundtrip() {
 }
 
 #[test]
-#[ignore] // Requires Hash192 type support (MPTokenIssuanceID field)
 fn test_base10_uint64_mptoken_encode() {
     let json = serde_json::json!({
         "Account": "raDQsd1s8rqGjL476g59a9vVNi1rSwrC44",
@@ -184,14 +183,12 @@ fn test_base10_uint64_mptoken_encode() {
 }
 
 #[test]
-#[ignore] // Requires Hash192 type support (MPTokenIssuanceID field)
 fn test_base10_uint64_mptoken_decode() {
     let decoded = decode(MPTOKEN_ENTRY_BINARY).expect("decode failed");
     assert_eq!(decoded["MPTAmount"], "100");
 }
 
 #[test]
-#[ignore] // Requires Hash192 type support (MPTokenIssuanceID field)
 fn test_base10_uint64_mptoken_roundtrip() {
     let json = serde_json::json!({
         "Account": "raDQsd1s8rqGjL476g59a9vVNi1rSwrC44",
@@ -206,4 +203,75 @@ fn test_base10_uint64_mptoken_roundtrip() {
     let encoded = encode(&json).expect("encode failed");
     let decoded = decode(&encoded).expect("decode failed");
     assert_eq!(json, decoded);
+}
+
+// ── Lowercase hex tests ─────────────
+
+const LOWERCASE_HEX_STR: &str =
+    "1100612200000000240000000125000068652D0000000055B6632D6376A2D9319F20A1C6DCCB486432D1E4A79951229D4C3DE2946F51D56662400009184E72A00081140DD319918CD5AE792BF7EC80D63B0F01B4573BBC";
+
+const LOWERCASE_HEX_BIN: &str =
+    "1100612200000000240000000125000000082D00000000550735A0B32B2A3F4C938B76D6933003E29447DB8C7CE382BBE089402FF12A03E56240000002540BE400811479927BAFFD3D04A26096C0C97B1B0D45B01AD3C0";
+
+#[test]
+fn test_lowercase_hex_correctly_decodes() {
+    // xrpl.js: decode(lower) == decode(str)
+    let lower = LOWERCASE_HEX_STR.to_lowercase();
+    let decoded_lower = decode(&lower).expect("decode lowercase failed");
+    let decoded_upper = decode(LOWERCASE_HEX_STR).expect("decode uppercase failed");
+    assert_eq!(decoded_lower, decoded_upper);
+}
+
+#[test]
+fn test_lowercase_hex_re_encodes_to_uppercase() {
+    // xrpl.js: encode(decode(lower)) == str
+    let lower = LOWERCASE_HEX_STR.to_lowercase();
+    let decoded = decode(&lower).expect("decode failed");
+    let re_encoded = encode(&decoded).expect("encode failed");
+    assert_eq!(re_encoded, LOWERCASE_HEX_STR);
+}
+
+#[test]
+fn test_lowercase_hex_encode_when_hex_field_lowercase() {
+    // xrpl.js: encode(json) == bin, where json has lowercase PreviousTxnID
+    let json = serde_json::json!({
+        "OwnerCount": 0,
+        "Account": "rUnFEsHjxqTswbivzL2DNHBb34rhAgZZZK",
+        "PreviousTxnLgrSeq": 8,
+        "LedgerEntryType": "AccountRoot",
+        "PreviousTxnID": "0735a0b32b2a3f4c938b76d6933003e29447db8c7ce382bbe089402ff12a03e5",
+        "Flags": 0,
+        "Sequence": 1,
+        "Balance": "10000000000"
+    });
+    let encoded = encode(&json).expect("encode failed");
+    assert_eq!(encoded, LOWERCASE_HEX_BIN);
+}
+
+#[test]
+fn test_lowercase_hex_re_decodes_to_uppercase() {
+    // xrpl.js: decode(encode(json)) == jsonUpper (PreviousTxnID uppercased)
+    let json = serde_json::json!({
+        "OwnerCount": 0,
+        "Account": "rUnFEsHjxqTswbivzL2DNHBb34rhAgZZZK",
+        "PreviousTxnLgrSeq": 8,
+        "LedgerEntryType": "AccountRoot",
+        "PreviousTxnID": "0735a0b32b2a3f4c938b76d6933003e29447db8c7ce382bbe089402ff12a03e5",
+        "Flags": 0,
+        "Sequence": 1,
+        "Balance": "10000000000"
+    });
+    let json_upper = serde_json::json!({
+        "OwnerCount": 0,
+        "Account": "rUnFEsHjxqTswbivzL2DNHBb34rhAgZZZK",
+        "PreviousTxnLgrSeq": 8,
+        "LedgerEntryType": "AccountRoot",
+        "PreviousTxnID": "0735A0B32B2A3F4C938B76D6933003E29447DB8C7CE382BBE089402FF12A03E5",
+        "Flags": 0,
+        "Sequence": 1,
+        "Balance": "10000000000"
+    });
+    let encoded = encode(&json).expect("encode failed");
+    let decoded = decode(&encoded).expect("decode failed");
+    assert_eq!(decoded, json_upper);
 }
