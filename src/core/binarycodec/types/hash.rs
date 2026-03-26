@@ -513,7 +513,7 @@ mod test {
         assert!(hash256.is_err());
     }
 
-    // ── Hash192 tests (mirrors xrpl.js hash.test.ts) ──────────────────────
+    // ── Hash192 tests ──────────────────────
 
     #[test]
     fn test_hash192_has_width_24() {
