@@ -835,7 +835,7 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
             );
             Ok(Value::Number(val.into()))
         }
-        "STObject" => decode_st_object(parser, true),
+        "STObject" => decode_st_object(parser),
         "STArray" => decode_st_array(parser),
         "PathSet" => {
             let path_set = PathSet::from_parser(parser, length)?;
@@ -877,10 +877,7 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
 
 /// Decode an STObject from the parser. Reads fields until ObjectEndMarker (0xE1)
 /// or end of parser data.
-pub(crate) fn decode_st_object(
-    parser: &mut BinaryParser,
-    _is_inner: bool,
-) -> XRPLCoreResult<Value> {
+pub(crate) fn decode_st_object(parser: &mut BinaryParser) -> XRPLCoreResult<Value> {
     let mut accumulator = Map::new();
 
     while !parser.is_end(None) {
@@ -909,7 +906,7 @@ fn decode_st_array(parser: &mut BinaryParser) -> XRPLCoreResult<Value> {
             break;
         }
 
-        let inner = decode_st_object(parser, true)?;
+        let inner = decode_st_object(parser)?;
         let mut wrapper = Map::new();
         wrapper.insert(field.name, inner);
         result.push(Value::Object(wrapper));

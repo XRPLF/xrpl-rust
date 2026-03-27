@@ -154,7 +154,7 @@ pub fn encode_for_signing_batch(flags: u32, tx_ids: &[&str]) -> XRPLCoreResult<S
 /// JSON representation as a `serde_json::Value`.
 pub fn decode(hex_string: &str) -> XRPLCoreResult<Value> {
     let mut parser = BinaryParser::try_from(hex_string)?;
-    decode_st_object(&mut parser, false)
+    decode_st_object(&mut parser)
 }
 
 /// Decode a serialized ledger header from hex into JSON.
