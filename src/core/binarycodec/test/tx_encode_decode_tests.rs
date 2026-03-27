@@ -1040,3 +1040,41 @@ fn test_encode_for_signing_invalid_transaction_type() {
     });
     assert!(encode_for_signing(&tx).is_err());
 }
+
+/// Regression test: IOU amounts with positive exponents (value >= 1e16) must
+/// round-trip correctly. Previously `unsigned_abs()` discarded the exponent sign,
+/// causing values like "12345678901234560" to decode as "123456789012345.6".
+#[test]
+fn test_iou_positive_exponent_roundtrip() {
+    use bigdecimal::BigDecimal;
+    use core::str::FromStr;
+    use types::Amount;
+
+    let test_values = [
+        "12345678901234560",   // exp = 1
+        "1234567890123456000", // exp = 3
+        "1e17",                // exp = 2
+    ];
+    let currency = "USD";
+    let issuer = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+
+    for val in &test_values {
+        let json_val = serde_json::json!({
+            "value": val.to_string(),
+            "currency": currency,
+            "issuer": issuer,
+        });
+        let amount = Amount::try_from(json_val).expect("Amount::try_from failed");
+        let decoded: serde_json::Value =
+            serde_json::to_value(&amount).expect("Amount serialize failed");
+        let decoded_value = decoded["value"].as_str().expect("missing value field");
+
+        let original = BigDecimal::from_str(val).unwrap().normalized();
+        let roundtripped = BigDecimal::from_str(decoded_value).unwrap().normalized();
+
+        assert_eq!(
+            original, roundtripped,
+            "IOU round-trip failed for value={val}, decoded={decoded_value}"
+        );
+    }
+}

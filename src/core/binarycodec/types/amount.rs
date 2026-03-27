@@ -292,9 +292,11 @@ impl IssuedCurrency {
             let int_mantissa = i128::from_str_radix(&hex_mantissa, 16)
                 .map_err(XRPLBinaryCodecException::ParseIntError)?;
 
-            // Adjust scale using the exponent
-            let scale = exp.unsigned_abs();
-            value = BigDecimal::new(int_mantissa.into(), scale as i64);
+            // Adjust scale using the exponent.
+            // BigDecimal::new(mantissa, scale) = mantissa * 10^(-scale),
+            // so we need scale = -exp to get mantissa * 10^exp.
+            let scale = -(exp as i64);
+            value = BigDecimal::new(int_mantissa.into(), scale);
 
             // Handle the sign
             if bytes[0] & 0x40 > 0 {
