@@ -212,6 +212,15 @@ pub fn number_to_string(bytes: &[u8]) -> Result<String, XRPLCoreException> {
         return Ok("0".to_string());
     }
 
+    // Validate exponent for non-zero mantissa: must be within normalized range.
+    // Crafted binary with extreme exponents (e.g. i32::MIN) could cause integer
+    // overflow in the offset arithmetic below (Rust-specific; JS doesn't overflow).
+    if exponent < MIN_EXPONENT - 1 || exponent > MAX_EXPONENT + 1 {
+        return Err(XRPLCoreException::XRPLUtilsError(
+            "Invalid exponent in Number bytes".into(),
+        ));
+    }
+
     let is_negative = mantissa < 0;
     let mut mantissa_abs: i128 = if is_negative {
         -(mantissa as i128)

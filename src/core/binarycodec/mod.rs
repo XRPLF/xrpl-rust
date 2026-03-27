@@ -23,8 +23,8 @@ pub mod utils;
 pub use binary_wrappers::*;
 
 use self::binary_wrappers::{
-    decode_ledger_data_inner, decode_st_object, serialize_json, PAYMENT_CHANNEL_CLAIM_PREFIX,
-    TRANSACTION_MULTISIG_PREFIX, TRANSACTION_SIGNATURE_PREFIX,
+    decode_ledger_data_inner, decode_st_object, serialize_json, BATCH_PREFIX,
+    PAYMENT_CHANNEL_CLAIM_PREFIX, TRANSACTION_MULTISIG_PREFIX, TRANSACTION_SIGNATURE_PREFIX,
 };
 
 use super::exceptions::XRPLCoreResult;
@@ -106,6 +106,44 @@ pub fn encode_for_signing_claim(channel: &str, amount: &str) -> XRPLCoreResult<S
     buf.extend_from_slice(&PAYMENT_CHANNEL_CLAIM_PREFIX);
     buf.extend_from_slice(&channel_bytes);
     buf.extend_from_slice(&amount_val.to_be_bytes());
+    Ok(hex::encode_upper(&buf))
+}
+
+/// Encode a Batch transaction for signing.
+///
+/// This produces the serialized data that must be signed to authorize
+/// a batch transaction. The format is:
+/// - 4 bytes: HashPrefix `0x42434800` ("BCH\0")
+/// - 4 bytes: flags (UInt32, big-endian)
+/// - 4 bytes: number of txIDs (UInt32, big-endian)
+/// - N × 32 bytes: each txID (Hash256)
+///
+/// See Batch Transaction:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/batch>`
+pub fn encode_for_signing_batch(flags: u32, tx_ids: &[&str]) -> XRPLCoreResult<String> {
+    let mut buf = alloc::vec::Vec::with_capacity(4 + 4 + 4 + tx_ids.len() * 32);
+    buf.extend_from_slice(&BATCH_PREFIX);
+    buf.extend_from_slice(&flags.to_be_bytes());
+    buf.extend_from_slice(&(tx_ids.len() as u32).to_be_bytes());
+    for tx_id in tx_ids {
+        let id_bytes = hex::decode(tx_id).map_err(|_| {
+            super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+                exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                    expected: 64,
+                    found: tx_id.len(),
+                },
+            )
+        })?;
+        if id_bytes.len() != 32 {
+            return Err(super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+                exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                    expected: 32,
+                    found: id_bytes.len(),
+                },
+            ));
+        }
+        buf.extend_from_slice(&id_bytes);
+    }
     Ok(hex::encode_upper(&buf))
 }
 

@@ -870,3 +870,173 @@ fn test_mpt_amount_positive_sign_bit() {
         "00002403C84A0A28E0190E208E982C352BBD5006600555CF"
     );
 }
+
+// ============================================================
+// Signing data encoding tests (mirrors xrpl.js signing-data-encoding.test.ts)
+// ============================================================
+
+#[test]
+fn test_encode_for_signing_single_blob() {
+    // Port of xrpl.js: "can create single signing blobs"
+    let tx = serde_json::json!({
+        "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "Amount": "1000",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Fee": "10",
+        "Flags": 2147483648u64,
+        "Sequence": 1,
+        "TransactionType": "Payment",
+        "TxnSignature": "30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B",
+        "Signature": "30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B",
+        "SigningPubKey": "ED5F5AC8B98974A3CA843326D9B88CEBD0560177B973EE0B149F782CFAA06DC66A"
+    });
+    let actual = encode_for_signing(&tx).expect("encode_for_signing failed");
+    let expected = [
+        "53545800", // signingPrefix
+        "12",
+        "0000", // TransactionType
+        "22",
+        "80000000", // Flags
+        "24",
+        "00000001", // Sequence
+        "61",
+        "40000000000003E8", // Amount
+        "68",
+        "400000000000000A", // Fee
+        "73",
+        "21",
+        "ED5F5AC8B98974A3CA843326D9B88CEBD0560177B973EE0B149F782CFAA06DC66A", // SigningPubKey
+        "81",
+        "14",
+        "5B812C9D57731E27A2DA8B1830195F88EF32A3B6", // Account
+        "83",
+        "14",
+        "B5F762798A53D543A014CAF8B297CFF8F2F937E8", // Destination
+    ]
+    .join("");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_encode_for_multisigning_blob() {
+    // Port of xrpl.js: "can create multi signing blobs"
+    let tx = serde_json::json!({
+        "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "Amount": "1000",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Fee": "10",
+        "Flags": 2147483648u64,
+        "Sequence": 1,
+        "TransactionType": "Payment",
+        "SigningPubKey": ""
+    });
+    let signing_account = "rJZdUusLDtY9NEsGea7ijqhVrXv98rYBYN";
+    let actual = encode_for_multisigning(&tx, alloc::borrow::Cow::Borrowed(signing_account))
+        .expect("encode_for_multisigning failed");
+    let expected = [
+        "534D5400", // signingPrefix
+        "12",
+        "0000", // TransactionType
+        "22",
+        "80000000", // Flags
+        "24",
+        "00000001", // Sequence
+        "61",
+        "40000000000003E8", // Amount
+        "68",
+        "400000000000000A", // Fee
+        "73",
+        "00", // SigningPubKey (empty, VLLength=0)
+        "81",
+        "14",
+        "5B812C9D57731E27A2DA8B1830195F88EF32A3B6", // Account
+        "83",
+        "14",
+        "B5F762798A53D543A014CAF8B297CFF8F2F937E8", // Destination
+        "C0A5ABEF242802EFED4B041E8F2D4A8CC86AE3D1", // signingAccount suffix
+    ]
+    .join("");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_encode_for_signing_batch_blob() {
+    // Port of xrpl.js: "can create batch blob"
+    let flags = 1u32;
+    let tx_ids = [
+        "ABE4871E9083DF66727045D49DEEDD3A6F166EB7F8D1E92FE868F02E76B2C5CA",
+        "795AAC88B59E95C3497609749127E69F12958BC016C600C770AEEB1474C840B4",
+    ];
+    let actual = encode_for_signing_batch(flags, &tx_ids).expect("encode_for_signing_batch failed");
+    let expected = [
+        "42434800", // hash prefix
+        "00000001", // flags
+        "00000002", // txIds length
+        "ABE4871E9083DF66727045D49DEEDD3A6F166EB7F8D1E92FE868F02E76B2C5CA",
+        "795AAC88B59E95C3497609749127E69F12958BC016C600C770AEEB1474C840B4",
+    ]
+    .join("");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_encode_for_multisigning_non_empty_signing_pub_key() {
+    // Port of xrpl.js: "can create multi signing blobs with non-empty SigningPubKey"
+    let tx = serde_json::json!({
+        "TransactionType": "LoanSet",
+        "Flags": 0,
+        "Sequence": 3606,
+        "LastLedgerSequence": 3634,
+        "LoanBrokerID": "B91CD2033E73E0DD17AF043FBD458CE7D996850A83DCED23FB122A3BFAA7F430",
+        "Fee": "12",
+        "SigningPubKey": "EDCEDEBC063D32FD4327C272ED2C46851129C47BE41FCA4222D4D94205AB1B587B",
+        "TxnSignature": "CCF8287A8A8EC0CF47C67219639C2F7BC7E7FCF2648FD328A518E9B9FA05ADB9A28A6EFB02D17A776DAEE5D1E25623FFBEFC06B5BBC1F77104188602F865A70F",
+        "Account": "rHLLL3Z7uBLK49yZcMaj8FAP7DU12Nw5A5",
+        "PrincipalRequested": "100000"
+    });
+    let signing_account = "rJ73aumLPTQQmy5wnGhvrogqf5DDhjuzc9";
+    let actual = encode_for_multisigning(&tx, alloc::borrow::Cow::Borrowed(signing_account))
+        .expect("encode_for_multisigning failed");
+    let expected = [
+        "534D5400", // signingPrefix
+        "12",
+        "0050", // TransactionType (LoanSet = 80)
+        "22",
+        "00000000", // Flags
+        "24",
+        "00000E16", // Sequence (3606)
+        "201B",
+        "00000E32", // LastLedgerSequence (3634)
+        "5025",
+        "B91CD2033E73E0DD17AF043FBD458CE7D996850A83DCED23FB122A3BFAA7F430", // LoanBrokerID
+        "68",
+        "400000000000000C", // Fee
+        "73",
+        "21",
+        "EDCEDEBC063D32FD4327C272ED2C46851129C47BE41FCA4222D4D94205AB1B587B", // SigningPubKey
+        "81",
+        "14",
+        "B32A0D322D38281C81D4F49DCCDC260A81879B57", // Account
+        "9E",
+        "0DE0B6B3A7640000FFFFFFF3",                 // PrincipalRequested
+        "BF9B4C3302798C111649BFA38DB60525C6E1021C", // signingAccount suffix
+    ]
+    .join("");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn test_encode_for_signing_invalid_transaction_type() {
+    // Port of xrpl.js: "can fail gracefully for invalid TransactionType"
+    let tx = serde_json::json!({
+        "Account": "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ",
+        "Amount": "1000",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Fee": "10",
+        "Flags": 2147483648u64,
+        "Sequence": 1,
+        "TransactionType": "NotAPayment",
+        "SigningPubKey": "ED5F5AC8B98974A3CA843326D9B88CEBD0560177B973EE0B149F782CFAA06DC66A"
+    });
+    assert!(encode_for_signing(&tx).is_err());
+}

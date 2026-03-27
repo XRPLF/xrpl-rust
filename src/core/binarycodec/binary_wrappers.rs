@@ -692,6 +692,7 @@ impl Iterator for BinaryParser {
 pub(crate) const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
 pub(crate) const TRANSACTION_MULTISIG_PREFIX: [u8; 4] = (0x534D5400u32).to_be_bytes();
 pub(crate) const PAYMENT_CHANNEL_CLAIM_PREFIX: [u8; 4] = (0x434C4D00u32).to_be_bytes();
+pub(crate) const BATCH_PREFIX: [u8; 4] = (0x42434800u32).to_be_bytes();
 
 /// UInt64 fields that should be encoded/decoded as base-10 strings instead of hex.
 pub(crate) const BASE10_UINT64_FIELDS: &[&str] = &[
