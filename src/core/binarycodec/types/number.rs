@@ -215,7 +215,7 @@ pub fn number_to_string(bytes: &[u8]) -> Result<String, XRPLCoreException> {
     // Validate exponent for non-zero mantissa: must be within normalized range.
     // Crafted binary with extreme exponents (e.g. i32::MIN) could cause integer
     // overflow in the offset arithmetic below (Rust-specific; JS doesn't overflow).
-    if exponent < MIN_EXPONENT - 1 || exponent > MAX_EXPONENT + 1 {
+    if !(MIN_EXPONENT - 1..=MAX_EXPONENT + 1).contains(&exponent) {
         return Err(XRPLCoreException::XRPLUtilsError(
             "Invalid exponent in Number bytes".into(),
         ));
