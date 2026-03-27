@@ -90,7 +90,9 @@ impl TryFrom<Value> for Issue {
                 let issuer_account = &mpt_bytes[4..24];
 
                 // Convert sequence to little-endian
-                let sequence = u32::from_be_bytes(sequence_be.try_into().unwrap());
+                let sequence = u32::from_be_bytes(sequence_be.try_into().map_err(|_| {
+                    XRPLCoreException::XRPLUtilsError("Invalid sequence bytes".to_string())
+                })?);
                 let sequence_le = sequence.to_le_bytes();
 
                 // Build: issuer(20) + NO_ACCOUNT(20) + sequence_le(4) = 44 bytes
@@ -134,7 +136,11 @@ impl Serialize for Issue {
             let issuer_account = &bytes[0..20];
             // bytes[20..40] = NO_ACCOUNT (skip)
             let sequence_le = &bytes[40..44];
-            let sequence = u32::from_le_bytes(sequence_le.try_into().unwrap());
+            let sequence = u32::from_le_bytes(
+                sequence_le
+                    .try_into()
+                    .map_err(|e: core::array::TryFromSliceError| serde::ser::Error::custom(e))?,
+            );
 
             // Reconstruct mpt_issuance_id: sequence(BE, 4) + issuer(20) = 24 bytes
             let sequence_be = sequence.to_be_bytes();
