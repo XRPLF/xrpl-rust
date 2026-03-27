@@ -866,7 +866,10 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
                 let bytes = parser.read(len)?;
                 Ok(Value::String(hex::encode_upper(&bytes)))
             } else {
-                Ok(Value::Null)
+                Err(XRPLCoreException::XRPLUtilsError(alloc::format!(
+                    "Unknown field type '{}' with no length prefix",
+                    field.associated_type
+                )))
             }
         }
     }
@@ -1114,6 +1117,80 @@ mod test {
 
         serializer.write_field_and_value(field_instance, &test_bytes, false);
         assert_eq!(expected, serializer);
+    }
+
+    /// Test that decode_field_value returns an error for unknown field types
+    /// with no length prefix, rather than silently returning Null.
+    /// Mirrors xrpl.js behavior where readFieldValue throws on unsupported types.
+    #[test]
+    fn test_decode_field_value_unknown_type_no_length_errors() {
+        use super::decode_field_value;
+        use crate::core::binarycodec::definitions::{FieldHeader, FieldInfo, FieldInstance};
+
+        let field_info = FieldInfo {
+            nth: 1,
+            is_vl_encoded: false,
+            is_serialized: true,
+            is_signing_field: true,
+            r#type: "FutureType".to_string(),
+        };
+        let field_header = FieldHeader {
+            type_code: 99,
+            field_code: 1,
+        };
+        let field = FieldInstance::new(&field_info, "FutureField", field_header);
+
+        let mut parser = BinaryParser::from(&[0xAB, 0xCD][..]);
+        let result = decode_field_value(&mut parser, &field);
+
+        assert!(
+            result.is_err(),
+            "Expected error for unknown type with no length prefix"
+        );
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Unknown field type 'FutureType'"),
+            "Error should mention the unknown type name, got: {}",
+            err_msg
+        );
+        // Parser should not have advanced (no bytes consumed)
+        assert_eq!(
+            parser.0.len(),
+            2,
+            "Parser should not have consumed any bytes"
+        );
+    }
+
+    /// Test that decode_field_value handles unknown VL-encoded types
+    /// by reading the bytes and returning them as hex.
+    #[test]
+    fn test_decode_field_value_unknown_type_with_vl_returns_hex() {
+        use super::decode_field_value;
+        use crate::core::binarycodec::definitions::{FieldHeader, FieldInfo, FieldInstance};
+
+        let field_info = FieldInfo {
+            nth: 1,
+            is_vl_encoded: true,
+            is_serialized: true,
+            is_signing_field: true,
+            r#type: "FutureVLType".to_string(),
+        };
+        let field_header = FieldHeader {
+            type_code: 99,
+            field_code: 1,
+        };
+        let field = FieldInstance::new(&field_info, "FutureVLField", field_header);
+
+        // VL prefix 0x03 = 3 bytes, followed by 3 bytes of data
+        let mut parser = BinaryParser::from(&[0x03, 0xAA, 0xBB, 0xCC][..]);
+        let result = decode_field_value(&mut parser, &field);
+
+        assert!(result.is_ok(), "VL-encoded unknown type should succeed");
+        assert_eq!(
+            result.unwrap(),
+            serde_json::Value::String("AABBCC".to_string())
+        );
+        assert!(parser.0.is_empty(), "Parser should have consumed all bytes");
     }
 
     /// This is currently a sanity check for private
