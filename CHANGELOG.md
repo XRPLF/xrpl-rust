@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
+### Breaking Changes
+
+### Added
+
+- Implemented full deserialization from hex binary back to JSON, update `definitions.json` to `xrpl.js` latest, added all codec test fixtures from xrpl.js and implemented tests for all of them.
+- Added integration tests for all transaction types, refactored to separate files.
+
+### Fixed
+
+- Fixed serialization issues for `PathSet`, `Issue`, and `STArray` types.
+
 ## [[v1.0.0]]
 
 - Initial production release

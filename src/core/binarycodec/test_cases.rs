@@ -22,7 +22,11 @@ pub struct FieldTest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct WholeObject {}
+pub struct WholeObject {
+    pub tx_json: Value,
+    pub fields: Value,
+    pub blob_with_no_signing: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ValueTest {
@@ -48,8 +52,6 @@ pub struct TestDefinitions {
 
 fn _load_tests() -> &'static Option<TestDefinitions> {
     pub const DATA_DRIVEN_TESTS: &str = include_str!("./test_data/data-driven-tests.json");
-    pub const CODEC_TEST_FIXTURES: &str = include_str!("./test_data/codec-fixtures.json");
-    pub const X_CODEC_TEST_FIXTURES: &str = include_str!("./test_data/x-codec-fixtures.json");
 
     lazy_static! {
         static ref TEST_CASES: Option<TestDefinitions> =
@@ -82,29 +84,59 @@ pub fn load_data_tests(test_type: Option<&str>) -> Vec<ValueTest> {
     }
 }
 
-/// Transaction fixture test case from xrpl.js
+/// A single codec-fixtures entry (used for transactions, accountState, ledgerData).
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TxFixture {
-    pub name: String,
+pub struct CodecFixtureEntry {
     pub binary: String,
     pub json: Value,
 }
 
-/// Transaction fixtures collection from xrpl.js
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct TxFixtures {
-    pub description: String,
-    pub transactions: Vec<TxFixture>,
+pub struct CodecFixtures {
+    #[serde(rename = "accountState")]
+    pub account_state: Vec<CodecFixtureEntry>,
+    pub transactions: Vec<CodecFixtureEntry>,
+    #[serde(rename = "ledgerData")]
+    pub ledger_data: Vec<CodecFixtureEntry>,
 }
 
-/// Load additional transaction encoding fixtures from xrpl.js.
-pub fn load_additional_tx_fixtures() -> &'static TxFixtures {
-    pub const ADDITIONAL_TX_FIXTURES: &str =
-        include_str!("./test_data/additional-tx-fixtures.json");
+/// Load codec-fixtures.json.
+pub fn load_codec_fixtures() -> &'static CodecFixtures {
+    pub const CODEC_FIXTURES: &str = include_str!("./test_data/codec-fixtures.json");
 
     lazy_static! {
-        static ref FIXTURES: TxFixtures =
-            serde_json::from_str(ADDITIONAL_TX_FIXTURES).expect("load_additional_tx_fixtures");
+        static ref FIXTURES: CodecFixtures =
+            serde_json::from_str(CODEC_FIXTURES).expect("load_codec_fixtures");
+    }
+
+    &FIXTURES
+}
+
+/// Load whole_objects from data-driven-tests.json for recycle tests.
+pub fn load_whole_objects() -> &'static Vec<WholeObject> {
+    let definitions = _load_tests().as_ref().expect("load_whole_objects");
+    &definitions.whole_objects
+}
+
+/// A single x-codec-fixtures entry with rjson (classic) and xjson (X-address) pairs.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct XCodecFixtureEntry {
+    pub rjson: Value,
+    pub xjson: Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct XCodecFixtures {
+    pub transactions: Vec<XCodecFixtureEntry>,
+}
+
+/// Load x-codec-fixtures.json.
+pub fn load_x_codec_fixtures() -> &'static XCodecFixtures {
+    pub const X_CODEC_FIXTURES: &str = include_str!("./test_data/x-codec-fixtures.json");
+
+    lazy_static! {
+        static ref FIXTURES: XCodecFixtures =
+            serde_json::from_str(X_CODEC_FIXTURES).expect("load_x_codec_fixtures");
     }
 
     &FIXTURES
