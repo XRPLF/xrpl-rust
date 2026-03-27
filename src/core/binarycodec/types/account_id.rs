@@ -42,10 +42,14 @@ impl TryFromParser for AccountId {
     type Error = XRPLCoreException;
 
     /// Build AccountId from a BinaryParser.
+    /// When length is Some(0), returns the zero account (20 zero bytes).
     fn from_parser(
         parser: &mut BinaryParser,
         length: Option<usize>,
     ) -> Result<AccountId, Self::Error> {
+        if length == Some(0) {
+            return AccountId::new(Some(&[0u8; ACCOUNT_ID_LENGTH]));
+        }
         Ok(AccountId(Hash160::from_parser(parser, length)?))
     }
 }
@@ -71,14 +75,23 @@ impl TryFrom<&str> for AccountId {
     type Error = XRPLCoreException;
 
     /// Construct an AccountId from a hex string or
-    /// a base58 r-Address.
+    /// a base58 r-Address. An empty string produces
+    /// ACCOUNT_ZERO (20 zero bytes).
     fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
+        if value.is_empty() {
+            return Self::new(Some(&[0u8; ACCOUNT_ID_LENGTH]));
+        }
         if is_hex_address(value) {
             Self::new(Some(&hex::decode(value)?))
         } else if is_valid_classic_address(value) {
             Self::new(Some(&decode_classic_address(value)?))
         } else if is_valid_xaddress(value) {
-            let (classic_address, _, _) = xaddress_to_classic_address(value)?;
+            let (classic_address, tag, _) = xaddress_to_classic_address(value)?;
+            if tag.is_some() {
+                return Err(XRPLCoreException::XRPLAddressCodecError(
+                    XRPLAddressCodecException::InvalidClassicAddressValue,
+                ));
+            }
             Self::new(Some(&decode_classic_address(&classic_address)?))
         } else {
             Err(XRPLCoreException::XRPLAddressCodecError(

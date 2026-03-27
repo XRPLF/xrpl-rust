@@ -37,6 +37,18 @@ pub enum XRPLTypeException {
     MissingField(String),
     #[error("Parse int error: {0}")]
     ParseIntError(#[from] core::num::ParseIntError),
+    #[error("Invalid UInt value: {value} is out of range for {type_name} (max {max})")]
+    UIntOutOfRange {
+        type_name: String,
+        value: u64,
+        max: u64,
+    },
+    #[error("Invalid Int32 value: {value} must be >= {min} and <= {max}")]
+    Int32OutOfRange { value: i64, min: i64, max: i64 },
+    #[error("Cannot construct {0} from decimal value")]
+    DecimalNotAllowed(String),
+    #[error("Unknown field: {0}")]
+    UnknownField(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
