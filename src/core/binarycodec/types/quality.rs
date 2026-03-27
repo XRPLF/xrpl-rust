@@ -52,6 +52,12 @@ pub fn encode_quality(quality: &str) -> XRPLCoreResult<Vec<u8>> {
         .map_err(|_| XRPLCoreException::XRPLUtilsError("Mantissa too large for u64".into()))?;
 
     let mut bytes = mantissa_u64.to_be_bytes().to_vec();
+    if !(0..=255).contains(&(exponent + 100)) {
+        return Err(XRPLCoreException::XRPLUtilsError(alloc::format!(
+            "Quality exponent {} out of representable range [-100, 155]",
+            exponent
+        )));
+    }
     bytes[0] = (exponent + 100) as u8;
 
     Ok(bytes)
