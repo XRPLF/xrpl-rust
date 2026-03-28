@@ -173,7 +173,7 @@ pub fn decode_ledger_data(hex_string: &str) -> XRPLCoreResult<Value> {
     decode_ledger_data_inner(hex_string)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "std"))]
 mod test {
     use alloc::vec;
 
@@ -581,5 +581,4 @@ mod test {
         let hex2 = encode(&txn).expect("second encode failed");
         assert_eq!(hex1, hex2, "encoding should be deterministic");
     }
-
 }
