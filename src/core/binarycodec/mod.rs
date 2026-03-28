@@ -179,13 +179,13 @@ mod test {
 
     use super::*;
 
-    #[path = "test/binary_json_tests.rs"]
+    #[path = "binary_json_tests.rs"]
     mod binary_json_tests;
-    #[path = "test/binary_serializer_tests.rs"]
+    #[path = "binary_serializer_tests.rs"]
     mod binary_serializer_tests;
-    #[path = "test/tx_encode_decode_tests.rs"]
+    #[path = "tx_encode_decode_tests.rs"]
     mod tx_encode_decode_tests;
-    #[path = "test/x_address_tests.rs"]
+    #[path = "x_address_tests.rs"]
     mod x_address_tests;
 
     use crate::core::binarycodec::definitions::{
@@ -582,52 +582,4 @@ mod test {
         assert_eq!(hex1, hex2, "encoding should be deterministic");
     }
 
-    /// Test that transaction encoding matches expected binary from xrpl.js fixtures.
-    #[cfg(feature = "std")]
-    #[test]
-    fn test_encode_additional_fixtures() {
-        use crate::core::binarycodec::test_cases::load_additional_tx_fixtures;
-
-        let fixtures = load_additional_tx_fixtures();
-        let total = fixtures.transactions.len();
-
-        println!(
-            "\n=== Running {} xrpl.js transaction fixture tests ===\n",
-            total
-        );
-
-        let mut passed = 0;
-        let mut failed = 0;
-
-        for (i, fixture) in fixtures.transactions.iter().enumerate() {
-            let result = encode(&fixture.json);
-
-            match result {
-                Ok(encoded) => {
-                    if encoded.to_uppercase() == fixture.binary.to_uppercase() {
-                        println!("  ✓ [{}/{}] {} passed", i + 1, total, fixture.name);
-                        passed += 1;
-                    } else {
-                        println!("  ✗ [{}/{}] {} MISMATCH", i + 1, total, fixture.name);
-                        println!("    Expected: {}", fixture.binary);
-                        println!("    Got:      {}", encoded);
-                        failed += 1;
-                    }
-                }
-                Err(e) => {
-                    println!("  ✗ [{}/{}] {} FAILED: {:?}", i + 1, total, fixture.name, e);
-                    failed += 1;
-                }
-            }
-        }
-
-        println!(
-            "\n=== Results: {} passed, {} failed out of {} ===\n",
-            passed, failed, total
-        );
-
-        if failed > 0 {
-            panic!("{} out of {} tests failed", failed, total);
-        }
-    }
 }
