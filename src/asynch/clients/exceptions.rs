@@ -1,4 +1,4 @@
-#[cfg(not(feature = "std"))]
+#[cfg(all(not(feature = "std"), feature = "websocket"))]
 use alloc::boxed::Box;
 use thiserror_no_std::Error;
 
