@@ -2,7 +2,7 @@ use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
 
-use super::metadata::TransactionMetadata;
+use crate::models::transactions::metadata::TransactionMetadata;
 
 /// Response format for the transaction_entry method.
 ///
