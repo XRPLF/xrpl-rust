@@ -8,8 +8,8 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 
 use crate::models::amount::{Amount, XRPAmount};
@@ -255,8 +255,8 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::models::Model;
     use crate::models::amount::{Amount, IssuedCurrencyAmount, XRPAmount};
+    use crate::models::Model;
 
     #[test]
     fn test_amount_error() {

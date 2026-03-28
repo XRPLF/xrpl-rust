@@ -185,7 +185,7 @@ impl<'a> AMMWithdraw<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{IssuedCurrency, currency::XRP};
+    use crate::models::{currency::XRP, IssuedCurrency};
 
     #[test]
     fn test_serde() {

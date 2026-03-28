@@ -84,7 +84,14 @@ impl NFTokenMintFlag {
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/nftokenmint>`
 #[skip_serializing_none]
 #[derive(
-    Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone, xrpl_rust_macros::ValidateCurrencies,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
 )]
 #[serde(rename_all = "PascalCase")]
 pub struct NFTokenMint<'a> {
@@ -290,8 +297,8 @@ mod tests {
     use alloc::vec;
     use core::convert::TryFrom;
 
-    use crate::models::Model;
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_issuer_error() {
@@ -359,8 +366,8 @@ mod tests {
                 fee: Some("10".into()),
                 flags: vec![NFTokenMintFlag::TfTransferable].into(),
                 memos: Some(vec![Memo::new(
-                    Some("72656E74".to_string()), 
-                    None, 
+                    Some("72656E74".to_string()),
+                    None,
                     Some("687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963".to_string())
                 )]),
                 signing_pub_key: Some("".into()),
@@ -371,9 +378,9 @@ mod tests {
             uri: Some("697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469".into()),
             ..Default::default()
         };
-        
+
         let default_json_str = r#"{"Account":"rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B","TransactionType":"NFTokenMint","Fee":"10","Flags":8,"Memos":[{"Memo":{"MemoData":"72656E74","MemoFormat":null,"MemoType":"687474703A2F2F6578616D706C652E636F6D2F6D656D6F2F67656E65726963"}}],"SigningPubKey":"","NFTokenTaxon":0,"TransferFee":314,"URI":"697066733A2F2F62616679626569676479727A74357366703775646D37687537367568377932366E6634646675796C71616266336F636C67747179353566627A6469"}"#;
-        
+
         // Serialize
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
@@ -411,14 +418,20 @@ mod tests {
         ));
 
         assert_eq!(nftoken_mint.nftoken_taxon, 12345);
-        assert_eq!(nftoken_mint.issuer.as_ref().unwrap(), "rLsn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK");
+        assert_eq!(
+            nftoken_mint.issuer.as_ref().unwrap(),
+            "rLsn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK"
+        );
         assert_eq!(nftoken_mint.transfer_fee, Some(314));
         assert!(nftoken_mint.uri.is_some());
         assert!(nftoken_mint.has_flag(&NFTokenMintFlag::TfTransferable));
         assert!(nftoken_mint.has_flag(&NFTokenMintFlag::TfBurnable));
         assert_eq!(nftoken_mint.common_fields.fee.as_ref().unwrap().0, "10");
         assert_eq!(nftoken_mint.common_fields.sequence, Some(123));
-        assert_eq!(nftoken_mint.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(
+            nftoken_mint.common_fields.last_ledger_sequence,
+            Some(7108682)
+        );
         assert_eq!(nftoken_mint.common_fields.source_tag, Some(12345));
         assert_eq!(nftoken_mint.common_fields.memos.as_ref().unwrap().len(), 1);
     }
@@ -435,8 +448,14 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(nftoken_mint.common_fields.account, "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B");
-        assert_eq!(nftoken_mint.common_fields.transaction_type, TransactionType::NFTokenMint);
+        assert_eq!(
+            nftoken_mint.common_fields.account,
+            "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B"
+        );
+        assert_eq!(
+            nftoken_mint.common_fields.transaction_type,
+            TransactionType::NFTokenMint
+        );
         assert_eq!(nftoken_mint.nftoken_taxon, 0);
         assert!(nftoken_mint.issuer.is_none());
         assert!(nftoken_mint.transfer_fee.is_none());
@@ -454,7 +473,10 @@ mod tests {
             nftoken_taxon: 99999, // Collection identifier
             ..Default::default()
         }
-        .with_flags(vec![NFTokenMintFlag::TfTransferable, NFTokenMintFlag::TfOnlyXRP])
+        .with_flags(vec![
+            NFTokenMintFlag::TfTransferable,
+            NFTokenMintFlag::TfOnlyXRP,
+        ])
         .with_transfer_fee(500) // 0.5%
         .with_uri("ipfs://collection-metadata-hash".into())
         .with_fee("15".into())

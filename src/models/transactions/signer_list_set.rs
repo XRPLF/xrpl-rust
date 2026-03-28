@@ -4,17 +4,17 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use derive_new::new;
-use serde::{Deserialize, Serialize, ser::SerializeMap};
+use serde::{ser::SerializeMap, Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::FlagCollection;
 use crate::models::NoFlags;
 use crate::models::XRPLModelResult;
-use crate::models::transactions::exceptions::XRPLSignerListSetException;
 use crate::models::{
-    Model, ValidateCurrencies,
     amount::XRPAmount,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies,
 };
 use crate::serde_with_tag;
 

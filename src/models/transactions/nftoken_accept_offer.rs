@@ -6,12 +6,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 use crate::models::{
-    Model, ValidateCurrencies,
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model, ValidateCurrencies,
 };
+use crate::models::{FlagCollection, NoFlags, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -185,8 +185,8 @@ mod tests {
 
     use super::*;
     use crate::models::{
-        Model,
         amount::{Amount, IssuedCurrencyAmount, XRPAmount},
+        Model,
     };
 
     #[test]
@@ -416,13 +416,11 @@ mod tests {
         .with_sequence(111);
 
         assert!(currency_fee_accept.nftoken_broker_fee.is_some());
-        assert!(
-            !currency_fee_accept
-                .nftoken_broker_fee
-                .as_ref()
-                .unwrap()
-                .is_xrp()
-        );
+        assert!(!currency_fee_accept
+            .nftoken_broker_fee
+            .as_ref()
+            .unwrap()
+            .is_xrp());
         assert_eq!(currency_fee_accept.common_fields.sequence, Some(111));
         assert!(currency_fee_accept.validate().is_ok());
     }

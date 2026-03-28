@@ -857,8 +857,8 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             } => {
                 use alloc::borrow::Cow;
 
-                use crate::models::IssuedCurrencyAmount;
                 use crate::models::transactions::trust_set::TrustSet;
+                use crate::models::IssuedCurrencyAmount;
                 use crate::wallet::Wallet;
 
                 // Create wallet from seed
@@ -991,7 +991,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
         Commands::Server(server_cmd) => match server_cmd {
             #[cfg(feature = "std")]
             ServerCommands::Fee { url } => {
-                use crate::ledger::{FeeType, get_fee};
+                use crate::ledger::{get_fee, FeeType};
 
                 // Create a runtime and client
                 let rt = get_or_create_runtime()?;
