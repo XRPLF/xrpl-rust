@@ -295,4 +295,52 @@ mod tests {
             "different prefixes must produce different hashes"
         );
     }
+
+    // -------------------------------------------------------------------
+    // xrpl.js ledger hash test vector — ported from:
+    //   packages/xrpl/test/fixtures/requests/hashLedger.json
+    //   packages/xrpl/test/hashLedger.test.ts
+    // -------------------------------------------------------------------
+
+    /// Helper: decode a hex string to a 32-byte array.
+    fn hex_to_32(hex: &str) -> [u8; 32] {
+        let bytes = hex::decode(hex).unwrap();
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        arr
+    }
+
+    /// xrpl.js hashLedger test vector: real ledger header with known hash.
+    ///
+    /// Source: packages/xrpl/test/fixtures/requests/hashLedger.json
+    /// Expected: F4D865D83EB88C1A1911B9E90641919A1314F36E1B099F8E95FE3B7C77BE3349
+    #[test]
+    fn test_xrpljs_ledger_hash_vector() {
+        let header = LedgerHeader {
+            ledger_index: 15_202_439,
+            total_coins: 99_998_831_688_050_493,
+            parent_hash: hex_to_32(
+                "12724A65B030C15A1573AA28B1BBB5DF3DA4589AA3623675A31CAE69B23B1C4E",
+            ),
+            transaction_hash: hex_to_32(
+                "325EACC5271322539EEEC2D6A5292471EF1B3E72AE7180533EFC3B8F0AD435C8",
+            ),
+            account_hash: hex_to_32(
+                "D9ABF622DA26EEEE48203085D4BC23B0F77DC6F8724AC33D975DA3CA492D2E44",
+            ),
+            parent_close_time: 492_656_460,
+            close_time: 492_656_470,
+            close_time_resolution: 10,
+            close_flags: 0,
+        };
+
+        let expected =
+            hex_to_32("F4D865D83EB88C1A1911B9E90641919A1314F36E1B099F8E95FE3B7C77BE3349");
+        let computed = ledger_hash(&header);
+
+        assert_eq!(
+            computed, expected,
+            "ledger hash must match xrpl.js test vector"
+        );
+    }
 }

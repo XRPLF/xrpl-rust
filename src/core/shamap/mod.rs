@@ -1,14 +1,15 @@
 //! ShaMap: a radix-16 Merkle trie used in the XRP Ledger.
 //!
-//! This module implements the full ShaMap tree structure matching the xrpl.js
-//! class hierarchy. It provides:
+//! This module implements an optimized ShaMap using HAMT bitmap indexing,
+//! hash caching with dirty-flag propagation, and single-buffer hashing.
 //!
 //! - [`ShaMap`] -- the top-level hash tree for building transaction and account
-//!   state trees
-//! - [`hash_prefix`] -- domain-separation constants for all hash contexts
-//! - [`sha512half`] -- the SHA-512/256 hash primitive used throughout the XRPL
+//!   state trees. Supports O(1) cached `hash()`, incremental add/remove, and
+//!   Merkle inclusion proofs.
+//! - [`hash_prefix`] -- domain-separation constants for all XRPL hash contexts
+//! - [`sha512half`] -- the SHA-512/256 hash primitive
 //! - [`ledger`] -- ledger header hashing and tree construction helpers
-//! - Inclusion proofs via [`ShaMapProof`] and [`verify_proof`]
+//! - [`ShaMapProof`] and [`verify_proof`] -- SPV-style inclusion proofs
 
 pub mod hash_prefix;
 pub mod ledger;

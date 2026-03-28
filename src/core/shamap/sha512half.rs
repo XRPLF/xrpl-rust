@@ -41,11 +41,16 @@ impl Default for Sha512Half {
     }
 }
 
-/// Convenience function: compute SHA-512Half of a single byte slice.
+/// Compute SHA-512Half of a single byte slice.
+///
+/// For fixed-size inputs (like the 516-byte inner-node hash), this avoids
+/// the overhead of multiple `update()` calls by hashing the entire buffer
+/// in one shot.
 pub fn sha512half(data: &[u8]) -> [u8; 32] {
-    let mut h = Sha512Half::new();
-    h.update(data);
-    h.finish()
+    let result = Sha512::digest(data);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&result[..32]);
+    out
 }
 
 #[cfg(test)]
