@@ -37,7 +37,7 @@ impl<'a: 'b, 'b> From<Amount<'a>> for Balance<'b> {
 }
 
 impl<'a> From<Balance<'a>> for Amount<'a> {
-    fn from(balance: Balance<'a>) -> Amount<'a> {
+    fn from(balance: Balance<'a>) -> Self {
         if balance.currency == "XRP" {
             Amount::XRPAmount(balance.value.into())
         } else {
