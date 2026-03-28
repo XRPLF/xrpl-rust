@@ -1,0 +1,49 @@
+[package]
+name = "xrpl-rust-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.xrpl-rust]
+path = ".."
+default-features = false
+features = ["core"]
+
+# Fuzz target: order-independent root hash
+[[bin]]
+name = "shamap_order_independence"
+path = "fuzz_targets/shamap_order_independence.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: add/remove roundtrip preserves hash
+[[bin]]
+name = "shamap_add_remove_roundtrip"
+path = "fuzz_targets/shamap_add_remove_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: every leaf has a valid proof, tampered proofs fail
+[[bin]]
+name = "shamap_proof_integrity"
+path = "fuzz_targets/shamap_proof_integrity.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz target: hash caching consistency
+[[bin]]
+name = "shamap_cache_consistency"
+path = "fuzz_targets/shamap_cache_consistency.rs"
+test = false
+doc = false
+bench = false
