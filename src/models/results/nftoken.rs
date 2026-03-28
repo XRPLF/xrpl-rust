@@ -1,9 +1,10 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, vec::Vec};
 use core::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 
-use super::{metadata::TransactionMetadata, tx::TxVersionMap};
+use super::tx::TxVersionMap;
+use crate::models::transactions::metadata::TransactionMetadata;
 use crate::models::{XRPLModelException, XRPLModelResult};
 
 /// Result type for NFTokenMint transaction
@@ -30,7 +31,7 @@ pub struct NFTokenCreateOfferResult<'a> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NFTokenCancelOfferResult<'a> {
     /// The NFTokenIDs of all tokens affected by the cancellation
-    pub nftoken_ids: Cow<'a, [Cow<'a, str>]>,
+    pub nftoken_ids: Vec<Cow<'a, str>>,
     /// The complete transaction metadata
     #[serde(flatten)]
     pub meta: TransactionMetadata<'a>,
