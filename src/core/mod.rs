@@ -4,6 +4,7 @@ pub mod addresscodec;
 pub mod binarycodec;
 pub mod exceptions;
 pub mod keypairs;
+pub mod shamap;
 
 pub use self::binarycodec::binary_wrappers::BinaryParser;
 pub use self::binarycodec::binary_wrappers::BinarySerializer;
