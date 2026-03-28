@@ -1,15 +1,19 @@
 //! Functions for encoding objects into the XRP Ledger's
 //! canonical binary format and decoding them.
+//!
+//! This module is the public API entry point.
+//! Internal serialization/deserialization logic lives in `binary_wrappers`
 
 pub mod definitions;
 pub mod types;
 
-use types::{AccountId, STObject};
+use types::AccountId;
 
-use alloc::{borrow::Cow, string::String, vec::Vec};
+use alloc::borrow::Cow;
+use alloc::string::String;
 use core::convert::TryFrom;
-use hex::ToHex;
 use serde::Serialize;
+use serde_json::Value;
 
 pub mod binary_wrappers;
 pub mod exceptions;
@@ -18,13 +22,14 @@ pub mod utils;
 
 pub use binary_wrappers::*;
 
-use crate::XRPLSerdeJsonError;
+use self::binary_wrappers::{
+    decode_ledger_data_inner, decode_st_object, serialize_json, BATCH_PREFIX,
+    PAYMENT_CHANNEL_CLAIM_PREFIX, TRANSACTION_MULTISIG_PREFIX, TRANSACTION_SIGNATURE_PREFIX,
+};
 
 use super::exceptions::XRPLCoreResult;
 
-const TRANSACTION_SIGNATURE_PREFIX: i32 = 0x53545800;
-const TRANSACTION_MULTISIG_PREFIX: [u8; 4] = (0x534D5400u32).to_be_bytes();
-
+/// Encode a transaction (or any XRPL object) to hex-encoded binary.
 pub fn encode<T>(signed_transaction: &T) -> XRPLCoreResult<String>
 where
     T: Serialize,
@@ -32,6 +37,7 @@ where
     serialize_json(signed_transaction, None, None, false)
 }
 
+/// Encode a transaction for signing (prepends the signing prefix).
 pub fn encode_for_signing<T>(prepared_transaction: &T) -> XRPLCoreResult<String>
 where
     T: Serialize,
@@ -44,6 +50,8 @@ where
     )
 }
 
+/// Encode a transaction for multi-signing (prepends multi-sign prefix,
+/// appends the signing account ID).
 pub fn encode_for_multisigning<T>(
     prepared_transaction: &T,
     signing_account: Cow<'_, str>,
@@ -61,30 +69,120 @@ where
     )
 }
 
-fn serialize_json<T>(
-    prepared_transaction: &T,
-    prefix: Option<&[u8]>,
-    suffix: Option<&[u8]>,
-    signing_only: bool,
-) -> XRPLCoreResult<String>
-where
-    T: Serialize,
-{
-    let mut buffer = Vec::new();
-    if let Some(p) = prefix {
-        buffer.extend(p);
+/// Encode a payment channel claim for signing.
+///
+/// This produces the serialized data that must be signed to authorize
+/// a claim against a payment channel. The format is:
+/// - 4 bytes: HashPrefix `0x434C4D00` ("CLM\0")
+/// - 32 bytes: channel ID (Hash256)
+/// - 8 bytes: amount in drops (UInt64, big-endian)
+///
+/// See Payment Channel Claim:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/paymentchannelclaim>`
+pub fn encode_for_signing_claim(channel: &str, amount: &str) -> XRPLCoreResult<String> {
+    let channel_bytes = hex::decode(channel).map_err(|_| {
+        super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+            exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                expected: 64,
+                found: channel.len(),
+            },
+        )
+    })?;
+    if channel_bytes.len() != 32 {
+        return Err(super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+            exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                expected: 32,
+                found: channel_bytes.len(),
+            },
+        ));
     }
+    let amount_val: u64 = amount.parse().map_err(|e| {
+        super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+            exceptions::XRPLBinaryCodecException::ParseIntError(e),
+        )
+    })?;
 
-    let json_value =
-        serde_json::to_value(prepared_transaction).map_err(XRPLSerdeJsonError::from)?;
-    // dbg!(&json_value);
-    let st_object = STObject::try_from_value(json_value, signing_only)?;
-    buffer.extend(st_object.as_ref());
+    let mut buf = alloc::vec::Vec::with_capacity(44);
+    buf.extend_from_slice(&PAYMENT_CHANNEL_CLAIM_PREFIX);
+    buf.extend_from_slice(&channel_bytes);
+    buf.extend_from_slice(&amount_val.to_be_bytes());
+    Ok(hex::encode_upper(&buf))
+}
 
-    if let Some(s) = suffix {
-        buffer.extend(s);
+/// Encode a Batch transaction for signing.
+///
+/// This produces the serialized data that must be signed to authorize
+/// a batch transaction. The format is:
+/// - 4 bytes: HashPrefix `0x42434800` ("BCH\0")
+/// - 4 bytes: flags (UInt32, big-endian)
+/// - 4 bytes: number of txIDs (UInt32, big-endian)
+/// - N × 32 bytes: each txID (Hash256)
+///
+/// See Batch Transaction:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/batch>`
+pub fn encode_for_signing_batch(flags: u32, tx_ids: &[&str]) -> XRPLCoreResult<String> {
+    let mut buf = alloc::vec::Vec::with_capacity(4 + 4 + 4 + tx_ids.len() * 32);
+    buf.extend_from_slice(&BATCH_PREFIX);
+    buf.extend_from_slice(&flags.to_be_bytes());
+    buf.extend_from_slice(&(tx_ids.len() as u32).to_be_bytes());
+    for tx_id in tx_ids {
+        let id_bytes = hex::decode(tx_id).map_err(|_| {
+            super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+                exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                    expected: 64,
+                    found: tx_id.len(),
+                },
+            )
+        })?;
+        if id_bytes.len() != 32 {
+            return Err(super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+                exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                    expected: 32,
+                    found: id_bytes.len(),
+                },
+            ));
+        }
+        buf.extend_from_slice(&id_bytes);
     }
-    let hex_string = buffer.encode_hex_upper::<String>();
+    Ok(hex::encode_upper(&buf))
+}
 
-    Ok(hex_string)
+/// Decode a hex-encoded XRPL binary blob into a JSON object.
+///
+/// This is the inverse of `encode`. It takes a hex string representing
+/// a serialized XRPL transaction (or other object) and returns its
+/// JSON representation as a `serde_json::Value`.
+pub fn decode(hex_string: &str) -> XRPLCoreResult<Value> {
+    let mut parser = BinaryParser::try_from(hex_string)?;
+    decode_st_object(&mut parser)
+}
+
+/// Decode a serialized ledger header from hex into JSON.
+///
+/// Ledger headers use a fixed-length format (not field-prefixed like STObject):
+/// - 4 bytes: ledger_index (UInt32)
+/// - 8 bytes: total_coins (UInt64, as base-10 string)
+/// - 32 bytes: parent_hash (Hash256)
+/// - 32 bytes: transaction_hash (Hash256)
+/// - 32 bytes: account_hash (Hash256)
+/// - 4 bytes: parent_close_time (UInt32)
+/// - 4 bytes: close_time (UInt32)
+/// - 1 byte: close_time_resolution (UInt8)
+/// - 1 byte: close_flags (UInt8)
+pub fn decode_ledger_data(hex_string: &str) -> XRPLCoreResult<Value> {
+    decode_ledger_data_inner(hex_string)
+}
+
+#[cfg(all(test, feature = "std"))]
+mod test {
+    use super::*;
+
+    #[path = "binary_json_tests.rs"]
+    mod binary_json_tests;
+    #[path = "binary_serializer_tests.rs"]
+    mod binary_serializer_tests;
+    #[path = "tx_encode_decode_tests.rs"]
+    mod tx_encode_decode_tests;
+    #[path = "x_address_tests.rs"]
+    mod x_address_tests;
 }

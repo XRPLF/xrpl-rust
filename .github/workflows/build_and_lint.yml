@@ -1,0 +1,64 @@
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+name: Build & Lint
+
+jobs:
+  build_and_lint:
+    name: Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-build-lint-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-lint-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-features -- -D warnings
+
+      - name: Build (default)
+        run: cargo build --release
+
+      - name: Build (no-default)
+        run: cargo build --release --no-default-features
+
+      - name: Build (no_std)
+        run: cargo build --release --no-default-features --features embassy-rt,core,wallet,models,helpers,websocket,json-rpc
+
+      - name: Build (core-only)
+        run: cargo build --release --no-default-features --features core
+
+      - name: Build (wallet-only)
+        run: cargo build --release --no-default-features --features wallet
+
+      - name: Build (models-only)
+        run: cargo build --release --no-default-features --features models
+
+      - name: Build (helpers-only)
+        run: cargo build --release --no-default-features --features websocket,json-rpc,helpers,tokio-rt
+
+      - name: Build (websocket-only)
+        run: cargo build --release --no-default-features --features websocket
+
+      - name: Build (json-rpc-only)
+        run: cargo build --release --no-default-features --features json-rpc

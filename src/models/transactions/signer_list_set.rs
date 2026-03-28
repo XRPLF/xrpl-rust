@@ -131,8 +131,8 @@ impl<'a> SignerListSetError for SignerListSet<'a> {
     fn _get_signer_quorum_error(&self) -> XRPLModelResult<()> {
         let mut accounts = Vec::new();
         let mut signer_weight_sum: u32 = 0;
-        if self.signer_entries.is_some() {
-            for signer_entry in self.signer_entries.as_ref().unwrap() {
+        if let Some(signer_entries) = &self.signer_entries {
+            for signer_entry in signer_entries {
                 accounts.push(&signer_entry.account);
                 let weight: u32 = signer_entry.signer_weight.into();
                 signer_weight_sum += weight;
@@ -363,7 +363,7 @@ mod tests {
 
         assert_eq!(
             signer_list_set.validate().unwrap_err().to_string().as_str(),
-            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries`"
+            "The field `signer_quorum` must be below or equal to the sum of `signer_weight` in `signer_entries` (max 3, found 10)"
         );
 
         signer_list_set.signer_entries = Some(vec![

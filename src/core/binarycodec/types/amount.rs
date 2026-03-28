@@ -39,6 +39,7 @@ const _POS_SIGN_BIT_MASK: i64 = 0x4000000000000000;
 const _ZERO_CURRENCY_AMOUNT_HEX: u64 = 0x8000000000000000;
 const _NATIVE_AMOUNT_BYTE_LENGTH: u8 = 8;
 const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
+const _MPT_AMOUNT_BYTE_LENGTH: u8 = 33;
 
 /// Normally when using bigdecimal "serde_json" feature a `1` will be serialized as `1.000000000000000`.
 /// This function normalizes a `BigDecimal` before serializing to a string.
@@ -139,6 +140,12 @@ fn _serialize_issued_currency_value(decimal: BigDecimal) -> XRPLCoreResult<[u8; 
 
 /// Serializes an XRP amount.
 fn _serialize_xrp_amount(value: &str) -> XRPLCoreResult<[u8; 8]> {
+    // XRP amounts in the binary codec are integer drops — no decimal point allowed
+    if _contains_decimal(value) {
+        return Err(XRPLCoreException::XRPLUtilsError(
+            XRPRangeException::InvalidXRPAmount.to_string(),
+        ));
+    }
     verify_valid_xrp_value(value).map_err(|e| XRPLCoreException::XRPLUtilsError(e.to_string()))?;
 
     let decimal = bigdecimal::BigDecimal::from_str(value)
@@ -180,6 +187,67 @@ fn _serialize_issued_currency_amount(issused_currency: IssuedCurrency) -> XRPLCo
     }
 }
 
+/// Maximum MPT amount value (i64::MAX).
+const _MAX_MPT_AMOUNT: i64 = i64::MAX; // 9223372036854775807
+
+/// Serialize an MPT amount object to bytes.
+/// Format: leading_byte (1) + amount (8) + mpt_issuance_id (24) = 33 bytes
+fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[u8; 33]> {
+    // Validate mpt_issuance_id length (24 bytes = 48 hex chars)
+    if mpt_issuance_id.len() != 48 {
+        return Err(XRPLCoreException::XRPLUtilsError(
+            "mpt_issuance_id has invalid hash length".to_string(),
+        ));
+    }
+
+    // Parse the value - can be decimal string or hex string (0x prefix)
+    let amount: u64 = if value.starts_with("0x") || value.starts_with("0X") {
+        u64::from_str_radix(&value[2..], 16).map_err(|_| {
+            XRPLCoreException::XRPLUtilsError("Value has bad hex character".to_string())
+        })?
+    } else if value == "-0" {
+        0u64
+    } else {
+        // Check for decimal point
+        if _contains_decimal(value) {
+            return Err(XRPLCoreException::XRPLUtilsError(
+                "Value has decimal point".to_string(),
+            ));
+        }
+        // Check for negative
+        if value.starts_with('-') {
+            return Err(XRPLCoreException::XRPLUtilsError(
+                "Value is negative".to_string(),
+            ));
+        }
+        value
+            .parse::<u64>()
+            .map_err(|_| XRPLCoreException::XRPLUtilsError("Value has bad character".to_string()))?
+    };
+
+    // Validate range: must fit in i64 (< 2^63)
+    if amount > _MAX_MPT_AMOUNT as u64 {
+        return Err(XRPLCoreException::XRPLUtilsError(
+            "Value is too large".to_string(),
+        ));
+    }
+
+    let mpt_id_bytes = hex::decode(mpt_issuance_id).map_err(|_| {
+        XRPLCoreException::XRPLUtilsError("Invalid mpt_issuance_id hex".to_string())
+    })?;
+
+    let mut result = [0u8; 33];
+    // Leading byte: 0x60 = MPT flag (0x20) + positive flag (0x40)
+    result[0] = 0x60;
+    // Amount as big-endian u64
+    let amount_bytes = amount.to_be_bytes();
+    result[1..9].copy_from_slice(&amount_bytes);
+    // MPT issuance ID (24 bytes)
+    result[9..33].copy_from_slice(&mpt_id_bytes);
+
+    Ok(result)
+}
+
 impl Amount {
     /// Deserialize native asset amount.
     fn _deserialize_native_amount(&self) -> String {
@@ -191,7 +259,12 @@ impl Amount {
 
     /// Returns True if this amount is a native XRP amount.
     pub fn is_native(&self) -> bool {
-        self.0[0] & 0x80 == 0
+        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
+    }
+
+    /// Returns True if this amount is an MPT amount.
+    pub fn is_mpt(&self) -> bool {
+        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
     /// Returns true if 2nd bit in 1st byte is set to 1
@@ -219,9 +292,11 @@ impl IssuedCurrency {
             let int_mantissa = i128::from_str_radix(&hex_mantissa, 16)
                 .map_err(XRPLBinaryCodecException::ParseIntError)?;
 
-            // Adjust scale using the exponent
-            let scale = exp.unsigned_abs();
-            value = BigDecimal::new(int_mantissa.into(), scale as i64);
+            // Adjust scale using the exponent.
+            // BigDecimal::new(mantissa, scale) = mantissa * 10^(-scale),
+            // so we need scale = -exp to get mantissa * 10^exp.
+            let scale = -(exp as i64);
+            value = BigDecimal::new(int_mantissa.into(), scale);
 
             // Handle the sign
             if bytes[0] & 0x40 > 0 {
@@ -260,10 +335,19 @@ impl TryFromParser for Amount {
         parser: &mut BinaryParser,
         _length: Option<usize>,
     ) -> XRPLCoreResult<Amount, Self::Error> {
-        let parser_first_byte = parser.peek();
-        let num_bytes = match parser_first_byte {
-            None => _CURRENCY_AMOUNT_BYTE_LENGTH,
-            Some(_) => _NATIVE_AMOUNT_BYTE_LENGTH,
+        let first_byte = parser
+            .peek()
+            .ok_or(XRPLBinaryCodecException::InvalidReadFromBytesValue)?;
+        // Determine amount type from high bits of first byte:
+        // 0x80 set => IOU (48 bytes)
+        // 0x80 clear, 0x20 set => MPT (33 bytes)
+        // 0x80 clear, 0x20 clear => Native XRP (8 bytes)
+        let num_bytes = if first_byte[0] & 0x80 != 0 {
+            _CURRENCY_AMOUNT_BYTE_LENGTH
+        } else if first_byte[0] & 0x20 != 0 {
+            _MPT_AMOUNT_BYTE_LENGTH
+        } else {
+            _NATIVE_AMOUNT_BYTE_LENGTH
         };
 
         Ok(Amount(parser.read(num_bytes as usize)?))
@@ -294,6 +378,22 @@ impl Serialize for Amount {
     {
         if self.is_native() {
             serializer.serialize_str(&self._deserialize_native_amount())
+        } else if self.is_mpt() {
+            // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id
+            let bytes = self.as_ref();
+            let leading = bytes[0];
+            let is_positive = leading & 0x40 != 0;
+            let sign = if is_positive { "" } else { "-" };
+            let mut amount_bytes = [0u8; 8];
+            amount_bytes.copy_from_slice(&bytes[1..9]);
+            let amount_val = u64::from_be_bytes(amount_bytes);
+            let mpt_id = hex::encode_upper(&bytes[9..33]);
+
+            let value_str = alloc::format!("{}{}", sign, amount_val);
+            let mut builder = serializer.serialize_map(Some(2))?;
+            builder.serialize_entry("value", &value_str)?;
+            builder.serialize_entry("mpt_issuance_id", &mpt_id)?;
+            builder.end()
         } else {
             let mut parser = BinaryParser::from(self.as_ref());
 
@@ -342,7 +442,32 @@ impl TryFrom<serde_json::Value> for Amount {
             let xrp_value = value.as_str().ok_or(XRPLTypeException::InvalidNoneValue)?;
             Self::try_from(xrp_value)
         } else if value.is_object() {
-            Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
+            let obj = value
+                .as_object()
+                .ok_or(XRPLTypeException::InvalidNoneValue)?;
+            if obj.contains_key("mpt_issuance_id") {
+                // MPT amount: must have mpt_issuance_id + value, no currency/issuer
+                if obj.contains_key("currency") {
+                    return Err(XRPLCoreException::XRPLUtilsError(
+                        "Currency not valid for MPT".to_string(),
+                    ));
+                }
+                if obj.contains_key("issuer") {
+                    return Err(XRPLCoreException::XRPLUtilsError(
+                        "Issuer not valid for MPT".to_string(),
+                    ));
+                }
+                let mpt_id = obj["mpt_issuance_id"]
+                    .as_str()
+                    .ok_or(XRPLTypeException::InvalidNoneValue)?;
+                let val = obj["value"]
+                    .as_str()
+                    .ok_or(XRPLTypeException::InvalidNoneValue)?;
+                let serialized = _serialize_mpt_amount(val, mpt_id)?;
+                Ok(Amount::new(Some(&serialized))?)
+            } else {
+                Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
+            }
         } else {
             Err(XRPLCoreException::SerdeJsonError(
                 XRPLSerdeJsonError::UnexpectedValueType {

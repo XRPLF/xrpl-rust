@@ -52,7 +52,7 @@ pub fn unscramble_taxon(taxon: u64, token_seq: u64) -> u64 {
 /// |    `---> TransferFee: 1337.0 bps or 13.37%
 /// |
 /// `---> Flags: 11 -> lsfBurnable, lsfOnlyXRP and lsfTransferable
-pub fn parse_nftoken_id(nft_id: Cow<str>) -> XRPLUtilsResult<NFTokenId<'_>> {
+pub fn parse_nftoken_id(nft_id: Cow<'_, str>) -> XRPLUtilsResult<NFTokenId<'_>> {
     const EXPECTED_LEN: usize = 64;
 
     if nft_id.len() != EXPECTED_LEN {

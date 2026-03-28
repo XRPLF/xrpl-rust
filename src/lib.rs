@@ -19,6 +19,7 @@
 //! [XRP Ledger](https://xrpl.org/docs.html).
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)] // Remove eventually
+#![allow(clippy::result_large_err)]
 
 use ::core::fmt::Display;
 

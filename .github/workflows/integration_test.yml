@@ -1,0 +1,69 @@
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+name: Integration Test
+
+env:
+  RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop
+
+jobs:
+  integration_test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start rippled standalone
+        run: |
+          docker run --detach --rm \
+            -p 5005:5005 \
+            -p 6006:6006 \
+            --volume "${{ github.workspace }}/.ci-config/":"/etc/opt/ripple/" \
+            --name rippled-service \
+            --health-cmd="rippled server_info || exit 1" \
+            --health-interval=5s \
+            --health-retries=10 \
+            --health-timeout=2s \
+            --env GITHUB_ACTIONS=true \
+            --env CI=true \
+            --entrypoint bash \
+            ${{ env.RIPPLED_DOCKER_IMAGE }} \
+            -c "mkdir -p /var/lib/rippled/db/ && rippled -a"
+
+      - name: Wait for rippled to be healthy
+        run: |
+          until docker inspect --format='{{.State.Health.Status}}' rippled-service | grep -q healthy; do
+            echo "Waiting for rippled to be ready..."
+            sleep 2
+          done
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-integration-
+
+      - name: Run integration tests
+        run: cargo test --release --features std,json-rpc,helpers,integration --test integration_test -- --test-threads=1
+        env:
+          RUST_BACKTRACE: 1
+
+      - name: Stop rippled
+        if: always()
+        run: docker stop rippled-service

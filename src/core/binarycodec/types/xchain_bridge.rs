@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
-use serde::Deserialize;
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::Value;
 
 use crate::core::{
@@ -102,6 +103,37 @@ impl TryFrom<&str> for XChainBridge {
 
     fn try_from(value: &str) -> XRPLCoreResult<Self, Self::Error> {
         Ok(XChainBridge(SerializedType::from(hex::decode(value)?)))
+    }
+}
+
+impl Serialize for XChainBridge {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let bytes = self.as_ref();
+        let mut parser = BinaryParser::from(bytes);
+        let mut map = serializer.serialize_map(Some(4))?;
+
+        for [name, object_type] in TYPE_ORDER {
+            match object_type {
+                "AccountID" => {
+                    // Skip the 0x14 length prefix byte
+                    let _ = parser.read(1).map_err(serde::ser::Error::custom)?;
+                    let account_id = AccountId::from_parser(&mut parser, None)
+                        .map_err(serde::ser::Error::custom)?;
+                    map.serialize_entry(name, &account_id)?;
+                }
+                "Issue" => {
+                    let issue =
+                        Issue::from_parser(&mut parser, None).map_err(serde::ser::Error::custom)?;
+                    map.serialize_entry(name, &issue)?;
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        map.end()
     }
 }
 

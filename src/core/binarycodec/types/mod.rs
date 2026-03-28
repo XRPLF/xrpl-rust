@@ -7,7 +7,9 @@ pub mod currency;
 pub mod exceptions;
 pub mod hash;
 pub mod issue;
+pub mod number;
 pub mod paths;
+pub mod quality;
 pub(crate) mod test_cases;
 pub mod utils;
 pub mod vector256;
@@ -26,8 +28,10 @@ pub use self::currency::Currency;
 pub use self::hash::Hash;
 pub use self::hash::Hash128;
 pub use self::hash::Hash160;
+pub use self::hash::Hash192;
 pub use self::hash::Hash256;
 pub use self::issue::Issue;
+pub use self::number::Number;
 pub use self::paths::Path;
 pub use self::paths::PathSet;
 pub use self::paths::PathStep;
@@ -35,7 +39,10 @@ pub use self::vector256::Vector256;
 pub use self::xchain_bridge::XChainBridge;
 
 use crate::core::binarycodec::binary_wrappers::Serialization;
+use crate::core::binarycodec::binary_wrappers::BASE10_UINT64_FIELDS;
+use crate::core::binarycodec::definitions::get_delegatable_permission_code;
 use crate::core::binarycodec::definitions::get_field_instance;
+use crate::core::binarycodec::definitions::get_ledger_entry_type_code;
 use crate::core::binarycodec::definitions::get_transaction_result_code;
 use crate::core::binarycodec::definitions::get_transaction_type_code;
 use crate::core::binarycodec::definitions::FieldInstance;
@@ -74,8 +81,11 @@ pub enum XRPLTypes {
     Currency(Currency),
     Hash128(Hash128),
     Hash160(Hash160),
+    Hash192(Hash192),
     Hash256(Hash256),
+    Int32(i32),
     Issue(Issue),
+    Number(Number),
     Path(Path),
     PathSet(PathSet),
     PathStep(PathStep),
@@ -103,6 +113,7 @@ impl XRPLTypes {
                 "Currency" => Ok(Some(XRPLTypes::Currency(Self::type_from_str(value)?))),
                 "Hash128" => Ok(Some(XRPLTypes::Hash128(Self::type_from_str(value)?))),
                 "Hash160" => Ok(Some(XRPLTypes::Hash160(Self::type_from_str(value)?))),
+                "Hash192" => Ok(Some(XRPLTypes::Hash192(Self::type_from_str(value)?))),
                 "Hash256" => Ok(Some(XRPLTypes::Hash256(Self::type_from_str(value)?))),
                 "XChainClaimID" => Ok(Some(XRPLTypes::Hash256(Self::type_from_str(value)?))),
                 "UInt8" => Ok(Some(XRPLTypes::UInt8(
@@ -121,19 +132,89 @@ impl XRPLTypes {
                         .map_err(XRPLTypeException::ParseIntError)?,
                 ))),
                 "UInt64" => Ok(Some(XRPLTypes::UInt64(
-                    value
-                        .parse::<u64>()
-                        .map_err(XRPLTypeException::ParseIntError)?,
+                    u64::from_str_radix(value, 16).map_err(XRPLTypeException::ParseIntError)?,
                 ))),
+                "Number" => Ok(Some(XRPLTypes::Number(Number::try_from(value)?))),
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_u64() {
             // dbg!("is u64");
             match name {
-                "UInt8" => Ok(Some(XRPLTypes::UInt8(value as u8))),
-                "UInt16" => Ok(Some(XRPLTypes::UInt16(value as u16))),
-                "UInt32" => Ok(Some(XRPLTypes::UInt32(value as u32))),
+                "UInt8" => {
+                    if value > u8::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::UIntOutOfRange {
+                            type_name: "UInt8".into(),
+                            value,
+                            max: u8::MAX as u64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::UInt8(value as u8)))
+                    }
+                }
+                "UInt16" => {
+                    if value > u16::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::UIntOutOfRange {
+                            type_name: "UInt16".into(),
+                            value,
+                            max: u16::MAX as u64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::UInt16(value as u16)))
+                    }
+                }
+                "UInt32" => {
+                    if value > u32::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::UIntOutOfRange {
+                            type_name: "UInt32".into(),
+                            value,
+                            max: u32::MAX as u64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::UInt32(value as u32)))
+                    }
+                }
                 "UInt64" => Ok(Some(XRPLTypes::UInt64(value))),
+                "Int32" => {
+                    // Positive integer that fits in i32
+                    if value > i32::MAX as u64 {
+                        Err(exceptions::XRPLTypeException::Int32OutOfRange {
+                            value: value as i64,
+                            min: i32::MIN as i64,
+                            max: i32::MAX as i64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::Int32(value as i32)))
+                    }
+                }
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
+            }
+        } else if value.is_f64() {
+            // Decimal values are not allowed for any integer type
+            match name {
+                "UInt8" | "UInt16" | "UInt32" | "UInt64" | "Int32" => {
+                    Err(exceptions::XRPLTypeException::DecimalNotAllowed(name.into()).into())
+                }
+                _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
+            }
+        } else if let Some(value) = value.as_i64() {
+            // Negative integer values — only valid for Int32
+            match name {
+                "Int32" => {
+                    if value < i32::MIN as i64 || value > i32::MAX as i64 {
+                        Err(exceptions::XRPLTypeException::Int32OutOfRange {
+                            value,
+                            min: i32::MIN as i64,
+                            max: i32::MAX as i64,
+                        }
+                        .into())
+                    } else {
+                        Ok(Some(XRPLTypes::Int32(value as i32)))
+                    }
+                }
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else if let Some(value) = value.as_object() {
@@ -142,6 +223,9 @@ impl XRPLTypes {
                 "Amount" => Ok(Some(XRPLTypes::Amount(Self::amount_from_map(
                     value.to_owned(),
                 )?))),
+                "Issue" => Ok(Some(XRPLTypes::Issue(Issue::try_from(Value::Object(
+                    value.to_owned(),
+                ))?))),
                 "STObject" => Ok(Some(XRPLTypes::STObject(STObject::try_from_value(
                     Value::Object(value.to_owned()),
                     false,
@@ -157,6 +241,41 @@ impl XRPLTypes {
                 "STArray" => Ok(Some(XRPLTypes::STArray(STArray::try_from_value(
                     Value::Array(value.to_owned()),
                 )?))),
+                "PathSet" => {
+                    let cleaned_paths: Vec<Vec<Map<String, Value>>> = value
+                        .iter()
+                        .filter_map(|path| path.as_array())
+                        .map(|path| {
+                            path.iter()
+                                .filter_map(|step| step.as_object())
+                                .map(|step| {
+                                    let mut cleaned_step = Map::new();
+                                    for (key, val) in step.iter() {
+                                        // Only keep account, currency, and issuer fields
+                                        if key == "account" || key == "currency" || key == "issuer"
+                                        {
+                                            cleaned_step.insert(key.clone(), val.clone());
+                                        }
+                                    }
+                                    cleaned_step
+                                })
+                                .collect()
+                        })
+                        .collect();
+
+                    let json_str = serde_json::to_string(&cleaned_paths)
+                        .map_err(|_| exceptions::XRPLTypeException::UnknownXRPLType)?;
+                    Ok(Some(XRPLTypes::PathSet(PathSet::try_from(
+                        json_str.as_str(),
+                    )?)))
+                }
+                "Vector256" => {
+                    let hash_strings: Vec<&str> = value.iter().filter_map(|v| v.as_str()).collect();
+
+                    Ok(Some(XRPLTypes::Vector256(Vector256::try_from(
+                        hash_strings,
+                    )?)))
+                }
                 _ => Err(exceptions::XRPLTypeException::UnknownXRPLType.into()),
             }
         } else {
@@ -198,7 +317,9 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::Currency(currency) => SerializedType::from(currency),
             XRPLTypes::Hash128(hash128) => SerializedType::from(hash128),
             XRPLTypes::Hash160(hash160) => SerializedType::from(hash160),
+            XRPLTypes::Hash192(hash192) => SerializedType::from(hash192),
             XRPLTypes::Hash256(hash256) => SerializedType::from(hash256),
+            XRPLTypes::Int32(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::Path(path) => SerializedType::from(path),
             XRPLTypes::PathSet(path_set) => SerializedType::from(path_set),
             XRPLTypes::PathStep(path_step) => SerializedType::from(path_step),
@@ -211,6 +332,7 @@ impl From<XRPLTypes> for SerializedType {
             XRPLTypes::UInt64(value) => SerializedType(value.to_be_bytes().to_vec()),
             XRPLTypes::XChainBridge(x_chain_bridge) => SerializedType::from(x_chain_bridge),
             XRPLTypes::Issue(issue) => SerializedType::from(issue),
+            XRPLTypes::Number(number) => SerializedType::from(number.as_ref().to_vec()),
             XRPLTypes::Unknown => SerializedType(vec![]),
         }
     }
@@ -400,7 +522,7 @@ impl STObject {
                         Value::Number(transaction_result_code.to_owned().into()),
                     );
                 } else if field == "LedgerEntryType" {
-                    let ledger_entry_type_code = match get_transaction_type_code(value) {
+                    let ledger_entry_type_code = match get_ledger_entry_type_code(value) {
                         Some(code) => code,
                         None => {
                             return Err(
@@ -415,6 +537,29 @@ impl STObject {
                         field.to_owned(),
                         Value::Number(ledger_entry_type_code.to_owned().into()),
                     );
+                } else if field == "PermissionValue" {
+                    let permission_code = match get_delegatable_permission_code(value) {
+                        Some(code) => code,
+                        None => {
+                            return Err(
+                                exceptions::XRPLSerializeMapException::UnknownTransactionType(
+                                    value.to_string(),
+                                )
+                                .into(),
+                            )
+                        }
+                    };
+                    value_xaddress_handled
+                        .insert(field.to_owned(), Value::Number((*permission_code).into()));
+                } else if BASE10_UINT64_FIELDS.contains(&field.as_str()) {
+                    // BASE10 UInt64 fields: convert decimal string to hex for encoding
+                    let decimal_val: u64 = value.parse().map_err(|_| {
+                        exceptions::XRPLSerializeMapException::UnknownTransactionType(
+                            alloc::format!("{} {} is not a valid base 10 string", field, value),
+                        )
+                    })?;
+                    let hex_str = alloc::format!("{:016X}", decimal_val);
+                    value_xaddress_handled.insert(field.to_owned(), Value::String(hex_str));
                 } else {
                     value_xaddress_handled
                         .insert(field.to_owned(), Value::String(value.to_owned()));
@@ -433,6 +578,10 @@ impl STObject {
                 {
                     sorted_keys.push(field_instance);
                 }
+            } else {
+                // Skip fields not in the XRPL definitions (e.g. "meta", "date", "hash").
+                // This matches xrpl.js STObject.from() which silently filters unknown fields.
+                continue;
             }
         }
         sorted_keys.sort_by_key(|k| k.ordinal);

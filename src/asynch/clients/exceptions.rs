@@ -1,3 +1,5 @@
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 use thiserror_no_std::Error;
 
 #[cfg(feature = "helpers")]
@@ -23,7 +25,7 @@ pub enum XRPLClientException {
     XRPLFaucetError(#[from] XRPLFaucetException),
     #[cfg(feature = "websocket")]
     #[error("XRPL WebSocket error: {0}")]
-    XRPLWebSocketError(#[from] XRPLWebSocketException),
+    XRPLWebSocketError(Box<XRPLWebSocketException>),
     #[cfg(feature = "json-rpc")]
     #[error("XRPL JSON-RPC error: {0}")]
     XRPLJsonRpcError(#[from] XRPLJsonRpcException),
@@ -47,10 +49,17 @@ impl From<reqwless::Error> for XRPLClientException {
     }
 }
 
+#[cfg(feature = "websocket")]
+impl From<XRPLWebSocketException> for XRPLClientException {
+    fn from(error: XRPLWebSocketException) -> Self {
+        XRPLClientException::XRPLWebSocketError(Box::new(error))
+    }
+}
+
 #[cfg(all(feature = "std", feature = "websocket"))]
 impl From<tokio_tungstenite::tungstenite::Error> for XRPLClientException {
     fn from(error: tokio_tungstenite::tungstenite::Error) -> Self {
-        XRPLClientException::XRPLWebSocketError(XRPLWebSocketException::from(error))
+        XRPLClientException::XRPLWebSocketError(Box::new(XRPLWebSocketException::from(error)))
     }
 }
 

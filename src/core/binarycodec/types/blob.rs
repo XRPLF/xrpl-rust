@@ -3,7 +3,9 @@
 //! See Blob Fields:
 //! `<https://xrpl.org/serialization.html#blob-fields>`
 
+use crate::core::binarycodec::binary_wrappers::Parser;
 use crate::core::exceptions::{XRPLCoreException, XRPLCoreResult};
+use crate::core::BinaryParser;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
@@ -11,7 +13,7 @@ use core::fmt::Display;
 use serde::Serializer;
 use serde::{Deserialize, Serialize};
 
-use super::XRPLType;
+use super::{TryFromParser, XRPLType};
 
 /// Codec for serializing and deserializing blob fields.
 ///
@@ -39,6 +41,19 @@ impl Serialize for Blob {
         S: Serializer,
     {
         serializer.serialize_str(&hex::encode_upper(self.as_ref()))
+    }
+}
+
+impl TryFromParser for Blob {
+    type Error = XRPLCoreException;
+
+    fn from_parser(
+        parser: &mut BinaryParser,
+        length: Option<usize>,
+    ) -> XRPLCoreResult<Self, Self::Error> {
+        let len = length.unwrap_or(parser.len());
+        let bytes = parser.read(len)?;
+        Ok(Blob(bytes))
     }
 }
 
