@@ -15,6 +15,10 @@ pub mod escrow_create;
 pub mod escrow_finish;
 pub mod exceptions;
 pub mod metadata;
+pub mod mptoken_authorize;
+pub mod mptoken_issuance_create;
+pub mod mptoken_issuance_destroy;
+pub mod mptoken_issuance_set;
 pub mod nftoken_accept_offer;
 pub mod nftoken_burn;
 pub mod nftoken_cancel_offer;
@@ -80,6 +84,10 @@ pub enum TransactionType {
     EscrowCancel,
     EscrowCreate,
     EscrowFinish,
+    MPTokenAuthorize,
+    MPTokenIssuanceCreate,
+    MPTokenIssuanceDestroy,
+    MPTokenIssuanceSet,
     NFTokenAcceptOffer,
     NFTokenBurn,
     NFTokenCancelOffer,
