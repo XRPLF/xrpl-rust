@@ -5,11 +5,11 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLNFTokenCancelOfferException;
-use crate::models::{FlagCollection, NoFlags, ValidateCurrencies, XRPLModelResult};
 use crate::models::{
-    Model,
     transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
+use crate::models::{FlagCollection, NoFlags, ValidateCurrencies, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder};
 

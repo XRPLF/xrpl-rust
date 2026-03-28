@@ -9,7 +9,7 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
-use crate::models::transactions::{CommonFields, exceptions::XRPLAccountSetException};
+use crate::models::transactions::{exceptions::XRPLAccountSetException, CommonFields};
 use crate::models::{ValidateCurrencies, XRPLModelException, XRPLModelResult};
 use crate::{
     constants::{
@@ -17,8 +17,8 @@ use crate::{
         MIN_TRANSFER_RATE, SPECIAL_CASE_TRANFER_RATE,
     },
     models::{
-        Model,
         transactions::{Memo, Signer, Transaction, TransactionType},
+        Model,
     },
 };
 

@@ -6,11 +6,11 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
-    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+    transactions::{Memo, Signer, Transaction, TransactionType},
+    Model,
 };
 use crate::models::{
-    Model,
-    transactions::{Memo, Signer, Transaction, TransactionType},
+    FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 
 use super::CommonTransactionBuilder;
