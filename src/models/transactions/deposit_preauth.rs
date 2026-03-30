@@ -214,6 +214,7 @@ pub trait DepositPreauthError {
 mod tests {
     use super::*;
     use crate::models::Model;
+    use alloc::vec;
 
     #[test]
     fn test_authorize_and_unauthorize_error() {
