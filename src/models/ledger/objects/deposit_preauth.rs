@@ -2,12 +2,29 @@ use crate::models::FlagCollection;
 use crate::models::Model;
 use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
+use derive_new::new;
 
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
 
 use super::{CommonFields, LedgerObject};
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+#[serde(rename_all = "PascalCase")]
+pub struct CredentialAuthorizationFields<'a> {
+    pub issuer: Cow<'a, str>,
+    pub credential_type: Cow<'a, str>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+#[serde(rename_all = "PascalCase")]
+pub struct CredentialAuthorization<'a> {
+    pub credential: CredentialAuthorizationFields<'a>,
+}
 
 /// A `DepositPreauth` object tracks a preauthorization from one account to another.
 /// `DepositPreauth` transactions create these objects.
@@ -30,7 +47,9 @@ pub struct DepositPreauth<'a> {
     /// The account that granted the preauthorization.
     pub account: Cow<'a, str>,
     /// The account that received the preauthorization.
-    pub authorize: Cow<'a, str>,
+    pub authorize: Option<Cow<'a, str>>,
+    /// The credential(s) that received the preauthorization.
+    pub authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
     /// A hint indicating which page of the sender's owner directory links to this object, in case
     /// the directory consists of multiple pages.
     pub owner_node: Cow<'a, str>,
@@ -54,7 +73,8 @@ impl<'a> DepositPreauth<'a> {
         index: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
-        authorize: Cow<'a, str>,
+        authorize: Option<Cow<'a, str>>,
+        authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
         owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
@@ -68,6 +88,7 @@ impl<'a> DepositPreauth<'a> {
             },
             account,
             authorize,
+            authorize_credentials,
             owner_node,
             previous_txn_id,
             previous_txn_lgr_seq,
@@ -87,10 +108,35 @@ mod tests {
             )),
             None,
             Cow::from("rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8"),
-            Cow::from("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"),
+            Some(Cow::from("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de")),
+            None,
             Cow::from("0000000000000000"),
             Cow::from("3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702"),
             7,
+        );
+        let serialized = serde_json::to_string(&deposit_preauth).unwrap();
+
+        let deserialized: DepositPreauth = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deposit_preauth, deserialized);
+    }
+
+    #[test]
+    fn test_serde_with_authorize_credentials() {
+        let deposit_preauth = DepositPreauth::new(
+            None,
+            None,
+            Cow::from("rOwner1111111111111111111111111111"),
+            None,
+            Some(vec![CredentialAuthorization::new(
+                CredentialAuthorizationFields::new(
+                    Cow::from("rIssuer111111111111111111111111111"),
+                    Cow::from("4B5943"),
+                ),
+            )]),
+            Cow::from("0000000000000001"),
+            Cow::from("3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702"),
+            8,
         );
         let serialized = serde_json::to_string(&deposit_preauth).unwrap();
 

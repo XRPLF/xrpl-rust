@@ -15,6 +15,15 @@ pub struct DepositPreauth<'a> {
     pub owner: Cow<'a, str>,
 }
 
+/// Required fields for requesting a Credential if not
+/// querying by object ID.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct Credential<'a> {
+    pub subject: Cow<'a, str>,
+    pub issuer: Cow<'a, str>,
+    pub credential_type: Cow<'a, str>,
+}
+
 /// Required fields for requesting a DirectoryNode if not
 /// querying by object ID.
 #[skip_serializing_none]
@@ -88,6 +97,7 @@ pub struct LedgerEntry<'a> {
     /// data in JSON format. The default is false.
     pub binary: Option<bool>,
     pub check: Option<Cow<'a, str>>,
+    pub credential: Option<Credential<'a>>,
     pub deposit_preauth: Option<DepositPreauth<'a>>,
     pub directory: Option<Directory<'a>>,
     pub escrow: Option<Escrow<'a>>,
@@ -141,6 +151,9 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.deposit_preauth.is_some() {
             signing_methods += 1
         }
+        if self.credential.is_some() {
+            signing_methods += 1
+        }
         if self.ticket.is_some() {
             signing_methods += 1
         }
@@ -156,6 +169,7 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "escrow",
                 "payment_channel",
                 "deposit_preauth",
+                "credential",
                 "ticket",
             ]))
         } else {
@@ -180,6 +194,7 @@ impl<'a> LedgerEntry<'a> {
         account_root: Option<Cow<'a, str>>,
         binary: Option<bool>,
         check: Option<Cow<'a, str>>,
+        credential: Option<Credential<'a>>,
         deposit_preauth: Option<DepositPreauth<'a>>,
         directory: Option<Directory<'a>>,
         escrow: Option<Escrow<'a>>,
@@ -200,6 +215,7 @@ impl<'a> LedgerEntry<'a> {
             index,
             account_root,
             check,
+            credential,
             payment_channel,
             deposit_preauth,
             directory,
@@ -243,6 +259,7 @@ mod test_ledger_entry_errors {
             None,
             None,
             None,
+            None,
             Some(Offer {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
@@ -262,11 +279,12 @@ mod test_ledger_entry_errors {
             "escrow",
             "payment_channel",
             "deposit_preauth",
+            "credential",
             "ticket",
         ]);
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
+            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, credential, ticket"
         );
     }
 
@@ -275,6 +293,7 @@ mod test_ledger_entry_errors {
         let req = LedgerEntry::new(
             None,
             Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
+            None,
             None,
             None,
             None,

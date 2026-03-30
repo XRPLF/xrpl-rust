@@ -21,6 +21,8 @@ pub struct DepositAuthorized<'a> {
     pub destination_account: Cow<'a, str>,
     /// The sender of a possible payment.
     pub source_account: Cow<'a, str>,
+    /// Credential IDs to consider when evaluating authorization.
+    pub credentials: Option<Cow<'a, [Cow<'a, str>]>>,
     /// The unique identifier of a ledger.
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
@@ -43,6 +45,7 @@ impl<'a> DepositAuthorized<'a> {
         id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
         source_account: Cow<'a, str>,
+        credentials: Option<Cow<'a, [Cow<'a, str>]>>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
     ) -> Self {
@@ -53,6 +56,7 @@ impl<'a> DepositAuthorized<'a> {
             },
             source_account,
             destination_account,
+            credentials,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,
