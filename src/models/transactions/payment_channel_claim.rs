@@ -88,6 +88,7 @@ pub struct PaymentChannelClaim<'a> {
     /// trying to apply the transaction to the ledger.)
     pub public_key: Option<Cow<'a, str>>,
     /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
     pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
@@ -374,6 +375,27 @@ mod tests {
         assert!(payment_channel_claim.amount.is_none());
         assert!(payment_channel_claim.signature.is_none());
         assert!(payment_channel_claim.public_key.is_none());
+    }
+
+    #[test]
+    fn test_credential_ids_serde_name() {
+        let claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            credential_ids: Some(
+                alloc::vec![
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+                ]
+                .into(),
+            ),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&claim).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
     }
 
     #[test]

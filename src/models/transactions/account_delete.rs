@@ -46,6 +46,7 @@ pub struct AccountDelete<'a> {
     /// of the deleted account's leftover XRP.
     pub destination_tag: Option<u32>,
     /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
     pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
@@ -280,6 +281,27 @@ mod tests {
         assert_eq!(tagged_delete.destination, "rExchange123");
         assert_eq!(tagged_delete.destination_tag, Some(987654321));
         assert_eq!(tagged_delete.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_credential_ids_serde_name() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rDeleteAccount789".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rExchange123".into(),
+            credential_ids: Some(
+                alloc::vec![
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+                ]
+                .into(),
+            ),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&account_delete).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
     }
 
     #[test]

@@ -7,7 +7,7 @@ use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    Model, XRPLModelException, XRPLModelResult,
 };
 use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
 
@@ -40,7 +40,8 @@ pub struct CredentialAccept<'a> {
 }
 
 impl<'a> Model for CredentialAccept<'a> {
-    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_credential_type_error()?;
         self.validate_currencies()
     }
 }
@@ -107,9 +108,35 @@ impl<'a> CredentialAccept<'a> {
     }
 }
 
+impl<'a> CredentialAcceptError for CredentialAccept<'a> {
+    fn _get_credential_type_error(&self) -> XRPLModelResult<()> {
+        let len = self.credential_type.len();
+        if len == 0 {
+            Err(XRPLModelException::ValueTooShort {
+                field: "credential_type".into(),
+                min: 1,
+                found: 0,
+            })
+        } else if len > 128 {
+            Err(XRPLModelException::ValueTooLong {
+                field: "credential_type".into(),
+                max: 128,
+                found: len,
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub trait CredentialAcceptError {
+    fn _get_credential_type_error(&self) -> XRPLModelResult<()>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_serde() {
@@ -135,5 +162,19 @@ mod tests {
 
         let deserialized: CredentialAccept = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_credential_type_length_validation() {
+        let tx = CredentialAccept {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: "rIssuer111111111111111111111111111".into(),
+            credential_type: "".into(),
+        };
+        assert!(tx.get_errors().is_err());
     }
 }

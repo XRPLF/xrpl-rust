@@ -44,6 +44,7 @@ pub struct CredentialDelete<'a> {
 impl<'a> Model for CredentialDelete<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_subject_or_issuer_error()?;
+        self._get_credential_type_error()?;
         self.validate_currencies()
     }
 }
@@ -116,6 +117,45 @@ impl<'a> CredentialDeleteError for CredentialDelete<'a> {
     fn _get_subject_or_issuer_error(&self) -> XRPLModelResult<()> {
         if self.subject.is_none() && self.issuer.is_none() {
             Err(XRPLModelException::ExpectedOneOf(&["subject", "issuer"]))
+        } else if let Some(subject) = &self.subject {
+            if &self.common_fields.account != subject
+                && self.issuer.as_ref() != Some(&self.common_fields.account)
+            {
+                Err(XRPLModelException::InvalidFieldCombination {
+                    field: "account",
+                    other_fields: &["subject", "issuer"],
+                })
+            } else {
+                Ok(())
+            }
+        } else if let Some(issuer) = &self.issuer {
+            if &self.common_fields.account != issuer {
+                Err(XRPLModelException::InvalidFieldCombination {
+                    field: "account",
+                    other_fields: &["issuer"],
+                })
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    fn _get_credential_type_error(&self) -> XRPLModelResult<()> {
+        let len = self.credential_type.len();
+        if len == 0 {
+            Err(XRPLModelException::ValueTooShort {
+                field: "credential_type".into(),
+                min: 1,
+                found: 0,
+            })
+        } else if len > 128 {
+            Err(XRPLModelException::ValueTooLong {
+                field: "credential_type".into(),
+                max: 128,
+                found: len,
+            })
         } else {
             Ok(())
         }
@@ -124,6 +164,7 @@ impl<'a> CredentialDeleteError for CredentialDelete<'a> {
 
 pub trait CredentialDeleteError {
     fn _get_subject_or_issuer_error(&self) -> XRPLModelResult<()>;
+    fn _get_credential_type_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -159,6 +200,21 @@ mod tests {
             credential_type: "4B5943".into(),
         };
         assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_account_must_match_subject_or_issuer() {
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rSubmitter111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: Some("rSubject11111111111111111111111111".into()),
+            issuer: Some("rIssuer111111111111111111111111111".into()),
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_err());
     }
 
     #[test]

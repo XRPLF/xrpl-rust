@@ -1,34 +1,18 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use super::CommonTransactionBuilder;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model,
+    CredentialAuthorization, Model,
 };
 use crate::models::{
     FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
-use super::CommonTransactionBuilder;
-
-#[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
-#[serde(rename_all = "PascalCase")]
-pub struct CredentialAuthorizationFields<'a> {
-    pub issuer: Cow<'a, str>,
-    pub credential_type: Cow<'a, str>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
-#[serde(rename_all = "PascalCase")]
-pub struct CredentialAuthorization<'a> {
-    pub credential: CredentialAuthorizationFields<'a>,
-}
 
 /// A DepositPreauth transaction gives another account pre-approval
 /// to deliver payments to the sender of this transaction.
@@ -168,6 +152,28 @@ impl<'a> DepositPreauth<'a> {
 
 impl<'a> DepositPreauthError for DepositPreauth<'a> {
     fn _get_authorization_error(&self) -> XRPLModelResult<()> {
+        fn validate_credential_list(
+            credentials: &[CredentialAuthorization<'_>],
+            field: &'static str,
+        ) -> XRPLModelResult<()> {
+            let len = credentials.len();
+            if len < 1 {
+                return Err(XRPLModelException::ValueTooShort {
+                    field: field.into(),
+                    min: 1,
+                    found: len,
+                });
+            }
+            if len > 8 {
+                return Err(XRPLModelException::ValueTooLong {
+                    field: field.into(),
+                    max: 8,
+                    found: len,
+                });
+            }
+            Ok(())
+        }
+
         let count = [
             self.authorize.is_some(),
             self.unauthorize.is_some(),
@@ -179,17 +185,24 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
         .count();
 
         if count != 1 {
-            Err(XRPLModelException::InvalidFieldCombination {
+            return Err(XRPLModelException::InvalidFieldCombination {
                 field: "authorize",
                 other_fields: &[
                     "unauthorize",
                     "authorize_credentials",
                     "unauthorize_credentials",
                 ],
-            })
-        } else {
-            Ok(())
+            });
         }
+
+        if let Some(credentials) = &self.authorize_credentials {
+            validate_credential_list(credentials, "authorize_credentials")?;
+        }
+        if let Some(credentials) = &self.unauthorize_credentials {
+            validate_credential_list(credentials, "unauthorize_credentials")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -363,7 +376,7 @@ mod tests {
             },
             authorize: None,
             authorize_credentials: Some(vec![CredentialAuthorization::new(
-                CredentialAuthorizationFields::new(
+                crate::models::CredentialAuthorizationFields::new(
                     "rIssuer111111111111111111111111111".into(),
                     "4B5943".into(),
                 ),
@@ -373,5 +386,33 @@ mod tests {
         };
 
         assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_credentials_array_size_validation() {
+        let mut deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(vec![]),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+
+        deposit_preauth.authorize_credentials = Some(
+            (0..9)
+                .map(|_| {
+                    CredentialAuthorization::new(crate::models::CredentialAuthorizationFields::new(
+                        "rIssuer111111111111111111111111111".into(),
+                        "4B5943".into(),
+                    ))
+                })
+                .collect(),
+        );
+        assert!(deposit_preauth.get_errors().is_err());
     }
 }

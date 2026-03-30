@@ -98,6 +98,7 @@ pub struct Payment<'a> {
     /// if this is a partial payment. For non-XRP amounts, the nested field names are lower-case.
     pub deliver_min: Option<Amount<'a>>,
     /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
     pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
@@ -494,6 +495,28 @@ mod tests {
         // Deserialize
         let deserialized: Payment = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_credential_ids_serde_name() {
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: "rSender111111111111111111111111111".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount("1000".into()),
+            destination: "rDestination11111111111111111111111".into(),
+            credential_ids: Some(
+                alloc::vec![
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+                ]
+                .into(),
+            ),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&payment).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
     }
 
     #[test]

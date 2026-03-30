@@ -28,7 +28,7 @@ async fn test_deposit_preauth_base() {
             None,
             Some(authorized.classic_address.clone().into()), // authorize
             None,
-            None,                                            // unauthorize
+            None, // unauthorize
             None,
         );
 

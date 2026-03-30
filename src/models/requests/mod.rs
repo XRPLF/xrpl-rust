@@ -147,7 +147,7 @@ pub enum XRPLRequest<'a> {
     LedgerClosed(ledger_closed::LedgerClosed<'a>),
     LedgerCurrent(ledger_current::LedgerCurrent<'a>),
     LedgerData(ledger_data::LedgerData<'a>),
-    LedgerEntry(ledger_entry::LedgerEntry<'a>),
+    LedgerEntry(Box<ledger_entry::LedgerEntry<'a>>),
     Subscribe(subscribe::Subscribe<'a>),
     Unsubscribe(unsubscribe::Unsubscribe<'a>),
     Fee(fee::Fee<'a>),
@@ -322,7 +322,7 @@ impl<'a> From<ledger_data::LedgerData<'a>> for XRPLRequest<'a> {
 
 impl<'a> From<ledger_entry::LedgerEntry<'a>> for XRPLRequest<'a> {
     fn from(request: ledger_entry::LedgerEntry<'a>) -> Self {
-        XRPLRequest::LedgerEntry(request)
+        XRPLRequest::LedgerEntry(Box::new(request))
     }
 }
 

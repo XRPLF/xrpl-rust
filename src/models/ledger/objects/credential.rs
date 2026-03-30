@@ -1,13 +1,24 @@
+use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::FlagCollection;
 use crate::models::Model;
-use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use serde_with::skip_serializing_none;
+use strum_macros::{AsRefStr, Display, EnumIter};
 
 use super::{CommonFields, LedgerObject};
+
+#[derive(
+    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+)]
+#[repr(u32)]
+pub enum CredentialFlag {
+    /// Credential has been accepted by the subject.
+    LsfAccepted = 0x00010000,
+}
 
 /// A `Credential` object is an on-ledger representation of a credential.
 ///
@@ -18,7 +29,7 @@ use super::{CommonFields, LedgerObject};
 pub struct Credential<'a> {
     /// The base fields for all ledger object models.
     #[serde(flatten)]
-    pub common_fields: CommonFields<'a, NoFlags>,
+    pub common_fields: CommonFields<'a, CredentialFlag>,
     /// The account the credential is for.
     pub subject: Cow<'a, str>,
     /// The account that issued the credential.
@@ -43,7 +54,7 @@ pub struct Credential<'a> {
 
 impl<'a> Model for Credential<'a> {}
 
-impl<'a> LedgerObject<NoFlags> for Credential<'a> {
+impl<'a> LedgerObject<CredentialFlag> for Credential<'a> {
     fn get_ledger_entry_type(&self) -> LedgerEntryType {
         self.common_fields.get_ledger_entry_type()
     }
