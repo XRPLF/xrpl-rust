@@ -1,5 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -12,8 +13,22 @@ use crate::models::{
 use crate::models::{
     FlagCollection, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
-
 use super::CommonTransactionBuilder;
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+#[serde(rename_all = "PascalCase")]
+pub struct CredentialAuthorizationFields<'a> {
+    pub issuer: Cow<'a, str>,
+    pub credential_type: Cow<'a, str>,
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+#[serde(rename_all = "PascalCase")]
+pub struct CredentialAuthorization<'a> {
+    pub credential: CredentialAuthorizationFields<'a>,
+}
 
 /// A DepositPreauth transaction gives another account pre-approval
 /// to deliver payments to the sender of this transaction.
@@ -41,13 +56,17 @@ pub struct DepositPreauth<'a> {
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The XRP Ledger address of the sender to preauthorize.
     pub authorize: Option<Cow<'a, str>>,
+    /// The credential(s) to preauthorize.
+    pub authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
     /// The XRP Ledger address of a sender whose preauthorization should be revoked.
     pub unauthorize: Option<Cow<'a, str>>,
+    /// The credential(s) whose preauthorization should be revoked.
+    pub unauthorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
 }
 
 impl<'a> Model for DepositPreauth<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self._get_authorize_and_unauthorize_error()?;
+        self._get_authorization_error()?;
         self.validate_currencies()
     }
 }
@@ -88,7 +107,9 @@ impl<'a> DepositPreauth<'a> {
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         authorize: Option<Cow<'a, str>>,
+        authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
         unauthorize: Option<Cow<'a, str>>,
+        unauthorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
     ) -> Self {
         Self {
             common_fields: CommonFields::new(
@@ -108,7 +129,9 @@ impl<'a> DepositPreauth<'a> {
                 None,
             ),
             authorize,
+            authorize_credentials,
             unauthorize,
+            unauthorize_credentials,
         }
     }
 
@@ -117,20 +140,48 @@ impl<'a> DepositPreauth<'a> {
         self
     }
 
+    pub fn with_authorize_credentials(
+        mut self,
+        authorize_credentials: Vec<CredentialAuthorization<'a>>,
+    ) -> Self {
+        self.authorize_credentials = Some(authorize_credentials);
+        self
+    }
+
     pub fn with_unauthorize(mut self, unauthorize: Cow<'a, str>) -> Self {
         self.unauthorize = Some(unauthorize);
+        self
+    }
+
+    pub fn with_unauthorize_credentials(
+        mut self,
+        unauthorize_credentials: Vec<CredentialAuthorization<'a>>,
+    ) -> Self {
+        self.unauthorize_credentials = Some(unauthorize_credentials);
         self
     }
 }
 
 impl<'a> DepositPreauthError for DepositPreauth<'a> {
-    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()> {
-        if (self.authorize.is_none() && self.unauthorize.is_none())
-            || (self.authorize.is_some() && self.unauthorize.is_some())
-        {
+    fn _get_authorization_error(&self) -> XRPLModelResult<()> {
+        let count = [
+            self.authorize.is_some(),
+            self.unauthorize.is_some(),
+            self.authorize_credentials.is_some(),
+            self.unauthorize_credentials.is_some(),
+        ]
+        .iter()
+        .filter(|x| **x)
+        .count();
+
+        if count != 1 {
             Err(XRPLModelException::InvalidFieldCombination {
                 field: "authorize",
-                other_fields: &["unauthorize"],
+                other_fields: &[
+                    "unauthorize",
+                    "authorize_credentials",
+                    "unauthorize_credentials",
+                ],
             })
         } else {
             Ok(())
@@ -139,7 +190,7 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
 }
 
 pub trait DepositPreauthError {
-    fn _get_authorize_and_unauthorize_error(&self) -> XRPLModelResult<()>;
+    fn _get_authorization_error(&self) -> XRPLModelResult<()>;
 }
 
 #[cfg(test)]
@@ -156,7 +207,9 @@ mod tests {
                 ..Default::default()
             },
             authorize: None,
+            authorize_credentials: None,
             unauthorize: None,
+            unauthorize_credentials: None,
         };
 
         assert!(deposit_preauth.get_errors().is_err());
@@ -171,7 +224,9 @@ mod tests {
                 ..Default::default()
             },
             authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            authorize_credentials: None,
             unauthorize: Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()),
+            unauthorize_credentials: None,
         };
 
         assert!(deposit_preauth.get_errors().is_err());
@@ -186,7 +241,9 @@ mod tests {
                 ..Default::default()
             },
             authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            authorize_credentials: None,
             unauthorize: None,
+            unauthorize_credentials: None,
         };
 
         assert!(deposit_preauth.get_errors().is_ok());
@@ -201,7 +258,9 @@ mod tests {
                 ..Default::default()
             },
             authorize: None,
+            authorize_credentials: None,
             unauthorize: Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()),
+            unauthorize_credentials: None,
         };
 
         assert!(deposit_preauth.get_errors().is_ok());
@@ -219,7 +278,9 @@ mod tests {
                 ..Default::default()
             },
             authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            authorize_credentials: None,
             unauthorize: None,
+            unauthorize_credentials: None,
         };
 
         let default_json_str = r#"{"Account":"rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8","TransactionType":"DepositPreauth","Fee":"10","Flags":0,"Sequence":2,"SigningPubKey":"","Authorize":"rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"}"#;
@@ -285,6 +346,28 @@ mod tests {
         );
         assert_eq!(deposit_preauth.common_fields.fee.as_ref().unwrap().0, "10");
         assert_eq!(deposit_preauth.common_fields.sequence, Some(123));
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_with_authorize_credentials() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+
         assert!(deposit_preauth.get_errors().is_ok());
     }
 }

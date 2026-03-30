@@ -97,6 +97,8 @@ pub struct Payment<'a> {
     /// Minimum amount of destination currency this transaction should deliver. Only valid
     /// if this is a partial payment. For non-XRP amounts, the nested field names are lower-case.
     pub deliver_min: Option<Amount<'a>>,
+    /// Credential IDs attached to this transaction.
+    pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
 impl<'a: 'static> Model for Payment<'a> {
@@ -252,6 +254,7 @@ impl<'a> Payment<'a> {
             paths,
             send_max,
             deliver_min,
+            credential_ids: None,
         }
     }
 
@@ -291,6 +294,11 @@ impl<'a> Payment<'a> {
             Some(paths) => paths.push(path),
             None => self.paths = Some(alloc::vec![path]),
         }
+        self
+    }
+
+    pub fn with_credential_ids(mut self, credential_ids: Cow<'a, [Cow<'a, str>]>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 

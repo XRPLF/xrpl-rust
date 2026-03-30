@@ -45,6 +45,8 @@ pub struct AccountDelete<'a> {
     /// recipient or other information for the recipient
     /// of the deleted account's leftover XRP.
     pub destination_tag: Option<u32>,
+    /// Credential IDs attached to this transaction.
+    pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
 impl<'a> Model for AccountDelete<'a> {
@@ -110,12 +112,18 @@ impl<'a> AccountDelete<'a> {
             ),
             destination,
             destination_tag,
+            credential_ids: None,
         }
     }
 
     /// Set destination tag
     pub fn with_destination_tag(mut self, tag: u32) -> Self {
         self.destination_tag = Some(tag);
+        self
+    }
+
+    pub fn with_credential_ids(mut self, credential_ids: Cow<'a, [Cow<'a, str>]>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 }
@@ -137,6 +145,7 @@ mod tests {
             },
             destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
             destination_tag: Some(13),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm","TransactionType":"AccountDelete","Fee":"2000000","Flags":0,"Sequence":2470665,"SigningPubKey":"","Destination":"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe","DestinationTag":13}"#;

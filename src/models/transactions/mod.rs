@@ -9,6 +9,9 @@ pub mod amm_withdraw;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
+pub mod credential_accept;
+pub mod credential_create;
+pub mod credential_delete;
 pub mod deposit_preauth;
 pub mod escrow_cancel;
 pub mod escrow_create;
@@ -76,6 +79,9 @@ pub enum TransactionType {
     CheckCancel,
     CheckCash,
     CheckCreate,
+    CredentialAccept,
+    CredentialCreate,
+    CredentialDelete,
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,
