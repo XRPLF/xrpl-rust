@@ -49,6 +49,7 @@ pub struct DepositPreauth<'a> {
     pub account: Cow<'a, str>,
     /// The account that received the preauthorization.
     /// Mutually exclusive with `authorize_credentials`.
+    /// This is optional to support XLS-70 credential-based preauthorization.
     pub authorize: Option<Cow<'a, str>>,
     /// The credential(s) that received the preauthorization.
     /// Mutually exclusive with `authorize`.
@@ -76,6 +77,10 @@ impl<'a> LedgerObject<NoFlags> for DepositPreauth<'a> {
 }
 
 impl<'a> DepositPreauth<'a> {
+    /// Creates an account-based DepositPreauth object.
+    ///
+    /// This constructor remains backward-compatible with existing callers by
+    /// taking a non-optional `authorize` account and storing it as `Some`.
     pub fn new(
         index: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
@@ -101,6 +106,7 @@ impl<'a> DepositPreauth<'a> {
         }
     }
 
+    /// Creates a credential-based DepositPreauth object as introduced by XLS-70.
     pub fn new_with_authorize_credentials(
         index: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
