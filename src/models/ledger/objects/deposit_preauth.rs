@@ -1,5 +1,6 @@
 use crate::models::FlagCollection;
 use crate::models::Model;
+use crate::models::{XRPLModelException, XRPLModelResult};
 use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
@@ -47,8 +48,10 @@ pub struct DepositPreauth<'a> {
     /// The account that granted the preauthorization.
     pub account: Cow<'a, str>,
     /// The account that received the preauthorization.
+    /// Mutually exclusive with `authorize_credentials`.
     pub authorize: Option<Cow<'a, str>>,
     /// The credential(s) that received the preauthorization.
+    /// Mutually exclusive with `authorize`.
     pub authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
     /// A hint indicating which page of the sender's owner directory links to this object, in case
     /// the directory consists of multiple pages.
@@ -60,7 +63,11 @@ pub struct DepositPreauth<'a> {
     pub previous_txn_lgr_seq: u32,
 }
 
-impl<'a> Model for DepositPreauth<'a> {}
+impl<'a> Model for DepositPreauth<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        self._get_authorization_error()
+    }
+}
 
 impl<'a> LedgerObject<NoFlags> for DepositPreauth<'a> {
     fn get_ledger_entry_type(&self) -> LedgerEntryType {
@@ -73,8 +80,7 @@ impl<'a> DepositPreauth<'a> {
         index: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
         account: Cow<'a, str>,
-        authorize: Option<Cow<'a, str>>,
-        authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
+        authorize: Cow<'a, str>,
         owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
@@ -87,8 +93,33 @@ impl<'a> DepositPreauth<'a> {
                 ledger_index,
             },
             account,
-            authorize,
-            authorize_credentials,
+            authorize: Some(authorize),
+            authorize_credentials: None,
+            owner_node,
+            previous_txn_id,
+            previous_txn_lgr_seq,
+        }
+    }
+
+    pub fn new_with_authorize_credentials(
+        index: Option<Cow<'a, str>>,
+        ledger_index: Option<Cow<'a, str>>,
+        account: Cow<'a, str>,
+        authorize_credentials: Vec<CredentialAuthorization<'a>>,
+        owner_node: Cow<'a, str>,
+        previous_txn_id: Cow<'a, str>,
+        previous_txn_lgr_seq: u32,
+    ) -> Self {
+        Self {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index,
+                ledger_index,
+            },
+            account,
+            authorize: None,
+            authorize_credentials: Some(authorize_credentials),
             owner_node,
             previous_txn_id,
             previous_txn_lgr_seq,
@@ -96,9 +127,31 @@ impl<'a> DepositPreauth<'a> {
     }
 }
 
+impl<'a> DepositPreauthError for DepositPreauth<'a> {
+    fn _get_authorization_error(&self) -> XRPLModelResult<()> {
+        let count = [self.authorize.is_some(), self.authorize_credentials.is_some()]
+            .iter()
+            .filter(|x| **x)
+            .count();
+        if count != 1 {
+            Err(XRPLModelException::InvalidFieldCombination {
+                field: "authorize",
+                other_fields: &["authorize_credentials"],
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub trait DepositPreauthError {
+    fn _get_authorization_error(&self) -> XRPLModelResult<()>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::Model;
 
     #[test]
     fn test_serde() {
@@ -108,8 +161,7 @@ mod tests {
             )),
             None,
             Cow::from("rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8"),
-            Some(Cow::from("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de")),
-            None,
+            Cow::from("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de"),
             Cow::from("0000000000000000"),
             Cow::from("3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702"),
             7,
@@ -123,17 +175,16 @@ mod tests {
 
     #[test]
     fn test_serde_with_authorize_credentials() {
-        let deposit_preauth = DepositPreauth::new(
+        let deposit_preauth = DepositPreauth::new_with_authorize_credentials(
             None,
             None,
             Cow::from("rOwner1111111111111111111111111111"),
-            None,
-            Some(vec![CredentialAuthorization::new(
+            vec![CredentialAuthorization::new(
                 CredentialAuthorizationFields::new(
                     Cow::from("rIssuer111111111111111111111111111"),
                     Cow::from("4B5943"),
                 ),
-            )]),
+            )],
             Cow::from("0000000000000001"),
             Cow::from("3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702"),
             8,
@@ -143,5 +194,26 @@ mod tests {
         let deserialized: DepositPreauth = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(deposit_preauth, deserialized);
+    }
+
+    #[test]
+    fn test_invalid_without_authorization_fields() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: None,
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
     }
 }

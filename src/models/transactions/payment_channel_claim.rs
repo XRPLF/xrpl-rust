@@ -193,6 +193,7 @@ impl<'a> PaymentChannelClaim<'a> {
         self
     }
 
+    /// Set credential IDs to attach to this transaction for credential-based authorization checks.
     pub fn with_credential_ids(mut self, credential_ids: Cow<'a, [Cow<'a, str>]>) -> Self {
         self.credential_ids = Some(credential_ids);
         self
