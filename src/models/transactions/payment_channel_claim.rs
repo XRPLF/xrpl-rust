@@ -87,6 +87,8 @@ pub struct PaymentChannelClaim<'a> {
     /// includes the public key so that rippled can check the validity of the signature before
     /// trying to apply the transaction to the ledger.)
     pub public_key: Option<Cow<'a, str>>,
+    /// Credential IDs attached to this transaction.
+    pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
 impl<'a> Model for PaymentChannelClaim<'a> {
@@ -163,6 +165,7 @@ impl<'a> PaymentChannelClaim<'a> {
             amount,
             signature,
             public_key,
+            credential_ids: None,
         }
     }
 
@@ -187,6 +190,11 @@ impl<'a> PaymentChannelClaim<'a> {
     /// Set public key
     pub fn with_public_key(mut self, public_key: Cow<'a, str>) -> Self {
         self.public_key = Some(public_key);
+        self
+    }
+
+    pub fn with_credential_ids(mut self, credential_ids: Cow<'a, [Cow<'a, str>]>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 
@@ -223,6 +231,7 @@ mod tests {
             amount: Some("1000000".into()),
             signature: Some("30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B".into()),
             public_key: Some("32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into()),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"PaymentChannelClaim","Flags":0,"SigningPubKey":"","Channel":"C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198","Balance":"1000000","Amount":"1000000","Signature":"30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B","PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A"}"#;

@@ -43,6 +43,8 @@ pub struct EscrowFinish<'a> {
     pub condition: Option<Cow<'a, str>>,
     /// Hex value of the PREIMAGE-SHA-256 crypto-condition fulfillment matching the held payment's Condition.
     pub fulfillment: Option<Cow<'a, str>>,
+    /// Credential IDs attached to this transaction.
+    pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
 }
 
 impl<'a> Model for EscrowFinish<'a> {
@@ -113,6 +115,7 @@ impl<'a> EscrowFinish<'a> {
             offer_sequence,
             condition,
             fulfillment,
+            credential_ids: None,
         }
     }
 
@@ -133,6 +136,11 @@ impl<'a> EscrowFinish<'a> {
     ) -> Self {
         self.condition = Some(condition);
         self.fulfillment = Some(fulfillment);
+        self
+    }
+
+    pub fn with_credential_ids(mut self, credential_ids: Cow<'a, [Cow<'a, str>]>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 }
@@ -176,6 +184,7 @@ mod tests {
                     .into(),
             ),
             fulfillment: None,
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_err());
@@ -193,6 +202,7 @@ mod tests {
             offer_sequence: 10,
             condition: None,
             fulfillment: Some("A0028000".into()),
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_err());
@@ -213,6 +223,7 @@ mod tests {
                     .into(),
             ),
             fulfillment: Some("A0028000".into()),
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_ok());
@@ -230,6 +241,7 @@ mod tests {
             offer_sequence: 10,
             condition: None,
             fulfillment: None,
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_ok());
@@ -251,6 +263,7 @@ mod tests {
                     .into(),
             ),
             fulfillment: Some("A0028000".into()),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowFinish","Flags":0,"SigningPubKey":"","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
