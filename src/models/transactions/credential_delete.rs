@@ -191,7 +191,7 @@ mod tests {
     fn test_valid_with_subject() {
         let tx = CredentialDelete {
             common_fields: CommonFields {
-                account: "rSubmitter111111111111111111111111".into(),
+                account: "rSubject11111111111111111111111111".into(),
                 transaction_type: TransactionType::CredentialDelete,
                 ..Default::default()
             },
