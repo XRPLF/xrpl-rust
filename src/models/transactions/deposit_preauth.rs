@@ -157,7 +157,7 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
             field: &'static str,
         ) -> XRPLModelResult<()> {
             let len = credentials.len();
-            if len < 1 {
+            if credentials.is_empty() {
                 return Err(XRPLModelException::ValueTooShort {
                     field: field.into(),
                     min: 1,
