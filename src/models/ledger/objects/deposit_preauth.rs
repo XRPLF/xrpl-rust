@@ -1,7 +1,7 @@
+use crate::models::CredentialAuthorization;
 use crate::models::FlagCollection;
 use crate::models::Model;
 use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
-use crate::models::CredentialAuthorization;
 use crate::models::{XRPLModelException, XRPLModelResult};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
@@ -145,8 +145,9 @@ pub trait DepositPreauthError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Model;
     use crate::models::CredentialAuthorizationFields;
+    use crate::models::Model;
+    use alloc::vec;
 
     #[test]
     fn test_serde() {
