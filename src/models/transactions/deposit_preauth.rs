@@ -55,10 +55,14 @@ pub struct DepositPreauth<'a> {
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
     /// The XRP Ledger address of the sender to preauthorize.
+    /// Mutually exclusive with `authorize_credentials`,
+    /// `unauthorize`, and `unauthorize_credentials`.
     pub authorize: Option<Cow<'a, str>>,
     /// The credential(s) to preauthorize.
     pub authorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
     /// The XRP Ledger address of a sender whose preauthorization should be revoked.
+    /// Mutually exclusive with `authorize`,
+    /// `authorize_credentials`, and `unauthorize_credentials`.
     pub unauthorize: Option<Cow<'a, str>>,
     /// The credential(s) whose preauthorization should be revoked.
     pub unauthorize_credentials: Option<Vec<CredentialAuthorization<'a>>>,
