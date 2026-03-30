@@ -1,31 +1,16 @@
 use crate::models::FlagCollection;
 use crate::models::Model;
-use crate::models::{XRPLModelException, XRPLModelResult};
 use crate::models::{ledger::objects::LedgerEntryType, NoFlags};
+use crate::models::CredentialAuthorization;
+use crate::models::{XRPLModelException, XRPLModelResult};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use derive_new::new;
 
 use serde::{Deserialize, Serialize};
 
 use serde_with::skip_serializing_none;
 
 use super::{CommonFields, LedgerObject};
-
-#[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
-#[serde(rename_all = "PascalCase")]
-pub struct CredentialAuthorizationFields<'a> {
-    pub issuer: Cow<'a, str>,
-    pub credential_type: Cow<'a, str>,
-}
-
-#[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
-#[serde(rename_all = "PascalCase")]
-pub struct CredentialAuthorization<'a> {
-    pub credential: CredentialAuthorizationFields<'a>,
-}
 
 /// A `DepositPreauth` object tracks a preauthorization from one account to another.
 /// `DepositPreauth` transactions create these objects.
@@ -135,10 +120,13 @@ impl<'a> DepositPreauth<'a> {
 
 impl<'a> DepositPreauthError for DepositPreauth<'a> {
     fn _get_authorization_error(&self) -> XRPLModelResult<()> {
-        let count = [self.authorize.is_some(), self.authorize_credentials.is_some()]
-            .iter()
-            .filter(|x| **x)
-            .count();
+        let count = [
+            self.authorize.is_some(),
+            self.authorize_credentials.is_some(),
+        ]
+        .iter()
+        .filter(|x| **x)
+        .count();
         if count != 1 {
             Err(XRPLModelException::InvalidFieldCombination {
                 field: "authorize",
@@ -158,6 +146,7 @@ pub trait DepositPreauthError {
 mod tests {
     use super::*;
     use crate::models::Model;
+    use crate::models::CredentialAuthorizationFields;
 
     #[test]
     fn test_serde() {
