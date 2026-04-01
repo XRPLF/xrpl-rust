@@ -128,13 +128,28 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
         .filter(|x| **x)
         .count();
         if count != 1 {
-            Err(XRPLModelException::InvalidFieldCombination {
+            return Err(XRPLModelException::InvalidFieldCombination {
                 field: "authorize",
                 other_fields: &["authorize_credentials"],
-            })
-        } else {
-            Ok(())
+            });
         }
+        if let Some(creds) = &self.authorize_credentials {
+            if creds.is_empty() {
+                return Err(XRPLModelException::ValueTooShort {
+                    field: "authorize_credentials".into(),
+                    min: 1,
+                    found: 0,
+                });
+            }
+            if creds.len() > 8 {
+                return Err(XRPLModelException::ValueTooLong {
+                    field: "authorize_credentials".into(),
+                    max: 8,
+                    found: creds.len(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -190,6 +205,56 @@ mod tests {
         let deserialized: DepositPreauth = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(deposit_preauth, deserialized);
+    }
+
+    #[test]
+    fn test_invalid_empty_authorize_credentials() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: Some(vec![]),
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_oversized_authorize_credentials() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..9)
+            .map(|i| {
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    Cow::from(alloc::format!("rIssuer{i}1111111111111111111111111")),
+                    Cow::from("4B5943"),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: Some(creds),
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
     }
 
     #[test]

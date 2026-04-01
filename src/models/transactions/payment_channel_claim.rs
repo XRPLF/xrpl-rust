@@ -89,7 +89,7 @@ pub struct PaymentChannelClaim<'a> {
     pub public_key: Option<Cow<'a, str>>,
     /// Credential IDs attached to this transaction.
     #[serde(rename = "CredentialIDs")]
-    pub credential_ids: Option<Cow<'a, [Cow<'a, str>]>>,
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl<'a> Model for PaymentChannelClaim<'a> {
@@ -195,7 +195,7 @@ impl<'a> PaymentChannelClaim<'a> {
     }
 
     /// Set credential IDs to attach to this transaction for credential-based authorization checks.
-    pub fn with_credential_ids(mut self, credential_ids: Cow<'a, [Cow<'a, str>]>) -> Self {
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
         self.credential_ids = Some(credential_ids);
         self
     }
@@ -386,12 +386,9 @@ mod tests {
                 ..Default::default()
             },
             channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
-            credential_ids: Some(
-                alloc::vec![
-                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
-                ]
-                .into(),
-            ),
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
             ..Default::default()
         };
         let serialized = serde_json::to_string(&claim).unwrap();
