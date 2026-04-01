@@ -28,6 +28,8 @@ pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
 pub mod payment_channel_fund;
+pub mod permissioned_domain_delete;
+pub mod permissioned_domain_set;
 pub mod pseudo_transactions;
 pub mod set_regular_key;
 pub mod signer_list_set;
@@ -94,6 +96,8 @@ pub enum TransactionType {
     #[default]
     Payment,
     PaymentChannelClaim,
+    PermissionedDomainDelete,
+    PermissionedDomainSet,
     PaymentChannelCreate,
     PaymentChannelFund,
     SetRegularKey,
@@ -669,6 +673,18 @@ fn validate_oracle_asset_price(value: &Option<String>) -> crate::models::XRPLMod
     }
 }
 
+serde_with_tag! {
+/// A credential entry used in PermissionedDomain transactions.
+/// Wraps as `{"Credential": {"Issuer": ..., "CredentialType": ...}}` in JSON.
+///
+/// See XLS-80 PermissionedDomains:
+/// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0080-permissioned-domains>`
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct Credential {
+    pub issuer: Option<String>,
+    pub credential_type: Option<String>,
+}
+} 3e1b32a (feat: add Credential type and PermissionedDomain transaction types for XLS-80)
 /// Standard functions for transactions.
 pub trait Transaction<'a, T>
 where
