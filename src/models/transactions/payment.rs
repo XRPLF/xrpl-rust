@@ -14,7 +14,7 @@ use crate::models::{
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLPaymentException;
 
-use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the Payment type support additional values
 /// in the Flags field. This enum represents those options.
@@ -107,6 +107,7 @@ impl<'a: 'static> Model for Payment<'a> {
         self._get_xrp_transaction_error()?;
         self._get_partial_payment_error()?;
         self._get_exchange_error()?;
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }

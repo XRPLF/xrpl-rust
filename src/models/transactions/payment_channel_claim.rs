@@ -13,7 +13,7 @@ use crate::models::{
 
 use crate::models::amount::XRPAmount;
 
-use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the PaymentChannelClaim type support additional values
 /// in the Flags field. This enum represents those options.
@@ -94,6 +94,7 @@ pub struct PaymentChannelClaim<'a> {
 
 impl<'a> Model for PaymentChannelClaim<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
