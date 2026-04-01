@@ -43,7 +43,7 @@ pub mod xchain_create_bridge;
 pub mod xchain_create_claim_id;
 pub mod xchain_modify_bridge;
 
-use super::{FlagCollection, XRPLModelResult};
+use super::{FlagCollection, XRPLModelException, XRPLModelResult};
 use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
 use crate::{_serde::txn_flags, serde_with_tag};
@@ -64,6 +64,28 @@ use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, Display};
 
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
+
+/// Validate that a `credential_ids` field, when present, contains 1..=8 entries
+/// as required by the XLS-70 specification.
+pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XRPLModelResult<()> {
+    if let Some(ids) = credential_ids {
+        if ids.is_empty() {
+            return Err(XRPLModelException::ValueTooShort {
+                field: "credential_ids".into(),
+                min: 1,
+                found: 0,
+            });
+        }
+        if ids.len() > 8 {
+            return Err(XRPLModelException::ValueTooLong {
+                field: "credential_ids".into(),
+                max: 8,
+                found: ids.len(),
+            });
+        }
+    }
+    Ok(())
+}
 
 /// Enum containing the different Transaction types.
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq, Default)]
