@@ -33,9 +33,11 @@ pub struct CredentialDelete<'a> {
     /// The base fields for all transaction models.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    /// The subject of the credential. If omitted, Account is assumed as subject.
+    /// The subject of the credential. At least one of `subject` or `issuer` must
+    /// be provided. When omitted, Account implicitly fills the subject role.
     pub subject: Option<Cow<'a, str>>,
-    /// The issuer of the credential. If omitted, Account is assumed as issuer.
+    /// The issuer of the credential. At least one of `subject` or `issuer` must
+    /// be provided. When omitted, Account implicitly fills the issuer role.
     pub issuer: Option<Cow<'a, str>>,
     /// A hex-encoded value identifying the credential type from this issuer.
     pub credential_type: Cow<'a, str>,
@@ -116,30 +118,19 @@ impl<'a> CredentialDelete<'a> {
 impl<'a> CredentialDeleteError for CredentialDelete<'a> {
     fn _get_subject_or_issuer_error(&self) -> XRPLModelResult<()> {
         if self.subject.is_none() && self.issuer.is_none() {
-            Err(XRPLModelException::ExpectedOneOf(&["subject", "issuer"]))
-        } else if let Some(subject) = &self.subject {
-            if &self.common_fields.account != subject
-                && self.issuer.as_ref() != Some(&self.common_fields.account)
-            {
-                Err(XRPLModelException::InvalidFieldCombination {
+            return Err(XRPLModelException::ExpectedOneOf(&["subject", "issuer"]));
+        }
+        // When both are explicitly provided, account must match one of them.
+        // When only one is provided, account implicitly fills the other role.
+        if let (Some(subject), Some(issuer)) = (&self.subject, &self.issuer) {
+            if self.common_fields.account != *subject && self.common_fields.account != *issuer {
+                return Err(XRPLModelException::InvalidFieldCombination {
                     field: "account",
                     other_fields: &["subject", "issuer"],
-                })
-            } else {
-                Ok(())
+                });
             }
-        } else if let Some(issuer) = &self.issuer {
-            if &self.common_fields.account != issuer {
-                Err(XRPLModelException::InvalidFieldCombination {
-                    field: "account",
-                    other_fields: &["issuer"],
-                })
-            } else {
-                Ok(())
-            }
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 
     fn _get_credential_type_error(&self) -> XRPLModelResult<()> {
@@ -215,6 +206,85 @@ mod tests {
             credential_type: "4B5943".into(),
         };
         assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_valid_with_issuer_only() {
+        // When only issuer is provided, account implicitly fills the subject role.
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: None,
+            issuer: Some("rIssuer111111111111111111111111111".into()),
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_subject_only_account_is_implicit_issuer() {
+        // When only subject is provided, account implicitly fills the issuer role.
+        // Account does NOT need to match subject — this was the bug.
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rSubmitter111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: Some("rSubject11111111111111111111111111".into()),
+            issuer: None,
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_issuer_only_account_is_implicit_subject() {
+        // Account does NOT need to match issuer when subject is omitted.
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rSubmitter111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: None,
+            issuer: Some("rIssuer111111111111111111111111111".into()),
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_both_provided_account_matches_subject() {
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: Some("rSubject11111111111111111111111111".into()),
+            issuer: Some("rIssuer111111111111111111111111111".into()),
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_both_provided_account_matches_issuer() {
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: Some("rSubject11111111111111111111111111".into()),
+            issuer: Some("rIssuer111111111111111111111111111".into()),
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_ok());
     }
 
     #[test]
