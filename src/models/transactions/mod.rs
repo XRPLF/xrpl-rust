@@ -22,6 +22,8 @@ pub mod nftoken_create_offer;
 pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
+pub mod oracle_delete;
+pub mod oracle_set;
 pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
@@ -87,6 +89,8 @@ pub enum TransactionType {
     NFTokenMint,
     OfferCancel,
     OfferCreate,
+    OracleDelete,
+    OracleSet,
     #[default]
     Payment,
     PaymentChannelClaim,
@@ -569,6 +573,20 @@ pub struct Signer {
     pub account: String,
     pub txn_signature: String,
     pub signing_pub_key: String,
+}
+}
+
+serde_with_tag! {
+/// Represents a single price data entry in an Oracle's PriceDataSeries.
+///
+/// See OracleSet:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/oracleset>`
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct PriceData {
+    pub base_asset: Option<String>,
+    pub quote_asset: Option<String>,
+    pub asset_price: Option<String>,
+    pub scale: Option<u8>,
 }
 }
 
