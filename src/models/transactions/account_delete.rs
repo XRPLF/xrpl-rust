@@ -10,7 +10,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::{CommonFields, CommonTransactionBuilder};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder};
 
 /// An AccountDelete transaction deletes an account and any objects it
 /// owns in the XRP Ledger, if possible, sending the account's remaining
@@ -52,6 +52,7 @@ pub struct AccountDelete<'a> {
 
 impl<'a> Model for AccountDelete<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }

@@ -10,7 +10,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::{CommonFields, CommonTransactionBuilder};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder};
 
 /// Finishes an Escrow and delivers XRP from a held payment to the recipient.
 ///
@@ -51,6 +51,7 @@ pub struct EscrowFinish<'a> {
 impl<'a> Model for EscrowFinish<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_condition_and_fulfillment_error()?;
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
