@@ -49,8 +49,12 @@ pub struct VaultCreate<'a> {
     #[serde(rename = "DomainID")]
     pub domain_id: Option<Cow<'a, str>>,
     /// The withdrawal policy for the vault.
-    /// 0 = unrestricted, 1 = stranded (withdrawals require approval).
+    /// 1 = first-come-first-serve (0x0001).
     pub withdrawal_policy: Option<u8>,
+    /// The Scale specifies the power of 10 to multiply an asset's value by
+    /// when converting it into an integer-based number of shares.
+    /// Fixed at 0 for XRP and MPT. Configurable 0-18 for IOU (default 6).
+    pub scale: Option<u8>,
 }
 
 impl Model for VaultCreate<'_> {
@@ -100,6 +104,7 @@ impl<'a> VaultCreate<'a> {
         mptoken_metadata: Option<Cow<'a, str>>,
         domain_id: Option<Cow<'a, str>>,
         withdrawal_policy: Option<u8>,
+        scale: Option<u8>,
     ) -> VaultCreate<'a> {
         VaultCreate {
             common_fields: CommonFields::new(
@@ -124,6 +129,7 @@ impl<'a> VaultCreate<'a> {
             mptoken_metadata,
             domain_id,
             withdrawal_policy,
+            scale,
         }
     }
 
@@ -156,6 +162,12 @@ impl<'a> VaultCreate<'a> {
         self.withdrawal_policy = Some(withdrawal_policy);
         self
     }
+
+    /// Set the scale field.
+    pub fn with_scale(mut self, scale: u8) -> Self {
+        self.scale = Some(scale);
+        self
+    }
 }
 
 #[cfg(test)]
@@ -178,6 +190,7 @@ mod tests {
             mptoken_metadata: None,
             domain_id: None,
             withdrawal_policy: None,
+            scale: None,
         };
 
         let json_str = r#"{"Account":"rVaultCreator123","TransactionType":"VaultCreate","Flags":0,"SigningPubKey":"","Asset":{"currency":"USD","issuer":"rIssuer456"}}"#;
@@ -211,6 +224,7 @@ mod tests {
                 "D0000000000000000000000000000000000000000000000000000000DEADBEEF".into(),
             ),
             withdrawal_policy: Some(1),
+            scale: Some(6),
         };
 
         let serialized = serde_json::to_string(&vault_create).unwrap();
@@ -238,6 +252,7 @@ mod tests {
         .with_mptoken_metadata("ABCDEF".into())
         .with_domain_id("D0000000000000000000000000000000000000000000000000000000DEADBEEF".into())
         .with_withdrawal_policy(1)
+        .with_scale(6)
         .with_memo(Memo {
             memo_data: Some("creating vault".into()),
             memo_format: None,
@@ -255,6 +270,7 @@ mod tests {
         assert_eq!(vault_create.assets_maximum, Some("1000000000".into()));
         assert_eq!(vault_create.mptoken_metadata, Some("ABCDEF".into()));
         assert_eq!(vault_create.withdrawal_policy, Some(1));
+        assert_eq!(vault_create.scale, Some(6));
         assert_eq!(vault_create.common_fields.memos.as_ref().unwrap().len(), 1);
     }
 
@@ -280,6 +296,7 @@ mod tests {
         assert!(vault_create.mptoken_metadata.is_none());
         assert!(vault_create.domain_id.is_none());
         assert!(vault_create.withdrawal_policy.is_none());
+        assert!(vault_create.scale.is_none());
         assert!(vault_create.common_fields.fee.is_none());
         assert!(vault_create.common_fields.sequence.is_none());
     }
@@ -398,6 +415,7 @@ mod tests {
             Some("ABCDEF".into()),
             Some("D0000000000000000000000000000000000000000000000000000000DEADBEEF".into()),
             Some(1),
+            Some(6),
         );
 
         assert_eq!(vault.common_fields.account, "rNewVaultAccount");
@@ -412,6 +430,24 @@ mod tests {
         assert_eq!(vault.assets_maximum, Some("1000000000".into()));
         assert_eq!(vault.mptoken_metadata, Some("ABCDEF".into()));
         assert_eq!(vault.withdrawal_policy, Some(1));
+    }
+
+    #[test]
+    fn test_get_transaction_type() {
+        use crate::models::transactions::Transaction;
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rTxTypeTest".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            ..Default::default()
+        };
+        assert_eq!(
+            *vault_create.get_transaction_type(),
+            TransactionType::VaultCreate
+        );
     }
 
     #[test]
