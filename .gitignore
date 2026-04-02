@@ -26,7 +26,8 @@ rustc-ice*
 # Machine-specific Cargo config (e.g. jobs = N) — keep local overrides out of the tree
 .cargo/config.toml
 .cargo/config
-.local/*
+# Local working files
+.local/
 dev/*
 .playwright-mcp/*
 .worktrees/

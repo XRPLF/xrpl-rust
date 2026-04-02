@@ -361,4 +361,22 @@ mod tests {
         assert_eq!(multi_memo_delete.destination_tag, Some(555));
         assert_eq!(multi_memo_delete.common_fields.sequence, Some(300));
     }
+
+    #[test]
+    fn test_credential_ids_duplicate_entries_error() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rDeleteAccount789".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rExchange123".into(),
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        assert!(account_delete.get_errors().is_err());
+    }
 }
