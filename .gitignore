@@ -22,3 +22,6 @@
 **/.DS_Store
 
 rustc-ice*
+
+# Local working files
+.local/

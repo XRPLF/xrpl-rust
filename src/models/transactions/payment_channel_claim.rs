@@ -13,7 +13,7 @@ use crate::models::{
 
 use crate::models::amount::XRPAmount;
 
-use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the PaymentChannelClaim type support additional values
 /// in the Flags field. This enum represents those options.
@@ -87,10 +87,14 @@ pub struct PaymentChannelClaim<'a> {
     /// includes the public key so that rippled can check the validity of the signature before
     /// trying to apply the transaction to the ledger.)
     pub public_key: Option<Cow<'a, str>>,
+    /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl<'a> Model for PaymentChannelClaim<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
@@ -163,6 +167,7 @@ impl<'a> PaymentChannelClaim<'a> {
             amount,
             signature,
             public_key,
+            credential_ids: None,
         }
     }
 
@@ -187,6 +192,12 @@ impl<'a> PaymentChannelClaim<'a> {
     /// Set public key
     pub fn with_public_key(mut self, public_key: Cow<'a, str>) -> Self {
         self.public_key = Some(public_key);
+        self
+    }
+
+    /// Set credential IDs to attach to this transaction for credential-based authorization checks.
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 
@@ -223,6 +234,7 @@ mod tests {
             amount: Some("1000000".into()),
             signature: Some("30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B".into()),
             public_key: Some("32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A".into()),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"ra5nK24KXen9AHvsdFTKHSANinZseWnPcX","TransactionType":"PaymentChannelClaim","Flags":0,"SigningPubKey":"","Channel":"C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198","Balance":"1000000","Amount":"1000000","Signature":"30440220718D264EF05CAED7C781FF6DE298DCAC68D002562C9BF3A07C1E721B420C0DAB02203A5A4779EF4D2CCC7BC3EF886676D803A9981B928D3B8ACA483B80ECA3CD7B9B","PublicKey":"32D2471DB72B27E3310F355BB33E339BF26F8392D5A93D3BC0FC3B566612DA0F0A"}"#;
@@ -364,6 +376,24 @@ mod tests {
         assert!(payment_channel_claim.amount.is_none());
         assert!(payment_channel_claim.signature.is_none());
         assert!(payment_channel_claim.public_key.is_none());
+    }
+
+    #[test]
+    fn test_credential_ids_serde_name() {
+        let claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&claim).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
     }
 
     #[test]

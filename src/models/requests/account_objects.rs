@@ -14,6 +14,7 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 #[serde(rename_all = "snake_case")]
 pub enum AccountObjectType {
     Check,
+    Credential,
     DepositPreauth,
     Escrow,
     Offer,

@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -21,6 +22,8 @@ pub struct DepositAuthorized<'a> {
     pub destination_account: Cow<'a, str>,
     /// The sender of a possible payment.
     pub source_account: Cow<'a, str>,
+    /// Credential IDs to consider when evaluating authorization.
+    pub credentials: Option<Vec<Cow<'a, str>>>,
     /// The unique identifier of a ledger.
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
@@ -43,6 +46,7 @@ impl<'a> DepositAuthorized<'a> {
         id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
         source_account: Cow<'a, str>,
+        credentials: Option<Vec<Cow<'a, str>>>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
     ) -> Self {
@@ -53,6 +57,7 @@ impl<'a> DepositAuthorized<'a> {
             },
             source_account,
             destination_account,
+            credentials,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,

@@ -10,7 +10,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::{CommonFields, CommonTransactionBuilder};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder};
 
 /// An AccountDelete transaction deletes an account and any objects it
 /// owns in the XRP Ledger, if possible, sending the account's remaining
@@ -45,10 +45,14 @@ pub struct AccountDelete<'a> {
     /// recipient or other information for the recipient
     /// of the deleted account's leftover XRP.
     pub destination_tag: Option<u32>,
+    /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl<'a> Model for AccountDelete<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
@@ -110,12 +114,19 @@ impl<'a> AccountDelete<'a> {
             ),
             destination,
             destination_tag,
+            credential_ids: None,
         }
     }
 
     /// Set destination tag
     pub fn with_destination_tag(mut self, tag: u32) -> Self {
         self.destination_tag = Some(tag);
+        self
+    }
+
+    /// Set credential IDs to attach to this transaction for credential-based authorization checks.
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 }
@@ -137,6 +148,7 @@ mod tests {
             },
             destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
             destination_tag: Some(13),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm","TransactionType":"AccountDelete","Fee":"2000000","Flags":0,"Sequence":2470665,"SigningPubKey":"","Destination":"rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe","DestinationTag":13}"#;
@@ -273,6 +285,26 @@ mod tests {
     }
 
     #[test]
+    fn test_credential_ids_serde_roundtrip() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rDeleteAccount789".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rExchange123".into(),
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&account_delete).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
+        let deserialized: AccountDelete = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(account_delete, deserialized);
+    }
+
+    #[test]
     fn test_ticket_sequence() {
         let ticket_delete = AccountDelete {
             common_fields: CommonFields {
@@ -328,5 +360,23 @@ mod tests {
         );
         assert_eq!(multi_memo_delete.destination_tag, Some(555));
         assert_eq!(multi_memo_delete.common_fields.sequence, Some(300));
+    }
+
+    #[test]
+    fn test_credential_ids_duplicate_entries_error() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rDeleteAccount789".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rExchange123".into(),
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        assert!(account_delete.get_errors().is_err());
     }
 }

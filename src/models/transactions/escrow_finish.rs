@@ -10,7 +10,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
-use super::{CommonFields, CommonTransactionBuilder};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder};
 
 /// Finishes an Escrow and delivers XRP from a held payment to the recipient.
 ///
@@ -43,11 +43,15 @@ pub struct EscrowFinish<'a> {
     pub condition: Option<Cow<'a, str>>,
     /// Hex value of the PREIMAGE-SHA-256 crypto-condition fulfillment matching the held payment's Condition.
     pub fulfillment: Option<Cow<'a, str>>,
+    /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl<'a> Model for EscrowFinish<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_condition_and_fulfillment_error()?;
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
@@ -113,6 +117,7 @@ impl<'a> EscrowFinish<'a> {
             offer_sequence,
             condition,
             fulfillment,
+            credential_ids: None,
         }
     }
 
@@ -133,6 +138,12 @@ impl<'a> EscrowFinish<'a> {
     ) -> Self {
         self.condition = Some(condition);
         self.fulfillment = Some(fulfillment);
+        self
+    }
+
+    /// Set credential IDs to attach to this transaction for credential-based authorization checks.
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 }
@@ -176,6 +187,7 @@ mod tests {
                     .into(),
             ),
             fulfillment: None,
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_err());
@@ -193,6 +205,7 @@ mod tests {
             offer_sequence: 10,
             condition: None,
             fulfillment: Some("A0028000".into()),
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_err());
@@ -213,6 +226,7 @@ mod tests {
                     .into(),
             ),
             fulfillment: Some("A0028000".into()),
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_ok());
@@ -230,6 +244,7 @@ mod tests {
             offer_sequence: 10,
             condition: None,
             fulfillment: None,
+            credential_ids: None,
         };
 
         assert!(escrow_finish.get_errors().is_ok());
@@ -251,6 +266,7 @@ mod tests {
                     .into(),
             ),
             fulfillment: Some("A0028000".into()),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","TransactionType":"EscrowFinish","Flags":0,"SigningPubKey":"","Owner":"rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn","OfferSequence":7,"Condition":"A0258020E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855810100","Fulfillment":"A0028000"}"#;
@@ -321,5 +337,24 @@ mod tests {
         assert_eq!(escrow_finish.common_fields.fee.as_ref().unwrap().0, "12");
         assert_eq!(escrow_finish.common_fields.sequence, Some(123));
         assert!(escrow_finish.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_credential_ids_serde_name() {
+        let escrow_finish = EscrowFinish {
+            common_fields: CommonFields {
+                account: "rSubmitter111111111111111111111111".into(),
+                transaction_type: TransactionType::EscrowFinish,
+                ..Default::default()
+            },
+            owner: "rOwner11111111111111111111111111111".into(),
+            offer_sequence: 7,
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&escrow_finish).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
     }
 }
