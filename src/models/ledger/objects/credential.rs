@@ -124,4 +124,107 @@ mod tests {
 
         assert_eq!(credential, deserialized);
     }
+
+    #[test]
+    fn test_serde_round_trip_all_fields() {
+        // Full credential with every field populated
+        let credential = Credential {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Credential,
+                index: Some(Cow::from(
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001",
+                )),
+                ledger_index: Some(Cow::from("42")),
+            },
+            subject: Cow::from("rALICE1111111111111111111111111111"),
+            issuer: Cow::from("rISABEL111111111111111111111111111"),
+            credential_type: Cow::from("4B5943"),
+            expiration: Some(789004799),
+            uri: Some(Cow::from(
+                "69736162656C2E636F6D2F63726564656E7469616C732F6B79632F616C696365",
+            )),
+            subject_node: Cow::from("0000000000000000"),
+            issuer_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        let json = serde_json::to_string(&credential).unwrap();
+        let deserialized: Credential = serde_json::from_str(&json).unwrap();
+        assert_eq!(credential, deserialized);
+    }
+
+    #[test]
+    fn test_serde_round_trip_optional_fields_omitted() {
+        // Credential without optional expiration and URI
+        let credential = Credential {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Credential,
+                index: Some(Cow::from(
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001",
+                )),
+                ledger_index: None,
+            },
+            subject: Cow::from("rALICE1111111111111111111111111111"),
+            issuer: Cow::from("rISABEL111111111111111111111111111"),
+            credential_type: Cow::from("4B5943"),
+            expiration: None,
+            uri: None,
+            subject_node: Cow::from("0000000000000000"),
+            issuer_node: Cow::from("0000000000000000"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 5,
+        };
+        let json = serde_json::to_string(&credential).unwrap();
+        // Verify optional fields are absent from serialized JSON
+        assert!(!json.contains("Expiration"));
+        assert!(!json.contains("URI"));
+
+        let deserialized: Credential = serde_json::from_str(&json).unwrap();
+        assert_eq!(credential, deserialized);
+        assert!(deserialized.expiration.is_none());
+        assert!(deserialized.uri.is_none());
+    }
+
+    #[test]
+    fn test_lsf_accepted_flag_value() {
+        // Verify the lsfAccepted flag has the correct value per the spec: 0x00010000
+        assert_eq!(CredentialFlag::LsfAccepted as u32, 0x00010000);
+    }
+
+    #[test]
+    fn test_serde_with_accepted_flag() {
+        // Credential with the lsfAccepted flag set
+        let mut flags = FlagCollection::default();
+        flags.0.push(CredentialFlag::LsfAccepted);
+        let credential = Credential {
+            common_fields: CommonFields {
+                flags,
+                ledger_entry_type: LedgerEntryType::Credential,
+                index: Some(Cow::from(
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001",
+                )),
+                ledger_index: None,
+            },
+            subject: Cow::from("rALICE1111111111111111111111111111"),
+            issuer: Cow::from("rISABEL111111111111111111111111111"),
+            credential_type: Cow::from("4B5943"),
+            expiration: None,
+            uri: None,
+            subject_node: Cow::from("0000000000000000"),
+            issuer_node: Cow::from("0000000000000000"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 10,
+        };
+        let json = serde_json::to_string(&credential).unwrap();
+        let deserialized: Credential = serde_json::from_str(&json).unwrap();
+        assert_eq!(credential, deserialized);
+    }
 }

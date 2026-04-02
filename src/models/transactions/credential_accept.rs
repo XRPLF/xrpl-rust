@@ -137,6 +137,7 @@ pub trait CredentialAcceptError {
 mod tests {
     use super::*;
     use crate::models::Model;
+    use alloc::borrow::Cow;
 
     #[test]
     fn test_serde() {
@@ -176,5 +177,64 @@ mod tests {
             credential_type: "".into(),
         };
         assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_credential_type_empty_error() {
+        let tx = CredentialAccept {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: "rIssuer111111111111111111111111111".into(),
+            credential_type: Cow::from(""),
+        };
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_credential_type_too_long_error() {
+        // 129 hex chars exceeds the 128 limit
+        let too_long: Cow<'_, str> = Cow::from("A".repeat(129));
+        let tx = CredentialAccept {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: "rIssuer111111111111111111111111111".into(),
+            credential_type: too_long,
+        };
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_credential_type_at_max_128_ok() {
+        let max_hex: Cow<'_, str> = Cow::from("A".repeat(128));
+        let tx = CredentialAccept {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: "rIssuer111111111111111111111111111".into(),
+            credential_type: max_hex,
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_minimal_accept() {
+        let tx = CredentialAccept {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: "rIssuer111111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+        };
+        assert!(tx.get_errors().is_ok());
     }
 }

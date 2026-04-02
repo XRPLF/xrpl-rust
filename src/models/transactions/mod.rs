@@ -65,8 +65,8 @@ use strum_macros::{AsRefStr, Display};
 
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
-/// Validate that a `credential_ids` field, when present, contains 1..=8 entries
-/// as required by the XLS-70 specification.
+/// Validate that a `credential_ids` field, when present, contains 1..=8 unique entries
+/// as required by the XLS-70 specification (sections 8.1 and 8.2).
 pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XRPLModelResult<()> {
     if let Some(ids) = credential_ids {
         if ids.is_empty() {
@@ -82,6 +82,14 @@ pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XR
                 max: 8,
                 found: ids.len(),
             });
+        }
+        for (i, id) in ids.iter().enumerate() {
+            if ids[..i].contains(id) {
+                return Err(XRPLModelException::ValueEqualsValue {
+                    field1: "credential_ids".into(),
+                    field2: "credential_ids (duplicate entry)".into(),
+                });
+            }
         }
     }
     Ok(())

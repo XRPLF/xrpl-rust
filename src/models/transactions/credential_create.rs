@@ -151,18 +151,22 @@ impl<'a> CredentialCreateError for CredentialCreate<'a> {
 
     fn _get_uri_error(&self) -> XRPLModelResult<()> {
         if let Some(uri) = &self.uri {
+            if uri.is_empty() {
+                return Err(XRPLModelException::ValueTooShort {
+                    field: "uri".into(),
+                    min: 1,
+                    found: 0,
+                });
+            }
             if uri.len() > MAX_URI_LENGTH {
-                Err(XRPLModelException::ValueTooLong {
+                return Err(XRPLModelException::ValueTooLong {
                     field: "uri".into(),
                     max: MAX_URI_LENGTH,
                     found: uri.len(),
-                })
-            } else {
-                Ok(())
+                });
             }
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -175,6 +179,7 @@ pub trait CredentialCreateError {
 mod tests {
     use super::*;
     use crate::models::Model;
+    use alloc::borrow::Cow;
 
     #[test]
     fn test_serde() {
@@ -218,5 +223,158 @@ mod tests {
             uri: None,
         };
         assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_credential_type_empty_error() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: Cow::from(""),
+            expiration: None,
+            uri: None,
+        };
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_credential_type_at_max_128_hex_chars_ok() {
+        // 128 hex chars = 64 bytes, the spec maximum
+        let max_hex: Cow<'_, str> = Cow::from("A".repeat(128));
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: max_hex,
+            expiration: None,
+            uri: None,
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_credential_type_exceeds_128_hex_chars_error() {
+        // 129 hex chars exceeds the limit
+        let too_long: Cow<'_, str> = Cow::from("A".repeat(129));
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: too_long,
+            expiration: None,
+            uri: None,
+        };
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_uri_at_max_length_ok() {
+        // MAX_URI_LENGTH is 512 chars
+        let max_uri: Cow<'_, str> = Cow::from("A".repeat(MAX_URI_LENGTH));
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: Some(max_uri),
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_uri_exceeds_max_length_error() {
+        let too_long: Cow<'_, str> = Cow::from("A".repeat(MAX_URI_LENGTH + 1));
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: Some(too_long),
+        };
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_uri_empty_error() {
+        // Spec section 3.2: "The URI field is empty" is a failure condition.
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: Some(Cow::from("")),
+        };
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_subject_same_as_account_self_issued_ok() {
+        // Per the spec, an issuer can issue a credential to themselves
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rSelfIssuer1111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSelfIssuer1111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: None,
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_minimal_credential_create() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "AB".into(),
+            expiration: None,
+            uri: None,
+        };
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_uri_none_ok() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: None,
+        };
+        assert!(tx.get_errors().is_ok());
     }
 }
