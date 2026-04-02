@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelResult};
+use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
@@ -16,16 +16,7 @@ use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, T
 /// See VaultClawback transaction:
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0065d-single-asset-vault>`
 #[skip_serializing_none]
-#[derive(
-    Debug,
-    Default,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    Clone,
-    xrpl_rust_macros::ValidateCurrencies,
-)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct VaultClawback<'a> {
     /// The base fields for all transaction models.
@@ -39,13 +30,14 @@ pub struct VaultClawback<'a> {
     pub vault_id: Cow<'a, str>,
     /// The account address of the holder whose assets are being clawed back.
     pub holder: Cow<'a, str>,
-    /// The amount of the asset to claw back from the holder.
-    pub amount: Amount<'a>,
+    /// The asset amount to clawback as a string-encoded number.
+    /// When 0 or omitted, clawback all funds up to the total shares the Holder owns.
+    pub amount: Option<Cow<'a, str>>,
 }
 
 impl Model for VaultClawback<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.validate_currencies()
+        Ok(())
     }
 }
 
@@ -86,7 +78,7 @@ impl<'a> VaultClawback<'a> {
         ticket_sequence: Option<u32>,
         vault_id: Cow<'a, str>,
         holder: Cow<'a, str>,
-        amount: Amount<'a>,
+        amount: Option<Cow<'a, str>>,
     ) -> VaultClawback<'a> {
         VaultClawback {
             common_fields: CommonFields::new(
@@ -115,7 +107,6 @@ impl<'a> VaultClawback<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{IssuedCurrencyAmount, XRPAmount};
 
     const VAULT_ID: &str = "A0000000000000000000000000000000000000000000000000000000DEADBEEF";
 
@@ -130,14 +121,10 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rHolder456".into(),
-            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                "USD".into(),
-                "rIssuer123".into(),
-                "500".into(),
-            )),
+            amount: Some("500".into()),
         };
 
-        let json_str = r#"{"Account":"rIssuer123","TransactionType":"VaultClawback","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF","Holder":"rHolder456","Amount":{"currency":"USD","issuer":"rIssuer123","value":"500"}}"#;
+        let json_str = r#"{"Account":"rIssuer123","TransactionType":"VaultClawback","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF","Holder":"rHolder456","Amount":"500"}"#;
 
         // Serialize
         let serialized = serde_json::to_string(&vault_clawback).unwrap();
@@ -152,17 +139,17 @@ mod tests {
     }
 
     #[test]
-    fn test_serde_xrp_amount() {
+    fn test_serde_no_amount() {
         let vault_clawback = VaultClawback {
             common_fields: CommonFields {
-                account: "rIssuerXRP789".into(),
+                account: "rIssuerNoAmt789".into(),
                 transaction_type: TransactionType::VaultClawback,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
-            holder: "rHolderXRP012".into(),
-            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            holder: "rHolderNoAmt012".into(),
+            amount: None,
         };
 
         let serialized = serde_json::to_string(&vault_clawback).unwrap();
@@ -180,11 +167,7 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rHolder456".into(),
-            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                "USD".into(),
-                "rIssuer123".into(),
-                "500".into(),
-            )),
+            amount: Some("500".into()),
         }
         .with_fee("12".into())
         .with_sequence(100)
@@ -221,7 +204,7 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rHolder012".into(),
-            amount: Amount::XRPAmount(XRPAmount::from("100000")),
+            amount: Some("100000".into()),
         };
 
         assert_eq!(vault_clawback.common_fields.account, "rIssuer789");
@@ -245,7 +228,7 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rTicketHolder222".into(),
-            amount: Amount::XRPAmount(XRPAmount::from("2000000")),
+            amount: Some("2000000".into()),
         }
         .with_ticket_sequence(54321)
         .with_fee("12".into());
@@ -264,11 +247,7 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rMultiMemoHolder444".into(),
-            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                "EUR".into(),
-                "rMultiMemoIssuer333".into(),
-                "1000".into(),
-            )),
+            amount: Some("1000".into()),
         }
         .with_memo(Memo {
             memo_data: Some("compliance action".into()),
@@ -309,11 +288,7 @@ mod tests {
             None,
             VAULT_ID.into(),
             "rNewHolder666".into(),
-            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                "USD".into(),
-                "rNewIssuer555".into(),
-                "750".into(),
-            )),
+            Some("750".into()),
         );
 
         assert_eq!(vault_clawback.common_fields.account, "rNewIssuer555");
@@ -336,11 +311,51 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rValidateHolder888".into(),
-            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            amount: Some("1000000".into()),
         }
         .with_fee("12".into())
         .with_sequence(300);
 
+        assert!(vault_clawback.validate().is_ok());
+    }
+
+    #[test]
+    fn test_get_transaction_type() {
+        use crate::models::transactions::Transaction;
+        let vault_clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: "rTxTypeTest".into(),
+                transaction_type: TransactionType::VaultClawback,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: "rHolder".into(),
+            amount: None,
+        };
+        assert_eq!(
+            *vault_clawback.get_transaction_type(),
+            TransactionType::VaultClawback
+        );
+    }
+
+    #[test]
+    fn test_clawback_all_no_amount() {
+        let vault_clawback = VaultClawback::new(
+            "rIssuerAll999".into(),
+            None,
+            Some("12".into()),
+            None,
+            None,
+            Some(200),
+            None,
+            None,
+            None,
+            VAULT_ID.into(),
+            "rHolderAll000".into(),
+            None,
+        );
+
+        assert!(vault_clawback.amount.is_none());
         assert!(vault_clawback.validate().is_ok());
     }
 }

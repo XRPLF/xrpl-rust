@@ -39,6 +39,10 @@ pub struct VaultWithdraw<'a> {
     pub vault_id: Cow<'a, str>,
     /// The amount of the asset to withdraw from the vault.
     pub amount: Amount<'a>,
+    /// An account to receive the withdrawn assets. Must be able to receive the asset.
+    pub destination: Option<Cow<'a, str>>,
+    /// Arbitrary tag identifying the reason for the withdrawal to the destination.
+    pub destination_tag: Option<u32>,
 }
 
 impl Model for VaultWithdraw<'_> {
@@ -84,6 +88,8 @@ impl<'a> VaultWithdraw<'a> {
         ticket_sequence: Option<u32>,
         vault_id: Cow<'a, str>,
         amount: Amount<'a>,
+        destination: Option<Cow<'a, str>>,
+        destination_tag: Option<u32>,
     ) -> VaultWithdraw<'a> {
         VaultWithdraw {
             common_fields: CommonFields::new(
@@ -104,7 +110,21 @@ impl<'a> VaultWithdraw<'a> {
             ),
             vault_id,
             amount,
+            destination,
+            destination_tag,
         }
+    }
+
+    /// Set the destination account.
+    pub fn with_destination(mut self, destination: Cow<'a, str>) -> Self {
+        self.destination = Some(destination);
+        self
+    }
+
+    /// Set the destination tag.
+    pub fn with_destination_tag(mut self, destination_tag: u32) -> Self {
+        self.destination_tag = Some(destination_tag);
+        self
     }
 }
 
@@ -126,6 +146,8 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: None,
+            destination_tag: None,
         };
 
         let json_str = r#"{"Account":"rWithdrawer123","TransactionType":"VaultWithdraw","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF","Amount":"1000000"}"#;
@@ -157,6 +179,8 @@ mod tests {
                 "rIssuer789".into(),
                 "500".into(),
             )),
+            destination: None,
+            destination_tag: None,
         };
 
         let serialized = serde_json::to_string(&vault_withdraw).unwrap();
@@ -174,6 +198,8 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: None,
+            destination_tag: None,
         }
         .with_fee("12".into())
         .with_sequence(100)
@@ -209,6 +235,8 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             amount: Amount::XRPAmount(XRPAmount::from("5000000")),
+            destination: None,
+            destination_tag: None,
         };
 
         assert_eq!(vault_withdraw.common_fields.account, "rWithdrawer789");
@@ -231,6 +259,8 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             amount: Amount::XRPAmount(XRPAmount::from("2000000")),
+            destination: None,
+            destination_tag: None,
         }
         .with_ticket_sequence(54321)
         .with_fee("12".into());
@@ -253,6 +283,8 @@ mod tests {
                 "rUSDIssuer333".into(),
                 "250".into(),
             )),
+            destination: None,
+            destination_tag: None,
         }
         .with_memo(Memo {
             memo_data: Some("partial withdrawal".into()),
@@ -293,6 +325,8 @@ mod tests {
             None,
             VAULT_ID.into(),
             Amount::XRPAmount(XRPAmount::from("10000000")),
+            None,
+            None,
         );
 
         assert_eq!(vault_withdraw.common_fields.account, "rNewWithdrawer444");
@@ -305,6 +339,46 @@ mod tests {
     }
 
     #[test]
+    fn test_with_destination() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawerDest".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: None,
+            destination_tag: None,
+        }
+        .with_destination("rDestAccount789".into())
+        .with_destination_tag(42);
+
+        assert_eq!(vault_withdraw.destination, Some("rDestAccount789".into()));
+        assert_eq!(vault_withdraw.destination_tag, Some(42));
+    }
+
+    #[test]
+    fn test_get_transaction_type() {
+        use crate::models::transactions::Transaction;
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rTxTypeTest".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: None,
+            destination_tag: None,
+        };
+        assert_eq!(
+            *vault_withdraw.get_transaction_type(),
+            TransactionType::VaultWithdraw
+        );
+    }
+
+    #[test]
     fn test_validate() {
         let vault_withdraw = VaultWithdraw {
             common_fields: CommonFields {
@@ -314,6 +388,8 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: None,
+            destination_tag: None,
         }
         .with_fee("12".into())
         .with_sequence(300);
