@@ -12,7 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
-### Breaking Changes
+### Added
+
+### Fixed
+
+## [[v1.1.0]]
 
 - `DepositPreauth` ledger object: `authorize` field changed from `Cow<'a, str>` to `Option<Cow<'a, str>>` to support XLS-70 credential-based preauthorization. The `new()` constructor is unchanged (still accepts non-optional `authorize`), but direct struct construction must wrap the value in `Some(...)`.
 - `credential_ids` field on `AccountDelete`, `Payment`, `EscrowFinish`, `PaymentChannelClaim`, and `credentials` on `DepositAuthorized` request changed from `Option<Cow<'a, [Cow<'a, str>]>>` to `Option<Vec<Cow<'a, str>>>` for reliable serde round-trip.
