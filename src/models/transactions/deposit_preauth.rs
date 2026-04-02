@@ -171,6 +171,14 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
                     found: len,
                 });
             }
+            for (i, cred) in credentials.iter().enumerate() {
+                if credentials[..i].contains(cred) {
+                    return Err(XRPLModelException::ValueEqualsValue {
+                        field1: field.into(),
+                        field2: alloc::format!("{field} (duplicate entry)"),
+                    });
+                }
+            }
             Ok(())
         }
 
@@ -213,6 +221,7 @@ pub trait DepositPreauthError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::CredentialAuthorizationFields;
     use crate::models::Model;
     use alloc::vec;
 
@@ -414,6 +423,308 @@ mod tests {
                 })
                 .collect(),
         );
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_all_four_fields_set_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+            unauthorize: Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()),
+            unauthorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_no_fields_set_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_authorize_credentials_zero_entries_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(vec![]),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_authorize_credentials_nine_entries_error() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..9)
+            .map(|_| {
+                CredentialAuthorization::new(crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(creds),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_authorize_credentials_exactly_eight_ok() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..8)
+            .map(|i| {
+                CredentialAuthorization::new(crate::models::CredentialAuthorizationFields::new(
+                    alloc::format!("rIssuer{i}1111111111111111111111111").into(),
+                    "4B5943".into(),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(creds),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_credentials_exactly_one_ok() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_unauthorize_credentials_zero_entries_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: Some(vec![]),
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_unauthorize_credentials_nine_entries_error() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..9)
+            .map(|_| {
+                CredentialAuthorization::new(crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: Some(creds),
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_unauthorize_credentials_exactly_eight_ok() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..8)
+            .map(|i| {
+                CredentialAuthorization::new(crate::models::CredentialAuthorizationFields::new(
+                    alloc::format!("rIssuer{i}1111111111111111111111111").into(),
+                    "4B5943".into(),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: Some(creds),
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_unauthorize_credentials_exactly_one_ok() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_with_unauthorize_credentials() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_and_authorize_credentials_error() {
+        // Setting both authorize and authorize_credentials is invalid
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()),
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_unauthorize_and_unauthorize_credentials_error() {
+        // Setting both unauthorize and unauthorize_credentials is invalid
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()),
+            unauthorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                ),
+            )]),
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_authorize_credentials_duplicate_entries_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rOwner1111111111111111111111111111".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            unauthorize: None,
+            authorize_credentials: Some(vec![
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                )),
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                )),
+            ]),
+            unauthorize_credentials: None,
+        };
         assert!(deposit_preauth.get_errors().is_err());
     }
 }

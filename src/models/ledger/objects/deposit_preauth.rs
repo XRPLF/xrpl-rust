@@ -148,6 +148,14 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
                     found: creds.len(),
                 });
             }
+            for (i, cred) in creds.iter().enumerate() {
+                if creds[..i].contains(cred) {
+                    return Err(XRPLModelException::ValueEqualsValue {
+                        field1: "authorize_credentials".into(),
+                        field2: "authorize_credentials (duplicate entry)".into(),
+                    });
+                }
+            }
         }
         Ok(())
     }
@@ -269,6 +277,118 @@ mod tests {
             account: Cow::from("rOwner1111111111111111111111111111"),
             authorize: None,
             authorize_credentials: None,
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_both_authorize_and_authorize_credentials() {
+        // Setting both authorize and authorize_credentials is invalid per the spec:
+        // exactly one of the two must be present
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: Some(Cow::from("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de")),
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                CredentialAuthorizationFields::new(
+                    Cow::from("rIssuer111111111111111111111111111"),
+                    Cow::from("4B5943"),
+                ),
+            )]),
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_authorize_credentials_exactly_eight_ok() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..8)
+            .map(|i| {
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    Cow::from(alloc::format!("rIssuer{i}1111111111111111111111111")),
+                    Cow::from("4B5943"),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: Some(creds),
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_credentials_exactly_one_ok() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                CredentialAuthorizationFields::new(
+                    Cow::from("rIssuer111111111111111111111111111"),
+                    Cow::from("4B5943"),
+                ),
+            )]),
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_credentials_nine_entries_error() {
+        let creds: Vec<CredentialAuthorization<'_>> = (0..9)
+            .map(|i| {
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    Cow::from(alloc::format!("rIssuer{i}1111111111111111111111111")),
+                    Cow::from("4B5943"),
+                ))
+            })
+            .collect();
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: Some(creds),
             owner_node: Cow::from("0000000000000001"),
             previous_txn_id: Cow::from(
                 "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
