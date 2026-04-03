@@ -20,6 +20,8 @@ fn test_vault_withdraw_serde_roundtrip_xrp() {
         },
         vault_id: VAULT_ID.into(),
         amount: Amount::XRPAmount(XRPAmount::from("5000000")),
+        destination: None,
+        destination_tag: None,
     };
 
     let json_str = serde_json::to_string(&vault_withdraw).unwrap();
@@ -42,6 +44,8 @@ fn test_vault_withdraw_serde_roundtrip_issued() {
             "rIssuer789".into(),
             "500".into(),
         )),
+        destination: None,
+        destination_tag: None,
     };
 
     let json_str = serde_json::to_string(&vault_withdraw).unwrap();
@@ -62,6 +66,8 @@ fn test_vault_withdraw_builder_pattern() {
         },
         vault_id: VAULT_ID.into(),
         amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+        destination: None,
+        destination_tag: None,
     }
     .with_fee("12".into())
     .with_sequence(500)
