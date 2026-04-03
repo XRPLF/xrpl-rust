@@ -81,6 +81,9 @@ embassy-time = { version = "0.3.2", optional = true }
 embedded-websocket-embedded-io = { version = "0.1.0", optional = true, default-features = false, features = [
     "embedded-io-async",
 ] }
+# NOTE: reqwless 0.13.0 pins embedded-tls 0.17.0 which depends on atomic-polyfill
+# (RUSTSEC-2023-0089). Newer embedded-tls versions use portable-atomic instead, but
+# reqwless has not released a compatible update yet. Blocked upstream.
 reqwless = { version = "0.13.0", optional = true }
 reqwest = { version = "0.12.7", optional = true, features = ["json"] }
 tokio-tungstenite = { version = "0.24.0", optional = true, features = [
@@ -89,6 +92,8 @@ tokio-tungstenite = { version = "0.24.0", optional = true, features = [
 embassy-futures = { version = "0.1.1" }
 embedded-nal-async = { version = "0.8.0", optional = true }
 actix-rt = { version = "2.10.0", optional = true }
+# DEPRECATED: async-std has been discontinued (RUSTSEC-2025-0052). Use smol-rt instead.
+# Retained so the async-std-rt feature gate resolves; enabling it emits a compile_error.
 async-std = { version = "1.13.0", optional = true }
 futures-executor = { version = "0.3.30", optional = true }
 futures-timer = { version = "3.0.3", optional = true }
