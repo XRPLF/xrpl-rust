@@ -582,10 +582,10 @@ serde_with_tag! {
 ///
 /// See XLS-80 PermissionedDomains:
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0080-permissioned-domains>`
-#[derive(Debug, PartialEq, Eq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, new)]
 pub struct Credential {
-    pub issuer: Option<String>,
-    pub credential_type: Option<String>,
+    pub issuer: String,
+    pub credential_type: String,
 }
 }
 
