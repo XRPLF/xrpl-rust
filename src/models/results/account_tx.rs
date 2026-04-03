@@ -7,9 +7,9 @@ use serde_json::Value;
 use crate::models::requests::Marker;
 use crate::models::{XRPLModelException, XRPLModelResult};
 
-use super::{
-    exceptions::XRPLResultException, metadata::TransactionMetadata, XRPLResponse, XRPLResult,
-};
+use crate::models::transactions::metadata::TransactionMetadata;
+
+use super::{exceptions::XRPLResultException, XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
