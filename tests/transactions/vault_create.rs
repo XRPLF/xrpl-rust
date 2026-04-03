@@ -23,6 +23,7 @@ fn test_vault_create_serde_roundtrip() {
         mptoken_metadata: None,
         domain_id: None,
         withdrawal_policy: None,
+        scale: None,
     };
 
     let json_str = serde_json::to_string(&vault_create).unwrap();
@@ -46,6 +47,7 @@ fn test_vault_create_with_all_optional_fields() {
         mptoken_metadata: Some("ABCDEF".into()),
         domain_id: Some("D0000000000000000000000000000000000000000000000000000000DEADBEEF".into()),
         withdrawal_policy: Some(1),
+        scale: Some(6),
     };
 
     assert!(vault_create.validate().is_ok());
