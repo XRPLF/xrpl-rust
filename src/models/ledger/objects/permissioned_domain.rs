@@ -96,12 +96,12 @@ mod test_serde {
             Cow::from("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"),
             vec![
                 Credential {
-                    issuer: Some("rIssuerA".to_string()),
-                    credential_type: Some("KYC".to_string()),
+                    issuer: "rIssuerA".to_string(),
+                    credential_type: "KYC".to_string(),
                 },
                 Credential {
-                    issuer: Some("rIssuerB".to_string()),
-                    credential_type: Some("AML".to_string()),
+                    issuer: "rIssuerB".to_string(),
+                    credential_type: "AML".to_string(),
                 },
             ],
             1,
@@ -122,8 +122,8 @@ mod test_serde {
             None,
             Cow::from("rOwnerAccount123"),
             vec![Credential {
-                issuer: Some("rIssuer".to_string()),
-                credential_type: Some("KYC".to_string()),
+                issuer: "rIssuer".to_string(),
+                credential_type: "KYC".to_string(),
             }],
             5,
             None,
@@ -186,8 +186,8 @@ mod test_serde {
             Some(Cow::from("TestLedgerIndex")),
             Cow::from("rOwnerXYZ"),
             vec![Credential {
-                issuer: Some("rIssuerXYZ".to_string()),
-                credential_type: Some("ACCREDITED".to_string()),
+                issuer: "rIssuerXYZ".to_string(),
+                credential_type: "ACCREDITED".to_string(),
             }],
             42,
             Some(Cow::from("7")),
