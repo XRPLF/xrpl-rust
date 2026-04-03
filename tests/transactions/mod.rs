@@ -20,6 +20,8 @@ pub mod nftoken_create_offer;
 pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
+pub mod oracle_delete;
+pub mod oracle_set;
 pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
