@@ -32,12 +32,11 @@ fuzz_target!(|input: FuzzInput| {
     // Track the current set of items to rebuild a fresh tree for comparison
     let mut current_items: std::collections::BTreeSet<[u8; 32]> = std::collections::BTreeSet::new();
 
-    for op in &input.ops {
+    for (i, op) in input.ops.iter().enumerate() {
         match op {
             Op::Add(idx) => {
-                if current_items.insert(*idx) {
-                    map.add_item(*idx, prefix, idx.to_vec());
-                }
+                current_items.insert(*idx);
+                map.add_item(*idx, prefix, idx.to_vec());
             }
             Op::Remove(idx) => {
                 if current_items.remove(idx) {
@@ -45,25 +44,23 @@ fuzz_target!(|input: FuzzInput| {
                 }
             }
         }
+
+        // After each mutation, verify the cached hash equals a freshly-built tree's hash
+        let incremental_hash = map.hash();
+
+        let mut fresh = ShaMap::new();
+        for idx in &current_items {
+            fresh.add_item(*idx, prefix, idx.to_vec());
+        }
+        let fresh_hash = fresh.hash();
+
+        assert_eq!(
+            incremental_hash, fresh_hash,
+            "incremental tree hash diverged from fresh-build hash after op {} ({} items)",
+            i + 1,
+            current_items.len()
+        );
+
+        assert_eq!(map.len(), current_items.len());
     }
-
-    // The incremental tree's hash
-    let incremental_hash = map.hash();
-
-    // Build a fresh tree from the same logical contents
-    let mut fresh = ShaMap::new();
-    for idx in &current_items {
-        fresh.add_item(*idx, prefix, idx.to_vec());
-    }
-    let fresh_hash = fresh.hash();
-
-    assert_eq!(
-        incremental_hash, fresh_hash,
-        "incremental tree hash must equal fresh-build hash after {} ops ({} items remain)",
-        input.ops.len(),
-        current_items.len()
-    );
-
-    // Also verify len consistency
-    assert_eq!(map.len(), current_items.len());
 });
