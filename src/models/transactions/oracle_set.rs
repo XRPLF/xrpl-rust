@@ -5,9 +5,12 @@ use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::{Memo, PriceData, Signer, Transaction, TransactionType};
-use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
+use crate::models::{FlagCollection, Model, NoFlags, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, CommonTransactionBuilder};
+
+/// Maximum number of PriceData entries allowed in a single OracleSet transaction.
+const MAX_ORACLE_DATA_SERIES: u32 = 10;
 
 /// An OracleSet transaction creates or updates an Oracle ledger entry.
 ///
@@ -25,7 +28,7 @@ pub struct OracleSet<'a> {
     pub common_fields: CommonFields<'a, NoFlags>,
     /// A unique identifier of the price oracle for the account.
     #[serde(rename = "OracleDocumentID")]
-    pub oracle_document_id: Option<u32>,
+    pub oracle_document_id: u32,
     /// An arbitrary value that identifies an oracle provider, such as
     /// Chainlink, Band, or DIA. This field is a string, up to 256 ASCII
     /// hex encoded characters (128 bytes).
@@ -39,7 +42,7 @@ pub struct OracleSet<'a> {
     /// (8 bytes).
     pub asset_class: Option<Cow<'a, str>>,
     /// The time the data was last updated, represented in the ripple epoch.
-    pub last_update_time: Option<u32>,
+    pub last_update_time: u32,
     /// An array of up to 10 PriceData objects, each representing one
     /// price data entry.
     pub price_data_series: Option<Vec<PriceData>>,
@@ -47,6 +50,15 @@ pub struct OracleSet<'a> {
 
 impl Model for OracleSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        if let Some(ref series) = self.price_data_series {
+            if series.len() as u32 > MAX_ORACLE_DATA_SERIES {
+                return Err(XRPLModelException::ValueTooHigh {
+                    field: "price_data_series".into(),
+                    max: MAX_ORACLE_DATA_SERIES,
+                    found: series.len() as u32,
+                });
+            }
+        }
         Ok(())
     }
 }
@@ -86,11 +98,11 @@ impl<'a> OracleSet<'a> {
         signers: Option<Vec<Signer>>,
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
-        oracle_document_id: Option<u32>,
+        oracle_document_id: u32,
         provider: Option<Cow<'a, str>>,
         uri: Option<Cow<'a, str>>,
         asset_class: Option<Cow<'a, str>>,
-        last_update_time: Option<u32>,
+        last_update_time: u32,
         price_data_series: Option<Vec<PriceData>>,
     ) -> Self {
         Self {
@@ -121,7 +133,7 @@ impl<'a> OracleSet<'a> {
 
     /// Set the oracle document ID
     pub fn with_oracle_document_id(mut self, id: u32) -> Self {
-        self.oracle_document_id = Some(id);
+        self.oracle_document_id = id;
         self
     }
 
@@ -145,7 +157,7 @@ impl<'a> OracleSet<'a> {
 
     /// Set the last update time
     pub fn with_last_update_time(mut self, time: u32) -> Self {
-        self.last_update_time = Some(time);
+        self.last_update_time = time;
         self
     }
 
@@ -173,11 +185,11 @@ mod tests {
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
-            oracle_document_id: Some(1),
+            oracle_document_id: 1,
             provider: Some("chainlink".into()),
             uri: Some("https://example.com/oracle1".into()),
             asset_class: Some("63757272656E6379".into()),
-            last_update_time: Some(743609014),
+            last_update_time: 743609014,
             price_data_series: Some(vec![PriceData {
                 base_asset: Some("XRP".to_string()),
                 quote_asset: Some("USD".to_string()),
@@ -211,11 +223,11 @@ mod tests {
         .with_last_ledger_sequence(596447)
         .with_source_tag(42);
 
-        assert_eq!(oracle_set.oracle_document_id, Some(1));
+        assert_eq!(oracle_set.oracle_document_id, 1);
         assert_eq!(oracle_set.provider.as_deref(), Some("chainlink"));
         assert_eq!(oracle_set.uri.as_deref(), Some("https://example.com"));
         assert_eq!(oracle_set.asset_class.as_deref(), Some("63757272656E6379"));
-        assert_eq!(oracle_set.last_update_time, Some(743609014));
+        assert_eq!(oracle_set.last_update_time, 743609014);
         assert_eq!(oracle_set.common_fields.fee.as_ref().unwrap().0, "12");
         assert_eq!(oracle_set.common_fields.sequence, Some(100));
         assert_eq!(oracle_set.common_fields.last_ledger_sequence, Some(596447));
@@ -241,11 +253,11 @@ mod tests {
             oracle_set.common_fields.transaction_type,
             TransactionType::OracleSet
         );
-        assert!(oracle_set.oracle_document_id.is_none());
+        assert_eq!(oracle_set.oracle_document_id, 0);
         assert!(oracle_set.provider.is_none());
         assert!(oracle_set.uri.is_none());
         assert!(oracle_set.asset_class.is_none());
-        assert!(oracle_set.last_update_time.is_none());
+        assert_eq!(oracle_set.last_update_time, 0);
         assert!(oracle_set.price_data_series.is_none());
     }
 
@@ -297,11 +309,11 @@ mod tests {
             None,
             None,
             None,
-            Some(1),
+            1,
             None,
             None,
             None,
-            None,
+            743609014,
             None,
         );
 
@@ -313,7 +325,7 @@ mod tests {
             oracle_set.common_fields.transaction_type,
             TransactionType::OracleSet
         );
-        assert_eq!(oracle_set.oracle_document_id, Some(1));
+        assert_eq!(oracle_set.oracle_document_id, 1);
     }
 
     #[test]
@@ -335,11 +347,11 @@ mod tests {
             None,
             None,
             None,
-            Some(1),
+            1,
             Some("chainlink".into()),
             Some("https://example.com/oracle1".into()),
             Some("63757272656E6379".into()),
-            Some(743609014),
+            743609014,
             Some(price_data),
         );
 
@@ -349,9 +361,9 @@ mod tests {
         );
         assert_eq!(oracle_set.common_fields.fee, Some("12".into()));
         assert_eq!(oracle_set.common_fields.sequence, Some(391));
-        assert_eq!(oracle_set.oracle_document_id, Some(1));
+        assert_eq!(oracle_set.oracle_document_id, 1);
         assert_eq!(oracle_set.provider.as_deref(), Some("chainlink"));
-        assert_eq!(oracle_set.last_update_time, Some(743609014));
+        assert_eq!(oracle_set.last_update_time, 743609014);
         assert_eq!(oracle_set.price_data_series.as_ref().unwrap().len(), 1);
     }
 
@@ -431,5 +443,61 @@ mod tests {
         assert!(series[0].quote_asset.is_none());
         assert!(series[0].asset_price.is_none());
         assert!(series[0].scale.is_none());
+    }
+
+    #[test]
+    fn test_price_data_series_max_valid() {
+        let series: Vec<PriceData> = (0..10)
+            .map(|i| PriceData {
+                base_asset: Some(alloc::format!("ASSET{i}")),
+                quote_asset: Some("USD".to_string()),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            })
+            .collect();
+
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(series);
+
+        assert!(oracle_set.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_price_data_series_exceeds_max() {
+        let series: Vec<PriceData> = (0..11)
+            .map(|i| PriceData {
+                base_asset: Some(alloc::format!("ASSET{i}")),
+                quote_asset: Some("USD".to_string()),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            })
+            .collect();
+
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(series);
+
+        let err = oracle_set.get_errors().unwrap_err();
+        assert_eq!(
+            err,
+            XRPLModelException::ValueTooHigh {
+                field: "price_data_series".into(),
+                max: 10,
+                found: 11,
+            }
+        );
     }
 }

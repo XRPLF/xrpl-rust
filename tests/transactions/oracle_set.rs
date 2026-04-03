@@ -20,11 +20,11 @@ fn test_oracle_set_construction() {
             sequence: Some(391),
             ..Default::default()
         },
-        oracle_document_id: Some(1),
+        oracle_document_id: 1,
         provider: Some("chainlink".into()),
         uri: Some("https://example.com/oracle".into()),
         asset_class: Some("63757272656E6379".into()),
-        last_update_time: Some(743609014),
+        last_update_time: 743609014,
         price_data_series: Some(vec![PriceData {
             base_asset: Some("XRP".into()),
             quote_asset: Some("USD".into()),
@@ -37,7 +37,7 @@ fn test_oracle_set_construction() {
         oracle_set.common_fields.transaction_type,
         TransactionType::OracleSet
     );
-    assert_eq!(oracle_set.oracle_document_id, Some(1));
+    assert_eq!(oracle_set.oracle_document_id, 1);
     assert_eq!(oracle_set.price_data_series.as_ref().unwrap().len(), 1);
 }
 
@@ -53,11 +53,11 @@ fn test_oracle_set_serde_roundtrip() {
         None,
         None,
         None,
-        Some(1),
+        1,
         Some("provider".into()),
         None,
         None,
-        Some(743609014),
+        743609014,
         None,
     );
 
