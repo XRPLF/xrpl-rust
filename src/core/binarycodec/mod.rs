@@ -175,6 +175,8 @@ pub fn decode_ledger_data(hex_string: &str) -> XRPLCoreResult<Value> {
 
 #[cfg(all(test, feature = "std"))]
 mod test {
+    use alloc::vec;
+
     use super::*;
 
     #[path = "binary_json_tests.rs"]
@@ -185,4 +187,398 @@ mod test {
     mod tx_encode_decode_tests;
     #[path = "x_address_tests.rs"]
     mod x_address_tests;
+
+    use crate::core::binarycodec::definitions::{
+        get_field_instance, get_ledger_entry_type_code, get_transaction_type_code,
+    };
+    use crate::core::binarycodec::utils::{decode_field_name, encode_field_name};
+    use crate::models::transactions::{
+        mptoken_authorize::MPTokenAuthorize,
+        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+        mptoken_issuance_destroy::MPTokenIssuanceDestroy,
+        mptoken_issuance_set::{MPTokenIssuanceSet, MPTokenIssuanceSetFlag},
+        CommonFields, TransactionType,
+    };
+
+    // ── Field encoding / decoding ──────────────────────────────────────
+
+    #[test]
+    fn test_mpt_field_name_encoding() {
+        // (field_name, expected_hex)
+        // Hash192 type_code=21 (>=16), AccountID type_code=8 (<16),
+        // UInt8 type_code=16 (>=16), UInt64 type_code=3, Blob type_code=7
+        let cases = [
+            ("MPTokenIssuanceID", "0115"), // Hash192(21), nth 1 → byte1=0x01, byte2=0x15
+            ("ShareMPTID", "0215"),        // Hash192(21), nth 2 → byte1=0x02, byte2=0x15
+            ("Holder", "8B"),              // AccountID(8), nth 11 → (8<<4)|11 = 0x8B
+            ("AssetScale", "0510"),        // UInt8(16), nth 5 → byte1=0x05, byte2=0x10
+            ("MaximumAmount", "3018"),     // UInt64(3), nth 24 → (3<<4)=0x30, 0x18
+            ("MPTAmount", "301A"),         // UInt64(3), nth 26 → (3<<4)=0x30, 0x1A
+            ("MPTokenMetadata", "701E"),   // Blob(7), nth 30 → (7<<4)=0x70, 0x1E
+        ];
+
+        for (field_name, expected_hex) in &cases {
+            let encoded = encode_field_name(field_name)
+                .unwrap_or_else(|e| panic!("failed to encode field {}: {:?}", field_name, e));
+            let hex = hex::encode_upper(encoded);
+            assert_eq!(
+                &hex, expected_hex,
+                "encode mismatch for field {}",
+                field_name
+            );
+
+            let decoded = decode_field_name(expected_hex)
+                .unwrap_or_else(|e| panic!("failed to decode hex {}: {:?}", expected_hex, e));
+            assert_eq!(
+                decoded, *field_name,
+                "decode mismatch for hex {}",
+                expected_hex
+            );
+        }
+    }
+
+    // ── Type code resolution ───────────────────────────────────────────
+
+    #[test]
+    fn test_mpt_transaction_type_codes() {
+        assert_eq!(
+            get_transaction_type_code("MPTokenIssuanceCreate"),
+            Some(&54)
+        );
+        assert_eq!(
+            get_transaction_type_code("MPTokenIssuanceDestroy"),
+            Some(&55)
+        );
+        assert_eq!(get_transaction_type_code("MPTokenIssuanceSet"), Some(&56));
+        assert_eq!(get_transaction_type_code("MPTokenAuthorize"), Some(&57));
+    }
+
+    #[test]
+    fn test_mpt_ledger_entry_type_codes() {
+        assert_eq!(get_ledger_entry_type_code("MPTokenIssuance"), Some(&126));
+        assert_eq!(get_ledger_entry_type_code("MPToken"), Some(&127));
+    }
+
+    // ── Field instance metadata ────────────────────────────────────────
+
+    #[test]
+    fn test_mpt_field_instances() {
+        let fi = get_field_instance("MPTokenIssuanceID").expect("MPTokenIssuanceID not found");
+        assert_eq!(fi.associated_type, "Hash192");
+        assert_eq!(fi.nth, 1);
+        assert!(fi.is_serialized);
+        assert!(fi.is_signing);
+
+        let fi = get_field_instance("Holder").expect("Holder not found");
+        assert_eq!(fi.associated_type, "AccountID");
+        assert_eq!(fi.nth, 11);
+        assert!(fi.is_vl_encoded);
+
+        let fi = get_field_instance("MPTAmount").expect("MPTAmount not found");
+        assert_eq!(fi.associated_type, "UInt64");
+        assert_eq!(fi.nth, 26);
+
+        let fi = get_field_instance("MPTokenMetadata").expect("MPTokenMetadata not found");
+        assert_eq!(fi.associated_type, "Blob");
+        assert_eq!(fi.nth, 30);
+        assert!(fi.is_vl_encoded);
+
+        let fi = get_field_instance("AssetScale").expect("AssetScale not found");
+        assert_eq!(fi.associated_type, "UInt8");
+        assert_eq!(fi.nth, 5);
+
+        let fi = get_field_instance("MaximumAmount").expect("MaximumAmount not found");
+        assert_eq!(fi.associated_type, "UInt64");
+        assert_eq!(fi.nth, 24);
+
+        let fi = get_field_instance("ShareMPTID").expect("ShareMPTID not found");
+        assert_eq!(fi.associated_type, "Hash192");
+        assert_eq!(fi.nth, 2);
+    }
+
+    // ── Full transaction encoding ──────────────────────────────────────
+
+    /// TransactionType is always the first serialized field (lowest ordinal).
+    /// For MPTokenIssuanceCreate (code 54 = 0x0036), the hex starts with
+    /// field ID 0x12 (UInt16, nth 2) followed by the 2-byte type code.
+    #[test]
+    fn test_encode_mptoken_issuance_create() {
+        let txn = MPTokenIssuanceCreate {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenIssuanceCreate,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            asset_scale: Some(2),
+            maximum_amount: Some("1000000".into()),
+            transfer_fee: Some(314),
+            mptoken_metadata: Some("CAFEBABE".into()),
+        };
+
+        let hex = encode(&txn).expect("encode MPTokenIssuanceCreate failed");
+
+        // TransactionType field: 0x12 + 0x0036 (54)
+        assert!(
+            hex.starts_with("120036"),
+            "expected hex to start with 120036 (MPTokenIssuanceCreate), got: {}",
+            &hex[..core::cmp::min(20, hex.len())]
+        );
+
+        // TransferFee field: 0x14 + 0x013A (314)
+        assert!(
+            hex.contains("14013A"),
+            "expected TransferFee 314 (14013A) in hex"
+        );
+
+        // Flags = 0: 0x22 + 0x00000000
+        assert!(
+            hex.contains("2200000000"),
+            "expected Flags 0 (2200000000) in hex"
+        );
+
+        // Sequence = 1: 0x24 + 0x00000001
+        assert!(
+            hex.contains("2400000001"),
+            "expected Sequence 1 (2400000001) in hex"
+        );
+
+        // AssetScale = 2: field ID 0x0510 + 0x02
+        assert!(
+            hex.contains("051002"),
+            "expected AssetScale 2 (051002) in hex"
+        );
+
+        // MPTokenMetadata (Blob): field ID 0x701E + length prefix + CAFEBABE
+        assert!(
+            hex.contains("CAFEBABE"),
+            "expected MPTokenMetadata hex payload in encoded output"
+        );
+    }
+
+    #[test]
+    fn test_encode_mptoken_issuance_create_with_flags() {
+        let txn = MPTokenIssuanceCreate {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenIssuanceCreate,
+                fee: Some("12".into()),
+                sequence: Some(5),
+                flags: vec![
+                    MPTokenIssuanceCreateFlag::TfMPTCanTransfer,
+                    MPTokenIssuanceCreateFlag::TfMPTCanLock,
+                ]
+                .into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let hex = encode(&txn).expect("encode MPTokenIssuanceCreate with flags failed");
+
+        assert!(hex.starts_with("120036"), "wrong transaction type");
+
+        // Flags = TfMPTCanTransfer (0x20) | TfMPTCanLock (0x02) = 0x22
+        assert!(
+            hex.contains("2200000022"),
+            "expected Flags 0x22 (2200000022) in hex, got: {}",
+            hex
+        );
+    }
+
+    /// MPTokenIssuanceDestroy (code 55 = 0x0037) exercises Hash192
+    /// serialization through the MPTokenIssuanceID field.
+    #[test]
+    fn test_encode_mptoken_issuance_destroy() {
+        let txn = MPTokenIssuanceDestroy {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenIssuanceDestroy,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344".into(),
+        };
+
+        let hex = encode(&txn).expect("encode MPTokenIssuanceDestroy failed");
+
+        // TransactionType = 55 = 0x0037
+        assert!(
+            hex.starts_with("120037"),
+            "expected hex to start with 120037 (MPTokenIssuanceDestroy), got: {}",
+            &hex[..core::cmp::min(20, hex.len())]
+        );
+
+        // The Hash192 value should appear verbatim in the encoded hex
+        // (Hash192 is a fixed-length 24-byte field, no length prefix)
+        assert!(
+            hex.contains("00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344"),
+            "expected MPTokenIssuanceID hash in encoded output"
+        );
+    }
+
+    /// MPTokenIssuanceSet (code 56 = 0x0038) with the TfMPTLock flag
+    /// and Holder field (AccountID, nth 11).
+    #[test]
+    fn test_encode_mptoken_issuance_set() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344".into(),
+            holder: Some("rPcHbQ26o4Xrwb2bu5gLc3gWUsS52yx1pG".into()),
+        };
+
+        let hex = encode(&txn).expect("encode MPTokenIssuanceSet failed");
+
+        // TransactionType = 56 = 0x0038
+        assert!(
+            hex.starts_with("120038"),
+            "expected hex to start with 120038 (MPTokenIssuanceSet), got: {}",
+            &hex[..core::cmp::min(20, hex.len())]
+        );
+
+        // TfMPTLock = 0x00000001
+        assert!(
+            hex.contains("2200000001"),
+            "expected Flags TfMPTLock (2200000001) in hex"
+        );
+
+        // Hash192 value in output
+        assert!(
+            hex.contains("00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344"),
+            "expected MPTokenIssuanceID in encoded output"
+        );
+
+        // Holder field (AccountID, 0x8B) should be present
+        assert!(hex.contains("8B"), "expected Holder field ID (8B) in hex");
+    }
+
+    /// MPTokenAuthorize (code 57 = 0x0039) with holder opt-in (no holder field).
+    #[test]
+    fn test_encode_mptoken_authorize() {
+        let txn = MPTokenAuthorize {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenAuthorize,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344".into(),
+            ..Default::default()
+        };
+
+        let hex = encode(&txn).expect("encode MPTokenAuthorize failed");
+
+        // TransactionType = 57 = 0x0039
+        assert!(
+            hex.starts_with("120039"),
+            "expected hex to start with 120039 (MPTokenAuthorize), got: {}",
+            &hex[..core::cmp::min(20, hex.len())]
+        );
+
+        // Hash192 value
+        assert!(
+            hex.contains("00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344"),
+            "expected MPTokenIssuanceID in encoded output"
+        );
+    }
+
+    /// Verify that encode_for_signing adds the signing prefix and
+    /// excludes non-signing fields for MPT transactions.
+    #[test]
+    fn test_encode_for_signing_mptoken_issuance_create() {
+        let txn = MPTokenIssuanceCreate {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenIssuanceCreate,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let hex = encode_for_signing(&txn).expect("encode_for_signing failed");
+
+        // Signing prefix: 0x53545800
+        assert!(
+            hex.starts_with("53545800"),
+            "expected signing prefix 53545800, got: {}",
+            &hex[..core::cmp::min(20, hex.len())]
+        );
+
+        // TransactionType follows the prefix
+        assert!(
+            hex[8..].starts_with("120036"),
+            "expected TransactionType after signing prefix"
+        );
+    }
+
+    /// Verify that encode_for_multisigning adds the multisign prefix,
+    /// the signing account suffix, and excludes non-signing fields.
+    #[test]
+    fn test_encode_for_multisigning_mptoken_authorize() {
+        let txn = MPTokenAuthorize {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenAuthorize,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344".into(),
+            ..Default::default()
+        };
+
+        let hex = encode_for_multisigning(&txn, "rPcHbQ26o4Xrwb2bu5gLc3gWUsS52yx1pG".into())
+            .expect("encode_for_multisigning failed");
+
+        // Multisign prefix: 0x534D5400
+        assert!(
+            hex.starts_with("534D5400"),
+            "expected multisign prefix 534D5400, got: {}",
+            &hex[..core::cmp::min(20, hex.len())]
+        );
+
+        // TransactionType follows the prefix
+        assert!(
+            hex[8..].starts_with("120039"),
+            "expected MPTokenAuthorize type after multisign prefix"
+        );
+
+        // The signing account ID should appear at the end as a suffix
+        // (account ID is 20 bytes = 40 hex chars at end of encoded output)
+        assert!(
+            hex.len() > 40,
+            "encoded output too short for multisign suffix"
+        );
+    }
+
+    /// Encode the same transaction twice and verify deterministic output.
+    #[test]
+    fn test_encode_deterministic() {
+        let txn = MPTokenIssuanceDestroy {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::MPTokenIssuanceDestroy,
+                fee: Some("10".into()),
+                sequence: Some(42),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "AABBCCDD11223344AABBCCDD11223344AABBCCDD11223344".into(),
+        };
+
+        let hex1 = encode(&txn).expect("first encode failed");
+        let hex2 = encode(&txn).expect("second encode failed");
+        assert_eq!(hex1, hex2, "encoding should be deterministic");
+    }
 }
