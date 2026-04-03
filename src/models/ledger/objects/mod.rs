@@ -16,6 +16,7 @@ pub mod pay_channel;
 pub mod ripple_state;
 pub mod signer_list;
 pub mod ticket;
+pub mod vault;
 pub mod xchain_owned_claim_id;
 pub mod xchain_owned_create_account_claim_id;
 
@@ -44,6 +45,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
 use ticket::Ticket;
+use vault::Vault;
 use xchain_owned_claim_id::XChainOwnedClaimID;
 use xchain_owned_create_account_claim_id::XChainOwnedCreateAccountClaimID;
 
@@ -70,6 +72,7 @@ pub enum LedgerEntryType {
     RippleState = 0x0072,
     SignerList = 0x0053,
     Ticket = 0x0054,
+    Vault = 0x0084,
     XChainOwnedClaimID = 0x0071,
     XChainOwnedCreateAccountClaimID = 0x0074,
 }
@@ -94,6 +97,7 @@ pub enum LedgerEntry<'a> {
     RippleState(RippleState<'a>),
     SignerList(SignerList<'a>),
     Ticket(Ticket<'a>),
+    Vault(Vault<'a>),
     XChainOwnedClaimID(XChainOwnedClaimID<'a>),
     XChainOwnedCreateAccountClaimID(XChainOwnedCreateAccountClaimID<'a>),
 }
