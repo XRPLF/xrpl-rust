@@ -29,8 +29,8 @@ async fn test_permissioned_domain_set_base() {
             None,
             None, // No domain_id means create new domain
             vec![Credential {
-                issuer: Some(wallet.classic_address.clone()),
-                credential_type: Some("KYC".to_string()),
+                issuer: wallet.classic_address.clone(),
+                credential_type: "KYC".to_string(),
             }],
         );
 

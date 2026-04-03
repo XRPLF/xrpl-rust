@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
+use crate::models::exceptions::XRPLModelException;
 use crate::models::{
     transactions::{Credential, Memo, Signer, Transaction, TransactionType},
     Model, ValidateCurrencies,
@@ -52,6 +53,16 @@ pub struct PermissionedDomainSet<'a> {
 
 impl<'a> Model for PermissionedDomainSet<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        for credential in &self.accepted_credentials {
+            if credential.issuer.is_empty() {
+                return Err(XRPLModelException::MissingField("Credential.issuer".into()));
+            }
+            if credential.credential_type.is_empty() {
+                return Err(XRPLModelException::MissingField(
+                    "Credential.credential_type".into(),
+                ));
+            }
+        }
         self.validate_currencies()
     }
 }
@@ -154,8 +165,8 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: Some("rIssuer111111111111111111111".to_string()),
-                credential_type: Some("KYC".to_string()),
+                issuer: "rIssuer111111111111111111111".to_string(),
+                credential_type: "KYC".to_string(),
             }],
         };
 
@@ -179,8 +190,8 @@ mod tests {
                 "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2".into(),
             ),
             accepted_credentials: vec![Credential {
-                issuer: Some("rIssuer222222222222222222222".to_string()),
-                credential_type: Some("AML".to_string()),
+                issuer: "rIssuer222222222222222222222".to_string(),
+                credential_type: "AML".to_string(),
             }],
         };
 
@@ -211,8 +222,8 @@ mod tests {
         .with_last_ledger_sequence(596447)
         .with_source_tag(42)
         .with_credential(Credential {
-            issuer: Some("rIssuer333333333333333333333".to_string()),
-            credential_type: Some("KYC".to_string()),
+            issuer: "rIssuer333333333333333333333".to_string(),
+            credential_type: "KYC".to_string(),
         });
 
         assert_eq!(
@@ -265,32 +276,29 @@ mod tests {
             domain_id: None,
             accepted_credentials: vec![
                 Credential {
-                    issuer: Some("rIssuerA".to_string()),
-                    credential_type: Some("KYC".to_string()),
+                    issuer: "rIssuerA".to_string(),
+                    credential_type: "KYC".to_string(),
                 },
                 Credential {
-                    issuer: Some("rIssuerB".to_string()),
-                    credential_type: Some("AML".to_string()),
+                    issuer: "rIssuerB".to_string(),
+                    credential_type: "AML".to_string(),
                 },
                 Credential {
-                    issuer: Some("rIssuerC".to_string()),
-                    credential_type: Some("ACCREDITED".to_string()),
+                    issuer: "rIssuerC".to_string(),
+                    credential_type: "ACCREDITED".to_string(),
                 },
             ],
         };
 
         assert_eq!(txn.accepted_credentials.len(), 3);
-        assert_eq!(
-            txn.accepted_credentials[0].issuer,
-            Some("rIssuerA".to_string())
-        );
+        assert_eq!(txn.accepted_credentials[0].issuer, "rIssuerA".to_string());
         assert_eq!(
             txn.accepted_credentials[1].credential_type,
-            Some("AML".to_string())
+            "AML".to_string()
         );
         assert_eq!(
             txn.accepted_credentials[2].credential_type,
-            Some("ACCREDITED".to_string())
+            "ACCREDITED".to_string()
         );
     }
 
@@ -308,8 +316,8 @@ mod tests {
             },
             domain_id: Some(domain_id.clone().into()),
             accepted_credentials: vec![Credential {
-                issuer: Some("rNewIssuer".to_string()),
-                credential_type: Some("VERIFIED".to_string()),
+                issuer: "rNewIssuer".to_string(),
+                credential_type: "VERIFIED".to_string(),
             }],
         };
 
@@ -329,8 +337,8 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: Some("rIssuer111111111111111111111".to_string()),
-                credential_type: Some("KYC".to_string()),
+                issuer: "rIssuer111111111111111111111".to_string(),
+                credential_type: "KYC".to_string(),
             }],
         };
 
@@ -353,8 +361,8 @@ mod tests {
             None,
             None,
             vec![Credential {
-                issuer: Some("rIssuer".to_string()),
-                credential_type: Some("KYC".to_string()),
+                issuer: "rIssuer".to_string(),
+                credential_type: "KYC".to_string(),
             }],
         );
 
@@ -385,8 +393,8 @@ mod tests {
         }
         .with_domain_id("AABB0011".into())
         .with_accepted_credentials(vec![Credential {
-            issuer: Some("rIssuer".to_string()),
-            credential_type: Some("KYC".to_string()),
+            issuer: "rIssuer".to_string(),
+            credential_type: "KYC".to_string(),
         }]);
 
         assert_eq!(txn.domain_id, Some("AABB0011".into()));
@@ -411,8 +419,8 @@ mod tests {
             memo_type: Some("text".into()),
         })
         .with_credential(Credential {
-            issuer: Some("rIssuer".to_string()),
-            credential_type: Some("KYC".to_string()),
+            issuer: "rIssuer".to_string(),
+            credential_type: "KYC".to_string(),
         });
 
         assert_eq!(txn.common_fields.memos.as_ref().unwrap().len(), 1);
@@ -454,11 +462,57 @@ mod tests {
         .with_ticket_sequence(42)
         .with_fee("10".into())
         .with_credential(Credential {
-            issuer: Some("rIssuer".to_string()),
-            credential_type: Some("KYC".to_string()),
+            issuer: "rIssuer".to_string(),
+            credential_type: "KYC".to_string(),
         });
 
         assert_eq!(txn.common_fields.ticket_sequence, Some(42));
         assert!(txn.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_credential_empty_issuer_rejected() {
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: vec![Credential {
+                issuer: "".to_string(),
+                credential_type: "KYC".to_string(),
+            }],
+        };
+
+        let result = txn.get_errors();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            XRPLModelException::MissingField("Credential.issuer".into())
+        );
+    }
+
+    #[test]
+    fn test_credential_empty_credential_type_rejected() {
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: vec![Credential {
+                issuer: "rIssuer".to_string(),
+                credential_type: "".to_string(),
+            }],
+        };
+
+        let result = txn.get_errors();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            XRPLModelException::MissingField("Credential.credential_type".into())
+        );
     }
 }
