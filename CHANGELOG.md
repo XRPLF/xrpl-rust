@@ -12,7 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
-### Breaking Changes
+### Added
+
+### Fixed
+
+## [[v1.1.0]]
 
 - **`async-std-rt` feature deprecated**: The `async-std` crate has been officially discontinued (RUSTSEC-2025-0052). The `async-std-rt` feature now emits a `compile_error!` directing users to migrate to `smol-rt` as a drop-in replacement. Code using `async-std-rt` will no longer compile until the feature is updated.
 
