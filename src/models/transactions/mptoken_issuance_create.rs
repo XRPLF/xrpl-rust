@@ -17,6 +17,9 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// Maximum transfer fee value (50000 = 50.000%).
 const MAX_MPT_TRANSFER_FEE: u16 = 50000;
 
+/// Maximum asset scale value (rippled rejects values above 9).
+const MAX_MPT_ASSET_SCALE: u8 = 9;
+
 /// Transactions of the MPTokenIssuanceCreate type support additional values
 /// in the Flags field.
 ///
@@ -123,6 +126,7 @@ pub struct MPTokenIssuanceCreate<'a> {
 impl<'a> Model for MPTokenIssuanceCreate<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_transfer_fee_error()?;
+        self._get_asset_scale_error()?;
         self.validate_currencies()
     }
 }
@@ -193,6 +197,22 @@ impl<'a> MPTokenIssuanceCreate<'a> {
                     field: "transfer_fee".into(),
                     max: MAX_MPT_TRANSFER_FEE as u32,
                     found: transfer_fee as u32,
+                })
+            } else {
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    fn _get_asset_scale_error(&self) -> XRPLModelResult<()> {
+        if let Some(scale) = self.asset_scale {
+            if scale > MAX_MPT_ASSET_SCALE {
+                Err(XRPLModelException::ValueTooHigh {
+                    field: "asset_scale".into(),
+                    max: MAX_MPT_ASSET_SCALE as u32,
+                    found: scale as u32,
                 })
             } else {
                 Ok(())
@@ -312,6 +332,55 @@ mod tests {
         };
 
         assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_asset_scale_error() {
+        let txn = MPTokenIssuanceCreate {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::MPTokenIssuanceCreate,
+                ..Default::default()
+            },
+            asset_scale: Some(10),
+            ..Default::default()
+        };
+
+        assert!(txn.validate().is_err());
+        assert_eq!(
+            txn.validate().unwrap_err().to_string().as_str(),
+            "The value of the field `\"asset_scale\"` is defined above its maximum (max 9, found 10)"
+        );
+    }
+
+    #[test]
+    fn test_asset_scale_at_max() {
+        let txn = MPTokenIssuanceCreate {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceCreate,
+                ..Default::default()
+            },
+            asset_scale: Some(9),
+            ..Default::default()
+        };
+
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_asset_scale_at_max_u8() {
+        let txn = MPTokenIssuanceCreate {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceCreate,
+                ..Default::default()
+            },
+            asset_scale: Some(255),
+            ..Default::default()
+        };
+
+        assert!(txn.validate().is_err());
     }
 
     #[test]
