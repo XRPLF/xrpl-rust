@@ -93,7 +93,7 @@ embassy-futures = { version = "0.1.1" }
 embedded-nal-async = { version = "0.8.0", optional = true }
 actix-rt = { version = "2.10.0", optional = true }
 # DEPRECATED: async-std has been discontinued (RUSTSEC-2025-0052). Use smol-rt instead.
-# Retained so the async-std-rt feature gate resolves; enabling it triggers a runtime panic.
+# Retained so the async-std-rt feature gate resolves; enabling it emits a compile_error.
 async-std = { version = "1.13.0", optional = true }
 futures-executor = { version = "0.3.30", optional = true }
 futures-timer = { version = "3.0.3", optional = true }

@@ -36,6 +36,7 @@ jobs:
       - name: Clippy
         # Exclude async-std-rt: it is deprecated (RUSTSEC-2025-0052) and emits a
         # compile_error! at crate level, so --all-features would always fail.
+        # NOTE: When adding new Cargo features, add them to this list manually.
         run: cargo clippy --features std,tokio-rt,embassy-rt,actix-rt,futures-rt,smol-rt,core,wallet,models,utils,helpers,json-rpc,websocket,cli -- -D warnings
 
       - name: Build (default)
