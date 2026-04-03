@@ -282,7 +282,16 @@ impl ShaMapInner {
             return;
         }
 
-        // Leaf collision: replace with a new inner node containing both leaves
+        // Leaf collision: check for duplicate key first
+        if let ShaMapNode::Leaf(ref existing_leaf) = self.children[idx] {
+            if existing_leaf.index == leaf.index {
+                // Duplicate key: replace the existing leaf
+                self.children[idx] = ShaMapNode::Leaf(leaf);
+                return;
+            }
+        }
+
+        // Different keys in the same slot: replace with a new inner node containing both leaves
         let existing = self.children.remove(idx);
         self.bitmap &= !(1u16 << slot);
 
