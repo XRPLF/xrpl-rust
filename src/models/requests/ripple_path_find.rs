@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{currency::Currency, requests::RequestMethod, Model};
+use crate::models::{amount::Amount, currency::Currency, requests::RequestMethod, Model};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
@@ -38,7 +38,7 @@ pub struct RipplePathFind<'a> {
     /// of the value field (for non-XRP currencies). This requests a
     /// path to deliver as much as possible, while spending no more
     /// than the amount specified in send_max (if provided).
-    pub destination_amount: Currency<'a>,
+    pub destination_amount: Amount<'a>,
     /// Unique address of the account that would send funds
     /// in a transaction.
     pub source_account: Cow<'a, str>,
@@ -74,7 +74,7 @@ impl<'a> RipplePathFind<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
-        destination_amount: Currency<'a>,
+        destination_amount: Amount<'a>,
         source_account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,

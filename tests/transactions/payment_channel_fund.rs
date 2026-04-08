@@ -1,11 +1,8 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/paymentChannelFund.test.ts
-//
 // Scenarios:
 //   - base: create a channel, then add 100 more drops via PaymentChannelFund
 //
-// NOTE: xrpl.js computes the channel ID via hashPaymentChannel(account, dest, seq).
-// xrpl-rust has no equivalent utility, so we read the channel ID from account_objects
-// after the PaymentChannelCreate is validated.
+// NOTE: xrpl-rust has no hashPaymentChannel utility, so we read the channel ID from
+// account_objects after the PaymentChannelCreate is validated.
 
 use crate::common::{
     generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,

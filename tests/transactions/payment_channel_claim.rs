@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/paymentChannelClaim.test.ts
-//
 // Scenarios:
 //   - base: create a channel, then submit a claim for 100 drops (channel source claims to destination)
 //
@@ -9,8 +7,8 @@
 // NOTE: `amount` in PaymentChannelClaim is `Option<Cow<'a, str>>` (raw drop string),
 // not XRPAmount. Pass `Some("100".into())` for 100 drops.
 //
-// NOTE: xrpl.js computes the channel ID via hashPaymentChannel(). We read it from
-// account_objects instead since xrpl-rust has no equivalent utility.
+// NOTE: We read the channel ID from account_objects since xrpl-rust has no
+// hashPaymentChannel utility.
 
 use crate::common::{
     generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,

@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/nftokenMint.test.ts
-//
 // Scenarios:
 //   - sell_offer: mint an NFT then create a sell offer for it
 

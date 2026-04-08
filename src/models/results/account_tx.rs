@@ -77,10 +77,12 @@ pub struct AccountTxV1<'a> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct TransactionBase<'a> {
     /// The ledger index of the ledger version that included this transaction.
-    pub ledger_index: u32,
+    /// In API v1 this field is inside the `tx` object rather than at the
+    /// transaction-entry level, so it may be absent here.
+    pub ledger_index: Option<u32>,
     /// Whether or not the transaction is included in a validated ledger. Any
     /// transaction not yet in a validated ledger is subject to change.
-    pub validated: bool,
+    pub validated: Option<bool>,
     /// (Binary mode) A unique hex string defining the transaction.
     pub tx_blob: Option<Cow<'a, str>>,
 }
@@ -103,8 +105,10 @@ pub struct AccountTxTransaction<'a> {
 pub struct AccountTxTransactionV1<'a> {
     #[serde(flatten)]
     pub base: TransactionBase<'a>,
-    /// (Binary mode) A hex string of the transaction in binary format.
-    pub tx: Cow<'a, str>,
+    /// (JSON mode) JSON object defining the transaction (API v1).
+    pub tx: Option<Value>,
+    /// (JSON mode) The transaction results metadata in JSON.
+    pub meta: Option<TransactionMetadata<'a>>,
 }
 
 impl<'a> TryFrom<XRPLResult<'a>> for AccountTxVersionMap<'a> {
@@ -113,6 +117,9 @@ impl<'a> TryFrom<XRPLResult<'a>> for AccountTxVersionMap<'a> {
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::AccountTx(account_tx) => Ok(account_tx),
+            XRPLResult::Other(super::XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
             res => Err(XRPLResultException::UnexpectedResultType(
                 "AccountTx".to_string(),
                 res.get_name(),

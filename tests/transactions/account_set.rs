@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/accountSet.test.ts
-//
 // Scenarios:
 //   - base: set domain field with hex-encoded value
 //   - with_memo: attach a memo to the transaction

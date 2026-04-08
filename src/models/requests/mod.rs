@@ -62,6 +62,7 @@ pub enum RequestMethod {
     #[serde(rename = "amm_info")]
     AMMInfo,
     GatewayBalances,
+    #[serde(rename = "noripple_check")]
     NoRippleCheck,
 
     // Transaction methods

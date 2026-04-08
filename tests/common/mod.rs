@@ -183,9 +183,8 @@ where
 }
 
 /// Look up the OfferSequence for the first escrow owned by `account`.
-/// Mirrors xrpl.js:
-///   const accountObjects = (await client.request({command:'account_objects', account})).result.account_objects
-///   const sequence = (await client.request({command:'tx', transaction: accountObjects[0].PreviousTxnID})).result.tx_json.Sequence
+/// Queries account_objects to find the escrow, then looks up its creating
+/// transaction to extract the validated Sequence number.
 #[cfg(feature = "std")]
 pub async fn get_escrow_offer_sequence(account: &str) -> u32 {
     use xrpl::asynch::clients::XRPLAsyncClient;

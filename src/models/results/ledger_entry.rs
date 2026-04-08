@@ -14,9 +14,10 @@ pub struct Node<'a> {
     /// The identifying address of this account
     pub account: Cow<'a, str>,
     /// The identifying hash of the transaction that most recently modified
-    /// this object
+    /// this object. Only present if the account has the asfAccountTxnID flag
+    /// enabled.
     #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Cow<'a, str>,
+    pub account_txn_id: Option<Cow<'a, str>>,
     /// The account's current XRP balance in drops
     pub balance: Cow<'a, str>,
     /// The domain associated with this account. The raw domain value is a
@@ -127,7 +128,7 @@ mod tests {
         assert_eq!(node.account, "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
         assert_eq!(
             node.account_txn_id,
-            "4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB"
+            Some("4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB".into())
         );
         assert_eq!(node.balance, "424021949");
         assert_eq!(node.domain, Some("6D64756F31332E636F6D".into()));

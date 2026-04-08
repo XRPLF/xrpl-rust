@@ -1,6 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/nftokenMint.test.ts
-//   (xrpl.js does not have a dedicated NFTokenBurn test file)
-//
 // Scenarios:
 //   - base: mint an NFT then burn it
 
