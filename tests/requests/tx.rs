@@ -55,10 +55,10 @@ async fn test_tx_base() {
 
         // Query the transaction by hash
         let request = TxRequest::new(
-            None,                       // id
-            None,                       // binary
-            None,                       // max_ledger
-            None,                       // min_ledger
+            None,                             // id
+            None,                             // binary
+            None,                             // max_ledger
+            None,                             // min_ledger
             Some(tx_hash.to_string().into()), // transaction
         );
 
@@ -67,9 +67,7 @@ async fn test_tx_base() {
             .await
             .expect("tx request failed");
 
-        let result: TxVersionMap = response
-            .try_into()
-            .expect("failed to parse tx result");
+        let result: TxVersionMap = response.try_into().expect("failed to parse tx result");
 
         // Verify the hash matches what we submitted
         match &result {
@@ -84,4 +82,3 @@ async fn test_tx_base() {
     })
     .await;
 }
-

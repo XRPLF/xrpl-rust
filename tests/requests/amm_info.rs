@@ -4,8 +4,7 @@
 use crate::common::with_blockchain_lock;
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
-    requests::amm_info::AMMInfo as AMMInfoRequest,
-    results::amm_info::AMMInfo as AMMInfoResult,
+    requests::amm_info::AMMInfo as AMMInfoRequest, results::amm_info::AMMInfo as AMMInfoResult,
     Currency, IssuedCurrency, XRP,
 };
 
@@ -40,4 +39,3 @@ async fn test_amm_info_base() {
     })
     .await;
 }
-

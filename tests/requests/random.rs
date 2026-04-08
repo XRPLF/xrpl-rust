@@ -17,9 +17,7 @@ async fn test_random_base() {
             .await
             .expect("random request failed");
 
-        let result: RandomResult = response
-            .try_into()
-            .expect("failed to parse random result");
+        let result: RandomResult = response.try_into().expect("failed to parse random result");
 
         // Verify the random string is a 64-character hex value
         assert_eq!(result.random.len(), 64);
@@ -27,4 +25,3 @@ async fn test_random_base() {
     })
     .await;
 }
-
