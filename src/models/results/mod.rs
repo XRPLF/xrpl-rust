@@ -610,9 +610,8 @@ where
 {
     type Error = XRPLModelException;
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
-        match response.result {
-            Some(XRPLResult::LedgerData(value)) => return Ok(value),
-            _ => {}
+        if let Some(XRPLResult::LedgerData(value)) = response.result {
+            return Ok(value);
         }
         // Fallback: re-deserialize from the raw result JSON
         match response.raw_result {
@@ -628,9 +627,8 @@ where
 {
     type Error = XRPLModelException;
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
-        match response.result {
-            Some(XRPLResult::LedgerEntry(value)) => return Ok(value),
-            _ => {}
+        if let Some(XRPLResult::LedgerEntry(value)) = response.result {
+            return Ok(value);
         }
         match response.raw_result {
             Some(raw) => serde_json::from_value(raw).map_err(Into::into),
@@ -704,9 +702,8 @@ where
 {
     type Error = XRPLModelException;
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
-        match response.result {
-            Some(XRPLResult::NoRippleCheck(value)) => return Ok(value),
-            _ => {}
+        if let Some(XRPLResult::NoRippleCheck(value)) = response.result {
+            return Ok(value);
         }
         match response.raw_result {
             Some(raw) => serde_json::from_value(raw).map_err(Into::into),
@@ -724,9 +721,8 @@ where
 {
     type Error = XRPLModelException;
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
-        match response.result {
-            Some(XRPLResult::RipplePathFind(value)) => return Ok(value),
-            _ => {}
+        if let Some(XRPLResult::RipplePathFind(value)) = response.result {
+            return Ok(value);
         }
         match response.raw_result {
             Some(raw) => serde_json::from_value(raw).map_err(Into::into),
@@ -780,9 +776,8 @@ where
 {
     type Error = XRPLModelException;
     fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
-        match response.result {
-            Some(XRPLResult::SubmitMultisigned(value)) => return Ok(value),
-            _ => {}
+        if let Some(XRPLResult::SubmitMultisigned(value)) = response.result {
+            return Ok(value);
         }
         match response.raw_result {
             Some(raw) => serde_json::from_value(raw).map_err(Into::into),
