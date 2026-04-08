@@ -1,4 +1,4 @@
-// xrpl.js reference: no dedicated test file — AMMDelete is a cleanup operation
+// AMMDelete is a cleanup operation
 // for AMMs that could not be fully deleted by AMMWithdraw due to too many trust
 // lines (> ~512 LP token holders). In the simple 2-trust-line setup used here,
 // AMMWithdraw TfWithdrawAll auto-deletes the AMM in a single transaction, so

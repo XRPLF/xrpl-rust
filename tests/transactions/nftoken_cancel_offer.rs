@@ -1,6 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/nftokenMint.test.ts
-//   (xrpl.js does not have a dedicated NFTokenCancelOffer test file)
-//
 // Scenarios:
 //   - base: mint an NFT, create a sell offer, then cancel it
 

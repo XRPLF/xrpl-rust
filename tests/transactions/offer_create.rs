@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/offerCreate.test.ts
-//
 // Scenarios:
 //   - base: place an XRP/USD offer on the DEX
 //

@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/ammDeposit.test.ts
-//
 // Scenarios:
 //   - single_asset: deposit 1000 XRP drops into an XRP/USD pool (TfSingleAsset flag)
 //

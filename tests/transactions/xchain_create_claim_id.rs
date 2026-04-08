@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainCreateClaimID.test.ts
-//
 // Scenarios:
 //   - base: claim ID holder creates a claim ID on an existing bridge
 //

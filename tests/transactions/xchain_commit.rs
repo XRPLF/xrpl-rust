@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainCommit.test.ts
-//
 // Scenarios:
 //   - base: committer locks 10_000_000 drops onto the locking chain door (XChainClaimID = 1)
 //

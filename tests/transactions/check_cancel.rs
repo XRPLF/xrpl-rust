@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/checkCancel.test.ts
-//
 // Scenarios:
 //   - base: create a Check for 50 drops, then cancel it (creator cancels their own check)
 
