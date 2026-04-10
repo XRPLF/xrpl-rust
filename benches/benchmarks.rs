@@ -99,7 +99,10 @@ pub fn bench_shamap_incremental_add(c: &mut Criterion) {
                 map.add_item(*extra_idx, prefix, extra_data.clone());
                 let h = black_box(map.hash());
                 // Remove to reset for next iteration
-                map.remove_item(extra_idx);
+                assert!(
+                    map.remove_item(extra_idx),
+                    "failed to remove extra item in benchmark"
+                );
                 let _ = map.hash(); // re-cache
                 h
             })
