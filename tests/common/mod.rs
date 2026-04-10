@@ -277,3 +277,46 @@ where
     );
     ledger_accept().await;
 }
+
+/// Create an MPToken issuance and return the MPTokenIssuanceID.
+///
+/// The ID is `{sequence as 4-byte BE hex}{account_id as 20-byte hex}`.
+#[cfg(feature = "std")]
+pub async fn create_mptoken_issuance(wallet: &Wallet) -> String {
+    use xrpl::asynch::transaction::sign_and_submit;
+    use xrpl::models::transactions::{
+        mptoken_issuance_create::MPTokenIssuanceCreate, CommonFields, TransactionType,
+    };
+
+    let mut tx = MPTokenIssuanceCreate {
+        common_fields: CommonFields {
+            account: wallet.classic_address.clone().into(),
+            transaction_type: TransactionType::MPTokenIssuanceCreate,
+            fee: Some("10".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = get_client().await;
+    let result = sign_and_submit(&mut tx, client, wallet, true, true)
+        .await
+        .expect("create_mptoken_issuance: sign_and_submit failed");
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "create_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
+        result.engine_result, result.engine_result_message
+    );
+    ledger_accept().await;
+
+    // Build MPTokenIssuanceID from the autofilled sequence + account ID
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing from tx_json") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("failed to decode classic address");
+    let mut id_bytes = Vec::with_capacity(24);
+    id_bytes.extend_from_slice(&sequence.to_be_bytes());
+    id_bytes.extend_from_slice(&account_id);
+    hex::encode_upper(&id_bytes)
+}

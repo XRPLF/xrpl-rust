@@ -18,20 +18,24 @@ pub struct MPToken<'a> {
     /// The base fields for all ledger object models.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    /// The account that holds this MPT balance.
+    /// The owner (holder) of these MPTs.
     pub account: Cow<'a, str>,
-    /// The issuance ID identifying which MPT this balance belongs to.
+    /// The `MPTokenIssuance` identifier.
     #[serde(rename = "MPTokenIssuanceID")]
     pub mptoken_issuance_id: Cow<'a, str>,
-    /// The amount of tokens held by this account.
+    /// The amount of tokens currently held by the owner. The minimum is 0
+    /// and the maximum is 2^63-1.
     #[serde(rename = "MPTAmount")]
     pub mpt_amount: Cow<'a, str>,
-    /// Hash of the most recent transaction that modified this object.
+    /// The identifying hash of the transaction that most recently modified
+    /// this entry.
     #[serde(rename = "PreviousTxnID")]
     pub previous_txn_id: Cow<'a, str>,
-    /// Ledger index of the most recent transaction that modified this object.
+    /// The index of the ledger that contains the transaction that most
+    /// recently modified this object.
     pub previous_txn_lgr_seq: u32,
-    /// The page in the owner's directory where this entry is located.
+    /// A hint indicating which page of the owner directory links to this
+    /// entry, in case the directory consists of multiple pages.
     pub owner_node: Option<Cow<'a, str>>,
 }
 

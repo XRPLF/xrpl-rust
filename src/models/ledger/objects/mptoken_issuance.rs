@@ -18,27 +18,41 @@ pub struct MPTokenIssuance<'a> {
     /// The base fields for all ledger object models.
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    /// The account that issued this MPT.
+    /// The address of the account that controls both the issuance amounts
+    /// and characteristics of a particular fungible token.
     pub issuer: Cow<'a, str>,
-    /// The number of decimal places for this token's amounts.
+    /// An asset scale is the difference, in terms of orders of magnitude,
+    /// between a standard unit and a corresponding fractional unit. The
+    /// asset scale is a non-negative integer (0, 1, 2, ...) and defaults
+    /// to 0.
     pub asset_scale: Option<u8>,
-    /// The maximum amount of this token that can ever exist.
+    /// The maximum number of MPTs that can exist at one time. If omitted,
+    /// the maximum is currently limited to 2^63-1.
     pub maximum_amount: Option<Cow<'a, str>>,
-    /// The total amount of this token currently in circulation.
+    /// The total amount of MPTs of this issuance currently in circulation.
+    /// This value increases when the issuer sends MPTs to a non-issuer, and
+    /// decreases whenever the issuer receives MPTs.
     pub outstanding_amount: Cow<'a, str>,
-    /// Transfer fee for this token (in hundredths of a basis point, 0-50000).
+    /// This value specifies the fee, in tenths of a basis point, charged by
+    /// the issuer for secondary sales of the token, from 0 to 50,000
+    /// inclusive (where 50,000 = 50%).
     pub transfer_fee: Option<u16>,
-    /// Arbitrary metadata associated with this issuance (hex-encoded).
+    /// Arbitrary metadata about this issuance, in hex format. The limit is
+    /// 1024 bytes.
     #[serde(rename = "MPTokenMetadata")]
     pub mptoken_metadata: Option<Cow<'a, str>>,
-    /// The sequence number of the transaction that created this issuance.
+    /// The Sequence (or Ticket) number of the transaction that created this
+    /// issuance, helping uniquely identify it.
     pub sequence: u32,
-    /// The page in the owner's directory where this entry is located.
+    /// A hint indicating which page of the owner directory links to this
+    /// entry.
     pub owner_node: Option<Cow<'a, str>>,
-    /// Hash of the most recent transaction that modified this object.
+    /// The identifying hash of the transaction that most recently modified
+    /// this entry.
     #[serde(rename = "PreviousTxnID")]
     pub previous_txn_id: Cow<'a, str>,
-    /// Ledger index of the most recent transaction that modified this object.
+    /// The index of the ledger that contains the transaction that most
+    /// recently modified this object.
     pub previous_txn_lgr_seq: u32,
 }
 
