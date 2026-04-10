@@ -261,8 +261,11 @@ impl ShaMapInner {
 
     /// Insert a leaf, creating sub-trees on collision.
     ///
+    /// Returns `true` if a new leaf was inserted, `false` if an existing leaf
+    /// with the same key was replaced.
+    ///
     /// Hash caches are invalidated along the insertion path only.
-    pub fn add_item(&mut self, leaf: ShaMapLeaf) {
+    pub fn add_item(&mut self, leaf: ShaMapLeaf) -> bool {
         let slot = nibble(&leaf.index, self.depth as usize);
         self.invalidate();
 
@@ -271,15 +274,14 @@ impl ShaMapInner {
             let idx = compact_index(self.bitmap, slot);
             self.bitmap |= 1u16 << slot;
             self.children.insert(idx, ShaMapNode::Leaf(leaf));
-            return;
+            return true;
         }
 
         let idx = compact_index(self.bitmap, slot);
 
         // In-place mutation: avoid unboxing + re-boxing for inner node recursion
         if self.children[idx].is_inner() {
-            self.children[idx].as_inner_mut().add_item(leaf);
-            return;
+            return self.children[idx].as_inner_mut().add_item(leaf);
         }
 
         // Leaf collision: check for duplicate key first
@@ -287,7 +289,7 @@ impl ShaMapInner {
             if existing_leaf.index == leaf.index {
                 // Duplicate key: replace the existing leaf
                 self.children[idx] = ShaMapNode::Leaf(leaf);
-                return;
+                return false;
             }
         }
 
@@ -295,16 +297,18 @@ impl ShaMapInner {
         let existing = self.children.remove(idx);
         self.bitmap &= !(1u16 << slot);
 
-        let mut new_inner = ShaMapInner::new(self.depth + 1);
+        let mut new_inner =
+            ShaMapInner::new(self.depth.checked_add(1).expect("ShaMap depth overflow"));
         match existing {
             ShaMapNode::Leaf(existing_leaf) => new_inner.add_item(existing_leaf),
             ShaMapNode::Inner(_) => unreachable!(),
-        }
+        };
         new_inner.add_item(leaf);
 
         let new_idx = compact_index(self.bitmap, slot);
         self.bitmap |= 1u16 << slot;
         self.children.insert(new_idx, ShaMapNode::Inner(new_inner));
+        true
     }
 
     /// Remove the item at `index`, collapsing single-child inner nodes.
@@ -456,6 +460,9 @@ pub fn verify_proof(proof: &ShaMapProof, expected_root: &Hash256) -> bool {
     let mut current_hash = proof.leaf_hash;
 
     for level in proof.path.iter().rev() {
+        if level.nibble > 15 {
+            return false;
+        }
         let mut buf = [0u8; INNER_HASH_INPUT_LEN];
         buf[..4].copy_from_slice(&hash_prefix::INNER_NODE);
 
@@ -494,18 +501,29 @@ impl ShaMap {
     }
 
     /// Add an item to the ShaMap (leaf hash includes the index).
-    pub fn add_item(&mut self, index: ShaMapIndex, hash_prefix: [u8; 4], data: Vec<u8>) {
+    ///
+    /// Returns `true` if a new item was inserted, `false` if an existing item
+    /// with the same index was replaced.
+    pub fn add_item(&mut self, index: ShaMapIndex, hash_prefix: [u8; 4], data: Vec<u8>) -> bool {
         self.root
-            .add_item(ShaMapLeaf::new(index, hash_prefix, data));
+            .add_item(ShaMapLeaf::new(index, hash_prefix, data))
     }
 
     /// Add an item whose leaf hash does NOT include the index.
     ///
     /// Used for `TRANSACTION_NO_METADATA` nodes where the hash is
     /// `sha512half(TRANSACTION_ID || data)`.
-    pub fn add_item_no_index(&mut self, index: ShaMapIndex, hash_prefix: [u8; 4], data: Vec<u8>) {
+    ///
+    /// Returns `true` if a new item was inserted, `false` if an existing item
+    /// with the same index was replaced.
+    pub fn add_item_no_index(
+        &mut self,
+        index: ShaMapIndex,
+        hash_prefix: [u8; 4],
+        data: Vec<u8>,
+    ) -> bool {
         self.root
-            .add_item(ShaMapLeaf::new_no_index(index, hash_prefix, data));
+            .add_item(ShaMapLeaf::new_no_index(index, hash_prefix, data))
     }
 
     /// Remove the item at `index`. Returns `true` if found and removed.
