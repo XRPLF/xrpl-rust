@@ -4,6 +4,7 @@ pub mod amm;
 pub mod bridge;
 pub mod check;
 pub mod deposit_preauth;
+pub mod did;
 pub mod directory_node;
 pub mod escrow;
 pub mod fee_settings;
@@ -26,6 +27,7 @@ use bridge::Bridge;
 use check::Check;
 use deposit_preauth::DepositPreauth;
 use derive_new::new;
+use did::DID;
 use directory_node::DirectoryNode;
 use escrow::Escrow;
 use fee_settings::FeeSettings;
@@ -57,6 +59,7 @@ pub enum LedgerEntryType {
     AMM = 0x0079,
     Bridge = 0x0069,
     Check = 0x0043,
+    DID = 0x0049,
     DepositPreauth = 0x0070,
     DirectoryNode = 0x0064,
     Escrow = 0x0075,
@@ -81,6 +84,7 @@ pub enum LedgerEntry<'a> {
     AMM(AMM<'a>),
     Bridge(Bridge<'a>),
     Check(Check<'a>),
+    DID(DID<'a>),
     DepositPreauth(DepositPreauth<'a>),
     DirectoryNode(DirectoryNode<'a>),
     Escrow(Escrow<'a>),
