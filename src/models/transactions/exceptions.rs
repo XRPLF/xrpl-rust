@@ -231,7 +231,7 @@ pub enum XRPLDIDSetException {
         max: usize,
         found: usize,
     },
-    #[error("The field `{field:?}` must be hex-encoded and must be <= 256 characters (found {found_length})")]
+    #[error("The field `{field:?}` must be hex-encoded and must be <= 512 characters (found {found_length})")]
     InvalidFieldHexAndTooLong { field: String, found_length: usize },
 }
 

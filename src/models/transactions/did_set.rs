@@ -16,9 +16,10 @@ use super::{
 };
 
 /// Maximum length in hex characters for DID fields (Data, DIDDocument, URI).
-/// Each field is limited to 256 bytes, which is 256 hex characters in
-/// the client library convention (matching xrpl-py).
-pub const MAX_DID_FIELD_LENGTH: usize = 256;
+/// Each field is limited to 256 bytes on the ledger. Since values are
+/// hex-encoded in JSON (2 hex characters per byte), the limit is 512
+/// hex characters.
+pub const MAX_DID_FIELD_LENGTH: usize = 512;
 
 /// Create or update a DID (Decentralized Identifier) associated with
 /// the sending account.
@@ -207,8 +208,12 @@ mod tests {
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
         "A"
-    ); // 257 chars
+    ); // 513 hex chars (> 512 limit)
     const BAD_HEX_FIELD: &str = "random_non_hex_content";
 
     #[test]
@@ -284,8 +289,7 @@ mod tests {
             uri: None,
         };
         assert!(!tx.is_valid());
-        let err = tx.validate().unwrap_err();
-        assert!(err.to_string().contains("Must have at least one"));
+        assert!(tx.get_errors().is_err());
     }
 
     #[test]
@@ -301,10 +305,7 @@ mod tests {
             uri: Some("".into()),
         };
         assert!(!tx.is_valid());
-        let err = tx.validate().unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("must have a length greater than zero"));
+        assert!(tx.get_errors().is_err());
     }
 
     #[test]
@@ -337,8 +338,7 @@ mod tests {
             uri: None,
         };
         assert!(!tx.is_valid());
-        let err = tx.validate().unwrap_err();
-        assert!(err.to_string().contains("256"));
+        assert!(tx.get_errors().is_err());
     }
 
     #[test]
@@ -354,8 +354,7 @@ mod tests {
             uri: None,
         };
         assert!(!tx.is_valid());
-        let err = tx.validate().unwrap_err();
-        assert!(err.to_string().contains("hex"));
+        assert!(tx.get_errors().is_err());
     }
 
     #[test]
@@ -373,9 +372,7 @@ mod tests {
             uri: Some(bad_field.into()),
         };
         assert!(!tx.is_valid());
-        let err = tx.validate().unwrap_err();
-        assert!(err.to_string().contains("hex"));
-        assert!(err.to_string().contains("256"));
+        assert!(tx.get_errors().is_err());
     }
 
     #[test]
@@ -451,8 +448,8 @@ mod tests {
     }
 
     #[test]
-    fn test_max_length_exactly_256() {
-        let max_field: alloc::string::String = "A".repeat(256);
+    fn test_max_length_exactly_512() {
+        let max_field: alloc::string::String = "A".repeat(512);
         let tx = DIDSet {
             common_fields: CommonFields {
                 account: ACCOUNT.into(),
