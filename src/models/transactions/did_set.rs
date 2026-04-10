@@ -359,8 +359,8 @@ mod tests {
 
     #[test]
     fn test_too_long_and_not_hex() {
-        // 257 non-hex chars
-        let bad_field: alloc::string::String = "q".repeat(257);
+        // 513 non-hex chars
+        let bad_field: alloc::string::String = "q".repeat(513);
         let tx = DIDSet {
             common_fields: CommonFields {
                 account: ACCOUNT.into(),
