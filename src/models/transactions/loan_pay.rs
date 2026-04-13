@@ -6,7 +6,8 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     transactions::{CommonTransactionBuilder, Memo, Signer},
-    Amount, FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelResult,
+    Amount, FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelException,
+    XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
@@ -55,7 +56,18 @@ pub struct LoanPay<'a> {
 
 impl Model for LoanPay<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+
+        let num_flags = self.common_fields.flags.0.len();
+        if num_flags > 1 {
+            return Err(XRPLModelException::InvalidValue {
+                field: "flags".into(),
+                expected: "Only one flag arrowed".into(),
+                found: format!("{} flags found", num_flags),
+            });
+        }
+
+        Ok(())
     }
 }
 
@@ -129,7 +141,7 @@ mod tests {
     const LOAN_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";
 
     #[test]
-    fn test_invalid_data_too_long() {
+    fn test_serde() {
         let tx = LoanPay {
             common_fields: CommonFields {
                 account: SOURCE.into(),
@@ -151,5 +163,29 @@ mod tests {
         let deserilized_tx: LoanPay = serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_invalid_flags() {
+        let tx = LoanPay {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanPay,
+                signing_pub_key: Some("".into()),
+                flags: FlagCollection::new(vec![
+                    LoanPayFlag::TfLoanFullPayment,
+                    LoanPayFlag::TfLoanLatePayment,
+                ]),
+                ..Default::default()
+            },
+            loan_id: LOAN_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount("1000".into())),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
     }
 }
