@@ -126,26 +126,26 @@ impl<'a> LoanBrokerCoverWithdraw<'a> {
 mod tests {
     use super::*;
 
-    const VAULT_ID: &str = "r9LqNeG6qHxVaultIdentity5weJ9mZgQ";
-    const TX_ID: &str = "r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9";
-    const LOAN_BROKER_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BEA02EF9";
+    const ACOUNT: &str = "r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9";
+    const LOAN_BROKER_ID: &str = "DB303FC1C7611B22C09E773B51044F6BEA02EF9";
+    const DESTINATION: &str = "rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR";
 
     #[test]
     fn test_serde() {
         let tx = LoanBrokerCoverWithdraw {
             common_fields: CommonFields {
-                account: TX_ID.into(),
+                account: ACOUNT.into(),
                 transaction_type: TransactionType::LoanBrokerCoverWithdraw,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
-            destination: Some(VAULT_ID.into()),
+            destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9","TransactionType":"LoanBrokerCoverWithdraw","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C7611B22C09E773B51044F6BEA02EF9","Amount":"1000000","Destination":"r9LqNeG6qHxVaultIdentity5weJ9mZgQ","DestinationTag":32}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9","TransactionType":"LoanBrokerCoverWithdraw","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C7611B22C09E773B51044F6BEA02EF9","Amount":"1000000","Destination":"rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR","DestinationTag":32}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(&serde_json::to_string(&tx).unwrap()).unwrap();
@@ -156,5 +156,23 @@ mod tests {
             serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_valid() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some(DESTINATION.into()),
+            destination_tag: Some(32),
+        };
+
+        assert!(tx.get_errors().is_ok())
     }
 }
