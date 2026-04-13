@@ -6,7 +6,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     transactions::{CommonTransactionBuilder, Memo, Signer},
-    FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelResult,
+    FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
@@ -53,7 +53,18 @@ pub struct LoanManage<'a> {
 
 impl Model for LoanManage<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+
+        let num_flags = self.common_fields.flags.0.len();
+        if num_flags > 1 {
+            return Err(XRPLModelException::InvalidValue {
+                field: "flags".into(),
+                expected: "Only one flag arrowed".into(),
+                found: format!("{} flags found", num_flags),
+            });
+        }
+
+        Ok(())
     }
 }
 
@@ -146,5 +157,28 @@ mod tests {
         let deserilized_tx: LoanManage = serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_invalid_flags() {
+        let tx = LoanManage {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanManage,
+                signing_pub_key: Some("".into()),
+                flags: FlagCollection::new(vec![
+                    LoanManageFlag::TfLoanDefault,
+                    LoanManageFlag::TfLoanImpair,
+                ]),
+                ..Default::default()
+            },
+            loan_id: LOAN_ID.into(),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
     }
 }
