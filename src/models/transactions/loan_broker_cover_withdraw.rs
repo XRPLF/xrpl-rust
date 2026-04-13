@@ -145,7 +145,7 @@ mod tests {
             destination_tag: Some(32),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9","TransactionType":"LoanBrokerCoverWithdraw","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C7611B22C09E773B51044F6BEA02EF9","Amount":"1000000","Destination":"rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR","DestinationTag":32}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9","TransactionType":"LoanBrokerCoverWithdraw","Flags":0,"SigningPubKey":"","LoanBrokerID":"DB303FC1C7611B22C09E773B51044F6BEA02EF9","Amount":"1000000","Destination":"rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR","DestinationTag":32}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(&serde_json::to_string(&tx).unwrap()).unwrap();
