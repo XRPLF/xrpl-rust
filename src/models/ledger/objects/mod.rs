@@ -8,6 +8,8 @@ pub mod directory_node;
 pub mod escrow;
 pub mod fee_settings;
 pub mod ledger_hashes;
+pub mod loan;
+pub mod loan_broker;
 pub mod negative_unl;
 pub mod nftoken_offer;
 pub mod nftoken_page;
@@ -62,6 +64,7 @@ pub enum LedgerEntryType {
     Escrow = 0x0075,
     FeeSettings = 0x0073,
     LedgerHashes = 0x0068,
+    LoanBroker = 0x008,
     NegativeUNL = 0x004E,
     NFTokenOffer = 0x0037,
     NFTokenPage = 0x0050,
