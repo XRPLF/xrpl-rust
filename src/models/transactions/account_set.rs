@@ -65,16 +65,18 @@ pub enum AccountSetFlag {
     /// on this account's behalf. Specify the authorized account in the
     /// NFTokenMinter field of the AccountRoot object.
     AsfAuthorizedNFTokenMinter = 10,
-    /// Disallow incoming Checks from other accounts.
-    AsfDisallowIncomingCheck = 11,
-    /// Disallow incoming Payment Channels from other accounts.
-    AsfDisallowIncomingPayChan = 12,
-    /// Disallow incoming trust lines from other accounts.
-    AsfDisallowIncomingTrustline = 13,
     /// Disallow incoming NFToken offers from other accounts.
-    AsfDisallowIncomingNFTokenOffer = 14,
-    /// Allow other accounts to mint NFTokens with this account set as the issuer.
-    AsfAllowTrustLineClawback = 15,
+    AsfDisallowIncomingNFTokenOffer = 12,
+    /// Disallow incoming Checks from other accounts.
+    AsfDisallowIncomingCheck = 13,
+    /// Disallow incoming Payment Channels from other accounts.
+    AsfDisallowIncomingPayChan = 14,
+    /// Disallow incoming trust lines from other accounts.
+    AsfDisallowIncomingTrustline = 15,
+    /// Allow clawback of tokens issued by this account.
+    /// This flag can only be set if the account has no trust lines.
+    /// Once set, it cannot be unset.
+    AsfAllowTrustLineClawback = 16,
 }
 
 /// An AccountSet transaction modifies the properties of an
