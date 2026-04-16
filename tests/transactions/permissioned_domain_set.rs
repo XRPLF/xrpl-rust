@@ -30,7 +30,8 @@ async fn test_permissioned_domain_set_base() {
             None, // No domain_id means create new domain
             vec![Credential {
                 issuer: wallet.classic_address.clone(),
-                credential_type: "KYC".to_string(),
+                // CredentialType is a Blob field; the value must be hex-encoded
+                credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         );
 
