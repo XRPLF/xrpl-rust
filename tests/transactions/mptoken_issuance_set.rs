@@ -11,7 +11,6 @@ use xrpl::models::transactions::{
     mptoken_issuance_set::{MPTokenIssuanceSet, MPTokenIssuanceSetFlag},
     CommonFields, TransactionType,
 };
-use xrpl::models::FlagCollection;
 
 #[tokio::test]
 async fn test_mptoken_issuance_set_lock() {
@@ -27,7 +26,7 @@ async fn test_mptoken_issuance_set_lock() {
                 account: issuer.classic_address.clone().into(),
                 transaction_type: TransactionType::MPTokenIssuanceSet,
                 fee: Some("10".into()),
-                flags: FlagCollection(vec![MPTokenIssuanceSetFlag::TfMPTLock]),
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
                 ..Default::default()
             },
             mptoken_issuance_id: issuance_id.into(),
