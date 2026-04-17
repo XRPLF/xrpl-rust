@@ -11,7 +11,8 @@ on:
 name: Integration Test
 
 env:
-  RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop
+  # Pin to known-good digest; rippleci/rippled:develop broke after 2026-04-01
+  RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop@sha256:328175bf14b7b83db9e5e6b50c7458bf828b02b2855453efc038233094aa8d85
 
 jobs:
   integration_test:
@@ -41,10 +42,22 @@ jobs:
 
       - name: Wait for rippled to be healthy
         run: |
-          until docker inspect --format='{{.State.Health.Status}}' rippled-service | grep -q healthy; do
-            echo "Waiting for rippled to be ready..."
+          for i in $(seq 1 30); do
+            if ! docker ps -q -f name=rippled-service | grep -q .; then
+              echo "Container exited unexpectedly"
+              docker logs rippled-service 2>&1 || true
+              exit 1
+            fi
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' rippled-service 2>/dev/null || echo "unknown")
+            echo "Attempt $i/30: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              exit 0
+            fi
             sleep 2
           done
+          echo "Timed out waiting for rippled"
+          docker logs rippled-service 2>&1 || true
+          exit 1
 
       - uses: dtolnay/rust-toolchain@stable
 
