@@ -34,13 +34,18 @@ async fn test_permissioned_domain_delete_base() {
             .await
             .expect("sign_and_submit should not fail at submission level");
 
-        // The domain may not exist and the amendment may not be enabled,
-        // so accept various result codes indicating the transaction was processed.
+        // The domain may not exist and the amendment may not be enabled; use a
+        // strict allowlist of exact engine_result codes rather than substring matches.
+        let allowed = [
+            "tesSUCCESS",
+            "temDISABLED",
+            "tecNO_PERMISSION",
+            "tecNO_ENTRY",
+            "tecNO_TARGET",
+        ];
         assert!(
-            result.engine_result.contains("tesSUCCESS")
-                || result.engine_result.contains("temDISABLED")
-                || result.engine_result.contains("tec"),
-            "Unexpected engine result: {}",
+            allowed.contains(&&*result.engine_result),
+            "unexpected engine_result: {}",
             result.engine_result
         );
 
