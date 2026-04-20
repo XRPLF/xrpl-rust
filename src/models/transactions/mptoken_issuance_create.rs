@@ -17,8 +17,9 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// Maximum transfer fee value (50000 = 50.000%).
 const MAX_MPT_TRANSFER_FEE: u16 = 50000;
 
-/// Maximum asset scale value (rippled rejects values above 9).
-const MAX_MPT_ASSET_SCALE: u8 = 9;
+/// Maximum asset scale value. Rippled preflight does not cap this directly;
+/// the practical ceiling is 19 (bounded by maxMPTokenAmount, approximately 2^63).
+const MAX_MPT_ASSET_SCALE: u8 = 19;
 
 /// Transactions of the MPTokenIssuanceCreate type support additional values
 /// in the Flags field.
@@ -342,14 +343,14 @@ mod tests {
                 transaction_type: TransactionType::MPTokenIssuanceCreate,
                 ..Default::default()
             },
-            asset_scale: Some(10),
+            asset_scale: Some(20),
             ..Default::default()
         };
 
         assert!(txn.validate().is_err());
         assert_eq!(
             txn.validate().unwrap_err().to_string().as_str(),
-            "The value of the field `\"asset_scale\"` is defined above its maximum (max 9, found 10)"
+            "The value of the field `\"asset_scale\"` is defined above its maximum (max 19, found 20)"
         );
     }
 
@@ -361,7 +362,7 @@ mod tests {
                 transaction_type: TransactionType::MPTokenIssuanceCreate,
                 ..Default::default()
             },
-            asset_scale: Some(9),
+            asset_scale: Some(19),
             ..Default::default()
         };
 

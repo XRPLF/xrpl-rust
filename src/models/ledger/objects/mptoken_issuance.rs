@@ -1,11 +1,39 @@
 use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
+use strum_macros::{AsRefStr, Display, EnumIter};
 
-use crate::models::{ledger::objects::LedgerEntryType, Model, NoFlags};
+use crate::models::{ledger::objects::LedgerEntryType, Model};
 
 use super::{CommonFields, LedgerObject};
+
+/// Ledger-object flags for the `MPTokenIssuance` object.
+///
+/// See `MPTokenIssuance` flags:
+/// `<https://xrpl.org/docs/references/protocol/ledger-data/ledger-entry-types/mptokenissuance>`
+#[derive(
+    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+)]
+#[repr(u32)]
+pub enum MPTokenIssuanceFlag {
+    /// The MPT issuance is locked; no holder can send or receive tokens.
+    LsfMPTLocked = 0x0001,
+    /// The issuer retains the ability to lock the issuance or individual
+    /// holders.
+    LsfMPTCanLock = 0x0002,
+    /// Holders must be individually authorized before they can hold this MPT.
+    LsfMPTRequireAuth = 0x0004,
+    /// This MPT can be placed into escrows.
+    LsfMPTCanEscrow = 0x0008,
+    /// This MPT can be traded on the DEX.
+    LsfMPTCanTrade = 0x0010,
+    /// This MPT can be transferred between non-issuer holders.
+    LsfMPTCanTransfer = 0x0020,
+    /// The issuer can clawback MPTs from holders.
+    LsfMPTCanClawback = 0x0040,
+}
 
 /// The `MPTokenIssuance` ledger object defines the properties and metadata of
 /// a Multi-Purpose Token issuance on the XRP Ledger.
@@ -17,7 +45,7 @@ use super::{CommonFields, LedgerObject};
 pub struct MPTokenIssuance<'a> {
     /// The base fields for all ledger object models.
     #[serde(flatten)]
-    pub common_fields: CommonFields<'a, NoFlags>,
+    pub common_fields: CommonFields<'a, MPTokenIssuanceFlag>,
     /// The address of the account that controls both the issuance amounts
     /// and characteristics of a particular fungible token.
     pub issuer: Cow<'a, str>,
@@ -58,7 +86,7 @@ pub struct MPTokenIssuance<'a> {
 
 impl<'a> Model for MPTokenIssuance<'a> {}
 
-impl<'a> LedgerObject<NoFlags> for MPTokenIssuance<'a> {
+impl<'a> LedgerObject<MPTokenIssuanceFlag> for MPTokenIssuance<'a> {
     fn get_ledger_entry_type(&self) -> LedgerEntryType {
         self.common_fields.get_ledger_entry_type()
     }
@@ -77,7 +105,7 @@ mod tests {
     fn test_serde() {
         let issuance = MPTokenIssuance {
             common_fields: CommonFields {
-                flags: FlagCollection(vec![]),
+                flags: FlagCollection(vec![MPTokenIssuanceFlag::LsfMPTCanTransfer]),
                 ledger_entry_type: LedgerEntryType::MPTokenIssuance,
                 index: Some(Cow::from(
                     "BFA9BE27383FA315651E26FDE1FA30815C5A5D0544EE10EC33D3E92532993769",

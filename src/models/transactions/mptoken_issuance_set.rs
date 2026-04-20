@@ -7,12 +7,17 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
+use crate::core::addresscodec::decode_classic_address;
 use crate::models::{
     transactions::{Transaction, TransactionType},
     Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, CommonTransactionBuilder};
+
+/// Expected length (in hex characters) of an MPTokenIssuanceID:
+/// 24 bytes (Hash192) = 48 hex chars.
+const MPTOKEN_ISSUANCE_ID_HEX_LEN: usize = 48;
 
 /// Transactions of the MPTokenIssuanceSet type support additional values
 /// in the Flags field.
@@ -90,6 +95,8 @@ pub struct MPTokenIssuanceSet<'a> {
 impl<'a> Model for MPTokenIssuanceSet<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_flag_error()?;
+        self._get_mptoken_issuance_id_error()?;
+        self._get_holder_error()?;
         self.validate_currencies()
     }
 }
@@ -147,14 +154,58 @@ impl<'a> MPTokenIssuanceSet<'a> {
         let has_lock = self.has_flag(&MPTokenIssuanceSetFlag::TfMPTLock);
         let has_unlock = self.has_flag(&MPTokenIssuanceSetFlag::TfMPTUnlock);
         if has_lock && has_unlock {
-            Err(XRPLModelException::InvalidFlagCombination {
+            return Err(XRPLModelException::InvalidFlagCombination {
                 flag1: "TfMPTLock".into(),
                 flag2: "TfMPTUnlock".into(),
-            })
-        } else {
-            Ok(())
+            });
         }
+        // Rippled preflight requires exactly one of TfMPTLock / TfMPTUnlock
+        // (DomainID modification is another allowed form, not yet modelled
+        // here); reject the no-flag submission until that lands.
+        if !has_lock && !has_unlock {
+            return Err(XRPLModelException::ExpectedOneOf(&[
+                "TfMPTLock",
+                "TfMPTUnlock",
+            ]));
+        }
+        Ok(())
     }
+
+    fn _get_mptoken_issuance_id_error(&self) -> XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())
+    }
+
+    fn _get_holder_error(&self) -> XRPLModelResult<()> {
+        if let Some(holder) = self.holder.as_deref() {
+            validate_holder_address(holder)?;
+        }
+        Ok(())
+    }
+}
+
+/// Validates that an `MPTokenIssuanceID` string is 48 ASCII hex characters
+/// (24 bytes, Hash192 per XLS-33).
+pub(crate) fn validate_mptoken_issuance_id(id: &str) -> XRPLModelResult<()> {
+    if id.len() != MPTOKEN_ISSUANCE_ID_HEX_LEN || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: "mptoken_issuance_id".into(),
+            format: alloc::format!("{MPTOKEN_ISSUANCE_ID_HEX_LEN}-char ASCII hex string"),
+            found: id.into(),
+        });
+    }
+    Ok(())
+}
+
+/// Validates that a `holder` string decodes as a classic XRPL address.
+pub(crate) fn validate_holder_address(holder: &str) -> XRPLModelResult<()> {
+    if decode_classic_address(holder).is_err() {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: "holder".into(),
+            format: "classic XRPL address".into(),
+            found: holder.into(),
+        });
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -175,7 +226,7 @@ mod tests {
                 flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             holder: Some("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into()),
         };
 
@@ -197,7 +248,7 @@ mod tests {
                 .into(),
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             ..Default::default()
         };
 
@@ -214,14 +265,14 @@ mod tests {
             },
             ..Default::default()
         }
-        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A00".into())
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
         .with_holder("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into())
         .with_flag(MPTokenIssuanceSetFlag::TfMPTLock)
         .with_fee("12".into());
 
         assert_eq!(
             txn.mptoken_issuance_id.as_ref(),
-            "00000001A407AF5856CEFBF81F3D4A00"
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58"
         );
         assert_eq!(
             txn.holder.as_deref(),
@@ -232,19 +283,88 @@ mod tests {
     }
 
     #[test]
-    fn test_default() {
+    fn test_default_requires_flag() {
+        // With neither TfMPTLock nor TfMPTUnlock set, rippled rejects the tx
+        // in preflight. The model mirrors that (DomainID-only changes are not
+        // yet modelled).
         let txn = MPTokenIssuanceSet {
             common_fields: CommonFields {
                 account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
                 transaction_type: TransactionType::MPTokenIssuanceSet,
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             ..Default::default()
         };
 
         assert!(txn.holder.is_none());
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_lock_only_is_ok() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            ..Default::default()
+        };
+
         assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_mptoken_issuance_id_length() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            // 32 hex chars, invalid (must be 48).
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            ..Default::default()
+        };
+
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_invalid_mptoken_issuance_id_non_hex() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            // Correct length, but contains a non-hex char ('Z').
+            mptoken_issuance_id: "Z0000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            ..Default::default()
+        };
+
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_invalid_holder_address() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            holder: Some("not_a_classic_address".into()),
+        };
+
+        assert!(txn.validate().is_err());
     }
 
     #[test]

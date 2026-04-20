@@ -8,6 +8,7 @@ use crate::models::{
     Model, NoFlags, ValidateCurrencies, XRPLModelResult,
 };
 
+use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// Destroys an existing MPToken issuance. Only the issuer can destroy an
@@ -41,6 +42,7 @@ pub struct MPTokenIssuanceDestroy<'a> {
 
 impl<'a> Model for MPTokenIssuanceDestroy<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
         self.validate_currencies()
     }
 }
@@ -95,7 +97,7 @@ mod tests {
                 fee: Some("10".into()),
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
         };
 
         let json_str = serde_json::to_string(&txn).unwrap();
@@ -113,13 +115,13 @@ mod tests {
             },
             ..Default::default()
         }
-        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A00".into())
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
         .with_fee("12".into())
         .with_sequence(100);
 
         assert_eq!(
             txn.mptoken_issuance_id.as_ref(),
-            "00000001A407AF5856CEFBF81F3D4A00"
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58"
         );
         assert!(txn.validate().is_ok());
     }
@@ -132,9 +134,24 @@ mod tests {
                 transaction_type: TransactionType::MPTokenIssuanceDestroy,
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
         };
 
         assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_mptoken_issuance_id() {
+        let txn = MPTokenIssuanceDestroy {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenIssuanceDestroy,
+                ..Default::default()
+            },
+            // 32 hex chars; must be 48.
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+        };
+
+        assert!(txn.validate().is_err());
     }
 }

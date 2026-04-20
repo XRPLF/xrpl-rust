@@ -12,6 +12,7 @@ use crate::models::{
     Model, ValidateCurrencies, XRPLModelResult,
 };
 
+use super::mptoken_issuance_set::{validate_holder_address, validate_mptoken_issuance_id};
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// Transactions of the MPTokenAuthorize type support additional values
@@ -83,6 +84,10 @@ pub struct MPTokenAuthorize<'a> {
 
 impl<'a> Model for MPTokenAuthorize<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        if let Some(holder) = self.holder.as_deref() {
+            validate_holder_address(holder)?;
+        }
         self.validate_currencies()
     }
 }
@@ -154,7 +159,7 @@ mod tests {
                 fee: Some("10".into()),
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             holder: Some("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into()),
         };
 
@@ -171,7 +176,7 @@ mod tests {
                 transaction_type: TransactionType::MPTokenAuthorize,
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             ..Default::default()
         };
 
@@ -189,14 +194,14 @@ mod tests {
             },
             ..Default::default()
         }
-        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A00".into())
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
         .with_holder("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into())
         .with_flag(MPTokenAuthorizeFlag::TfMPTUnauthorize)
         .with_fee("12".into());
 
         assert_eq!(
             txn.mptoken_issuance_id.as_ref(),
-            "00000001A407AF5856CEFBF81F3D4A00"
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58"
         );
         assert_eq!(
             txn.holder.as_deref(),
@@ -215,12 +220,43 @@ mod tests {
                 flags: vec![MPTokenAuthorizeFlag::TfMPTUnauthorize].into(),
                 ..Default::default()
             },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             ..Default::default()
         };
 
         assert!(txn.has_flag(&MPTokenAuthorizeFlag::TfMPTUnauthorize));
         assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_mptoken_issuance_id() {
+        let txn = MPTokenAuthorize {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenAuthorize,
+                ..Default::default()
+            },
+            // 32 hex chars; must be 48.
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A00".into(),
+            ..Default::default()
+        };
+
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_invalid_holder_address() {
+        let txn = MPTokenAuthorize {
+            common_fields: CommonFields {
+                account: "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B".into(),
+                transaction_type: TransactionType::MPTokenAuthorize,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            holder: Some("not_a_valid_address".into()),
+        };
+
+        assert!(txn.validate().is_err());
     }
 
     #[test]
