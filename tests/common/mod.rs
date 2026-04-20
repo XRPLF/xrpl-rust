@@ -28,7 +28,7 @@ const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
 
 /// HTTP JSON-RPC endpoint for local Docker standalone mode.
 #[cfg(feature = "std")]
-const STANDALONE_URL: &str = "http://localhost:5005";
+const STANDALONE_URL: &str = "http://127.0.0.1:5005";
 
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub async fn open_websocket(
@@ -113,11 +113,19 @@ pub async fn generate_funded_wallet() -> Wallet {
     );
 
     let client = get_client().await;
-    sign_and_submit(&mut payment, client, &genesis, true, true)
+    let result = sign_and_submit(&mut payment, client, &genesis, true, true)
         .await
         .expect("generate_funded_wallet: funding payment failed");
 
+    // Advance the ledger to confirm the funding payment
     ledger_accept().await;
+
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "generate_funded_wallet: funding payment engine_result was {}",
+        result.engine_result
+    );
+
     new_wallet
 }
 
