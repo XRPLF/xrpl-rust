@@ -51,12 +51,23 @@ pub struct OracleSet<'a> {
 impl Model for OracleSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         if let Some(ref series) = self.price_data_series {
+            // rippled requires at least one entry when the field is present.
+            if series.is_empty() {
+                return Err(XRPLModelException::ValueTooLow {
+                    field: "price_data_series".into(),
+                    min: 1,
+                    found: 0,
+                });
+            }
             if series.len() as u32 > MAX_ORACLE_DATA_SERIES {
                 return Err(XRPLModelException::ValueTooHigh {
                     field: "price_data_series".into(),
                     max: MAX_ORACLE_DATA_SERIES,
                     found: series.len() as u32,
                 });
+            }
+            for entry in series {
+                entry.validate()?;
             }
         }
         Ok(())
@@ -191,7 +202,7 @@ mod tests {
             asset_class: Some("63757272656E6379".into()),
             last_update_time: 743609014,
             price_data_series: Some(vec![PriceData {
-                base_asset: Some("XRP".to_string()),
+                base_asset: Some("EUR".to_string()),
                 quote_asset: Some("USD".to_string()),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
@@ -201,6 +212,8 @@ mod tests {
         let serialized = serde_json::to_string(&oracle_set).unwrap();
         let deserialized: OracleSet = serde_json::from_str(&serialized).unwrap();
         assert_eq!(oracle_set, deserialized);
+        // `XRP` was rejected as a PriceData asset; ensure this model validates.
+        assert!(oracle_set.get_errors().is_ok());
     }
 
     #[test]
@@ -265,7 +278,7 @@ mod tests {
     fn test_with_price_data() {
         let price_data = vec![
             PriceData {
-                base_asset: Some("XRP".to_string()),
+                base_asset: Some("EUR".to_string()),
                 quote_asset: Some("USD".to_string()),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
@@ -290,7 +303,7 @@ mod tests {
 
         let series = oracle_set.price_data_series.as_ref().unwrap();
         assert_eq!(series.len(), 2);
-        assert_eq!(series[0].base_asset.as_deref(), Some("XRP"));
+        assert_eq!(series[0].base_asset.as_deref(), Some("EUR"));
         assert_eq!(series[0].quote_asset.as_deref(), Some("USD"));
         assert_eq!(series[0].asset_price.as_deref(), Some("740"));
         assert_eq!(series[0].scale, Some(1));
@@ -331,7 +344,7 @@ mod tests {
     #[test]
     fn test_new_constructor() {
         let price_data = vec![PriceData {
-            base_asset: Some("XRP".to_string()),
+            base_asset: Some("EUR".to_string()),
             quote_asset: Some("USD".to_string()),
             asset_price: Some("740".to_string()),
             scale: Some(1),
@@ -405,7 +418,8 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_price_data_series() {
+    fn test_empty_price_data_series_rejected() {
+        // When `price_data_series` is present, rippled requires at least 1 entry.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
                 account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
@@ -416,13 +430,23 @@ mod tests {
         }
         .with_price_data_series(vec![]);
 
-        assert_eq!(oracle_set.price_data_series.as_ref().unwrap().len(), 0);
+        let err = oracle_set.get_errors().unwrap_err();
+        assert_eq!(
+            err,
+            XRPLModelException::ValueTooLow {
+                field: "price_data_series".into(),
+                min: 1,
+                found: 0,
+            }
+        );
     }
 
     #[test]
     fn test_price_data_partial_fields() {
+        // All fields optional at the type level: a partial entry deserializes fine
+        // and, when both asset fields are absent, does not trigger currency validation.
         let price_data = PriceData {
-            base_asset: Some("XRP".to_string()),
+            base_asset: Some("EUR".to_string()),
             quote_asset: None,
             asset_price: None,
             scale: None,
@@ -439,7 +463,7 @@ mod tests {
         .with_price_data_series(vec![price_data]);
 
         let series = oracle_set.price_data_series.as_ref().unwrap();
-        assert_eq!(series[0].base_asset.as_deref(), Some("XRP"));
+        assert_eq!(series[0].base_asset.as_deref(), Some("EUR"));
         assert!(series[0].quote_asset.is_none());
         assert!(series[0].asset_price.is_none());
         assert!(series[0].scale.is_none());
@@ -447,9 +471,10 @@ mod tests {
 
     #[test]
     fn test_price_data_series_max_valid() {
+        // Use valid 3-char ISO-style codes for the per-entry currency validation.
         let series: Vec<PriceData> = (0..10)
             .map(|i| PriceData {
-                base_asset: Some(alloc::format!("ASSET{i}")),
+                base_asset: Some(alloc::format!("A{i:02}")),
                 quote_asset: Some("USD".to_string()),
                 asset_price: Some("100".to_string()),
                 scale: Some(1),
@@ -473,7 +498,7 @@ mod tests {
     fn test_price_data_series_exceeds_max() {
         let series: Vec<PriceData> = (0..11)
             .map(|i| PriceData {
-                base_asset: Some(alloc::format!("ASSET{i}")),
+                base_asset: Some(alloc::format!("A{i:02}")),
                 quote_asset: Some("USD".to_string()),
                 asset_price: Some("100".to_string()),
                 scale: Some(1),
@@ -499,5 +524,126 @@ mod tests {
                 found: 11,
             }
         );
+    }
+
+    #[test]
+    fn test_scale_too_high_rejected() {
+        // Per XLS-47, `scale` must be in the inclusive range 0..=10.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: Some("EUR".to_string()),
+            quote_asset: Some("USD".to_string()),
+            asset_price: Some("100".to_string()),
+            scale: Some(11),
+        }]);
+
+        let err = oracle_set.get_errors().unwrap_err();
+        assert_eq!(
+            err,
+            XRPLModelException::ValueTooHigh {
+                field: "scale".into(),
+                max: 10,
+                found: 11,
+            }
+        );
+    }
+
+    #[test]
+    fn test_scale_at_max_ok() {
+        // Boundary: scale = 10 is explicitly permitted.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: Some("EUR".to_string()),
+            quote_asset: Some("USD".to_string()),
+            asset_price: Some("100".to_string()),
+            scale: Some(10),
+        }]);
+
+        assert!(oracle_set.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_base_asset_rejected() {
+        // A 4-character code is neither a valid ISO code nor a 40-char hex.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: Some("EURO".to_string()),
+            quote_asset: Some("USD".to_string()),
+            asset_price: Some("100".to_string()),
+            scale: Some(1),
+        }]);
+
+        let err = oracle_set.get_errors().unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLModelException::InvalidValue { ref field, .. } if field == "base_asset"
+        ));
+    }
+
+    #[test]
+    fn test_xrp_as_asset_rejected() {
+        // XRP is the native asset and must not appear as a 3-character oracle currency code.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: Some("XRP".to_string()),
+            quote_asset: Some("USD".to_string()),
+            asset_price: Some("100".to_string()),
+            scale: Some(1),
+        }]);
+
+        let err = oracle_set.get_errors().unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLModelException::InvalidValue { ref field, .. } if field == "base_asset"
+        ));
+    }
+
+    #[test]
+    fn test_hex_currency_accepted() {
+        // 40-character hex currency codes are valid.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: Some("0000000000000000000000005553440000000000".to_string()),
+            quote_asset: Some("USD".to_string()),
+            asset_price: Some("100".to_string()),
+            scale: Some(0),
+        }]);
+
+        assert!(oracle_set.get_errors().is_ok());
     }
 }
