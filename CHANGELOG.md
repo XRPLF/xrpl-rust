@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Unit-test and integration-test coverage are now scoped via Cargo feature flags rather than path regex. The unit-test workflow builds with `--no-default-features --features std,core,utils,wallet,models`, so integration-territory code (CLI, async clients, sync wrappers, faucet) simply isn't compiled and doesn't appear in the unit coverage report.
 - Network-dependent inline tests in `src/asynch/transaction/` and `src/asynch/wallet/` (`test_autofill_txn`, `test_autofill_and_sign`, `test_submit_and_wait`, `test_generate_faucet_wallet`) are now gated behind `feature = "integration"` so `cargo test --release` is hermetic by default.
 - Codecov **patch** coverage is now gated per flag (separate `unit` and `integration` sections) rather than a single combined gate.
+- Unified transaction metadata types: `TransactionMetadata` and related metadata structs now live in `xrpl::models::transactions::metadata`. The previous module path `xrpl::models::results::metadata` is retained as a deprecated re-export for backwards compatibility and will be removed in a future major release. Update imports to `xrpl::models::transactions::metadata::TransactionMetadata`.
 
 ### Fixed
 
