@@ -11,6 +11,16 @@ pub mod transaction;
 #[cfg(feature = "helpers")]
 pub mod wallet;
 
+// async-std has been discontinued (RUSTSEC-2025-0052). Emit a compile-time error so
+// callers get a clear message instead of a runtime panic, and avoid unreachable-code
+// lint when --all-features is used alongside other runtime feature flags.
+#[cfg(feature = "async-std-rt")]
+compile_error!(
+    "The async-std-rt feature is deprecated and no longer supported. \
+     async-std has been discontinued (RUSTSEC-2025-0052). \
+     Use the smol-rt feature instead."
+);
+
 async fn wait_seconds(_seconds: u64) {
     #[cfg(feature = "tokio-rt")]
     {
@@ -24,11 +34,6 @@ async fn wait_seconds(_seconds: u64) {
     {
         use core::time::Duration;
         actix_rt::time::sleep(Duration::from_secs(_seconds)).await;
-    }
-    #[cfg(feature = "async-std-rt")]
-    {
-        use core::time::Duration;
-        async_std::task::sleep(Duration::from_secs(_seconds)).await;
     }
     #[cfg(feature = "futures-rt")]
     {

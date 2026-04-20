@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[v1.1.0]]
 
+- **`async-std-rt` feature deprecated**: The `async-std` crate has been officially discontinued (RUSTSEC-2025-0052). The `async-std-rt` feature now emits a `compile_error!` directing users to migrate to `smol-rt` as a drop-in replacement. Code using `async-std-rt` will no longer compile until the feature is updated.
+
+### Known Blockers
+
+- **`atomic-polyfill` advisory (RUSTSEC-2023-0089)**: Cannot be resolved yet. `reqwless` 0.13.0 pins `embedded-tls` 0.17.0 which transitively depends on `atomic-polyfill`. This is blocked upstream and will be resolved when `reqwless` upgrades its `embedded-tls` dependency.
+
 ### Added
 
 - Implemented full deserialization from hex binary back to JSON, update `definitions.json` to `xrpl.js` latest, added all codec test fixtures from xrpl.js and implemented tests for all of them.

@@ -65,7 +65,6 @@ mod _serde;
         feature = "tokio-rt",
         feature = "embassy-rt",
         feature = "actix-rt",
-        feature = "async-std-rt",
         feature = "futures-rt",
         feature = "smol-rt"
     ))
