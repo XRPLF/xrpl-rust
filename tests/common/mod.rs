@@ -285,14 +285,15 @@ where
 pub async fn create_mptoken_issuance(wallet: &Wallet) -> String {
     use xrpl::asynch::transaction::sign_and_submit;
     use xrpl::models::transactions::{
-        mptoken_issuance_create::MPTokenIssuanceCreate, CommonFields, TransactionType,
+        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+        CommonFields, TransactionType,
     };
 
     let mut tx = MPTokenIssuanceCreate {
         common_fields: CommonFields {
             account: wallet.classic_address.clone().into(),
             transaction_type: TransactionType::MPTokenIssuanceCreate,
-            fee: Some("10".into()),
+            flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanLock].into(),
             ..Default::default()
         },
         ..Default::default()

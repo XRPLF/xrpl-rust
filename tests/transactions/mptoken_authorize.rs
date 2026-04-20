@@ -25,7 +25,6 @@ async fn test_mptoken_authorize_holder_opt_in() {
             common_fields: CommonFields {
                 account: holder.classic_address.clone().into(),
                 transaction_type: TransactionType::MPTokenAuthorize,
-                fee: Some("10".into()),
                 ..Default::default()
             },
             mptoken_issuance_id: issuance_id.into(),

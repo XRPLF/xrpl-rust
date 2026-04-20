@@ -25,7 +25,6 @@ async fn test_mptoken_issuance_set_lock() {
             common_fields: CommonFields {
                 account: issuer.classic_address.clone().into(),
                 transaction_type: TransactionType::MPTokenIssuanceSet,
-                fee: Some("10".into()),
                 flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
                 ..Default::default()
             },

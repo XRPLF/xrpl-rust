@@ -24,7 +24,6 @@ async fn test_mptoken_issuance_destroy_base() {
             common_fields: CommonFields {
                 account: issuer.classic_address.clone().into(),
                 transaction_type: TransactionType::MPTokenIssuanceDestroy,
-                fee: Some("10".into()),
                 ..Default::default()
             },
             mptoken_issuance_id: issuance_id.into(),

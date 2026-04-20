@@ -7,7 +7,8 @@
 
 use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::{
-    mptoken_issuance_create::MPTokenIssuanceCreate, CommonFields, TransactionType,
+    mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+    CommonFields, TransactionType,
 };
 
 #[tokio::test]
@@ -19,7 +20,6 @@ async fn test_mptoken_issuance_create_base() {
             common_fields: CommonFields {
                 account: wallet.classic_address.clone().into(),
                 transaction_type: TransactionType::MPTokenIssuanceCreate,
-                fee: Some("10".into()),
                 ..Default::default()
             },
             ..Default::default()
@@ -39,7 +39,7 @@ async fn test_mptoken_issuance_create_with_metadata() {
             common_fields: CommonFields {
                 account: wallet.classic_address.clone().into(),
                 transaction_type: TransactionType::MPTokenIssuanceCreate,
-                fee: Some("10".into()),
+                flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanTransfer].into(),
                 ..Default::default()
             },
             asset_scale: Some(2),
