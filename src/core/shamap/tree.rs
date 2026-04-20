@@ -190,7 +190,13 @@ impl ShaMapNode {
 
 impl ShaMapInner {
     /// Create a new empty inner node at the given depth.
-    pub fn new(depth: u8) -> Self {
+    ///
+    /// Crate-private: `depth` must satisfy `depth < 64` for all subsequent
+    /// operations on the node to be safe. Constructing an inner node with
+    /// `depth >= 64` would cause `nibble()` to index out of bounds on the
+    /// first call to `add_item` / `remove_item` / `contains` / `get`. Only
+    /// `ShaMap::new` and internal tree operations should call this.
+    pub(crate) fn new(depth: u8) -> Self {
         ShaMapInner {
             depth,
             bitmap: 0,
@@ -236,6 +242,7 @@ impl ShaMapInner {
             return h;
         }
         if self.bitmap == 0 {
+            self.hash_cache.set(Some(ZERO_256));
             return ZERO_256;
         }
 
@@ -443,6 +450,13 @@ pub struct ProofLevel {
 }
 
 /// An inclusion proof for a single leaf in the ShaMap.
+///
+/// Fields are `pub` for interoperability (e.g. serialization, fuzz harnesses),
+/// but callers SHOULD obtain proofs via [`ShaMap::extract_proof`] rather than
+/// constructing `ShaMapProof` manually. Directly constructed proofs will only
+/// verify if every `level.nibble` in `path` matches the nibble of `index` at
+/// the corresponding depth: `verify_proof` enforces this binding to prevent
+/// an attacker from routing a valid `leaf_hash` through an arbitrary path.
 pub struct ShaMapProof {
     /// The index of the leaf being proved.
     pub index: ShaMapIndex,
@@ -456,13 +470,33 @@ pub struct ShaMapProof {
 ///
 /// Walks the path from leaf to root, recomputing inner hashes at each level,
 /// using the single-buffer technique for consistency with tree hashing.
+///
+/// The verifier also binds each level's `nibble` to `proof.index`: at depth `d`
+/// (counted from the root, matching the `path` order), the nibble MUST equal
+/// `nibble(&proof.index, d)`. Without this check, `TRANSACTION_NO_METADATA`
+/// leaves (whose hash excludes the index) could be routed through an attacker
+/// chosen path to a different position in the tree.
 pub fn verify_proof(proof: &ShaMapProof, expected_root: &Hash256) -> bool {
-    let mut current_hash = proof.leaf_hash;
+    // Reject absurd paths early: a 256-bit index has at most 64 nibbles, so
+    // any path longer than that cannot correspond to a well-formed tree.
+    if proof.path.len() > 64 {
+        return false;
+    }
 
-    for level in proof.path.iter().rev() {
+    // Bind each level's nibble to the proof index at the corresponding depth.
+    // `path` is in root-to-leaf order: path[0] is depth 0, path[1] is depth 1, ...
+    for (depth, level) in proof.path.iter().enumerate() {
         if level.nibble > 15 {
             return false;
         }
+        if level.nibble as usize != nibble(&proof.index, depth) {
+            return false;
+        }
+    }
+
+    let mut current_hash = proof.leaf_hash;
+
+    for level in proof.path.iter().rev() {
         let mut buf = [0u8; INNER_HASH_INPUT_LEN];
         buf[..4].copy_from_slice(&hash_prefix::INNER_NODE);
 
@@ -1152,6 +1186,59 @@ mod tests {
         let proof = map.extract_proof(&idx).unwrap();
         let wrong_root = [0xFF; 32];
         assert!(!verify_proof(&proof, &wrong_root));
+    }
+
+    /// Proof-binding: a proof whose `index` does not match the nibble path
+    /// recorded in `path` must be rejected. This is critical for
+    /// `TRANSACTION_NO_METADATA` leaves where the leaf hash excludes the
+    /// index: without binding, an attacker could pair any leaf_hash in the
+    /// tree with an arbitrary index and have it verify against the root.
+    #[test]
+    fn test_proof_wrong_index_fails() {
+        let prefix = hash_prefix::TRANSACTION_ID;
+        let mut map = ShaMap::new();
+
+        // Build a small tree of no-index leaves at distinct top-nibble slots
+        // so each item lives on its own root branch.
+        let items: Vec<[u8; 32]> = (0u8..4)
+            .map(|i| {
+                let mut idx = [0u8; 32];
+                idx[0] = i.wrapping_mul(0x40); // 0x00, 0x40, 0x80, 0xC0
+                idx
+            })
+            .collect();
+
+        for item in &items {
+            map.add_item_no_index(*item, prefix, item.to_vec());
+        }
+
+        let root_hash = map.hash();
+
+        // Legit proof for items[0].
+        let valid = map.extract_proof(&items[0]).unwrap();
+        assert!(verify_proof(&valid, &root_hash));
+
+        // Forge a proof: keep the valid path (which routes to items[0]) but
+        // claim it proves `items[1]`. Because `leaf_hash` for no-index leaves
+        // omits the index, the forged proof would re-hash to the same root
+        // without the index-binding check, so verification must reject it.
+        let forged = ShaMapProof {
+            index: items[1],
+            leaf_hash: valid.leaf_hash,
+            path: valid
+                .path
+                .iter()
+                .map(|lvl| ProofLevel {
+                    nibble: lvl.nibble,
+                    sibling_hashes: lvl.sibling_hashes,
+                })
+                .collect(),
+        };
+
+        assert!(
+            !verify_proof(&forged, &root_hash),
+            "proof with wrong index must be rejected"
+        );
     }
 
     // --- Fuzz-style tests ---

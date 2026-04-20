@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use xrpl::core::binarycodec::definitions::get_field_type_name;
 use xrpl::core::shamap::{verify_proof, ShaMap};
 use xrpl::utils::xrp_to_drops;
@@ -83,29 +83,28 @@ pub fn bench_shamap_incremental_add(c: &mut Criterion) {
     for base_size in [100, 1_000, 10_000] {
         let items = make_shamap_items(base_size + 1);
         let (base_items, extra) = items.split_at(base_size);
-
-        // Pre-build and hash the base tree
-        let mut map = ShaMap::new();
-        for (idx, data) in base_items {
-            map.add_item(*idx, prefix, data.clone());
-        }
-        let _ = map.hash();
-
-        let (extra_idx, extra_data) = &extra[0];
+        let base_items = base_items.to_vec();
+        let (extra_idx, extra_data) = extra[0].clone();
 
         group.bench_with_input(BenchmarkId::new("base_size", base_size), &(), |b, _| {
-            b.iter(|| {
-                // Add one item and rehash (only dirty path recomputed)
-                map.add_item(*extra_idx, prefix, extra_data.clone());
-                let h = black_box(map.hash());
-                // Remove to reset for next iteration
-                assert!(
-                    map.remove_item(extra_idx),
-                    "failed to remove extra item in benchmark"
-                );
-                let _ = map.hash(); // re-cache
-                h
-            })
+            // `iter_batched` rebuilds a fresh pre-hashed map for each timed
+            // iteration; only the add_item + hash is measured. Setup (build
+            // base tree + prime cache) is excluded from the timing.
+            b.iter_batched(
+                || {
+                    let mut map = ShaMap::new();
+                    for (idx, data) in &base_items {
+                        map.add_item(*idx, prefix, data.clone());
+                    }
+                    let _ = map.hash(); // prime cache so only the dirty path is re-hashed
+                    map
+                },
+                |mut map| {
+                    map.add_item(extra_idx, prefix, extra_data.clone());
+                    black_box(map.hash())
+                },
+                BatchSize::SmallInput,
+            )
         });
     }
     group.finish();
