@@ -22,6 +22,8 @@ pub mod nftoken_create_offer;
 pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
+pub mod oracle_delete;
+pub mod oracle_set;
 pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
@@ -87,6 +89,8 @@ pub enum TransactionType {
     NFTokenMint,
     OfferCancel,
     OfferCreate,
+    OracleDelete,
+    OracleSet,
     #[default]
     Payment,
     PaymentChannelClaim,
@@ -570,6 +574,76 @@ pub struct Signer {
     pub txn_signature: String,
     pub signing_pub_key: String,
 }
+}
+
+serde_with_tag! {
+/// Represents a single price data entry in an Oracle's PriceDataSeries.
+///
+/// See OracleSet:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/oracleset>`
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct PriceData {
+    pub base_asset: Option<String>,
+    pub quote_asset: Option<String>,
+    pub asset_price: Option<String>,
+    pub scale: Option<u8>,
+}
+}
+
+/// Maximum allowed value for the `scale` field of a `PriceData` entry.
+///
+/// Per XLS-47, rippled enforces `0 <= scale <= 10`.
+pub const MAX_PRICE_DATA_SCALE: u8 = 10;
+
+impl crate::models::Model for PriceData {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        if let Some(scale) = self.scale {
+            if scale > MAX_PRICE_DATA_SCALE {
+                return Err(crate::models::XRPLModelException::ValueTooHigh {
+                    field: "scale".into(),
+                    max: MAX_PRICE_DATA_SCALE as u32,
+                    found: scale as u32,
+                });
+            }
+        }
+        if let Some(ref base_asset) = self.base_asset {
+            validate_oracle_currency("base_asset", base_asset)?;
+        }
+        if let Some(ref quote_asset) = self.quote_asset {
+            validate_oracle_currency("quote_asset", quote_asset)?;
+        }
+        Ok(())
+    }
+}
+
+/// Validate a currency code used in a `PriceData` entry.
+///
+/// Accepts either a 3-character ISO-style code (uppercase letters and digits)
+/// or a 40-character hex code. The reserved symbol `"XRP"` is rejected
+/// because an XRP oracle price is not meaningful (XRP is the ledger's native
+/// asset and is quoted directly, not via an IOU currency code).
+fn validate_oracle_currency(
+    field: &'static str,
+    value: &str,
+) -> crate::models::XRPLModelResult<()> {
+    if value == "XRP" {
+        return Err(crate::models::XRPLModelException::InvalidValue {
+            field: field.into(),
+            expected:
+                "a 3-character ISO currency code (excluding \"XRP\") or 40-character hex code"
+                    .into(),
+            found: value.into(),
+        });
+    }
+    if crate::utils::is_iso_code(value) || crate::utils::is_iso_hex(value) {
+        return Ok(());
+    }
+    Err(crate::models::XRPLModelException::InvalidValue {
+        field: field.into(),
+        expected: "a 3-character ISO currency code (excluding \"XRP\") or 40-character hex code"
+            .into(),
+        found: value.into(),
+    })
 }
 
 /// Standard functions for transactions.
