@@ -8,6 +8,8 @@ pub mod directory_node;
 pub mod escrow;
 pub mod fee_settings;
 pub mod ledger_hashes;
+pub mod mptoken;
+pub mod mptoken_issuance;
 pub mod negative_unl;
 pub mod nftoken_offer;
 pub mod nftoken_page;
@@ -30,6 +32,8 @@ use directory_node::DirectoryNode;
 use escrow::Escrow;
 use fee_settings::FeeSettings;
 use ledger_hashes::LedgerHashes;
+use mptoken::MPToken;
+use mptoken_issuance::MPTokenIssuance;
 use negative_unl::NegativeUNL;
 use nftoken_offer::NFTokenOffer;
 use nftoken_page::NFTokenPage;
@@ -62,6 +66,8 @@ pub enum LedgerEntryType {
     Escrow = 0x0075,
     FeeSettings = 0x0073,
     LedgerHashes = 0x0068,
+    MPToken = 0x007F,
+    MPTokenIssuance = 0x007E,
     NegativeUNL = 0x004E,
     NFTokenOffer = 0x0037,
     NFTokenPage = 0x0050,
@@ -86,6 +92,8 @@ pub enum LedgerEntry<'a> {
     Escrow(Escrow<'a>),
     FeeSettings(FeeSettings<'a>),
     LedgerHashes(LedgerHashes<'a>),
+    MPToken(MPToken<'a>),
+    MPTokenIssuance(MPTokenIssuance<'a>),
     NegativeUNL(NegativeUNL<'a>),
     NFTokenOffer(NFTokenOffer<'a>),
     NFTokenPage(NFTokenPage<'a>),

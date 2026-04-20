@@ -1,17 +1,20 @@
 version: "3"
 
 services:
-  rippled:
-    image: rippleci/rippled:develop
+  xrpld:
+    image: rippleci/xrpld:develop
     volumes:
-      - ./.ci-config:/etc/opt/ripple
+      - ./.ci-config:/etc/opt/xrpld
     ports:
       - "5005:5005"
       - "6006:6006"
-    entrypoint: bash
-    command: -c "mkdir -p /var/lib/rippled/db/ && rippled -a"
+    command: ["--standalone"]
     healthcheck:
-      test: ["CMD", "rippled", "server_info"]
+      test:
+        - CMD-SHELL
+        - >-
+          wget --quiet --tries=1 --post-data='{"method":"server_info","params":[{}]}'
+          --header="Content-Type: application/json" -O /dev/null http://localhost:5005/ || exit 1
       interval: 5s
       timeout: 2s
       retries: 10

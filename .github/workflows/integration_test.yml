@@ -11,7 +11,9 @@ on:
 name: Integration Test
 
 env:
-  RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop
+  # rippled binary was renamed to xrpld; use the new image name.
+  # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
+  XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
 
 jobs:
   integration_test:
@@ -22,29 +24,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start rippled standalone
+      - name: Run xrpld in standalone mode
         run: |
-          docker run --detach --rm \
-            -p 5005:5005 \
-            -p 6006:6006 \
-            --volume "${{ github.workspace }}/.ci-config/":"/etc/opt/ripple/" \
-            --name rippled-service \
-            --health-cmd="rippled server_info || exit 1" \
-            --health-interval=5s \
-            --health-retries=10 \
-            --health-timeout=2s \
-            --env GITHUB_ACTIONS=true \
-            --env CI=true \
-            --entrypoint bash \
-            ${{ env.RIPPLED_DOCKER_IMAGE }} \
-            -c "mkdir -p /var/lib/rippled/db/ && rippled -a"
+          docker run \
+            --detach \
+            --rm \
+            --publish 5005:5005 \
+            --publish 6006:6006 \
+            --volume "${{ github.workspace }}/.ci-config/":"/etc/opt/xrpld/" \
+            --name xrpld-service \
+            ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
 
-      - name: Wait for rippled to be healthy
+      - name: Wait for xrpld to accept RPC
         run: |
-          until docker inspect --format='{{.State.Health.Status}}' rippled-service | grep -q healthy; do
-            echo "Waiting for rippled to be ready..."
+          for i in $(seq 1 30); do
+            if ! docker ps -q -f name=xrpld-service | grep -q .; then
+              echo "Container exited unexpectedly"
+              docker logs xrpld-service 2>&1 || true
+              exit 1
+            fi
+            if curl -fsS -o /dev/null -X POST http://localhost:5005/ \
+                 -H 'Content-Type: application/json' \
+                 -d '{"method":"server_info","params":[{}]}'; then
+              echo "xrpld RPC ready (attempt $i)"
+              exit 0
+            fi
+            echo "Attempt $i/30: RPC not ready yet"
             sleep 2
           done
+          echo "Timed out waiting for xrpld RPC"
+          docker logs xrpld-service 2>&1 || true
+          exit 1
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -64,6 +74,8 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
-      - name: Stop rippled
+      - name: Dump xrpld logs and stop container
         if: always()
-        run: docker stop rippled-service
+        run: |
+          docker logs xrpld-service || true
+          docker stop xrpld-service || true
