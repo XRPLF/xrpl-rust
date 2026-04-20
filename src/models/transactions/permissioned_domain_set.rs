@@ -53,18 +53,55 @@ pub struct PermissionedDomainSet<'a> {
 
 impl<'a> Model for PermissionedDomainSet<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        // XLS-80 mandates AcceptedCredentials contain between 1 and 10 entries.
+        if self.accepted_credentials.is_empty() {
+            return Err(XRPLModelException::MissingField(
+                "AcceptedCredentials".into(),
+            ));
+        }
+        if self.accepted_credentials.len() > 10 {
+            return Err(XRPLModelException::ValueTooLong {
+                field: "AcceptedCredentials".into(),
+                max: 10,
+                found: self.accepted_credentials.len(),
+            });
+        }
         for credential in &self.accepted_credentials {
-            if credential.issuer.is_empty() {
-                return Err(XRPLModelException::MissingField("Credential.issuer".into()));
-            }
-            if credential.credential_type.is_empty() {
-                return Err(XRPLModelException::MissingField(
-                    "Credential.credential_type".into(),
-                ));
-            }
+            validate_credential(credential)?;
         }
         self.validate_currencies()
     }
+}
+
+/// Validate a `Credential` entry per XLS-80 / rippled `LedgerFormats.cpp`:
+/// `Issuer` must be non-empty and `CredentialType` is an `sfBlob` (hex),
+/// so it must be non-empty, even-length, hex-only, and at most 64 hex
+/// chars (32 bytes, rippled's `MaxCredentialTypeLength`).
+pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRPLModelResult<()> {
+    if credential.issuer.is_empty() {
+        return Err(XRPLModelException::MissingField("Credential.Issuer".into()));
+    }
+    let ct = &credential.credential_type;
+    if ct.is_empty() {
+        return Err(XRPLModelException::MissingField(
+            "Credential.CredentialType".into(),
+        ));
+    }
+    if ct.len() > 64 {
+        return Err(XRPLModelException::ValueTooLong {
+            field: "Credential.CredentialType".into(),
+            max: 64,
+            found: ct.len(),
+        });
+    }
+    if !ct.len().is_multiple_of(2) || !ct.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(XRPLModelException::InvalidValue {
+            field: "Credential.CredentialType".into(),
+            expected: "even-length hex string (<=64 chars)".into(),
+            found: ct.clone(),
+        });
+    }
+    Ok(())
 }
 
 impl<'a> Transaction<'a, NoFlags> for PermissionedDomainSet<'a> {
@@ -166,7 +203,7 @@ mod tests {
             domain_id: None,
             accepted_credentials: vec![Credential {
                 issuer: "rIssuer111111111111111111111".to_string(),
-                credential_type: "KYC".to_string(),
+                credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
 
@@ -191,7 +228,7 @@ mod tests {
             ),
             accepted_credentials: vec![Credential {
                 issuer: "rIssuer222222222222222222222".to_string(),
-                credential_type: "AML".to_string(),
+                credential_type: "414D4C".to_string(), // hex("AML")
             }],
         };
 
@@ -223,7 +260,7 @@ mod tests {
         .with_source_tag(42)
         .with_credential(Credential {
             issuer: "rIssuer333333333333333333333".to_string(),
-            credential_type: "KYC".to_string(),
+            credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
         assert_eq!(
@@ -277,15 +314,15 @@ mod tests {
             accepted_credentials: vec![
                 Credential {
                     issuer: "rIssuerA".to_string(),
-                    credential_type: "KYC".to_string(),
+                    credential_type: "4B5943".to_string(), // hex("KYC")
                 },
                 Credential {
                     issuer: "rIssuerB".to_string(),
-                    credential_type: "AML".to_string(),
+                    credential_type: "414D4C".to_string(), // hex("AML")
                 },
                 Credential {
                     issuer: "rIssuerC".to_string(),
-                    credential_type: "ACCREDITED".to_string(),
+                    credential_type: "41434352454449544544".to_string(), // hex("ACCREDITED")
                 },
             ],
         };
@@ -294,11 +331,11 @@ mod tests {
         assert_eq!(txn.accepted_credentials[0].issuer, "rIssuerA".to_string());
         assert_eq!(
             txn.accepted_credentials[1].credential_type,
-            "AML".to_string()
+            "414D4C".to_string()
         );
         assert_eq!(
             txn.accepted_credentials[2].credential_type,
-            "ACCREDITED".to_string()
+            "41434352454449544544".to_string()
         );
     }
 
@@ -317,7 +354,7 @@ mod tests {
             domain_id: Some(domain_id.clone().into()),
             accepted_credentials: vec![Credential {
                 issuer: "rNewIssuer".to_string(),
-                credential_type: "VERIFIED".to_string(),
+                credential_type: "5645524946494544".to_string(), // hex("VERIFIED")
             }],
         };
 
@@ -338,7 +375,7 @@ mod tests {
             domain_id: None,
             accepted_credentials: vec![Credential {
                 issuer: "rIssuer111111111111111111111".to_string(),
-                credential_type: "KYC".to_string(),
+                credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
 
@@ -362,7 +399,7 @@ mod tests {
             None,
             vec![Credential {
                 issuer: "rIssuer".to_string(),
-                credential_type: "KYC".to_string(),
+                credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         );
 
@@ -394,7 +431,7 @@ mod tests {
         .with_domain_id("AABB0011".into())
         .with_accepted_credentials(vec![Credential {
             issuer: "rIssuer".to_string(),
-            credential_type: "KYC".to_string(),
+            credential_type: "4B5943".to_string(), // hex("KYC")
         }]);
 
         assert_eq!(txn.domain_id, Some("AABB0011".into()));
@@ -420,7 +457,7 @@ mod tests {
         })
         .with_credential(Credential {
             issuer: "rIssuer".to_string(),
-            credential_type: "KYC".to_string(),
+            credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
         assert_eq!(txn.common_fields.memos.as_ref().unwrap().len(), 1);
@@ -428,7 +465,8 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_credentials() {
+    fn test_empty_credentials_rejected() {
+        // XLS-80 mandates AcceptedCredentials has 1..=10 entries; empty must fail validation.
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
                 account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
@@ -441,12 +479,90 @@ mod tests {
             accepted_credentials: vec![],
         };
 
-        assert!(txn.accepted_credentials.is_empty());
+        let result = txn.get_errors();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            XRPLModelException::MissingField("AcceptedCredentials".into())
+        );
+    }
 
-        // Round-trip serialization with empty credentials
-        let serialized = serde_json::to_string(&txn).unwrap();
-        let deserialized: PermissionedDomainSet = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(txn, deserialized);
+    #[test]
+    fn test_too_many_credentials_rejected() {
+        // XLS-80 caps AcceptedCredentials at 10 entries.
+        let credentials: Vec<Credential> = (0..11)
+            .map(|_| Credential {
+                issuer: "rIssuer".to_string(),
+                credential_type: "4B5943".to_string(),
+            })
+            .collect();
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: credentials,
+        };
+
+        let result = txn.get_errors();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            XRPLModelException::ValueTooLong {
+                max: 10,
+                found: 11,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn test_non_hex_credential_type_rejected() {
+        // CredentialType is an sfBlob; non-hex values must fail validation.
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: vec![Credential {
+                issuer: "rIssuer".to_string(),
+                credential_type: "KYC".to_string(), // not hex
+            }],
+        };
+        let result = txn.get_errors();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            XRPLModelException::InvalidValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_credential_type_too_long_rejected() {
+        // rippled MaxCredentialTypeLength = 32 bytes (64 hex chars).
+        let too_long = "A".repeat(66); // 66 hex chars
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: vec![Credential {
+                issuer: "rIssuer".to_string(),
+                credential_type: too_long,
+            }],
+        };
+        let result = txn.get_errors();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            XRPLModelException::ValueTooLong { max: 64, .. }
+        ));
     }
 
     #[test]
@@ -463,7 +579,7 @@ mod tests {
         .with_fee("10".into())
         .with_credential(Credential {
             issuer: "rIssuer".to_string(),
-            credential_type: "KYC".to_string(),
+            credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
         assert_eq!(txn.common_fields.ticket_sequence, Some(42));
@@ -481,7 +597,7 @@ mod tests {
             domain_id: None,
             accepted_credentials: vec![Credential {
                 issuer: "".to_string(),
-                credential_type: "KYC".to_string(),
+                credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
 
@@ -489,7 +605,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            XRPLModelException::MissingField("Credential.issuer".into())
+            XRPLModelException::MissingField("Credential.Issuer".into())
         );
     }
 
@@ -512,7 +628,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            XRPLModelException::MissingField("Credential.credential_type".into())
+            XRPLModelException::MissingField("Credential.CredentialType".into())
         );
     }
 }

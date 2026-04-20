@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
+use crate::models::exceptions::XRPLModelException;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model, ValidateCurrencies,
@@ -43,6 +44,16 @@ pub struct PermissionedDomainDelete<'a> {
 
 impl<'a> Model for PermissionedDomainDelete<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        // DomainID is the 32-byte hash of the PermissionedDomain ledger entry,
+        // serialized as 64 uppercase hex chars.
+        let domain_id = self.domain_id.as_ref();
+        if domain_id.len() != 64 || !domain_id.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Err(XRPLModelException::InvalidValue {
+                field: "DomainID".into(),
+                expected: "64-character hex string".into(),
+                found: domain_id.into(),
+            });
+        }
         self.validate_currencies()
     }
 }
@@ -168,7 +179,7 @@ mod tests {
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
-            domain_id: "AABB0011".into(),
+            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
         }
         .with_fee("12".into())
         .with_sequence(100)
@@ -189,7 +200,10 @@ mod tests {
         assert_eq!(txn.common_fields.last_ledger_sequence, Some(596447));
         assert_eq!(txn.common_fields.source_tag, Some(42));
         assert_eq!(txn.common_fields.memos.as_ref().unwrap().len(), 1);
-        assert_eq!(txn.domain_id, "AABB0011");
+        assert_eq!(
+            txn.domain_id,
+            "AABB00112233445566778899AABB00112233445566778899AABB00112233445A"
+        );
     }
 
     #[test]
@@ -200,7 +214,7 @@ mod tests {
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
-            domain_id: "AABB0011".into(),
+            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
         };
 
         assert_eq!(
@@ -211,7 +225,10 @@ mod tests {
             txn.common_fields.transaction_type,
             TransactionType::PermissionedDomainDelete
         );
-        assert_eq!(txn.domain_id, "AABB0011");
+        assert_eq!(
+            txn.domain_id,
+            "AABB00112233445566778899AABB00112233445566778899AABB00112233445A"
+        );
         assert!(txn.common_fields.fee.is_none());
         assert!(txn.common_fields.sequence.is_none());
     }
@@ -256,7 +273,7 @@ mod tests {
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
-            domain_id: "AABB0011".into(),
+            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
         }
         .with_ticket_sequence(42)
         .with_fee("10".into());
@@ -273,7 +290,7 @@ mod tests {
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
-            domain_id: "AABB0011".into(),
+            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
         }
         .with_account_txn_id("F1E2D3C4B5A69788".into())
         .with_fee("10".into())
@@ -286,6 +303,50 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_domain_id_rejected() {
+        // DomainID must be exactly 64 hex chars (32-byte hash).
+        let too_short = PermissionedDomainDelete {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainDelete,
+                ..Default::default()
+            },
+            domain_id: "AABB0011".into(),
+        };
+        assert!(matches!(
+            too_short.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValue { .. }
+        ));
+
+        // Correct length but non-hex chars.
+        let non_hex = PermissionedDomainDelete {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainDelete,
+                ..Default::default()
+            },
+            domain_id: "Z".repeat(64).into(),
+        };
+        assert!(matches!(
+            non_hex.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_valid_domain_id_accepted() {
+        let txn = PermissionedDomainDelete {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainDelete,
+                ..Default::default()
+            },
+            domain_id: "A".repeat(64).into(),
+        };
+        assert!(txn.get_errors().is_ok());
+    }
+
+    #[test]
     fn test_multiple_memos() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
@@ -293,7 +354,7 @@ mod tests {
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
-            domain_id: "AABB0011".into(),
+            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
         }
         .with_memo(Memo {
             memo_data: Some("reason 1".into()),
