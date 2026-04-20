@@ -26,7 +26,7 @@ fn test_oracle_set_construction() {
         asset_class: Some("63757272656E6379".into()),
         last_update_time: 743609014,
         price_data_series: Some(vec![PriceData {
-            base_asset: Some("XRP".into()),
+            base_asset: Some("EUR".into()),
             quote_asset: Some("USD".into()),
             asset_price: Some("740".into()),
             scale: Some(1),
