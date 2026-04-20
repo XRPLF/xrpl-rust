@@ -67,6 +67,7 @@ impl<'a> LedgerObject<NoFlags> for Vault<'a> {
 }
 
 impl<'a> Vault<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         index: Option<Cow<'a, str>>,
         ledger_index: Option<Cow<'a, str>>,
@@ -197,6 +198,83 @@ mod test_serde {
         let serialized = serde_json::to_string(&vault).unwrap();
         let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
         assert_eq!(vault, deserialized);
+    }
+
+    #[test]
+    fn test_serialized_keys_are_pascal_case() {
+        // Assert the raw wire format uses the exact PascalCase keys that
+        // XRPL expects. Relying only on a struct round-trip would silently
+        // tolerate a rename that breaks compatibility with rippled.
+        let vault = Vault::new(
+            Some(Cow::from("KeysTest")),
+            None,
+            Cow::from("rKeysOwner"),
+            Cow::from("rKeysAccount"),
+            Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuerX".into())),
+            Some("100".into()),
+            Some("90".into()),
+            Some("200".into()),
+            Some("5".into()),
+            Some("00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into()),
+            Some(1),
+            Some(6),
+            Some(1),
+            Some("48656C6C6F".into()),
+            Some("0".into()),
+            Cow::from("ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"),
+            100,
+        );
+
+        let json = serde_json::to_string(&vault).unwrap();
+        assert!(json.contains("\"Account\""), "missing Account key: {json}");
+        assert!(json.contains("\"Owner\""), "missing Owner key: {json}");
+        assert!(json.contains("\"Asset\""), "missing Asset key: {json}");
+        assert!(
+            json.contains("\"AssetsTotal\""),
+            "missing AssetsTotal key: {json}"
+        );
+        assert!(
+            json.contains("\"AssetsAvailable\""),
+            "missing AssetsAvailable key: {json}"
+        );
+        assert!(
+            json.contains("\"AssetsMaximum\""),
+            "missing AssetsMaximum key: {json}"
+        );
+        assert!(
+            json.contains("\"LossUnrealized\""),
+            "missing LossUnrealized key: {json}"
+        );
+        assert!(
+            json.contains("\"ShareMPTID\""),
+            "missing ShareMPTID key: {json}"
+        );
+        assert!(
+            json.contains("\"WithdrawalPolicy\""),
+            "missing WithdrawalPolicy key: {json}"
+        );
+        assert!(json.contains("\"Scale\""), "missing Scale key: {json}");
+        assert!(
+            json.contains("\"Sequence\""),
+            "missing Sequence key: {json}"
+        );
+        assert!(json.contains("\"Data\""), "missing Data key: {json}");
+        assert!(
+            json.contains("\"OwnerNode\""),
+            "missing OwnerNode key: {json}"
+        );
+        assert!(
+            json.contains("\"PreviousTxnID\""),
+            "missing PreviousTxnID key: {json}"
+        );
+        assert!(
+            json.contains("\"PreviousTxnLgrSeq\""),
+            "missing PreviousTxnLgrSeq key: {json}"
+        );
+        assert!(
+            json.contains("\"LedgerEntryType\":\"Vault\""),
+            "missing LedgerEntryType=Vault: {json}"
+        );
     }
 
     #[test]

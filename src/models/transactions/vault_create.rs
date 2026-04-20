@@ -1,14 +1,42 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
+use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
-use crate::models::{
-    Currency, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelResult,
-};
+use crate::models::{Currency, FlagCollection, Model, ValidateCurrencies, XRPLModelResult};
 
+use super::vault_common::validate_hex_blob;
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
+
+/// Maximum length, in hex characters, of the VaultCreate `Data` field.
+/// Per XLS-65, arbitrary metadata is capped at 256 bytes = 512 hex chars.
+const MAX_VAULT_DATA_HEX_LEN: usize = 512;
+
+/// Maximum length, in hex characters, of the VaultCreate `MPTokenMetadata`
+/// field. Per XLS-65, share-token metadata is capped at 1024 bytes
+/// = 2048 hex chars.
+const MAX_VAULT_MPTOKEN_METADATA_HEX_LEN: usize = 2048;
+
+/// Transactions of the VaultCreate type support additional values in the
+/// Flags field. This enum represents those options.
+///
+/// See XLS-65 SingleAssetVault:
+/// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0065d-single-asset-vault>`
+#[derive(
+    Debug, Eq, PartialEq, Copy, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+)]
+#[repr(u32)]
+pub enum VaultCreateFlag {
+    /// The vault is private: only accounts on the vault's domain allow-list
+    /// may deposit into it.
+    TfVaultPrivate = 0x00010000,
+    /// Share tokens issued by this vault are non-transferable: holders
+    /// cannot send them to other accounts, only redeem via VaultWithdraw.
+    TfVaultShareNonTransferable = 0x00020000,
+}
 
 /// Create a new single-asset vault on the XRP Ledger (XLS-65).
 ///
@@ -35,7 +63,7 @@ pub struct VaultCreate<'a> {
     /// See Transaction Common Fields:
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
-    pub common_fields: CommonFields<'a, NoFlags>,
+    pub common_fields: CommonFields<'a, VaultCreateFlag>,
     /// The asset that this vault will hold.
     pub asset: Currency<'a>,
     /// Arbitrary hex-encoded data associated with the vault.
@@ -59,16 +87,31 @@ pub struct VaultCreate<'a> {
 
 impl Model for VaultCreate<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+        if let Some(data) = self.data.as_deref() {
+            validate_hex_blob("data", data, MAX_VAULT_DATA_HEX_LEN)?;
+        }
+        if let Some(metadata) = self.mptoken_metadata.as_deref() {
+            validate_hex_blob(
+                "mptoken_metadata",
+                metadata,
+                MAX_VAULT_MPTOKEN_METADATA_HEX_LEN,
+            )?;
+        }
+        Ok(())
     }
 }
 
-impl<'a> Transaction<'a, NoFlags> for VaultCreate<'a> {
-    fn get_common_fields(&self) -> &CommonFields<'_, NoFlags> {
+impl<'a> Transaction<'a, VaultCreateFlag> for VaultCreate<'a> {
+    fn has_flag(&self, flag: &VaultCreateFlag) -> bool {
+        self.common_fields.has_flag(flag)
+    }
+
+    fn get_common_fields(&self) -> &CommonFields<'_, VaultCreateFlag> {
         &self.common_fields
     }
 
-    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, VaultCreateFlag> {
         &mut self.common_fields
     }
 
@@ -77,8 +120,8 @@ impl<'a> Transaction<'a, NoFlags> for VaultCreate<'a> {
     }
 }
 
-impl<'a> CommonTransactionBuilder<'a, NoFlags> for VaultCreate<'a> {
-    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, NoFlags> {
+impl<'a> CommonTransactionBuilder<'a, VaultCreateFlag> for VaultCreate<'a> {
+    fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, VaultCreateFlag> {
         &mut self.common_fields
     }
 
@@ -88,10 +131,12 @@ impl<'a> CommonTransactionBuilder<'a, NoFlags> for VaultCreate<'a> {
 }
 
 impl<'a> VaultCreate<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         account: Cow<'a, str>,
         account_txn_id: Option<Cow<'a, str>>,
         fee: Option<XRPAmount<'a>>,
+        flags: Option<FlagCollection<VaultCreateFlag>>,
         last_ledger_sequence: Option<u32>,
         memos: Option<Vec<Memo>>,
         sequence: Option<u32>,
@@ -112,7 +157,7 @@ impl<'a> VaultCreate<'a> {
                 TransactionType::VaultCreate,
                 account_txn_id,
                 fee,
-                Some(FlagCollection::default()),
+                Some(flags.unwrap_or_default()),
                 last_ledger_sequence,
                 memos,
                 None,
@@ -168,12 +213,19 @@ impl<'a> VaultCreate<'a> {
         self.scale = Some(scale);
         self
     }
+
+    /// Append a flag to this transaction's flag set.
+    pub fn with_flag(mut self, flag: VaultCreateFlag) -> Self {
+        self.common_fields.flags.0.push(flag);
+        self
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::currency::{IssuedCurrency, XRP};
+    use alloc::string::String;
 
     #[test]
     fn test_serde() {
@@ -403,6 +455,7 @@ mod tests {
             "rNewVaultAccount".into(),
             None,
             Some("12".into()),
+            None,
             Some(7108682),
             None,
             Some(100),
@@ -470,5 +523,116 @@ mod tests {
 
         assert_eq!(stranded_vault.withdrawal_policy, Some(1));
         assert!(stranded_vault.validate().is_ok());
+    }
+
+    #[test]
+    fn test_vault_create_flag_values() {
+        // Raw bit values defined by XLS-65 must not drift.
+        assert_eq!(VaultCreateFlag::TfVaultPrivate as u32, 0x00010000);
+        assert_eq!(
+            VaultCreateFlag::TfVaultShareNonTransferable as u32,
+            0x00020000
+        );
+    }
+
+    #[test]
+    fn test_vault_create_flags_serialize() {
+        // With both flags set the serialized Flags field must equal the OR
+        // of the two bit values (0x00010000 | 0x00020000 = 0x00030000 = 196608).
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rFlaggedVault".into(),
+                transaction_type: TransactionType::VaultCreate,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            ..Default::default()
+        }
+        .with_flag(VaultCreateFlag::TfVaultPrivate)
+        .with_flag(VaultCreateFlag::TfVaultShareNonTransferable);
+
+        let serialized = serde_json::to_string(&vault_create).unwrap();
+        assert!(
+            serialized.contains("\"Flags\":196608"),
+            "expected combined flag bits 0x30000 in serialized output, got: {serialized}"
+        );
+
+        // Round-trip through JSON to confirm both flags survive deserialize.
+        let deserialized: VaultCreate = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized
+            .common_fields
+            .flags
+            .0
+            .contains(&VaultCreateFlag::TfVaultPrivate));
+        assert!(deserialized
+            .common_fields
+            .flags
+            .0
+            .contains(&VaultCreateFlag::TfVaultShareNonTransferable));
+    }
+
+    #[test]
+    fn test_data_too_long_rejected() {
+        // 513 hex chars (exceeds 512 = 256-byte cap).
+        let oversize: String = "A".repeat(513);
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rDataTooLong".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            data: Some(oversize.into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_data_non_hex_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rDataBadHex".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            data: Some("not-hex!".into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_mptoken_metadata_too_long_rejected() {
+        // 2049 hex chars (exceeds 2048 = 1024-byte cap).
+        let oversize: String = "B".repeat(2049);
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rMetaTooLong".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            mptoken_metadata: Some(oversize.into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_mptoken_metadata_non_hex_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rMetaBadHex".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            mptoken_metadata: Some("ZZZZ".into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
     }
 }

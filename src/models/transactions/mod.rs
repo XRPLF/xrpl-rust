@@ -32,6 +32,7 @@ pub mod signer_list_set;
 pub mod ticket_create;
 pub mod trust_set;
 pub mod vault_clawback;
+pub(crate) mod vault_common;
 pub mod vault_create;
 pub mod vault_delete;
 pub mod vault_deposit;
