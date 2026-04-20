@@ -31,6 +31,13 @@ pub mod set_regular_key;
 pub mod signer_list_set;
 pub mod ticket_create;
 pub mod trust_set;
+pub mod vault_clawback;
+pub(crate) mod vault_common;
+pub mod vault_create;
+pub mod vault_delete;
+pub mod vault_deposit;
+pub mod vault_set;
+pub mod vault_withdraw;
 pub mod xchain_account_create_commit;
 pub mod xchain_add_account_create_attestation;
 pub mod xchain_add_claim_attestation;
@@ -96,6 +103,12 @@ pub enum TransactionType {
     SignerListSet,
     TicketCreate,
     TrustSet,
+    VaultClawback,
+    VaultCreate,
+    VaultDelete,
+    VaultDeposit,
+    VaultSet,
+    VaultWithdraw,
     XChainAccountCreateCommit,
     XChainAddAccountCreateAttestation,
     XChainAddClaimAttestation,
