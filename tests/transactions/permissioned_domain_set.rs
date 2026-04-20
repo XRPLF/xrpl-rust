@@ -39,13 +39,17 @@ async fn test_permissioned_domain_set_base() {
             .await
             .expect("sign_and_submit should not fail at submission level");
 
-        // The amendment may not be enabled on the test network, so accept
-        // various result codes that indicate the transaction was processed.
+        // The amendment may not be enabled on the test network; use a strict
+        // allowlist of exact engine_result codes rather than substring matches.
+        let allowed = [
+            "tesSUCCESS",
+            "temDISABLED",
+            "tecNO_PERMISSION",
+            "tecDUPLICATE",
+        ];
         assert!(
-            result.engine_result.contains("tesSUCCESS")
-                || result.engine_result.contains("temDISABLED")
-                || result.engine_result.contains("tec"),
-            "Unexpected engine result: {}",
+            allowed.contains(&&*result.engine_result),
+            "unexpected engine_result: {}",
             result.engine_result
         );
 

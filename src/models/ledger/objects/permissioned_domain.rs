@@ -97,11 +97,11 @@ mod test_serde {
             vec![
                 Credential {
                     issuer: "rIssuerA".to_string(),
-                    credential_type: "KYC".to_string(),
+                    credential_type: "4B5943".to_string(), // hex("KYC")
                 },
                 Credential {
                     issuer: "rIssuerB".to_string(),
-                    credential_type: "AML".to_string(),
+                    credential_type: "414D4C".to_string(), // hex("AML")
                 },
             ],
             1,
@@ -111,6 +111,16 @@ mod test_serde {
         );
 
         let serialized = serde_json::to_string(&domain).unwrap();
+
+        // Assert PascalCase JSON keys so silent field renames are caught.
+        assert!(serialized.contains("\"AcceptedCredentials\""));
+        assert!(serialized.contains("\"PreviousTxnID\""));
+        assert!(serialized.contains("\"PreviousTxnLgrSeq\""));
+        assert!(serialized.contains("\"Owner\""));
+        assert!(serialized.contains("\"OwnerNode\""));
+        assert!(serialized.contains("\"Sequence\""));
+        assert!(serialized.contains("\"LedgerEntryType\""));
+
         let deserialized: PermissionedDomain = serde_json::from_str(&serialized).unwrap();
         assert_eq!(domain, deserialized);
     }
@@ -123,7 +133,7 @@ mod test_serde {
             Cow::from("rOwnerAccount123"),
             vec![Credential {
                 issuer: "rIssuer".to_string(),
-                credential_type: "KYC".to_string(),
+                credential_type: "4B5943".to_string(), // hex("KYC")
             }],
             5,
             None,
@@ -187,7 +197,7 @@ mod test_serde {
             Cow::from("rOwnerXYZ"),
             vec![Credential {
                 issuer: "rIssuerXYZ".to_string(),
-                credential_type: "ACCREDITED".to_string(),
+                credential_type: "41434352454449544544".to_string(), // hex("ACCREDITED")
             }],
             42,
             Some(Cow::from("7")),
