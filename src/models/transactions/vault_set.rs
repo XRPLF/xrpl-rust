@@ -6,6 +6,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
 
+use super::vault_common::validate_vault_id;
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 /// Update the settings of an existing vault on the XRP Ledger (XLS-65).
@@ -39,7 +40,7 @@ pub struct VaultSet<'a> {
 
 impl Model for VaultSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        Ok(())
+        validate_vault_id(&self.vault_id)
     }
 }
 
@@ -335,6 +336,33 @@ mod tests {
         .with_sequence(300);
 
         assert!(vault_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_vault_id_rejected() {
+        // Wrong length.
+        let short_id = VaultSet {
+            common_fields: CommonFields {
+                account: "rShortID".into(),
+                transaction_type: TransactionType::VaultSet,
+                ..Default::default()
+            },
+            vault_id: "DEADBEEF".into(),
+            ..Default::default()
+        };
+        assert!(short_id.validate().is_err());
+
+        // Non-hex character.
+        let bad_hex = VaultSet {
+            common_fields: CommonFields {
+                account: "rBadHex".into(),
+                transaction_type: TransactionType::VaultSet,
+                ..Default::default()
+            },
+            vault_id: "Z0000000000000000000000000000000000000000000000000000000DEADBEEF".into(),
+            ..Default::default()
+        };
+        assert!(bad_hex.validate().is_err());
     }
 
     #[test]
