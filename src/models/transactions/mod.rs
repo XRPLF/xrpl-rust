@@ -26,6 +26,8 @@ pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
 pub mod payment_channel_fund;
+pub mod permissioned_domain_delete;
+pub mod permissioned_domain_set;
 pub mod pseudo_transactions;
 pub mod set_regular_key;
 pub mod signer_list_set;
@@ -90,6 +92,8 @@ pub enum TransactionType {
     #[default]
     Payment,
     PaymentChannelClaim,
+    PermissionedDomainDelete,
+    PermissionedDomainSet,
     PaymentChannelCreate,
     PaymentChannelFund,
     SetRegularKey,
@@ -569,6 +573,19 @@ pub struct Signer {
     pub account: String,
     pub txn_signature: String,
     pub signing_pub_key: String,
+}
+}
+
+serde_with_tag! {
+/// A credential entry used in PermissionedDomain transactions.
+/// Wraps as `{"Credential": {"Issuer": ..., "CredentialType": ...}}` in JSON.
+///
+/// See XLS-80 PermissionedDomains:
+/// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0080-permissioned-domains>`
+#[derive(Debug, PartialEq, Eq, Clone, Default, new)]
+pub struct Credential {
+    pub issuer: String,
+    pub credential_type: String,
 }
 }
 
