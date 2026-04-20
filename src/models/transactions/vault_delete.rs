@@ -6,6 +6,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
 
+use super::vault_common::validate_vault_id;
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 /// Delete a vault from the XRP Ledger (XLS-65).
@@ -32,7 +33,7 @@ pub struct VaultDelete<'a> {
 
 impl Model for VaultDelete<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        Ok(())
+        validate_vault_id(&self.vault_id)
     }
 }
 
