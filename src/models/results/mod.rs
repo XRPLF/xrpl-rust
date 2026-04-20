@@ -1,3 +1,18 @@
+/// Deprecated: re-export for backwards compatibility.
+///
+/// `TransactionMetadata` and related metadata types were moved to
+/// [`crate::models::transactions::metadata`]. This shim keeps pre-1.2.0
+/// imports such as `xrpl::models::results::metadata::TransactionMetadata`
+/// working, but new code should import directly from
+/// `crate::models::transactions::metadata` instead.
+#[deprecated(
+    since = "1.2.0",
+    note = "TransactionMetadata moved to models::transactions::metadata; update your imports"
+)]
+pub mod metadata {
+    pub use crate::models::transactions::metadata::*;
+}
+
 pub mod account_channels;
 pub mod account_currencies;
 pub mod account_info;
