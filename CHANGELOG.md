@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [[v1.2.0]]
+
+### Changed
+
+- Unified transaction metadata types: `TransactionMetadata` and related metadata structs now live in `xrpl::models::transactions::metadata`. The previous module path `xrpl::models::results::metadata` is retained as a deprecated re-export for backwards compatibility and will be removed in a future major release. Update imports to `xrpl::models::transactions::metadata::TransactionMetadata`.
+
 ## [[v1.1.0]]
 
 ### Added
