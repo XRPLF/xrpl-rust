@@ -55,4 +55,6 @@ jobs:
 
       - name: Dump xrpld logs and stop container
         if: always()
-        run: docker logs xrpld-service && docker stop xrpld-service
+        run: |
+          docker logs xrpld-service 2>&1 || echo "::warning::xrpld-service container not present for logs"
+          docker stop xrpld-service 2>/dev/null || true
