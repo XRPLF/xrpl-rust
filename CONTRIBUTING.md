@@ -91,7 +91,7 @@ Breaking down the `docker run` command:
 - `--rm` closes the container automatically when it exits.
 - `-it` keeps stdin open so you can stop the node with Ctrl-C.
 - `--name xrpld_standalone` is an instance name for clarity.
-- `--volume $PWD/.ci-config/:/etc/opt/xrpld/` mounts `xrpld.cfg` so the node binds on `0.0.0.0` and is reachable from the host. It must be an absolute path, so we use `$PWD` instead of `./`.
+- `--volume $PWD/.ci-config/:/etc/opt/xrpld/`: bind-mounts the host directory (left side) into the container (right side). `xrpld.cfg` lives in `$PWD/.ci-config/`, and this command is intended to be run from the root of the `xrpl-rust` project. The `xrpld` binary searches for its configuration file inside `/etc/opt/xrpld/`. An absolute path is required, so we use `$PWD` instead of `./`.
 - `rippleci/xrpld` is an image that is regularly updated with the latest `xrpld` releases (the binary formerly known as `rippled`; see xrpl.js PR #3270).
 - `--standalone` starts `xrpld` in standalone mode, where ledgers only close on demand.
 

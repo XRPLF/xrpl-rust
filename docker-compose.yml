@@ -10,11 +10,7 @@ services:
       - "6006:6006"
     command: ["--standalone"]
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          wget --quiet --tries=1 --post-data='{"method":"server_info","params":[{}]}'
-          --header="Content-Type: application/json" -O /dev/null http://localhost:5005/ || exit 1
+      test: ["CMD", "xrpld", "server_info"]
       interval: 5s
       timeout: 2s
       retries: 10

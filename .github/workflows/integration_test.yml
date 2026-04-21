@@ -35,27 +35,6 @@ jobs:
             --name xrpld-service \
             ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
 
-      - name: Wait for xrpld to accept RPC
-        run: |
-          for i in $(seq 1 30); do
-            if ! docker ps -q -f name=xrpld-service | grep -q .; then
-              echo "Container exited unexpectedly"
-              docker logs xrpld-service 2>&1 || true
-              exit 1
-            fi
-            if curl -fsS -o /dev/null -X POST http://localhost:5005/ \
-                 -H 'Content-Type: application/json' \
-                 -d '{"method":"server_info","params":[{}]}'; then
-              echo "xrpld RPC ready (attempt $i)"
-              exit 0
-            fi
-            echo "Attempt $i/30: RPC not ready yet"
-            sleep 2
-          done
-          echo "Timed out waiting for xrpld RPC"
-          docker logs xrpld-service 2>&1 || true
-          exit 1
-
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo registry
@@ -76,6 +55,4 @@ jobs:
 
       - name: Dump xrpld logs and stop container
         if: always()
-        run: |
-          docker logs xrpld-service || true
-          docker stop xrpld-service || true
+        run: docker logs xrpld-service && docker stop xrpld-service
