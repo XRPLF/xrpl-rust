@@ -14,7 +14,7 @@ use crate::models::{
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLPaymentException;
 
-use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder, FlagCollection};
 
 /// Transactions of the Payment type support additional values
 /// in the Flags field. This enum represents those options.
@@ -97,6 +97,9 @@ pub struct Payment<'a> {
     /// Minimum amount of destination currency this transaction should deliver. Only valid
     /// if this is a partial payment. For non-XRP amounts, the nested field names are lower-case.
     pub deliver_min: Option<Amount<'a>>,
+    /// Credential IDs attached to this transaction.
+    #[serde(rename = "CredentialIDs")]
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl<'a: 'static> Model for Payment<'a> {
@@ -104,6 +107,7 @@ impl<'a: 'static> Model for Payment<'a> {
         self._get_xrp_transaction_error()?;
         self._get_partial_payment_error()?;
         self._get_exchange_error()?;
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
@@ -252,6 +256,7 @@ impl<'a> Payment<'a> {
             paths,
             send_max,
             deliver_min,
+            credential_ids: None,
         }
     }
 
@@ -291,6 +296,12 @@ impl<'a> Payment<'a> {
             Some(paths) => paths.push(path),
             None => self.paths = Some(alloc::vec![path]),
         }
+        self
+    }
+
+    /// Set credential IDs to attach to this transaction for credential-based authorization checks.
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 
@@ -485,6 +496,27 @@ mod tests {
         // Deserialize
         let deserialized: Payment = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
+    }
+
+    #[test]
+    fn test_credential_ids_serde_roundtrip() {
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: "rSender111111111111111111111111111".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount("1000".into()),
+            destination: "rDestination11111111111111111111111".into(),
+            credential_ids: Some(alloc::vec![
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        let serialized = serde_json::to_string(&payment).unwrap();
+        assert!(serialized.contains("\"CredentialIDs\""));
+        let deserialized: Payment = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(payment, deserialized);
     }
 
     #[test]

@@ -27,7 +27,9 @@ async fn test_deposit_preauth_base() {
             None,
             None,
             Some(authorized.classic_address.clone().into()), // authorize
-            None,                                            // unauthorize
+            None,
+            None, // unauthorize
+            None,
         );
 
         test_transaction(&mut tx, &wallet).await;
