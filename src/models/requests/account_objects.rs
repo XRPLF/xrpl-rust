@@ -16,6 +16,8 @@ pub enum AccountObjectType {
     Check,
     DepositPreauth,
     Escrow,
+    Loan,
+    LoanBroker,
     Offer,
     PaymentChannel,
     SignerList,
