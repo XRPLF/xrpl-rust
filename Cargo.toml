@@ -1,3 +1,6 @@
+[workspace]
+members = ["internal/mpt-crypto-sys"]
+
 [package]
 name = "xrpl-rust"
 version = "1.1.0"
