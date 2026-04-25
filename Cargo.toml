@@ -1,5 +1,5 @@
 [workspace]
-members = ["internal/mpt-crypto-sys"]
+members = ["internal/mpt-crypto-sys", "internal/mpt-crypto"]
 
 [package]
 name = "xrpl-rust"
