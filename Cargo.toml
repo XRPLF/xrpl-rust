@@ -29,6 +29,9 @@ crate-type = ["lib"]
 
 [dependencies]
 xrpl-rust-macros = { version = "0.1.0", path = "xrpl-rust-macros" }
+# Optional: enabled by the `confidential-mpt` feature. The mpt-crypto crate
+# is std-only (FFI to the C library), so the feature also pulls in `std`.
+mpt-crypto       = { version = "0.1.0", path = "internal/mpt-crypto", optional = true }
 
 lazy_static = "1.4.0"
 sha2 = { version = "0.10.2", default-features = false }
@@ -142,6 +145,10 @@ websocket = [
 core = ["utils"]
 utils = []
 cli = ["dep:clap", "dep:bip39"]
+# Confidential MPT (XLS-0096) support. Requires `std` because mpt-crypto links
+# the native libmpt-crypto library via FFI. Adds the 5 ConfidentialMPT
+# transaction models and the safe-wrapper crypto crate to the public surface.
+confidential-mpt = ["std", "models", "dep:mpt-crypto"]
 integration = [] # Enable integration tests (requires network access)
 std = [
     "rand/std",
