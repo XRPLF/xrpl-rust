@@ -1,0 +1,24 @@
+[package]
+name = "mpt-crypto"
+version = "0.1.0"
+edition = "2024"
+description = "Safe Rust wrappers around mpt-crypto-sys (XLS-0096 Confidential MPTs)."
+license = "ISC"
+repository = "https://github.com/sephynox/xrpl-rust"
+publish = false
+
+[lib]
+name = "mpt_crypto"
+# Doctests merged-binary loads libmpt-crypto.dylib at startup; the merged
+# binary runs from a temp dir where our @loader_path-based rpath can't find
+# it. End-to-end coverage lives in `tests/integration.rs` instead.
+doctest = false
+
+[dependencies]
+mpt-crypto-sys = { path = "../mpt-crypto-sys", version = "0.1.0" }
+zeroize        = { version = "1.8", features = ["derive"] }
+thiserror      = "2.0"
+
+[dev-dependencies]
+# Tests reach into the sys crate directly to invoke C-side verifiers as oracles.
+mpt-crypto-sys = { path = "../mpt-crypto-sys", version = "0.1.0" }
