@@ -63,3 +63,25 @@ impl<'a> NFTsByIssuer<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = NFTsByIssuer::new(
+            Some("nbi-1".into()),
+            "rIssuer11111111111111111111111111".into(),
+            None,
+            None,
+            Some(100),
+            Some(Marker::Int(1)),
+            Some(42),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: NFTsByIssuer = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"nfts_by_issuer\""));
+    }
+}

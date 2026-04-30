@@ -42,3 +42,17 @@ impl<'a> LedgerCurrent<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = LedgerCurrent::new(Some("lcur-1".into()));
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerCurrent = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"ledger_current\""));
+    }
+}

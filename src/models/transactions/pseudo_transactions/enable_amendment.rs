@@ -107,3 +107,54 @@ impl<'a> EnableAmendment<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let txn = EnableAmendment::new(
+            "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
+            None,
+            Some("10".into()),
+            Some(FlagCollection::new(vec![EnableAmendmentFlag::TfGotMajority])),
+            None,
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            "C1B8D934087225F509BEB5A8EC24447854713EE447D277F69545ABFA0E0FD490".into(),
+            56865245,
+        );
+        let serialized = serde_json::to_string(&txn).unwrap();
+        let deserialized: EnableAmendment = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(txn, deserialized);
+        assert!(serialized.contains("\"TransactionType\":\"EnableAmendment\""));
+        assert!(serialized.contains("\"Amendment\""));
+        assert!(serialized.contains("\"LedgerSequence\":56865245"));
+    }
+
+    #[test]
+    fn test_has_flag() {
+        let txn = EnableAmendment::new(
+            "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
+            None,
+            None,
+            Some(FlagCollection::new(vec![EnableAmendmentFlag::TfLostMajority])),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "ABCD".into(),
+            1,
+        );
+        assert!(txn.has_flag(&EnableAmendmentFlag::TfLostMajority));
+        assert!(!txn.has_flag(&EnableAmendmentFlag::TfGotMajority));
+        assert_eq!(txn.get_transaction_type(), &TransactionType::EnableAmendment);
+    }
+}

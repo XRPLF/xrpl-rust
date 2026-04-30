@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{currency::Currency, requests::RequestMethod, Model};
+use crate::models::{amount::Amount, currency::Currency, requests::RequestMethod, Model};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
@@ -38,7 +38,7 @@ pub struct RipplePathFind<'a> {
     /// of the value field (for non-XRP currencies). This requests a
     /// path to deliver as much as possible, while spending no more
     /// than the amount specified in send_max (if provided).
-    pub destination_amount: Currency<'a>,
+    pub destination_amount: Amount<'a>,
     /// Unique address of the account that would send funds
     /// in a transaction.
     pub source_account: Cow<'a, str>,
@@ -74,7 +74,7 @@ impl<'a> RipplePathFind<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
-        destination_amount: Currency<'a>,
+        destination_amount: Amount<'a>,
         source_account: Cow<'a, str>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
@@ -96,5 +96,31 @@ impl<'a> RipplePathFind<'a> {
             send_max,
             source_currencies,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::amount::XRPAmount;
+    use crate::models::currency::XRP;
+    use alloc::vec;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = RipplePathFind::new(
+            Some("rpf-1".into()),
+            "rDest11111111111111111111111111111".into(),
+            Amount::XRPAmount(XRPAmount::from("1000000")),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+            Some(Currency::XRP(XRP::new())),
+            Some(vec![Currency::XRP(XRP::new())]),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: RipplePathFind = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"ripple_path_find\""));
     }
 }

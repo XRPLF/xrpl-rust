@@ -68,3 +68,26 @@ impl<'a> GatewayBalances<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = GatewayBalances::new(
+            Some("gb-1".into()),
+            "rIssuer11111111111111111111111111".into(),
+            Some(vec!["rHot1111111111111111111111111111".into()]),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+            Some(true),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: GatewayBalances = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"gateway_balances\""));
+        assert!(serialized.contains("\"hotwallet\""));
+    }
+}

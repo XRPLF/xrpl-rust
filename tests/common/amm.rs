@@ -1,12 +1,11 @@
 // Shared AMM pool setup helper used by all AMM integration tests.
 //
-// Creates a minimal XRP/USD AMM pool (mirrors xrpl.js setupAMMPool):
+// Creates a minimal XRP/USD AMM pool:
 //   1. issuerWallet:  AccountSet — enable DefaultRipple so the IOU can flow
 //   2. lpWallet:      TrustSet  — trust issuer for up to 1000 USD (tfClearNoRipple)
 //   3. issuerWallet:  Payment   — send 500 USD to lpWallet
 //   4. lpWallet:      AMMCreate — 250 XRP drops + 250 USD, trading_fee = 12
-//   5. lpWallet:      AMMDeposit — 1000 XRP drops (TfSingleAsset), matching
-//                     xrpl.js setupAMMPool which adds a testWallet deposit so
+//   5. lpWallet:      AMMDeposit — 1000 XRP drops (TfSingleAsset) so
 //                     pool has enough XRP for a 500-drop single-asset withdraw.
 //
 // The returned `AmmPool` carries both wallets so individual tests can build
@@ -132,7 +131,7 @@ pub async fn setup_amm_pool() -> AmmPool {
 
     // Step 5: lp_wallet deposits 1000 XRP drops (TfSingleAsset) so pool has
     // enough XRP for a 500-drop single-asset withdraw in amm_withdraw tests.
-    // Mirrors xrpl.js setupAMMPool testWallet deposit.
+    // Adds liquidity so pool has enough XRP for single-asset withdraw tests.
     let mut deposit_tx = AMMDeposit::new(
         lp_wallet.classic_address.clone().into(),
         None,                                             // account_txn_id

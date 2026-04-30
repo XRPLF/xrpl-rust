@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/nftokenMint.test.ts
-//
 // Scenarios:
 //   - base: mint an NFT with a URI
 

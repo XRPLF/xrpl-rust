@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainCreateBridge.test.ts
-//
 // Scenarios:
 //   - base: door account creates an XRP/XRP bridge with genesis as the issuing chain door
 //

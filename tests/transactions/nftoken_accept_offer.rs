@@ -1,6 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/nftokenMint.test.ts
-//   (xrpl.js covers NFTokenAcceptOffer indirectly via the "test with Amount" scenario in nftokenMint)
-//
 // Scenarios:
 //   - sell_offer: seller mints a transferable NFT, creates a sell offer, buyer accepts it
 

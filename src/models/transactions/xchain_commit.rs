@@ -123,3 +123,67 @@ mod test_serde {
         assert_eq!(actual, expected);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::currency::XRP;
+    use crate::models::transactions::Transaction;
+
+    fn xrp_bridge<'a>() -> XChainBridge<'a> {
+        XChainBridge {
+            locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+            locking_chain_issue: XRP::new().into(),
+            issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            issuing_chain_issue: XRP::new().into(),
+        }
+    }
+
+    #[test]
+    fn test_constructor_round_trip() {
+        let txn = XChainCommit::new(
+            "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo".into(),
+            None,
+            Some(XRPAmount::from("10")),
+            None,
+            None,
+            Some(1),
+            None,
+            None,
+            None,
+            Amount::XRPAmount(XRPAmount::from("10000")),
+            xrp_bridge(),
+            "13f".into(),
+            Some("rDest11111111111111111111111111111".into()),
+        );
+        let serialized = serde_json::to_string(&txn).unwrap();
+        let deserialized: XChainCommit = serde_json::from_str(&serialized).unwrap();
+        let reserialized = serde_json::to_string(&deserialized).unwrap();
+        assert_eq!(serialized, reserialized);
+        assert!(serialized.contains("\"TransactionType\":\"XChainCommit\""));
+        assert!(serialized.contains("\"XChainBridge\""));
+        assert!(serialized.contains("\"XChainClaimID\":\"13f\""));
+        assert!(serialized.contains("\"OtherChainDestination\""));
+        assert_eq!(txn.get_transaction_type(), &TransactionType::XChainCommit);
+    }
+
+    #[test]
+    fn test_validate_currencies_ok() {
+        let txn = XChainCommit::new(
+            "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Amount::XRPAmount(XRPAmount::from("10000")),
+            xrp_bridge(),
+            "1".into(),
+            None,
+        );
+        assert!(txn.get_errors().is_ok());
+    }
+}

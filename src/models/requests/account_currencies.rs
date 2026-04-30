@@ -67,3 +67,24 @@ impl<'a> AccountCurrencies<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = AccountCurrencies::new(
+            Some("acur-1".into()),
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            None,
+            Some(LedgerIndex::Int(123)),
+            Some(true),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: AccountCurrencies = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"account_currencies\""));
+        assert!(serialized.contains("\"strict\":true"));
+    }
+}
