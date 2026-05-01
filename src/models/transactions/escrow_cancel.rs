@@ -188,4 +188,27 @@ mod tests {
         assert_eq!(escrow_cancel.owner, "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
         assert_eq!(escrow_cancel.offer_sequence, 7);
     }
+
+    #[test]
+    fn test_new_constructor_and_trait_impls() {
+        let txn = EscrowCancel::new(
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            Some("12".into()),
+            Some(8_000_000),
+            None,
+            Some(456),
+            None,
+            None,
+            None,
+            "rOwner".into(),
+            7,
+        );
+        assert_eq!(txn.get_transaction_type(), &TransactionType::EscrowCancel);
+        assert_eq!(txn.get_common_fields().sequence, Some(456));
+        assert!(txn.get_errors().is_ok());
+        let mut t = txn;
+        t.common_fields.source_tag = Some(11);
+        assert_eq!(t.common_fields.source_tag, Some(11));
+    }
 }

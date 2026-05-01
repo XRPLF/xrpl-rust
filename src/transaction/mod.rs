@@ -127,3 +127,60 @@ where
         signers_count,
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asynch::clients::AsyncJsonRpcClient;
+    use crate::models::transactions::account_set::AccountSet;
+
+    fn dummy_account_set() -> AccountSet<'static> {
+        AccountSet::new(
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[test]
+    fn test_calculate_fee_per_transaction_type_no_client() {
+        // With client = None, the function returns the default net_fee of 10
+        // drops without making any network calls.
+        let txn = dummy_account_set();
+        let fee: XRPAmount = calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(
+            &txn, None, None,
+        )
+        .unwrap();
+        assert_eq!(fee.0, "10");
+    }
+
+    #[test]
+    fn test_calculate_fee_per_transaction_type_with_signers_no_client() {
+        let txn = dummy_account_set();
+        let fee: XRPAmount =
+            calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(&txn, None, Some(3))
+                .unwrap();
+        // With 3 signers, the fee should be larger than the no-signer baseline.
+        let baseline: XRPAmount =
+            calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(&txn, None, None)
+                .unwrap();
+        let fee_drops: u64 = fee.0.parse().unwrap();
+        let baseline_drops: u64 = baseline.0.parse().unwrap();
+        assert!(fee_drops >= baseline_drops);
+    }
+}

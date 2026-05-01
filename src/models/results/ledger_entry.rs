@@ -159,4 +159,62 @@ mod tests {
             "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8"
         );
     }
+
+    #[test]
+    fn test_ledger_entry_round_trip() {
+        let entry = LedgerEntry {
+            index: "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8".into(),
+            ledger_index: Some(61966146),
+            ledger_hash: Some(
+                "31850E8E48E76D1064651DF39DF4E9542E8C90A9A9B629F4DE339EB3FA74F726".into(),
+            ),
+            node: Some(Node {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                account_txn_id: None,
+                balance: "424021949".into(),
+                domain: Some("6D64756F31332E636F6D".into()),
+                email_hash: None,
+                flags: 9568256,
+                ledger_entry_type: "AccountRoot".into(),
+                message_key: None,
+                owner_count: 12,
+                previous_txn_id: "4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB"
+                    .into(),
+                previous_txn_lgr_seq: 61965653,
+                regular_key: None,
+                sequence: 385,
+                transfer_rate: None,
+                index: "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8"
+                    .into(),
+            }),
+            node_binary: None,
+            deleted_ledger_index: None,
+            validated: Some(true),
+        };
+
+        let serialized = serde_json::to_string(&entry).unwrap();
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(entry, deserialized);
+    }
+
+    #[test]
+    fn test_ledger_entry_default() {
+        let entry: LedgerEntry = LedgerEntry::default();
+        assert_eq!(entry.index, "");
+        assert!(entry.node.is_none());
+    }
+
+    #[test]
+    fn test_ledger_entry_node_binary_only() {
+        let json = r#"{
+            "index": "ABC",
+            "ledger_index": 1,
+            "node_binary": "AABBCC",
+            "validated": false
+        }"#;
+        let entry: LedgerEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.node_binary.as_deref(), Some("AABBCC"));
+        assert!(entry.node.is_none());
+        assert_eq!(entry.validated, Some(false));
+    }
 }

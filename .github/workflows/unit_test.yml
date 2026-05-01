@@ -41,15 +41,24 @@ jobs:
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
+      # Integration-territory files (CLI, async network clients, sync wrappers
+      # around network calls, faucet) are excluded from unit-test coverage.
+      # They are exercised by tests under tests/ behind the `integration`
+      # feature flag, which run against a live rippled in a separate workflow.
+      # Mirrors xrpl-py's split between tests/unit/ (--fail-under=85) and
+      # tests/integration/ (--fail-under=70).
       - name: Generate coverage report
-        run: cargo llvm-cov --lcov --output-path lcov.info
+        run: |
+          cargo llvm-cov --lcov --output-path lcov.info \
+            --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs'
 
       - name: Check coverage thresholds
         run: |
           cargo llvm-cov --summary-only \
-            --fail-under-lines 80 \
-            --fail-under-regions 78 \
-            --fail-under-functions 70
+            --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs' \
+            --fail-under-lines 85 \
+            --fail-under-regions 86 \
+            --fail-under-functions 76
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

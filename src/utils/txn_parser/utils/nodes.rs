@@ -75,3 +75,92 @@ pub fn normalize_nodes<'a: 'b, 'b>(meta: &'a TransactionMetadata<'_>) -> Vec<Nor
         .map(|node| normalize_node(node))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn meta() -> TransactionMetadata<'static> {
+        let json = r#"{
+            "AffectedNodes": [
+                {
+                    "CreatedNode": {
+                        "LedgerEntryType": "AccountRoot",
+                        "LedgerIndex": "AAAA",
+                        "NewFields": {
+                            "Account": "rNew",
+                            "Balance": "1000"
+                        }
+                    }
+                },
+                {
+                    "ModifiedNode": {
+                        "LedgerEntryType": "RippleState",
+                        "LedgerIndex": "BBBB",
+                        "FinalFields": {
+                            "Account": "rMod",
+                            "Balance": "2000"
+                        },
+                        "PreviousFields": {
+                            "Balance": "1500"
+                        },
+                        "PreviousTxnId": "TXNID",
+                        "PreviousTxnLgrSeq": 42
+                    }
+                },
+                {
+                    "DeletedNode": {
+                        "LedgerEntryType": "Offer",
+                        "LedgerIndex": "CCCC",
+                        "FinalFields": {
+                            "Account": "rDel",
+                            "Balance": "0"
+                        }
+                    }
+                }
+            ],
+            "TransactionIndex": 0,
+            "TransactionResult": "tesSUCCESS"
+        }"#;
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn test_normalize_nodes_all_variants() {
+        let meta = meta();
+        let normalized = normalize_nodes(&meta);
+        assert_eq!(normalized.len(), 3);
+
+        // CreatedNode
+        assert_eq!(normalized[0].node_type, NodeType::CreatedNode);
+        assert_eq!(normalized[0].ledger_entry_type, LedgerEntryType::AccountRoot);
+        assert!(normalized[0].new_fields.is_some());
+        assert!(normalized[0].final_fields.is_none());
+        assert!(normalized[0].previous_fields.is_none());
+
+        // ModifiedNode
+        assert_eq!(normalized[1].node_type, NodeType::ModifiedNode);
+        assert_eq!(normalized[1].ledger_entry_type, LedgerEntryType::RippleState);
+        assert!(normalized[1].new_fields.is_none());
+        assert!(normalized[1].final_fields.is_some());
+        assert!(normalized[1].previous_fields.is_some());
+        assert_eq!(normalized[1].previous_txn_id, Some("TXNID"));
+        assert_eq!(normalized[1].previous_txn_lgr_seq, Some(42));
+
+        // DeletedNode
+        assert_eq!(normalized[2].node_type, NodeType::DeletedNode);
+        assert_eq!(normalized[2].ledger_entry_type, LedgerEntryType::Offer);
+        assert!(normalized[2].new_fields.is_none());
+        assert!(normalized[2].final_fields.is_some());
+    }
+
+    #[test]
+    fn test_normalize_nodes_empty() {
+        let meta: TransactionMetadata = serde_json::from_str(
+            r#"{"AffectedNodes":[],"TransactionIndex":0,"TransactionResult":"tesSUCCESS"}"#,
+        )
+        .unwrap();
+        let normalized = normalize_nodes(&meta);
+        assert_eq!(normalized.len(), 0);
+    }
+}
