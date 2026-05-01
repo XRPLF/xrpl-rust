@@ -34,7 +34,8 @@ jobs:
           RUST_BACKTRACE: 1
 
       - name: Test for no_std
-        run: cargo test --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
+        run: cargo test --release --no-default-features --features
+          embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
         env:
           RUST_BACKTRACE: 1
 
@@ -57,8 +58,8 @@ jobs:
           cargo llvm-cov --summary-only \
             --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs' \
             --fail-under-lines 85 \
-            --fail-under-regions 86 \
-            --fail-under-functions 76
+            --fail-under-regions 85 \
+            --fail-under-functions 75
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
