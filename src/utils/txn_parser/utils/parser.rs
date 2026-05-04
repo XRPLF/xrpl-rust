@@ -74,6 +74,7 @@ mod tests {
     use crate::models::XRPAmount;
     use crate::models::{Amount, FlagCollection};
     use crate::utils::txn_parser::utils::{OfferChange, OfferStatus};
+    use alloc::string::ToString;
     use alloc::vec;
 
     fn balance(account: &'static str, value: &'static str) -> AccountBalance<'static> {

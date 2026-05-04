@@ -167,6 +167,7 @@ mod tests {
     use crate::models::amount::XRPAmount;
     use crate::models::currency::XRP;
     use crate::models::NoFlags;
+    use alloc::string::ToString;
 
     #[test]
     fn test_common_fields_new() {

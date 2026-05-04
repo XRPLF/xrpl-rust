@@ -111,6 +111,7 @@ pub fn negate(value: &BigDecimal) -> XRPLUtilsResult<BigDecimal> {
 mod tests {
     use super::*;
     use crate::models::{IssuedCurrencyAmount, XRPAmount};
+    use alloc::string::ToString;
 
     #[test]
     fn test_balance_from_xrp_amount() {

@@ -128,7 +128,9 @@ where
     ))
 }
 
-#[cfg(test)]
+// std-only: the no_std AsyncJsonRpcClient is generic over BUF/T/D and can't
+// be named without those parameters. The std variant is a simple struct.
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
     use crate::asynch::clients::AsyncJsonRpcClient;
