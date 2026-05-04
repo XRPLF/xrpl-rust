@@ -119,7 +119,9 @@ mod tests {
             "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
             None,
             Some("10".into()),
-            Some(FlagCollection::new(vec![EnableAmendmentFlag::TfGotMajority])),
+            Some(FlagCollection::new(vec![
+                EnableAmendmentFlag::TfGotMajority,
+            ])),
             None,
             None,
             Some(1),
@@ -143,7 +145,9 @@ mod tests {
             "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
             None,
             None,
-            Some(FlagCollection::new(vec![EnableAmendmentFlag::TfLostMajority])),
+            Some(FlagCollection::new(vec![
+                EnableAmendmentFlag::TfLostMajority,
+            ])),
             None,
             None,
             None,
@@ -155,6 +159,9 @@ mod tests {
         );
         assert!(txn.has_flag(&EnableAmendmentFlag::TfLostMajority));
         assert!(!txn.has_flag(&EnableAmendmentFlag::TfGotMajority));
-        assert_eq!(txn.get_transaction_type(), &TransactionType::EnableAmendment);
+        assert_eq!(
+            txn.get_transaction_type(),
+            &TransactionType::EnableAmendment
+        );
     }
 }

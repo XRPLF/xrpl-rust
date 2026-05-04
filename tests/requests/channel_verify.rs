@@ -37,4 +37,3 @@ async fn test_channel_verify_base() {
     })
     .await;
 }
-

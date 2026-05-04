@@ -206,7 +206,10 @@ mod tests {
         );
         assert_eq!(txn.get_transaction_type(), &TransactionType::CheckCancel);
         assert_eq!(txn.get_common_fields().sequence, Some(123));
-        assert_eq!(txn.get_common_fields().last_ledger_sequence, Some(7_000_000));
+        assert_eq!(
+            txn.get_common_fields().last_ledger_sequence,
+            Some(7_000_000)
+        );
         assert!(txn.get_errors().is_ok());
 
         let mut txn = txn;

@@ -125,11 +125,7 @@ mod tests {
 
     #[test]
     fn test_group_balances_by_account_groups_same_account() {
-        let balances = vec![
-            balance("rA", "1"),
-            balance("rB", "2"),
-            balance("rA", "3"),
-        ];
+        let balances = vec![balance("rA", "1"), balance("rB", "2"), balance("rA", "3")];
         let groups = group_balances_by_account(balances);
         assert_eq!(groups.len(), 2);
         let group_a = groups.iter().find(|g| g.account == "rA").unwrap();

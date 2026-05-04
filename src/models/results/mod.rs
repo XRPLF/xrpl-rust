@@ -1122,7 +1122,12 @@ mod tests {
         assert_eq!(value.get("k").and_then(|v| v.as_str()), Some("v"));
 
         let fee_value: Value = XRPLResult::Fee(fee_result()).try_into().unwrap();
-        assert_eq!(fee_value.get("ledger_current_index").and_then(|v| v.as_u64()), Some(26575101));
+        assert_eq!(
+            fee_value
+                .get("ledger_current_index")
+                .and_then(|v| v.as_u64()),
+            Some(26575101)
+        );
     }
 
     #[test]

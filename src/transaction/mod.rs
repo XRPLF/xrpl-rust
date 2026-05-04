@@ -162,10 +162,9 @@ mod tests {
         // With client = None, the function returns the default net_fee of 10
         // drops without making any network calls.
         let txn = dummy_account_set();
-        let fee: XRPAmount = calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(
-            &txn, None, None,
-        )
-        .unwrap();
+        let fee: XRPAmount =
+            calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(&txn, None, None)
+                .unwrap();
         assert_eq!(fee.0, "10");
     }
 

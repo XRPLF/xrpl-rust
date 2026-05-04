@@ -133,14 +133,20 @@ mod tests {
 
         // CreatedNode
         assert_eq!(normalized[0].node_type, NodeType::CreatedNode);
-        assert_eq!(normalized[0].ledger_entry_type, LedgerEntryType::AccountRoot);
+        assert_eq!(
+            normalized[0].ledger_entry_type,
+            LedgerEntryType::AccountRoot
+        );
         assert!(normalized[0].new_fields.is_some());
         assert!(normalized[0].final_fields.is_none());
         assert!(normalized[0].previous_fields.is_none());
 
         // ModifiedNode
         assert_eq!(normalized[1].node_type, NodeType::ModifiedNode);
-        assert_eq!(normalized[1].ledger_entry_type, LedgerEntryType::RippleState);
+        assert_eq!(
+            normalized[1].ledger_entry_type,
+            LedgerEntryType::RippleState
+        );
         assert!(normalized[1].new_fields.is_none());
         assert!(normalized[1].final_fields.is_some());
         assert!(normalized[1].previous_fields.is_some());

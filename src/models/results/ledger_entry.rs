@@ -184,8 +184,7 @@ mod tests {
                 regular_key: None,
                 sequence: 385,
                 transfer_rate: None,
-                index: "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8"
-                    .into(),
+                index: "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8".into(),
             }),
             node_binary: None,
             deleted_ledger_index: None,
