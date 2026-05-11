@@ -15,7 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # Pin to commit SHA so a future retag or branch movement can't substitute attacker
+      # code at install time (#288). v1 / latest "stable" branch HEAD at time of writing.
+      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -39,7 +41,12 @@ jobs:
           RUST_BACKTRACE: 1
 
       - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        # Pin to commit SHA (taiki-e/install-action v2.77.6) and use the explicit `tool:`
+        # input rather than the per-tool branch ref `@cargo-llvm-cov`, so a force-push to
+        # that branch can't swap the installer (#288).
+        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2.77.6
+        with:
+          tool: cargo-llvm-cov
 
       - name: Generate coverage report
         run: cargo llvm-cov --lcov --output-path lcov.info
