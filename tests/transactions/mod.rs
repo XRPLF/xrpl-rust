@@ -26,6 +26,7 @@ pub mod payment_channel_create;
 pub mod payment_channel_fund;
 pub mod set_regular_key;
 pub mod signer_list_set;
+pub mod submit_and_wait;
 pub mod ticket_create;
 pub mod trust_set;
 pub mod xchain_account_create_commit;
