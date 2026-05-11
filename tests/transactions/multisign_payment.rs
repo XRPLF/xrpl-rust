@@ -90,7 +90,11 @@ async fn test_multisign_payment() {
             .expect("multisign combine");
 
         assert!(
-            payment.common_fields.signers.as_ref().is_some_and(|s| s.len() == 2),
+            payment
+                .common_fields
+                .signers
+                .as_ref()
+                .is_some_and(|s| s.len() == 2),
             "multisigned payment should carry both signers"
         );
 

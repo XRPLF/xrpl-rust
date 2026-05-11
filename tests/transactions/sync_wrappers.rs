@@ -256,9 +256,7 @@ fn test_sync_json_rpc_client_request_and_common_fields() {
         .expect("sync json-rpc request");
     assert!(response.is_success(), "server_info should succeed");
 
-    let common = client
-        .get_common_fields()
-        .expect("sync get_common_fields");
+    let common = client.get_common_fields().expect("sync get_common_fields");
     assert!(
         common.build_version.as_ref().is_some_and(|v| !v.is_empty()),
         "rippled build_version should be populated"

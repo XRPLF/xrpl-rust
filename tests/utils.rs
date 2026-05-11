@@ -73,9 +73,8 @@ async fn test_websocket_account_info_request_for_genesis() {
         .expect("account_info request");
     assert!(response.is_success(), "account_info should succeed");
 
-    let _account_info: AccountInfoVersionMap = response
-        .try_into()
-        .expect("deserialize AccountInfo result");
+    let _account_info: AccountInfoVersionMap =
+        response.try_into().expect("deserialize AccountInfo result");
 
     client.close().await.expect("close websocket");
 }
