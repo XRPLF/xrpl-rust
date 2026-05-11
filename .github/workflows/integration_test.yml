@@ -48,10 +48,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-integration-
 
-      - name: Run integration tests
-        run: cargo test --release --features std,json-rpc,helpers,integration --test integration_test -- --test-threads=1
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Run integration tests with coverage
+        run: |
+          cargo llvm-cov \
+            --release \
+            --features std,json-rpc,helpers,integration \
+            --test integration_test \
+            --lcov \
+            --output-path integration-lcov.info \
+            -- --test-threads=1
         env:
           RUST_BACKTRACE: 1
+
+      - name: Integration coverage summary
+        # Prints the line / region / function percentages so they land in the run log
+        # and become trivially observable in PR runs. The `--fail-under-*` gates are
+        # intentionally not enabled yet (#297): pick realistic thresholds after a few
+        # baseline runs land, matching how `unit_test.yml`'s thresholds were tuned.
+        run: cargo llvm-cov report --summary-only
+
+      - name: Upload integration coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-lcov-report
+          path: integration-lcov.info
 
       - name: Dump xrpld logs and stop container
         if: always()
