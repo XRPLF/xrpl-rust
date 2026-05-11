@@ -13,6 +13,7 @@ pub mod deposit_preauth;
 pub mod escrow_cancel;
 pub mod escrow_create;
 pub mod escrow_finish;
+pub mod multisign_payment;
 pub mod nftoken_accept_offer;
 pub mod nftoken_burn;
 pub mod nftoken_cancel_offer;
