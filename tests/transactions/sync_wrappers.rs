@@ -265,6 +265,42 @@ fn test_sync_json_rpc_client_request_and_common_fields() {
     );
 }
 
+/// Sync wrapper around generate_faucet_wallet. Hits the public testnet
+/// faucet just like tests/cli_integration::test_generate_faucet_wallet, so
+/// it adds a second faucet round-trip per CI run. Tolerate flakes by
+/// running serially with --test-threads=1 (already enforced by CI).
+#[test]
+fn test_sync_generate_faucet_wallet() {
+    let rt = Runtime::new().expect("tokio runtime");
+    let _guard = rt.enter();
+
+    let client = AsyncJsonRpcClient::connect(
+        "https://s.altnet.rippletest.net:51234"
+            .parse()
+            .expect("testnet url"),
+    );
+
+    let wallet =
+        xrpl::wallet::faucet_generation::generate_faucet_wallet(&client, None, None, None, None)
+            .expect("sync generate_faucet_wallet");
+
+    assert!(!wallet.classic_address.is_empty());
+    assert!(!wallet.public_key.is_empty());
+    assert!(!wallet.private_key.is_empty());
+
+    // Defense-in-depth: the helper itself polls balance until it crosses the
+    // starting balance, but query independently via the sync account helper to
+    // confirm the new wallet really did receive XRP from the faucet.
+    let balance =
+        xrpl::account::get_xrp_balance(wallet.classic_address.clone().into(), &client, None)
+            .expect("sync get_xrp_balance on freshly funded wallet");
+    assert!(
+        balance > XRPAmount::from("0"),
+        "faucet wallet should have positive balance, got {}",
+        balance
+    );
+}
+
 #[test]
 fn test_sync_submit_and_wait_payment() {
     use core::time::Duration;
