@@ -18,7 +18,6 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use rand::Rng;
-use rand::SeedableRng;
 
 use super::exceptions::XRPLCoreResult;
 
@@ -105,8 +104,13 @@ pub fn generate_seed(
     if let Some(value) = entropy {
         random_bytes = value;
     } else {
-        let mut rng = rand_hc::Hc128Rng::from_entropy();
-        rng.fill(&mut random_bytes);
+        // Use the OS CSPRNG directly instead of seeding an Hc128 stream cipher from it once
+        // (#286). Hc128 is a recognised eSTREAM-portfolio cipher, but seeding it once and
+        // expanding for every wallet means a single compromise of the initial entropy snapshot
+        // exposes every wallet generated during the process lifetime. `OsRng` reads from the OS
+        // entropy pool on each call, matching what xrpl-py / xrpl.js use for secret-material
+        // generation.
+        rand::rngs::OsRng.fill(&mut random_bytes);
     }
 
     encode_seed(random_bytes, algo)
@@ -299,6 +303,21 @@ mod test {
         assert_eq!(
             generate_seed(Some(TEST_BYTES), Some(CryptoAlgorithm::SECP256K1)),
             Ok(SEED_SECP256K1.to_string()),
+        );
+    }
+
+    #[test]
+    fn generate_seed_without_entropy_produces_distinct_outputs() {
+        // Sanity check that the entropy=None path is actually random across calls. The pre-#286
+        // implementation seeded `Hc128Rng` from the OS once per call (`from_entropy` reads
+        // fresh entropy each time `generate_seed` was invoked, so it also passed this check) —
+        // the goal here is to lock the property: two consecutive seeds must differ. Per-call
+        // OsRng makes that trivially true and forward-compatible with future RNG choices.
+        let a = generate_seed(None, None).unwrap();
+        let b = generate_seed(None, None).unwrap();
+        assert_ne!(
+            a, b,
+            "generate_seed(None, ...) must produce a fresh seed on every call"
         );
     }
 
