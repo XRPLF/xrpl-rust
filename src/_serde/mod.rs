@@ -192,7 +192,7 @@ macro_rules! serde_with_tag {
                     )*
                 }
 
-                let hash_map: $crate::_serde::HashMap<&$lt str, Helper<$lt>> = $crate::_serde::HashMap::deserialize(deserializer)?;
+                let hash_map: $crate::_serde::HashMap<alloc::string::String, Helper<$lt>> = $crate::_serde::HashMap::deserialize(deserializer)?;
                 let helper_result = hash_map.get(stringify!($name));
 
                 match helper_result {
@@ -269,7 +269,7 @@ macro_rules! serde_with_tag {
                     )*
                 }
 
-                let hash_map: $crate::_serde::HashMap<&'de str, Helper> = $crate::_serde::HashMap::deserialize(deserializer)?;
+                let hash_map: $crate::_serde::HashMap<alloc::string::String, Helper> = $crate::_serde::HashMap::deserialize(deserializer)?;
                 let helper_result = hash_map.get(stringify!($name));
 
                 match helper_result {

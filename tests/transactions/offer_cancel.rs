@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/offerCancel.test.ts
-//
 // Scenarios:
 //   - base: create an offer then cancel it by sequence number
 

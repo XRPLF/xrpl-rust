@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainModifyBridge.test.ts
-//
 // Scenarios:
 //   - base: create a bridge then modify the signature_reward from 200 to 300 drops
 //

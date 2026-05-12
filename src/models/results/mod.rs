@@ -279,8 +279,40 @@ impl_try_from_result!(gateway_balances, GatewayBalances, GatewayBalances);
 impl_try_from_result!(ledger, Ledger, Ledger);
 impl_try_from_result!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_result!(ledger_current, LedgerCurrent, LedgerCurrent);
-impl_try_from_result!(ledger_data, LedgerData, LedgerData);
-impl_try_from_result!(ledger_entry, LedgerEntry, LedgerEntry);
+// LedgerData: serde's untagged enum may match LedgerClosed (which has fewer
+// required fields) before reaching LedgerData. Re-serialize and re-parse
+// to recover the full data.
+impl<'a> TryFrom<XRPLResult<'a>> for ledger_data::LedgerData<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::LedgerData(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
+// LedgerEntry: may match Ledger or LedgerClosed before reaching LedgerEntry.
+impl<'a> TryFrom<XRPLResult<'a>> for ledger_entry::LedgerEntry<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::LedgerEntry(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl_try_from_result!(manifest, Manifest, Manifest);
 // NFTBuyOffers and NFTSellOffers are structurally identical; the untagged enum
 // always picks the first matching variant (NFTBuyOffers). Both TryFrom impls
@@ -325,16 +357,49 @@ impl<'a> TryFrom<XRPLResult<'a>> for nft_sell_offers::NFTSellOffers<'a> {
     }
 }
 impl_try_from_result!(nftoken, NFTokenMintResult, NFTokenMintResult);
-impl_try_from_result!(no_ripple_check, NoRippleCheck, NoRippleCheck);
+// NoRippleCheck: may match Other(Value) due to untagged enum ordering.
+impl<'a> TryFrom<XRPLResult<'a>> for no_ripple_check::NoRippleCheck<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::NoRippleCheck(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl_try_from_result!(path_find, PathFind, PathFind);
 impl_try_from_result!(random, Random, Random);
-impl_try_from_result!(ripple_path_find, RipplePathFind, RipplePathFind);
+// RipplePathFind: may match LedgerCurrent due to untagged enum ordering.
+impl<'a> TryFrom<XRPLResult<'a>> for ripple_path_find::RipplePathFind<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::RipplePathFind(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl<'a> TryFrom<XRPLResult<'a>> for server_info::ServerInfo<'a> {
     type Error = XRPLModelException;
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::ServerInfo(value) => Ok(*value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
             res => Err(XRPLResultException::UnexpectedResultType(
                 "ServerInfo".to_string(),
                 res.get_name(),
@@ -358,7 +423,22 @@ impl<'a> TryFrom<XRPLResult<'a>> for server_state::ServerState<'a> {
     }
 }
 impl_try_from_result!(submit, Submit, Submit);
-impl_try_from_result!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
+// SubmitMultisigned: may match Submit due to untagged enum ordering.
+impl<'a> TryFrom<XRPLResult<'a>> for submit_multisigned::SubmitMultisigned<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::SubmitMultisigned(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl_try_from_result!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_result!(ping, Ping, Ping);
 impl_try_from_result!(subscribe, Subscribe, Subscribe);
@@ -445,6 +525,10 @@ pub struct XRPLResponse<'a> {
     pub forwarded: Option<bool>,
     pub request: Option<XRPLRequest<'a>>,
     pub result: Option<XRPLResult<'a>>,
+    /// Raw JSON of the `result` field, preserved for fallback re-deserialization
+    /// when the untagged `XRPLResult` enum matches the wrong variant.
+    #[serde(skip)]
+    pub raw_result: Option<Value>,
     pub status: Option<ResponseStatus>,
     pub r#type: Option<ResponseType>,
     pub warning: Option<Cow<'a, str>>,
@@ -517,8 +601,41 @@ impl_try_from_response!(gateway_balances, GatewayBalances, GatewayBalances);
 impl_try_from_response!(ledger, Ledger, Ledger);
 impl_try_from_response!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_response!(ledger_current, LedgerCurrent, LedgerCurrent);
-impl_try_from_response!(ledger_data, LedgerData, LedgerData);
-impl_try_from_response!(ledger_entry, LedgerEntry, LedgerEntry);
+// LedgerData / LedgerEntry: use raw_result fallback for untagged enum
+// mismatch where serde picks a wrong variant and loses fields.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for ledger_data::LedgerData<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::LedgerData(value)) = response.result {
+            return Ok(value);
+        }
+        // Fallback: re-deserialize from the raw result JSON
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for ledger_entry::LedgerEntry<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::LedgerEntry(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(manifest, Manifest, Manifest);
 impl_try_from_response!(nft_info, NFTInfo, NFTInfo);
 // NFTBuyOffers and NFTSellOffers are structurally identical; the untagged enum
@@ -576,11 +693,43 @@ where
     }
 }
 impl_try_from_response!(nftoken, NFTokenMintResult, NFTokenMintResult);
-impl_try_from_response!(no_ripple_check, NoRippleCheck, NoRippleCheck);
+// NoRippleCheck / RipplePathFind: use raw_result fallback for untagged
+// enum mismatch.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for no_ripple_check::NoRippleCheck<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::NoRippleCheck(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(path_find, PathFind, PathFind);
 impl_try_from_response!(ping, Ping, Ping);
 impl_try_from_response!(random, Random, Random);
-impl_try_from_response!(ripple_path_find, RipplePathFind, RipplePathFind);
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for ripple_path_find::RipplePathFind<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::RipplePathFind(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl<'a> TryFrom<XRPLResponse<'a>> for server_info::ServerInfo<'a> {
     type Error = XRPLModelException;
 
@@ -588,6 +737,9 @@ impl<'a> TryFrom<XRPLResponse<'a>> for server_info::ServerInfo<'a> {
         match response.result {
             Some(result) => match result {
                 XRPLResult::ServerInfo(value) => Ok(*value),
+                XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                    serde_json::from_value(value.clone()).map_err(Into::into)
+                }
                 res => Err(XRPLResultException::UnexpectedResultType(
                     "ServerInfo".to_string(),
                     res.get_name(),
@@ -616,7 +768,23 @@ impl<'a> TryFrom<XRPLResponse<'a>> for server_state::ServerState<'a> {
     }
 }
 impl_try_from_response!(submit, Submit, Submit);
-impl_try_from_response!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
+// SubmitMultisigned: may match Submit due to untagged enum ordering.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for submit_multisigned::SubmitMultisigned<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::SubmitMultisigned(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_response!(subscribe, Subscribe, Subscribe);
 impl_try_from_response!(unsubscribe, Unsubscribe, Unsubscribe);
@@ -645,12 +813,19 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
                 forwarded: None,
                 request: None,
                 result: serde_json::from_value(map_as_value).map_err(serde::de::Error::custom)?,
+                raw_result: None,
                 status: None,
                 r#type: None,
                 warning: None,
                 warnings: None,
             })
         } else {
+            // Preserve the raw result JSON so that TryFrom impls can
+            // re-deserialize when the untagged enum picks the wrong variant.
+            let raw_result = map.remove("result");
+            let result = raw_result
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
             Ok(XRPLResponse {
                 id: map
                     .remove("id")
@@ -668,9 +843,8 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
                 request: map
                     .remove("request")
                     .and_then(|v| serde_json::from_value(v).ok()),
-                result: map
-                    .remove("result")
-                    .and_then(|v| serde_json::from_value(v).ok()),
+                result,
+                raw_result,
                 status: map
                     .remove("status")
                     .and_then(|v| serde_json::from_value(v).ok()),

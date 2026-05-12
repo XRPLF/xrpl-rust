@@ -12,7 +12,6 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Display)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[serde(tag = "role")]
 #[derive(Default)]
 pub enum NoRippleCheckRole {
     #[default]
