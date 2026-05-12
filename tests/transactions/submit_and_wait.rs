@@ -8,12 +8,10 @@
 
 use core::time::Duration;
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
-use xrpl::{
-    asynch::transaction::submit_and_wait,
-    models::{transactions::payment::Payment, Amount, XRPAmount},
-    wallet::Wallet,
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, payment::xrp_payment, with_blockchain_lock,
 };
+use xrpl::{asynch::transaction::submit_and_wait, wallet::Wallet};
 
 #[tokio::test]
 async fn test_submit_and_wait_payment() {
@@ -22,24 +20,11 @@ async fn test_submit_and_wait_payment() {
         let sender = generate_funded_wallet().await;
         let recipient = Wallet::create(None).expect("recipient wallet");
 
-        let mut payment = Payment::new(
-            sender.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("20000000")), // 20 XRP — covers the standalone base reserve
-            recipient.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
+        // 20 XRP covers the standalone base reserve for the new recipient.
+        let mut payment = xrp_payment(
+            sender.classic_address.clone(),
+            recipient.classic_address.clone(),
+            "20000000",
         );
 
         // Drive ledger closes while submit_and_wait polls for validation.

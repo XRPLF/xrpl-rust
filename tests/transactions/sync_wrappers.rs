@@ -10,14 +10,11 @@
 // holds an EnterGuard while the sync call runs.
 
 use tokio::runtime::Runtime;
-use xrpl::{
-    asynch::clients::AsyncJsonRpcClient,
-    models::{transactions::payment::Payment, Amount, XRPAmount},
-    wallet::Wallet,
-};
+use xrpl::{asynch::clients::AsyncJsonRpcClient, models::XRPAmount, wallet::Wallet};
 
 use crate::common::{
-    constants::STANDALONE_URL, generate_funded_wallet, ledger_accept, with_blockchain_lock,
+    constants::STANDALONE_URL, generate_funded_wallet, ledger_accept, payment::xrp_payment,
+    with_blockchain_lock,
 };
 
 fn new_client() -> AsyncJsonRpcClient {
@@ -89,24 +86,11 @@ fn test_sync_sign_and_submit_payment() {
     rt.block_on(with_blockchain_lock(|| async {
         let sender = generate_funded_wallet().await;
         let recipient = Wallet::create(None).expect("recipient wallet");
-        let mut payment = Payment::new(
-            sender.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("20000000")), // 20 XRP — covers base reserve
-            recipient.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
+        // 20 XRP covers the standalone base reserve for the new recipient.
+        let mut payment = xrp_payment(
+            sender.classic_address.clone(),
+            recipient.classic_address.clone(),
+            "20000000",
         );
 
         // Now switch to the sync API. The runtime is still in scope via the outer
@@ -127,24 +111,10 @@ fn test_sync_autofill_and_calculate_fee() {
     rt.block_on(with_blockchain_lock(|| async {
         let sender = generate_funded_wallet().await;
         let recipient = Wallet::create(None).expect("recipient wallet");
-        let mut payment = Payment::new(
-            sender.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("20000000")),
-            recipient.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
+        let mut payment = xrp_payment(
+            sender.classic_address.clone(),
+            recipient.classic_address.clone(),
+            "20000000",
         );
 
         let client = new_client();
@@ -184,24 +154,10 @@ fn test_sync_autofill_and_sign_then_submit() {
     rt.block_on(with_blockchain_lock(|| async {
         let sender = generate_funded_wallet().await;
         let recipient = Wallet::create(None).expect("recipient wallet");
-        let mut payment = Payment::new(
-            sender.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("20000000")),
-            recipient.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
+        let mut payment = xrp_payment(
+            sender.classic_address.clone(),
+            recipient.classic_address.clone(),
+            "20000000",
         );
 
         let client = new_client();
@@ -309,24 +265,10 @@ fn test_sync_submit_and_wait_payment() {
     rt.block_on(with_blockchain_lock(|| async {
         let sender = generate_funded_wallet().await;
         let recipient = Wallet::create(None).expect("recipient wallet");
-        let mut payment = Payment::new(
-            sender.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("20000000")),
-            recipient.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
+        let mut payment = xrp_payment(
+            sender.classic_address.clone(),
+            recipient.classic_address.clone(),
+            "20000000",
         );
 
         // submit_and_wait polls for validation; standalone rippled needs ledger

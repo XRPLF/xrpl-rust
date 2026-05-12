@@ -6,16 +6,12 @@
 // Both are at 0% integration coverage because every other transaction test uses
 // the single-signer test_transaction helper.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, payment::xrp_payment, with_blockchain_lock,
+};
 use xrpl::{
     asynch::transaction::{autofill, sign, submit},
-    models::{
-        transactions::{
-            payment::Payment,
-            signer_list_set::{SignerEntry, SignerListSet},
-        },
-        Amount, XRPAmount,
-    },
+    models::transactions::signer_list_set::{SignerEntry, SignerListSet},
     wallet::Wallet,
 };
 
@@ -49,24 +45,10 @@ async fn test_multisign_payment() {
 
         // Build the payment but do not sign yet. autofill with signers_count=2 so
         // the fee accounts for the multisign cost.
-        let mut payment = Payment::new(
-            main_wallet.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("20000000")),
-            recipient.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
+        let mut payment = xrp_payment(
+            main_wallet.classic_address.clone(),
+            recipient.classic_address.clone(),
+            "20000000",
         );
         autofill(&mut payment, client, Some(2))
             .await
