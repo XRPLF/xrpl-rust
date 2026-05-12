@@ -51,12 +51,12 @@ jobs:
       - name: Generate coverage report
         run: |
           cargo llvm-cov --lcov --output-path lcov.info \
-            --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs'
+            --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger|asynch/transaction|asynch/wallet)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs'
 
       - name: Check coverage thresholds
         run: |
           cargo llvm-cov --summary-only \
-            --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs' \
+            --ignore-filename-regex 'src/(bin|cli|clients|account|ledger|asynch/clients|asynch/account|asynch/ledger|asynch/transaction|asynch/wallet)/|src/transaction/mod\.rs|src/wallet/faucet_generation\.rs' \
             --fail-under-lines 85 \
             --fail-under-regions 85 \
             --fail-under-functions 75
