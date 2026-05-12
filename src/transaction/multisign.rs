@@ -9,6 +9,13 @@ use crate::{
     models::transactions::Transaction, transaction::exceptions::XRPLMultisignException,
 };
 
+// TODO(#306): tx_list's borrow lifetime is conflated with T's Transaction<'a>
+// data lifetime through the shared 'a parameter. Callers whose transaction
+// data ends up 'static (e.g. anything built from string literals inside an
+// async block) are then forced to provide a 'static borrow of tx_list —
+// see tests/transactions/multisign_payment.rs's Box::leak workaround.
+// Fix: introduce a second lifetime parameter, e.g.
+//   pub fn multisign<'a, 'b, T, F>(transaction: &mut T, tx_list: &'b [T]) -> ...
 pub fn multisign<'a, T, F>(transaction: &mut T, tx_list: &'a Vec<T>) -> XRPLHelperResult<()>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq + 'a,
