@@ -16,9 +16,9 @@ use xrpl::{
     wallet::Wallet,
 };
 
-use crate::common::{generate_funded_wallet, ledger_accept, with_blockchain_lock};
-
-const STANDALONE_URL: &str = "http://localhost:5005";
+use crate::common::{
+    constants::STANDALONE_URL, generate_funded_wallet, ledger_accept, with_blockchain_lock,
+};
 
 fn new_client() -> AsyncJsonRpcClient {
     AsyncJsonRpcClient::connect(STANDALONE_URL.parse().unwrap())
