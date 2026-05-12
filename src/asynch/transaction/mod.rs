@@ -480,7 +480,7 @@ where
     }
 }
 
-#[cfg(all(feature = "websocket", feature = "std"))]
+#[cfg(all(feature = "websocket", feature = "std", feature = "integration"))]
 #[cfg(test)]
 mod test_autofill {
     use super::autofill;
@@ -594,6 +594,7 @@ mod test_sign {
         assertions::assert_transaction_multisigned(&tx);
     }
 
+    #[cfg(feature = "integration")]
     #[tokio::test]
     async fn test_autofill_and_sign() {
         let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());
