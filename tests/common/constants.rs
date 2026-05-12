@@ -8,3 +8,6 @@ pub const XRPL_WSS_TEST_NET: &'static str = "wss://testnet.xrpl-labs.com/";
 pub const XRPL_WS_TEST_NET: &'static str = "wss://s.altnet.rippletest.net:51233/";
 
 pub const GENESIS_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+
+/// HTTP JSON-RPC endpoint for local Docker standalone rippled.
+pub const STANDALONE_URL: &str = "http://localhost:5005";

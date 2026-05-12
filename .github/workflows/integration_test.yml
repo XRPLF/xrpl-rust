@@ -14,6 +14,10 @@ env:
   # rippled binary was renamed to xrpld; use the new image name.
   # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
   XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
+  # Files measured by the integration coverage gate are the inverse of this regex.
+  # Unit-test territory (models, core, utils, _serde) is excluded; integration territory
+  # (CLI, asynch::clients, account/, ledger/, transaction/, faucet) is what remains.
+  COVERAGE_IGNORE_REGEX: '(_serde|core|models|utils)/|constants\.rs$|macros\.rs$|lib\.rs$|wallet/(mod|exceptions)\.rs$|tests/'
 
 jobs:
   integration_test:
@@ -37,6 +41,9 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -48,10 +55,37 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-integration-
 
-      - name: Run integration tests
-        run: cargo test --release --features std,json-rpc,helpers,integration --test integration_test -- --test-threads=1
+      - name: Run integration tests under coverage
+        run: |
+          cargo llvm-cov --no-report --release \
+            --features std,json-rpc,helpers,cli,websocket,integration \
+            --test integration_test \
+            --test cli_integration \
+            --test funding \
+            --test utils \
+            --test test_utils \
+            -- --test-threads=1
         env:
           RUST_BACKTRACE: 1
+
+      - name: Generate lcov report (scoped to integration territory)
+        run: |
+          cargo llvm-cov report --release \
+            --lcov --output-path lcov.info \
+            --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
+
+      - name: Enforce integration coverage threshold (65% lines)
+        run: |
+          cargo llvm-cov report --release --summary-only \
+            --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}' \
+            --fail-under-lines 65
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-lcov-report
+          path: lcov.info
 
       - name: Dump xrpld logs and stop container
         if: always()
