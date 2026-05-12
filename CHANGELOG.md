@@ -14,7 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Expanded unit-test coverage and raised CI thresholds: lines `73 → 85`, regions `75 → 86`, functions `67 → 76`.
+- Split unit-test and integration-test coverage measurement in CI; integration-territory files (CLI, async network clients, sync wrappers, faucet) are excluded from the unit-test gate.
+
 ### Fixed
+
+- `RipplePathFind::destination_amount` changed from `Currency<'a>` to `Amount<'a>` to match the XRPL wire format.
+- `NoRippleCheckRole` no longer serializes with the `#[serde(tag = "role")]` discriminator; now emits a plain `snake_case` string matching the XRPL wire format.
 
 ## [[v1.1.0]]
 
