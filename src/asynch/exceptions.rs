@@ -4,17 +4,19 @@ use thiserror_no_std::Error;
 use super::clients::exceptions::XRPLClientException;
 #[cfg(feature = "helpers")]
 use super::{
-    transaction::exceptions::{
-        XRPLSignTransactionException, XRPLSubmitAndWaitException, XRPLTransactionHelperException,
-    },
+    transaction::exceptions::{XRPLSubmitAndWaitException, XRPLTransactionHelperException},
     wallet::exceptions::XRPLFaucetException,
 };
-#[cfg(feature = "helpers")]
+#[cfg(feature = "wallet")]
+use crate::wallet::exceptions::XRPLWalletException;
+// Available whenever `signing` is compiled (which requires core+models+wallet),
+// or whenever `helpers` is on — the former is a subset of the latter.
+#[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
 use crate::{
     core::exceptions::XRPLCoreException,
     models::transactions::exceptions::XRPLTransactionFieldException,
-    transaction::exceptions::XRPLMultisignException, utils::exceptions::XRPLUtilsException,
-    wallet::exceptions::XRPLWalletException,
+    signing::exceptions::{XRPLMultisignException, XRPLSignTransactionException},
+    utils::exceptions::XRPLUtilsException,
 };
 use crate::{models::XRPLModelException, XRPLSerdeJsonError};
 
@@ -22,7 +24,7 @@ pub type XRPLHelperResult<T, E = XRPLHelperException> = core::result::Result<T, 
 
 #[derive(Debug, Error)]
 pub enum XRPLHelperException {
-    #[cfg(feature = "helpers")]
+    #[cfg(feature = "wallet")]
     #[error("XRPL Wallet error: {0}")]
     XRPLWalletError(#[from] XRPLWalletException),
     #[cfg(feature = "helpers")]
@@ -33,18 +35,21 @@ pub enum XRPLHelperException {
     XRPLTransactionHelperError(#[from] XRPLTransactionHelperException),
     #[error("XRPL Model error: {0}")]
     XRPLModelError(#[from] XRPLModelException),
-    #[cfg(feature = "helpers")]
+    #[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
     #[error("XRPL Core error: {0}")]
     XRPLCoreError(#[from] XRPLCoreException),
-    #[cfg(feature = "helpers")]
+    #[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
     #[error("XRPL Transaction Field error: {0}")]
     XRPLTransactionFieldError(#[from] XRPLTransactionFieldException),
-    #[cfg(feature = "helpers")]
+    #[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
     #[error("XRPL Utils error: {0}")]
     XRPLUtilsError(#[from] XRPLUtilsException),
-    #[cfg(feature = "helpers")]
+    #[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
     #[error("XRPL MultiSign error: {0}")]
     XRPLMultiSignError(#[from] XRPLMultisignException),
+    #[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
+    #[error("XRPL Sign Transaction error: {0}")]
+    XRPLSignTransactionError(#[from] XRPLSignTransactionException),
     #[cfg(any(feature = "json-rpc", feature = "websocket"))]
     #[error("XRPL Client error: {0}")]
     XRPLClientError(#[from] XRPLClientException),
@@ -63,14 +68,9 @@ impl From<serde_json::Error> for XRPLHelperException {
     }
 }
 
-#[cfg(feature = "helpers")]
-impl From<XRPLSignTransactionException> for XRPLHelperException {
-    fn from(error: XRPLSignTransactionException) -> Self {
-        XRPLHelperException::XRPLTransactionHelperError(
-            XRPLTransactionHelperException::XRPLSignTransactionError(error),
-        )
-    }
-}
+// `XRPLSignTransactionException` is now a direct variant of
+// `XRPLHelperException` (see `XRPLSignTransactionError`), so the `From` impl
+// is derived automatically.
 
 #[cfg(feature = "helpers")]
 impl From<XRPLSubmitAndWaitException> for XRPLHelperException {
