@@ -1,7 +1,7 @@
 coverage:
   status:
     project:
-      unit:
+      default:
         target: 83%
         threshold: 1%
         flags:
