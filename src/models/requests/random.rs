@@ -42,3 +42,17 @@ impl<'a> Random<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = Random::new(Some("rand-1".into()));
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: Random = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"random\""));
+    }
+}

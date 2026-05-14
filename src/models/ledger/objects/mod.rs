@@ -160,3 +160,64 @@ where
 
     fn get_ledger_entry_type(&self) -> LedgerEntryType;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::amount::XRPAmount;
+    use crate::models::currency::XRP;
+    use crate::models::NoFlags;
+    use alloc::string::ToString;
+
+    #[test]
+    fn test_common_fields_new() {
+        let fields: CommonFields<'_, NoFlags> = CommonFields::new(
+            FlagCollection::default(),
+            LedgerEntryType::Bridge,
+            Some("AABBCC".into()),
+            Some("DDEEFF".into()),
+        );
+        assert_eq!(fields.get_ledger_entry_type(), LedgerEntryType::Bridge);
+        // The default impl on `LedgerObject` should return `false` here - no
+        // flag set is true. Pull a flag from the enum to satisfy IntoEnumIter.
+        // Because NoFlags has no variants, simply check the trait wiring works.
+        assert_eq!(fields.flags.0.len(), 0);
+    }
+
+    #[test]
+    fn test_ledger_entry_type_display() {
+        // The Display impl is auto-derived from `strum_macros::Display`.
+        assert_eq!(LedgerEntryType::AccountRoot.to_string(), "AccountRoot");
+        assert_eq!(LedgerEntryType::Bridge.to_string(), "Bridge");
+        assert_eq!(
+            LedgerEntryType::XChainOwnedClaimID.to_string(),
+            "XChainOwnedClaimID"
+        );
+    }
+
+    #[test]
+    fn test_ledger_entry_enum_serde_round_trip() {
+        let bridge = Bridge::new(
+            Some("AABBCC".into()),
+            Some("DDEEFF".into()),
+            "rPV4mZjsXfH2HvUSPLNmqz1J8d3Lpv7tpe".into(),
+            XRPAmount::from("100"),
+            0,
+            0,
+            crate::models::XChainBridge {
+                locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+                locking_chain_issue: XRP::new().into(),
+                issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                issuing_chain_issue: XRP::new().into(),
+            },
+            "1".into(),
+            None,
+        );
+        let entry = LedgerEntry::Bridge(bridge);
+        let serialized = serde_json::to_string(&entry).unwrap();
+        // The enum is untagged-ish; default behaviour is externally tagged on
+        // variant name. Either way, round-trip must work for the same JSON.
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(entry, deserialized);
+    }
+}

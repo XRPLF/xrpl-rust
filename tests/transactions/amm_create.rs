@@ -1,9 +1,7 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/ammCreate.test.ts
-//
 // Scenarios:
 //   - base: create an XRP/USD AMM pool (250 drops / 250 USD, trading_fee = 12)
 //
-// Setup (mirrors createAMMPool in xrpl.js/utils.ts):
+// Setup:
 //   1. issuerWallet AccountSet — enable DefaultRipple
 //   2. lpWallet TrustSet      — trust issuer for 1000 USD (tfClearNoRipple)
 //   3. issuerWallet Payment   — send 500 USD to lpWallet

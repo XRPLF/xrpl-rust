@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainAccountCreateCommit.test.ts
-//
 // Scenarios:
 //   - base: committer funds creation of a new account on the issuing chain by locking
 //           10_000_000 drops + signature_reward on the locking chain door

@@ -60,3 +60,23 @@ impl<'a> DepositAuthorized<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = DepositAuthorized::new(
+            Some("da-1".into()),
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: DepositAuthorized = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"deposit_authorized\""));
+    }
+}

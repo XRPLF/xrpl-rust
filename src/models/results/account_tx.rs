@@ -77,10 +77,12 @@ pub struct AccountTxV1<'a> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct TransactionBase<'a> {
     /// The ledger index of the ledger version that included this transaction.
-    pub ledger_index: u32,
+    /// In API v1 this field is inside the `tx` object rather than at the
+    /// transaction-entry level, so it may be absent here.
+    pub ledger_index: Option<u32>,
     /// Whether or not the transaction is included in a validated ledger. Any
     /// transaction not yet in a validated ledger is subject to change.
-    pub validated: bool,
+    pub validated: Option<bool>,
     /// (Binary mode) A unique hex string defining the transaction.
     pub tx_blob: Option<Cow<'a, str>>,
 }
@@ -103,8 +105,10 @@ pub struct AccountTxTransaction<'a> {
 pub struct AccountTxTransactionV1<'a> {
     #[serde(flatten)]
     pub base: TransactionBase<'a>,
-    /// (Binary mode) A hex string of the transaction in binary format.
-    pub tx: Cow<'a, str>,
+    /// (JSON mode) JSON object defining the transaction (API v1).
+    pub tx: Option<Value>,
+    /// (JSON mode) The transaction results metadata in JSON.
+    pub meta: Option<TransactionMetadata<'a>>,
 }
 
 impl<'a> TryFrom<XRPLResult<'a>> for AccountTxVersionMap<'a> {
@@ -113,6 +117,9 @@ impl<'a> TryFrom<XRPLResult<'a>> for AccountTxVersionMap<'a> {
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::AccountTx(account_tx) => Ok(account_tx),
+            XRPLResult::Other(super::XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
             res => Err(XRPLResultException::UnexpectedResultType(
                 "AccountTx".to_string(),
                 res.get_name(),
@@ -298,5 +305,119 @@ mod test_serde {
         let _: AccountTxVersionMap = serde_json::from_str(RESPONSE)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::results::{fee, ResponseStatus};
+    use serde_json::json;
+
+    fn default_account_tx() -> AccountTx<'static> {
+        AccountTx::default()
+    }
+
+    #[test]
+    fn test_account_tx_version_map_default() {
+        let map = AccountTxVersionMap::default();
+        match map {
+            AccountTxVersionMap::Default(_) => {}
+            _ => panic!("expected default variant"),
+        }
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_for_account_tx_success() {
+        let map = AccountTxVersionMap::Default(default_account_tx());
+        let wrapped = XRPLResult::AccountTx(map.clone());
+        let recovered: AccountTxVersionMap = wrapped.try_into().unwrap();
+        assert_eq!(recovered, map);
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_for_account_tx_other_fallback() {
+        // The Other(Value) fallback: re-deserializes from JSON.
+        let value = json!({
+            "account": "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+            "transactions": []
+        });
+        let wrapped: XRPLResult = value.into();
+        let recovered: AccountTxVersionMap = wrapped.try_into().unwrap();
+        match recovered {
+            AccountTxVersionMap::Default(tx) => {
+                assert_eq!(tx.base.account, "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
+            }
+            _ => panic!("expected default variant"),
+        }
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_for_account_tx_wrong_variant() {
+        let wrapped = XRPLResult::Fee(fee::Fee::default());
+        let recovered: Result<AccountTxVersionMap, _> = wrapped.try_into();
+        assert!(recovered.is_err());
+        assert!(recovered.unwrap_err().to_string().contains("AccountTx"));
+    }
+
+    #[test]
+    fn test_try_from_xrpl_response_for_account_tx() {
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::AccountTx(AccountTxVersionMap::Default(
+                default_account_tx(),
+            ))),
+            raw_result: None,
+            status: Some(ResponseStatus::Success),
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let _: AccountTxVersionMap = response.try_into().unwrap();
+    }
+
+    #[test]
+    fn test_try_from_xrpl_response_for_account_tx_no_result() {
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: None,
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let recovered: Result<AccountTxVersionMap, _> = response.try_into();
+        assert!(recovered.is_err());
+    }
+
+    #[test]
+    fn test_account_tx_round_trip() {
+        let tx = AccountTx {
+            base: AccountTxBase {
+                account: "rAccount".into(),
+                ledger_index_min: Some(1),
+                ledger_index_max: Some(100),
+                limit: Some(50),
+                transactions: alloc::vec::Vec::new(),
+                validated: Some(true),
+                marker: None,
+            },
+            meta: None,
+            meta_blob: None,
+        };
+        let serialized = serde_json::to_string(&tx).unwrap();
+        let deserialized: AccountTx = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tx, deserialized);
     }
 }

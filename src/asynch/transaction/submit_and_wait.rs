@@ -196,6 +196,7 @@ mod tests {
         },
     };
 
+    #[cfg(feature = "integration")]
     #[tokio::test]
     async fn test_submit_and_wait() {
         let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());

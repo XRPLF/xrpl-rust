@@ -70,3 +70,25 @@ impl<'a> AccountLines<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = AccountLines::new(
+            Some("al-1".into()),
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+            Some(100),
+            Some("rPeer11111111111111111111111111111".into()),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: AccountLines = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"account_lines\""));
+        assert!(serialized.contains("\"limit\":100"));
+    }
+}

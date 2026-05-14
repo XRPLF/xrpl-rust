@@ -33,7 +33,9 @@ extern crate std as alloc;
 
 #[cfg(feature = "helpers")]
 pub mod account;
-#[cfg(any(feature = "json-rpc", feature = "websocket", feature = "helpers"))]
+// `asynch::exceptions` requires `models` for `XRPLModelException`; the rest of
+// `asynch` is gated internally on individual features.
+#[cfg(feature = "models")]
 pub mod asynch;
 #[cfg(feature = "cli")]
 pub mod cli;
@@ -47,6 +49,8 @@ pub mod ledger;
 pub mod macros;
 #[cfg(feature = "models")]
 pub mod models;
+#[cfg(all(feature = "core", feature = "models", feature = "wallet"))]
+pub mod signing;
 #[cfg(feature = "helpers")]
 pub mod transaction;
 #[cfg(feature = "utils")]

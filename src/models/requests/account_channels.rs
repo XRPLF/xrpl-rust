@@ -95,3 +95,26 @@ impl<'a> Request<'a> for AccountChannels<'a> {
         &mut self.common_fields
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = AccountChannels::new(
+            Some("ac-1".into()),
+            "rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr".into(),
+            Some("rDest11111111111111111111111111111".into()),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+            Some(50),
+            Some(Marker::Int(12345)),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: AccountChannels = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"account_channels\""));
+        assert!(serialized.contains("\"account\":\"rH6ZiHU1PGamME2LvVTxrgvfjQpppWKGmr\""));
+    }
+}

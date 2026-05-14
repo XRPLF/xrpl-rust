@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/ammVote.test.ts
-//
 // Scenarios:
 //   - base: LP holder votes to change trading_fee to 150 (per 100_000)
 //

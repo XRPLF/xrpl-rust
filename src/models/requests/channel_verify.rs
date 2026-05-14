@@ -60,3 +60,23 @@ impl<'a> ChannelVerify<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = ChannelVerify::new(
+            Some("cv-1".into()),
+            "1000000".into(),
+            "5DB01B7FFED6B67E6B0414DED11E051D2EE2B7619CE0EAA6286D67A3A4D5BDB3".into(),
+            "aBQG8RQAzjs1eTKFEAQXr2gS4utcDiEC9wmi7pfUPTi27VCahwgw".into(),
+            "30440220...".into(),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: ChannelVerify = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"channel_verify\""));
+    }
+}

@@ -57,3 +57,22 @@ impl<'a> SubmitMultisigned<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let tx_json = serde_json::json!({
+            "TransactionType": "Payment",
+            "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        });
+        let req = SubmitMultisigned::new(Some("sm-1".into()), tx_json, Some(false));
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: SubmitMultisigned = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"submit_multisigned\""));
+        assert!(serialized.contains("\"fail_hard\":false"));
+    }
+}

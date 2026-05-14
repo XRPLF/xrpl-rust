@@ -210,4 +210,26 @@ mod tests {
         );
         assert!(set_regular_key.regular_key.is_none());
     }
+
+    #[test]
+    fn test_new_constructor_and_trait_impls() {
+        let txn = SetRegularKey::new(
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            Some("12".into()),
+            Some(8_000_000),
+            None,
+            Some(456),
+            None,
+            None,
+            None,
+            Some("rAR8rR8sUkBoCZFawhkWzY4Y5YoyuznwD".into()),
+        );
+        assert_eq!(txn.get_transaction_type(), &TransactionType::SetRegularKey);
+        assert_eq!(txn.get_common_fields().sequence, Some(456));
+        assert!(txn.get_errors().is_ok());
+        let mut t = txn;
+        t.common_fields.source_tag = Some(11);
+        assert_eq!(t.common_fields.source_tag, Some(11));
+    }
 }

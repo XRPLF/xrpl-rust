@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/escrowCreate.test.ts
-//
 // Scenarios:
 //   - base: create a time-locked XRP escrow (FinishAfter = close_time + 2) and verify tesSUCCESS
 //

@@ -106,3 +106,99 @@ pub fn negate(value: &BigDecimal) -> XRPLUtilsResult<BigDecimal> {
 
     Ok(BigDecimal::from_str(&working_value.to_string())?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{IssuedCurrencyAmount, XRPAmount};
+    use alloc::string::ToString;
+
+    #[test]
+    fn test_balance_from_xrp_amount() {
+        let amount = Amount::XRPAmount(XRPAmount::from("100"));
+        let balance: Balance = amount.into();
+        assert_eq!(balance.currency, "XRP");
+        assert_eq!(balance.value, "100");
+        assert!(balance.issuer.is_none());
+    }
+
+    #[test]
+    fn test_balance_from_issued_currency() {
+        let amount = Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+            currency: "USD".into(),
+            value: "5.5".into(),
+            issuer: "rIssuer".into(),
+        });
+        let balance: Balance = amount.into();
+        assert_eq!(balance.currency, "USD");
+        assert_eq!(balance.value, "5.5");
+        assert_eq!(balance.issuer.as_deref(), Some("rIssuer"));
+    }
+
+    #[test]
+    fn test_balance_to_xrp_amount() {
+        let balance = Balance {
+            currency: "XRP".into(),
+            value: "100".into(),
+            issuer: None,
+        };
+        let amount: Amount = balance.into();
+        match amount {
+            Amount::XRPAmount(x) => assert_eq!(x.0, "100"),
+            _ => panic!("expected XRPAmount"),
+        }
+    }
+
+    #[test]
+    fn test_balance_to_issued_currency() {
+        let balance = Balance {
+            currency: "USD".into(),
+            value: "10".into(),
+            issuer: Some("rIssuer".into()),
+        };
+        let amount: Amount = balance.into();
+        match amount {
+            Amount::IssuedCurrencyAmount(ic) => {
+                assert_eq!(ic.currency, "USD");
+                assert_eq!(ic.value, "10");
+                assert_eq!(ic.issuer, "rIssuer");
+            }
+            _ => panic!("expected IssuedCurrencyAmount"),
+        }
+    }
+
+    #[test]
+    fn test_balance_to_issued_currency_no_issuer_falls_back_to_empty() {
+        let balance = Balance {
+            currency: "USD".into(),
+            value: "10".into(),
+            issuer: None,
+        };
+        let amount: Amount = balance.into();
+        match amount {
+            Amount::IssuedCurrencyAmount(ic) => assert_eq!(ic.issuer, ""),
+            _ => panic!("expected IssuedCurrencyAmount"),
+        }
+    }
+
+    #[test]
+    fn test_negate_positive() {
+        let v = BigDecimal::from_str("123.45").unwrap();
+        let n = negate(&v).unwrap();
+        assert_eq!(n.to_string(), "-123.45");
+    }
+
+    #[test]
+    fn test_negate_negative() {
+        let v = BigDecimal::from_str("-50").unwrap();
+        let n = negate(&v).unwrap();
+        assert_eq!(n.to_string(), "50");
+    }
+
+    #[test]
+    fn test_negate_zero() {
+        let v = BigDecimal::from_str("0").unwrap();
+        let n = negate(&v).unwrap();
+        assert_eq!(n.to_string(), "0");
+    }
+}

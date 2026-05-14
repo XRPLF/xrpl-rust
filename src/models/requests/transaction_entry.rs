@@ -59,3 +59,22 @@ impl<'a> TransactionEntry<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = TransactionEntry::new(
+            Some("te-1".into()),
+            "C53ECF838647FA5A4C780377025FEC7999AB4182590510CA461444B207AB74A9".into(),
+            None,
+            Some(LedgerIndex::Int(56865245)),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: TransactionEntry = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"transaction_entry\""));
+    }
+}

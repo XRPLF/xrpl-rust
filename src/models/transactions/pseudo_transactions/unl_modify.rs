@@ -102,3 +102,52 @@ impl<'a> UNLModify<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let txn = UNLModify::new(
+            "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            56865245,
+            UNLModifyDisabling::Enable,
+            "ED1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF".into(),
+        );
+        let serialized = serde_json::to_string(&txn).unwrap();
+        let deserialized: UNLModify = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(txn, deserialized);
+        assert!(serialized.contains("\"TransactionType\":\"UNLModify\""));
+        assert!(serialized.contains("\"UnlmodifyDisabling\":1"));
+        assert_eq!(txn.get_transaction_type(), &TransactionType::UNLModify);
+    }
+
+    #[test]
+    fn test_disabling_disable() {
+        let txn = UNLModify::new(
+            "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            UNLModifyDisabling::Disable,
+            "ED00".into(),
+        );
+        let serialized = serde_json::to_string(&txn).unwrap();
+        assert!(serialized.contains("\"UnlmodifyDisabling\":0"));
+    }
+}

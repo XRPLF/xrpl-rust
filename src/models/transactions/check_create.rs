@@ -242,4 +242,32 @@ mod tests {
         assert!(check_create.expiration.is_none());
         assert!(check_create.invoice_id.is_none());
     }
+
+    #[test]
+    fn test_new_constructor_and_trait_impls() {
+        let txn = CheckCreate::new(
+            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+            None,
+            Some("12".into()),
+            Some(8_000_000),
+            None,
+            Some(123),
+            None,
+            None,
+            None,
+            "rfkE1aSy9G8Upk4JssnwBxhEv5p4mn2KTy".into(),
+            "100000000".into(),
+            Some(1),
+            Some(570113521),
+            Some("6F1DFD1D0FE8A32E40E1F2C05CF1C15545BAB56B617F9C6C2D63A6B704BEF59B".into()),
+        );
+        assert_eq!(txn.get_transaction_type(), &TransactionType::CheckCreate);
+        assert_eq!(txn.get_common_fields().sequence, Some(123));
+        assert_eq!(txn.destination_tag, Some(1));
+        assert_eq!(txn.expiration, Some(570113521));
+        assert!(txn.get_errors().is_ok());
+        let mut t = txn;
+        t.common_fields.source_tag = Some(11);
+        assert_eq!(t.common_fields.source_tag, Some(11));
+    }
 }
