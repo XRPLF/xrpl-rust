@@ -322,8 +322,8 @@ mod tests {
     use crate::models::{Model, PathStep};
     #[cfg(feature = "wallet")]
     use crate::{
-        asynch::exceptions::XRPLHelperResult, models::transactions::Transaction,
-        signing::sign, wallet::Wallet,
+        asynch::exceptions::XRPLHelperResult, models::transactions::Transaction, signing::sign,
+        wallet::Wallet,
     };
 
     use super::*;
