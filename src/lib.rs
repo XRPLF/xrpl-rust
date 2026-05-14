@@ -33,6 +33,9 @@ extern crate std as alloc;
 
 #[cfg(feature = "helpers")]
 pub mod account;
+// `asynch::exceptions` requires `models` for `XRPLModelException`; the rest of
+// `asynch` is gated internally on individual features.
+#[cfg(feature = "models")]
 pub mod asynch;
 #[cfg(feature = "cli")]
 pub mod cli;
