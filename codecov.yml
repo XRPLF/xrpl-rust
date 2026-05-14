@@ -1,0 +1,21 @@
+coverage:
+  status:
+    project:
+      unit:
+        target: 83%
+        threshold: 1%
+        flags:
+          - unit
+    patch:
+      default:
+        target: 80%
+        threshold: 1%
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: false
+
+flags:
+  unit:
+    paths:
+      - src/
