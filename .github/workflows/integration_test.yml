@@ -74,11 +74,13 @@ jobs:
             --lcov --output-path lcov.info \
             --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
 
-      - name: Enforce integration coverage threshold (65% lines)
-        run: |
-          cargo llvm-cov report --release --summary-only \
-            --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}' \
-            --fail-under-lines 65
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5.5.4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          flags: integration
+          fail_ci_if_error: true
 
       - name: Upload coverage report
         if: always()
