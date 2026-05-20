@@ -74,7 +74,7 @@ From the `xrpl-rust` folder, run the following commands:
 ```bash
 # Sets up the xrpld standalone Docker container — skip if you already have it running
 docker run -p 5005:5005 -p 6006:6006 --rm -it --name xrpld_standalone \
-  --volume "$PWD/.ci-config/:/etc/opt/xrpld/" \
+  --volume "$PWD/.ci-config/:/etc/xrpld/" \
   rippleci/xrpld:develop --standalone
 cargo test --release --features integration,std,json-rpc,helpers
 ```
@@ -91,7 +91,7 @@ Breaking down the `docker run` command:
 - `--rm` closes the container automatically when it exits.
 - `-it` keeps stdin open so you can stop the node with Ctrl-C.
 - `--name xrpld_standalone` is an instance name for clarity.
-- `--volume $PWD/.ci-config/:/etc/opt/xrpld/`: bind-mounts the host directory (left side) into the container (right side). `xrpld.cfg` lives in `$PWD/.ci-config/`, and this command is intended to be run from the root of the `xrpl-rust` project. The `xrpld` binary searches for its configuration file inside `/etc/opt/xrpld/`. An absolute path is required, so we use `$PWD` instead of `./`.
+- `--volume $PWD/.ci-config/:/etc/xrpld/`: bind-mounts the host directory (left side) into the container (right side). `xrpld.cfg` lives in `$PWD/.ci-config/`, and this command is intended to be run from the root of the `xrpl-rust` project. The `xrpld` binary searches for its configuration file inside `/etc/xrpld/`. An absolute path is required, so we use `$PWD` instead of `./`.
 - `rippleci/xrpld` is an image that is regularly updated with the latest `xrpld` releases (the binary formerly known as `rippled`; see xrpl.js PR #3270).
 - `--standalone` starts `xrpld` in standalone mode, where ledgers only close on demand.
 
