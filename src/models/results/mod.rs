@@ -886,18 +886,26 @@ impl<'a> TryInto<XRPLResult<'a>> for XRPLResponse<'a> {
 impl<'a> XRPLResponse<'a> {
     pub fn is_success(&self) -> bool {
         if let Some(status) = &self.status {
-            status == &ResponseStatus::Success
-        } else if let Some(result) = &self.result {
-            match serde_json::to_value(result) {
-                Ok(value) => match value.get("status") {
-                    Some(Value::String(status)) => status == "success",
-                    _ => false,
-                },
-                _ => false,
-            }
-        } else {
-            false
+            return status == &ResponseStatus::Success;
         }
+        // Typed `XRPLResult` variants (e.g. `ServerInfo`, `Ping`) drop
+        // unknown fields like `status` during deserialization. `raw_result`
+        // preserves the original JSON, so prefer it; fall back to
+        // re-serializing `result` only for responses constructed without a
+        // raw payload (mostly tests).
+        if let Some(raw) = &self.raw_result {
+            if let Some(Value::String(status)) = raw.get("status") {
+                return status == "success";
+            }
+        }
+        if let Some(result) = &self.result {
+            if let Ok(value) = serde_json::to_value(result) {
+                if let Some(Value::String(status)) = value.get("status") {
+                    return status == "success";
+                }
+            }
+        }
+        false
     }
 }
 
@@ -1187,6 +1195,40 @@ mod tests {
             warnings: None,
         };
         assert!(!response.is_success());
+    }
+
+    #[test]
+    fn test_is_success_reads_status_from_raw_result_for_typed_variants() {
+        // rippled's JSON-RPC server_info response puts `status` *inside*
+        // `result`. The typed `XRPLResult::ServerInfo` variant only carries
+        // `info`, so the `status` field is dropped during deserialization.
+        // is_success() must consult `raw_result` (preserved by the custom
+        // Deserialize impl) to recover the success/error signal.
+        let raw_json = r#"{
+            "result": {
+                "info": {
+                    "build_version": "1.12.0",
+                    "complete_ledgers": "32570-82521761",
+                    "hostid": "LEST",
+                    "io_latency_ms": 1,
+                    "jq_trans_overflow": "0",
+                    "last_close": {"converge_time_s": 3, "proposers": 35},
+                    "load_factor": 1,
+                    "network_id": 10,
+                    "peers": 22,
+                    "ports": [{"port": "80", "protocol": ["http"]}],
+                    "pubkey_node": "n9KQK8yvTDcZdGyhu2EGdDnFPEBSsY5wEGpU5GgpygTgLFsjQyPt",
+                    "server_state": "full",
+                    "server_state_duration_us": "91758491912",
+                    "time": "2023-Sep-13 22:12:31.377492 UTC",
+                    "uptime": 91948,
+                    "validation_quorum": 28
+                },
+                "status": "success"
+            }
+        }"#;
+        let response: XRPLResponse = serde_json::from_str(raw_json).expect("deserialize");
+        assert!(response.is_success());
     }
 
     #[test]
