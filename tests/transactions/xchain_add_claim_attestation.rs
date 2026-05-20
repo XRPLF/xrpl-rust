@@ -1,13 +1,10 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainAddClaimAttestation.test.ts
-//
 // Scenarios:
 //   - base: witness submits a claim attestation for a transfer of 10 XRP.
-//           The attestation payload is binary-encoded and signed with the witness private key,
-//           matching the same flow as xrpl.js: encode(attestationToSign) → sign(encoded, privateKey).
+//           The attestation payload is binary-encoded and signed with the witness private key.
 //
 // NOTE: XChainAddClaimAttestation has NO flags; standard 9 common-field order.
 //
-// Attestation signing flow (mirrors ripple-binary-codec + ripple-keypairs in xrpl.js):
+// Attestation signing flow:
 //   1. Build a struct with the attestation fields (PascalCase serde names).
 //   2. Binary-encode with xrpl::core::binarycodec::encode  → hex string.
 //   3. Hex-decode to bytes.

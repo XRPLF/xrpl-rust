@@ -34,22 +34,46 @@ jobs:
           RUST_BACKTRACE: 1
 
       - name: Test for no_std
-        run: cargo test --release --no-default-features --features embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
+        run: cargo test --release --no-default-features --features
+          embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
         env:
           RUST_BACKTRACE: 1
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
+      # Unit-test coverage is scoped via Cargo features rather than path
+      # exclusion. The minimal feature set (`std,core,utils,wallet,models`)
+      # compiles only the pure-logic modules — pure crypto, codec, address
+      # codec, transaction models, and the `signing` module. Integration-
+      # territory code (CLI, async network clients, sync wrappers around
+      # network calls, faucet client) is gated behind `helpers`/`json-rpc`/
+      # `websocket`/`cli` features, so it simply isn't compiled here and
+      # doesn't appear in the coverage report. Those files are exercised by
+      # the integration-test workflow against a live rippled.
+      # Mirrors xrpl-py's split between tests/unit/ (--fail-under=85) and
+      # tests/integration/ (--fail-under=70).
       - name: Generate coverage report
-        run: cargo llvm-cov --lcov --output-path lcov.info
+        run: |
+          cargo llvm-cov \
+            --no-default-features --features std,core,utils,wallet,models \
+            --lcov --output-path lcov.info
 
       - name: Check coverage thresholds
         run: |
           cargo llvm-cov --summary-only \
-            --fail-under-lines 73 \
-            --fail-under-regions 75 \
-            --fail-under-functions 67
+            --no-default-features --features std,core,utils,wallet,models \
+            --fail-under-lines 83 \
+            --fail-under-regions 85 \
+            --fail-under-functions 73
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          flags: unit
+          fail_ci_if_error: true
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4

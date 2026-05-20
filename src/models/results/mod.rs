@@ -279,8 +279,40 @@ impl_try_from_result!(gateway_balances, GatewayBalances, GatewayBalances);
 impl_try_from_result!(ledger, Ledger, Ledger);
 impl_try_from_result!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_result!(ledger_current, LedgerCurrent, LedgerCurrent);
-impl_try_from_result!(ledger_data, LedgerData, LedgerData);
-impl_try_from_result!(ledger_entry, LedgerEntry, LedgerEntry);
+// LedgerData: serde's untagged enum may match LedgerClosed (which has fewer
+// required fields) before reaching LedgerData. Re-serialize and re-parse
+// to recover the full data.
+impl<'a> TryFrom<XRPLResult<'a>> for ledger_data::LedgerData<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::LedgerData(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
+// LedgerEntry: may match Ledger or LedgerClosed before reaching LedgerEntry.
+impl<'a> TryFrom<XRPLResult<'a>> for ledger_entry::LedgerEntry<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::LedgerEntry(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl_try_from_result!(manifest, Manifest, Manifest);
 // NFTBuyOffers and NFTSellOffers are structurally identical; the untagged enum
 // always picks the first matching variant (NFTBuyOffers). Both TryFrom impls
@@ -325,16 +357,49 @@ impl<'a> TryFrom<XRPLResult<'a>> for nft_sell_offers::NFTSellOffers<'a> {
     }
 }
 impl_try_from_result!(nftoken, NFTokenMintResult, NFTokenMintResult);
-impl_try_from_result!(no_ripple_check, NoRippleCheck, NoRippleCheck);
+// NoRippleCheck: may match Other(Value) due to untagged enum ordering.
+impl<'a> TryFrom<XRPLResult<'a>> for no_ripple_check::NoRippleCheck<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::NoRippleCheck(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl_try_from_result!(path_find, PathFind, PathFind);
 impl_try_from_result!(random, Random, Random);
-impl_try_from_result!(ripple_path_find, RipplePathFind, RipplePathFind);
+// RipplePathFind: may match LedgerCurrent due to untagged enum ordering.
+impl<'a> TryFrom<XRPLResult<'a>> for ripple_path_find::RipplePathFind<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::RipplePathFind(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl<'a> TryFrom<XRPLResult<'a>> for server_info::ServerInfo<'a> {
     type Error = XRPLModelException;
 
     fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
         match result {
             XRPLResult::ServerInfo(value) => Ok(*value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
             res => Err(XRPLResultException::UnexpectedResultType(
                 "ServerInfo".to_string(),
                 res.get_name(),
@@ -358,7 +423,22 @@ impl<'a> TryFrom<XRPLResult<'a>> for server_state::ServerState<'a> {
     }
 }
 impl_try_from_result!(submit, Submit, Submit);
-impl_try_from_result!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
+// SubmitMultisigned: may match Submit due to untagged enum ordering.
+impl<'a> TryFrom<XRPLResult<'a>> for submit_multisigned::SubmitMultisigned<'a> {
+    type Error = XRPLModelException;
+    fn try_from(result: XRPLResult<'a>) -> XRPLModelResult<Self> {
+        match result {
+            XRPLResult::SubmitMultisigned(value) => Ok(value),
+            XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                serde_json::from_value(value.clone()).map_err(Into::into)
+            }
+            other => {
+                let value = serde_json::to_value(&other)?;
+                serde_json::from_value(value).map_err(Into::into)
+            }
+        }
+    }
+}
 impl_try_from_result!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_result!(ping, Ping, Ping);
 impl_try_from_result!(subscribe, Subscribe, Subscribe);
@@ -445,6 +525,10 @@ pub struct XRPLResponse<'a> {
     pub forwarded: Option<bool>,
     pub request: Option<XRPLRequest<'a>>,
     pub result: Option<XRPLResult<'a>>,
+    /// Raw JSON of the `result` field, preserved for fallback re-deserialization
+    /// when the untagged `XRPLResult` enum matches the wrong variant.
+    #[serde(skip)]
+    pub raw_result: Option<Value>,
     pub status: Option<ResponseStatus>,
     pub r#type: Option<ResponseType>,
     pub warning: Option<Cow<'a, str>>,
@@ -517,8 +601,41 @@ impl_try_from_response!(gateway_balances, GatewayBalances, GatewayBalances);
 impl_try_from_response!(ledger, Ledger, Ledger);
 impl_try_from_response!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_response!(ledger_current, LedgerCurrent, LedgerCurrent);
-impl_try_from_response!(ledger_data, LedgerData, LedgerData);
-impl_try_from_response!(ledger_entry, LedgerEntry, LedgerEntry);
+// LedgerData / LedgerEntry: use raw_result fallback for untagged enum
+// mismatch where serde picks a wrong variant and loses fields.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for ledger_data::LedgerData<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::LedgerData(value)) = response.result {
+            return Ok(value);
+        }
+        // Fallback: re-deserialize from the raw result JSON
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for ledger_entry::LedgerEntry<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::LedgerEntry(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(manifest, Manifest, Manifest);
 impl_try_from_response!(nft_info, NFTInfo, NFTInfo);
 // NFTBuyOffers and NFTSellOffers are structurally identical; the untagged enum
@@ -576,11 +693,43 @@ where
     }
 }
 impl_try_from_response!(nftoken, NFTokenMintResult, NFTokenMintResult);
-impl_try_from_response!(no_ripple_check, NoRippleCheck, NoRippleCheck);
+// NoRippleCheck / RipplePathFind: use raw_result fallback for untagged
+// enum mismatch.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for no_ripple_check::NoRippleCheck<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::NoRippleCheck(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(path_find, PathFind, PathFind);
 impl_try_from_response!(ping, Ping, Ping);
 impl_try_from_response!(random, Random, Random);
-impl_try_from_response!(ripple_path_find, RipplePathFind, RipplePathFind);
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for ripple_path_find::RipplePathFind<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::RipplePathFind(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl<'a> TryFrom<XRPLResponse<'a>> for server_info::ServerInfo<'a> {
     type Error = XRPLModelException;
 
@@ -588,6 +737,9 @@ impl<'a> TryFrom<XRPLResponse<'a>> for server_info::ServerInfo<'a> {
         match response.result {
             Some(result) => match result {
                 XRPLResult::ServerInfo(value) => Ok(*value),
+                XRPLResult::Other(XRPLOtherResult(ref value)) => {
+                    serde_json::from_value(value.clone()).map_err(Into::into)
+                }
                 res => Err(XRPLResultException::UnexpectedResultType(
                     "ServerInfo".to_string(),
                     res.get_name(),
@@ -616,7 +768,23 @@ impl<'a> TryFrom<XRPLResponse<'a>> for server_state::ServerState<'a> {
     }
 }
 impl_try_from_response!(submit, Submit, Submit);
-impl_try_from_response!(submit_multisigned, SubmitMultisigned, SubmitMultisigned);
+// SubmitMultisigned: may match Submit due to untagged enum ordering.
+impl<'a, 'b> TryFrom<XRPLResponse<'a>> for submit_multisigned::SubmitMultisigned<'b>
+where
+    'a: 'b,
+    'b: 'a,
+{
+    type Error = XRPLModelException;
+    fn try_from(response: XRPLResponse<'a>) -> XRPLModelResult<Self> {
+        if let Some(XRPLResult::SubmitMultisigned(value)) = response.result {
+            return Ok(value);
+        }
+        match response.raw_result {
+            Some(raw) => serde_json::from_value(raw).map_err(Into::into),
+            None => Err(XRPLModelException::MissingField("result".to_string())),
+        }
+    }
+}
 impl_try_from_response!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_response!(subscribe, Subscribe, Subscribe);
 impl_try_from_response!(unsubscribe, Unsubscribe, Unsubscribe);
@@ -645,12 +813,19 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
                 forwarded: None,
                 request: None,
                 result: serde_json::from_value(map_as_value).map_err(serde::de::Error::custom)?,
+                raw_result: None,
                 status: None,
                 r#type: None,
                 warning: None,
                 warnings: None,
             })
         } else {
+            // Preserve the raw result JSON so that TryFrom impls can
+            // re-deserialize when the untagged enum picks the wrong variant.
+            let raw_result = map.remove("result");
+            let result = raw_result
+                .as_ref()
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
             Ok(XRPLResponse {
                 id: map
                     .remove("id")
@@ -668,9 +843,8 @@ impl<'a, 'de> Deserialize<'de> for XRPLResponse<'a> {
                 request: map
                     .remove("request")
                     .and_then(|v| serde_json::from_value(v).ok()),
-                result: map
-                    .remove("result")
-                    .and_then(|v| serde_json::from_value(v).ok()),
+                result,
+                raw_result,
                 status: map
                     .remove("status")
                     .and_then(|v| serde_json::from_value(v).ok()),
@@ -732,4 +906,305 @@ pub struct XRPLWarning<'a> {
     pub id: Cow<'a, str>,
     pub message: Cow<'a, str>,
     pub forwarded: Option<bool>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn fee_result() -> fee::Fee<'static> {
+        fee::Fee {
+            current_ledger_size: "14".into(),
+            current_queue_size: "0".into(),
+            drops: fee::Drops {
+                base_fee: "10".into(),
+                median_fee: "11000".into(),
+                minimum_fee: "10".into(),
+                open_ledger_fee: "10".into(),
+            },
+            expected_ledger_size: "24".into(),
+            ledger_current_index: 26575101,
+            levels: fee::Levels {
+                median_level: "281600".into(),
+                minimum_level: "256".into(),
+                open_ledger_level: "256".into(),
+                reference_level: "256".into(),
+            },
+            max_queue_size: None,
+        }
+    }
+
+    fn random_result() -> random::Random<'static> {
+        random::Random {
+            random: "8ED765AEBBD6767603C2C9375B2679AEC76E6A8133EF59F04F9FC1AAA70E41AF".into(),
+        }
+    }
+
+    #[test]
+    fn test_from_into_xrpl_result() {
+        let fee = fee_result();
+        let result: XRPLResult = fee.clone().into();
+        match &result {
+            XRPLResult::Fee(f) => assert_eq!(f, &fee),
+            _ => panic!("expected Fee variant"),
+        }
+
+        let random = random_result();
+        let result: XRPLResult = random.clone().into();
+        assert_eq!(result.get_name(), "Random");
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_success() {
+        let fee = fee_result();
+        let result: XRPLResult = fee.clone().into();
+        let recovered: fee::Fee = result.try_into().unwrap();
+        assert_eq!(recovered, fee);
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_wrong_variant() {
+        let result: XRPLResult = random_result().into();
+        let recovered: Result<fee::Fee, _> = result.try_into();
+        assert!(recovered.is_err());
+        let err = recovered.unwrap_err().to_string();
+        assert!(err.contains("Fee"));
+        assert!(err.contains("Random"));
+    }
+
+    #[test]
+    fn test_get_name_for_variants() {
+        let cases: &[(XRPLResult, &str)] = &[
+            (XRPLResult::Fee(fee_result()), "Fee"),
+            (XRPLResult::Random(random_result()), "Random"),
+            (XRPLResult::Ping(ping::Ping::default()), "Ping"),
+        ];
+        for (result, expected) in cases {
+            assert_eq!(result.get_name(), *expected);
+        }
+
+        // Other variant
+        let other: XRPLResult = json!({"foo": "bar"}).into();
+        assert_eq!(other.get_name(), "Other");
+    }
+
+    #[test]
+    fn test_xrpl_other_result_get() {
+        let other: XRPLOtherResult = json!({
+            "value": 42,
+            "name": "test"
+        })
+        .into();
+        assert_eq!(other.get("value").and_then(|v| v.as_i64()), Some(42));
+        assert!(other.get("missing").is_none());
+        let v: u32 = other.try_get_typed("value").unwrap();
+        assert_eq!(v, 42);
+        let missing: Result<u32, _> = other.try_get_typed("missing");
+        assert!(missing.is_err());
+    }
+
+    #[test]
+    fn test_xrpl_other_result_try_from_xrpl_result() {
+        let other: XRPLResult = json!({"x": 1}).into();
+        let recovered: XRPLOtherResult = other.try_into().unwrap();
+        assert_eq!(recovered.get("x").and_then(|v| v.as_i64()), Some(1));
+
+        let fee: XRPLResult = fee_result().into();
+        let recovered: Result<XRPLOtherResult, _> = fee.try_into();
+        assert!(recovered.is_err());
+    }
+
+    #[test]
+    fn test_response_deserialize_success() {
+        let json = r#"{
+            "result": {
+                "current_ledger_size": "14",
+                "current_queue_size": "0",
+                "drops": {
+                    "base_fee": "10",
+                    "median_fee": "11000",
+                    "minimum_fee": "10",
+                    "open_ledger_fee": "10"
+                },
+                "expected_ledger_size": "24",
+                "ledger_current_index": 26575101,
+                "levels": {
+                    "median_level": "281600",
+                    "minimum_level": "256",
+                    "open_ledger_level": "256",
+                    "reference_level": "256"
+                }
+            },
+            "status": "success",
+            "type": "response"
+        }"#;
+        let response: XRPLResponse = serde_json::from_str(json).unwrap();
+        assert!(response.is_success());
+        assert_eq!(response.status, Some(ResponseStatus::Success));
+        assert_eq!(response.r#type, Some(ResponseType::Response));
+        assert!(response.result.is_some());
+        assert!(response.raw_result.is_some());
+        let fee: fee::Fee = response.try_into().unwrap();
+        assert_eq!(fee.ledger_current_index, 26575101);
+    }
+
+    #[test]
+    fn test_response_deserialize_error() {
+        let json = r#"{
+            "error": "noNetwork",
+            "error_code": 16,
+            "error_message": "Not synced to the network.",
+            "status": "error"
+        }"#;
+        let response: XRPLResponse = serde_json::from_str(json).unwrap();
+        assert!(!response.is_success());
+        assert_eq!(response.error.as_deref(), Some("noNetwork"));
+        assert_eq!(response.error_code, Some(16));
+        assert_eq!(response.status, Some(ResponseStatus::Error));
+
+        // Try-into Result reports the error message.
+        let result: Result<XRPLResult, _> = response.try_into();
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Not synced"));
+    }
+
+    #[test]
+    fn test_response_deserialize_empty_fails() {
+        let json = "{}";
+        let response: Result<XRPLResponse, _> = serde_json::from_str(json);
+        assert!(response.is_err());
+    }
+
+    #[test]
+    fn test_response_deserialize_subscription_stream() {
+        // Subscription stream items have no `result` and no `error_code`.
+        let json = r#"{
+            "type": "ledgerClosed",
+            "ledger_index": 12345
+        }"#;
+        let response: XRPLResponse = serde_json::from_str(json).unwrap();
+        // Stream items go into result as Other.
+        assert!(response.result.is_some());
+        // No status set for stream items
+        assert!(response.status.is_none());
+    }
+
+    #[test]
+    fn test_try_into_xrpl_result_no_result_field() {
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: None,
+            raw_result: None,
+            status: Some(ResponseStatus::Success),
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let result: Result<XRPLResult, _> = response.try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_into_value() {
+        let other: XRPLResult = json!({"k": "v"}).into();
+        let value: Value = other.try_into().unwrap();
+        assert_eq!(value.get("k").and_then(|v| v.as_str()), Some("v"));
+
+        let fee_value: Value = XRPLResult::Fee(fee_result()).try_into().unwrap();
+        assert_eq!(
+            fee_value
+                .get("ledger_current_index")
+                .and_then(|v| v.as_u64()),
+            Some(26575101)
+        );
+    }
+
+    #[test]
+    fn test_response_status_serde() {
+        assert_eq!(
+            serde_json::to_string(&ResponseStatus::Success).unwrap(),
+            "\"success\""
+        );
+        assert_eq!(
+            serde_json::from_str::<ResponseStatus>("\"error\"").unwrap(),
+            ResponseStatus::Error
+        );
+    }
+
+    #[test]
+    fn test_response_type_serde() {
+        // Uses camelCase
+        assert_eq!(
+            serde_json::to_string(&ResponseType::LedgerClosed).unwrap(),
+            "\"ledgerClosed\""
+        );
+        assert_eq!(
+            serde_json::from_str::<ResponseType>("\"transaction\"").unwrap(),
+            ResponseType::Transaction
+        );
+    }
+
+    #[test]
+    fn test_is_success_inferred_from_result_status_field() {
+        // No top-level status. The result is `Other(Value)` — its serialized
+        // form preserves the inner `status: success` field, so `is_success`
+        // can find it.
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(json!({"status": "success", "foo": "bar"}).into()),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        assert!(response.is_success());
+
+        // status: "error" inside the result → not success
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(json!({"status": "error"}).into()),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        assert!(!response.is_success());
+    }
+
+    #[test]
+    fn test_response_with_no_status_or_result_is_not_success() {
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: None,
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        assert!(!response.is_success());
+    }
 }

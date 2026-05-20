@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/signerListSet.test.ts
-//
 // Scenarios:
 //   - add:    set a signer list with two signers and quorum 2
 //   - remove: clear the signer list by setting SignerQuorum to 0

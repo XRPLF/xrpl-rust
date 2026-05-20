@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/ammBid.test.ts
-//
 // Scenarios:
 //   - base: LP holder bids for the AMM's auction slot (no BidMin/BidMax/AuthAccounts)
 //

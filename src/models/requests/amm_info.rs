@@ -47,3 +47,26 @@ impl<'a> AMMInfo<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::currency::{IssuedCurrency, XRP};
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = AMMInfo::new(
+            Some("amm-1".into()),
+            Some("rAMM1111111111111111111111111111111".into()),
+            Some(Currency::XRP(XRP::new())),
+            Some(Currency::IssuedCurrency(IssuedCurrency::new(
+                "USD".into(),
+                "rIssuer11111111111111111111111111".into(),
+            ))),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: AMMInfo = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"amm_info\""));
+    }
+}
