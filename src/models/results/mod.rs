@@ -111,7 +111,7 @@ impl XRPLOtherResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub enum XRPLResult<'a> {
