@@ -12,4 +12,12 @@ mod common;
     feature = "json-rpc",
     feature = "helpers"
 ))]
+mod requests;
+
+#[cfg(all(
+    feature = "integration",
+    feature = "std",
+    feature = "json-rpc",
+    feature = "helpers"
+))]
 mod transactions;

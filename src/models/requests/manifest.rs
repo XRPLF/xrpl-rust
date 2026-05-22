@@ -48,3 +48,20 @@ impl<'a> Manifest<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = Manifest::new(
+            Some("mf-1".into()),
+            "nHUFE9prPXPrHcG3SkwP1UzAQbSphqyQkQK9ATXLZsfkezhhda3p".into(),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: Manifest = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"manifest\""));
+    }
+}

@@ -118,6 +118,7 @@ mod test_faucet_wallet_generation {
         },
     };
 
+    #[cfg(feature = "integration")]
     #[tokio::test]
     async fn test_generate_faucet_wallet() {
         let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());
