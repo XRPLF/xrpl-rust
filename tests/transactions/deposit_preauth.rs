@@ -1,11 +1,8 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/depositPreauth.test.ts
-//
 // Scenarios:
 //   - base: authorize a second account to send payments to a deposit-auth-enabled account
 //
-// NOTE: The AuthorizeCredentials / UnauthorizeCredentials scenarios in xrpl.js require the
-// Credentials amendment which is not yet enabled on the public testnet. Those variants are
-// deferred until Docker standalone mode.
+// NOTE: The AuthorizeCredentials / UnauthorizeCredentials scenarios require the
+// Credentials amendment which is not yet enabled. Those variants are deferred.
 
 use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::transactions::deposit_preauth::DepositPreauth;

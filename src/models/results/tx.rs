@@ -309,3 +309,185 @@ mod test_serde {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::results::{fee, ResponseStatus};
+
+    fn default_tx() -> Tx<'static> {
+        let json = r#"{
+            "tx_json": {"TransactionType":"AccountSet","Account":"rAcc"},
+            "ctid": "C001",
+            "hash": "ABCD",
+            "ledger_index": 100,
+            "validated": true
+        }"#;
+        serde_json::from_str(json).unwrap()
+    }
+
+    fn v1_tx() -> TxV1<'static> {
+        let json = r#"{
+            "TransactionType": "AccountSet",
+            "Account": "rAcc",
+            "hash": "ABCD",
+            "Sequence": 1
+        }"#;
+        serde_json::from_str(json).unwrap()
+    }
+
+    #[test]
+    fn test_tx_version_map_get_metadata_default_none() {
+        let tx = default_tx();
+        let map = TxVersionMap::Default(tx);
+        assert!(map.get_transaction_metadata().is_none());
+    }
+
+    #[test]
+    fn test_tx_version_map_get_metadata_v1_none() {
+        let tx = v1_tx();
+        let map = TxVersionMap::V1(tx);
+        assert!(map.get_transaction_metadata().is_none());
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_for_tx_version_map_success() {
+        let map = TxVersionMap::Default(default_tx());
+        let result: XRPLResult = XRPLResult::Tx(map.clone());
+        let recovered: TxVersionMap = result.try_into().unwrap();
+        assert_eq!(recovered, map);
+    }
+
+    #[test]
+    fn test_try_from_xrpl_result_for_tx_version_map_wrong() {
+        let result: XRPLResult = XRPLResult::Fee(fee::Fee::default());
+        let recovered: Result<TxVersionMap, _> = result.try_into();
+        assert!(recovered.is_err());
+        assert!(recovered.unwrap_err().to_string().contains("Tx"));
+    }
+
+    #[test]
+    fn test_try_from_xrpl_response_for_tx_version_map() {
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::Tx(TxVersionMap::Default(default_tx()))),
+            raw_result: None,
+            status: Some(ResponseStatus::Success),
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let map: TxVersionMap = response.try_into().unwrap();
+        match map {
+            TxVersionMap::Default(_) => {}
+            _ => panic!("expected default variant"),
+        }
+    }
+
+    #[test]
+    fn test_try_from_xrpl_response_for_tx_version_map_no_result() {
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: None,
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let recovered: Result<TxVersionMap, _> = response.try_into();
+        assert!(recovered.is_err());
+    }
+
+    #[test]
+    fn test_try_from_xrpl_response_for_tx_v2_only() {
+        let v2_response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::Tx(TxVersionMap::Default(default_tx()))),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let _: Tx = v2_response.try_into().unwrap();
+
+        // Pass a V1 to a Tx (v2) try_from — should error
+        let v1_response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::Tx(TxVersionMap::V1(v1_tx()))),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let recovered: Result<Tx, _> = v1_response.try_into();
+        assert!(recovered.is_err());
+    }
+
+    #[test]
+    fn test_try_from_xrpl_response_for_tx_v1_only() {
+        let v1_response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::Tx(TxVersionMap::V1(v1_tx()))),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let _: TxV1 = v1_response.try_into().unwrap();
+
+        // Pass a V2 to a TxV1 try_from — should error
+        let v2_response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::Tx(TxVersionMap::Default(default_tx()))),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        let recovered: Result<TxV1, _> = v2_response.try_into();
+        assert!(recovered.is_err());
+    }
+
+    #[test]
+    fn test_tx_v1_round_trip() {
+        let tx = v1_tx();
+        let serialized = serde_json::to_string(&tx).unwrap();
+        let deserialized: TxV1 = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(tx, deserialized);
+    }
+}

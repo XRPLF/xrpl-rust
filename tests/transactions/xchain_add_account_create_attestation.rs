@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainAddAccountCreateAttestation.test.ts
-//
 // Scenarios:
 //   - base: witness submits an account-create attestation for a 300 XRP transfer
 //           to a new (unfunded) destination address.

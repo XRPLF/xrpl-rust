@@ -113,3 +113,50 @@ impl<'a> Subscribe<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::currency::{IssuedCurrency, XRP};
+    use alloc::vec;
+
+    #[test]
+    fn test_serde_round_trip_no_books() {
+        // SubscribeBook uses asymmetric serialize/deserialize naming
+        // (PascalCase vs snake_case), so a full round-trip with books does
+        // not work. Round-trip the request without books.
+        let req = Subscribe::new(
+            Some("sub-1".into()),
+            Some(vec!["rAcc1111111111111111111111111111".into()]),
+            None,
+            None,
+            Some(vec![StreamParameter::Ledger, StreamParameter::Transactions]),
+            Some("https://example.test/cb".into()),
+            None,
+            None,
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: Subscribe = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"subscribe\""));
+        assert!(serialized.contains("\"streams\""));
+    }
+
+    #[test]
+    fn test_subscribe_book_serializes() {
+        let book = SubscribeBook::new(
+            "rTaker1111111111111111111111111111".into(),
+            Currency::XRP(XRP::new()),
+            Currency::IssuedCurrency(IssuedCurrency::new(
+                "USD".into(),
+                "rIssuer11111111111111111111111111".into(),
+            )),
+            Some(true),
+            Some(false),
+        );
+        let serialized = serde_json::to_string(&book).unwrap();
+        assert!(serialized.contains("\"Taker\""));
+        assert!(serialized.contains("\"TakerGets\""));
+        assert!(serialized.contains("\"TakerPays\""));
+    }
+}
