@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/paymentChannelCreate.test.ts
-//
 // Scenarios:
 //   - base: create a payment channel from sender to destination with 100 drops and 86400s settle delay
 
