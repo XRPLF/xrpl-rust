@@ -15,7 +15,16 @@ use super::{exceptions::XRPLTypeException, SerializedType, TryFromParser, XRPLTy
 /// Width of an MPT Issue in bytes: issuer(20) + NO_ACCOUNT(20) + sequence(4) = 44
 const MPT_WIDTH: usize = 44;
 
-/// Sentinel account ID used to distinguish MPT issues from IOU issues.
+/// Sentinel used in the wire format to distinguish MPT issues from IOU issues.
+///
+/// This equals the XRPL address `rrrrrrrrrrrrrrrrrrrrBZbvji`. A known ambiguity
+/// exists: an IOU whose issuer is exactly this address cannot be distinguished
+/// from an MPT issue at the binary codec level. `from_parser` guards against
+/// silent misclassification by checking byte 0 of the first 20-byte field.
+/// Standard IOU currency codes have byte 0 == 0x00 (leading zero pad); a field
+/// starting with 0x00 followed by NO_ACCOUNT as issuer is the colliding case.
+/// When that combination is detected, `from_parser` returns an explicit error
+/// rather than silently misparsing the IOU as an MPT issue.
 const NO_ACCOUNT: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 #[derive(Debug, Clone)]
@@ -50,6 +59,29 @@ impl TryFromParser for Issue {
             // Read next 20 bytes (issuer for IOU, or NO_ACCOUNT sentinel for MPT)
             let next_20 = parser.read(20)?;
             if next_20 == NO_ACCOUNT {
+                // The NO_ACCOUNT sentinel signals MPT in most cases, but a standard IOU
+                // currency (bytes[0] == 0x00, i.e. the standard 20-byte IOU layout with
+                // 12 zero pad bytes, 3 ASCII currency chars, and 5 zero pad bytes) can
+                // collide if its issuer happens to equal NO_ACCOUNT
+                // (the XRPL address rrrrrrrrrrrrrrrrrrrrBZbvji, bytes all-zero except
+                // the last byte which is 0x01). Silently misparsing such an IOU as MPT
+                // would read 4 extra bytes from the parser and corrupt the field, so we
+                // return an explicit error for that ambiguous combination.
+                //
+                // MPT issuer account IDs are raw 20-byte account hashes. They can start
+                // with any byte value except 0x00 in the standard-IOU-currency sense —
+                // in practice the only case that triggers a collision is when the first
+                // 20 bytes follow the standard IOU currency layout (leading byte 0x00).
+                if bytes[0] == 0x00 {
+                    return Err(XRPLCoreException::XRPLUtilsError(
+                        "Ambiguous Issue type: issuer equals NO_ACCOUNT sentinel \
+                         (rrrrrrrrrrrrrrrrrrrrBZbvji) for an IOU whose currency \
+                         byte[0] is 0x00 (standard currency layout); this issuer \
+                         cannot be used in the binary codec without colliding with \
+                         the MPT type marker"
+                            .to_string(),
+                    ));
+                }
                 // MPT: read 4 more bytes for sequence
                 let sequence = parser.read(4)?;
                 bytes.extend_from_slice(&next_20);
@@ -89,7 +121,9 @@ impl TryFrom<Value> for Issue {
                 let sequence_be = &mpt_bytes[0..4];
                 let issuer_account = &mpt_bytes[4..24];
 
-                // Convert sequence to little-endian
+                // The sequence field inside the MPT Issue binary encoding is stored
+                // little-endian. Convert from the big-endian representation in
+                // mpt_issuance_id before writing it into the wire buffer.
                 let sequence = u32::from_be_bytes(sequence_be.try_into().map_err(|_| {
                     XRPLCoreException::XRPLUtilsError("Invalid sequence bytes".to_string())
                 })?);
@@ -135,15 +169,14 @@ impl Serialize for Issue {
         if bytes.len() == MPT_WIDTH {
             let issuer_account = &bytes[0..20];
             // bytes[20..40] = NO_ACCOUNT (skip)
-            let sequence_le = &bytes[40..44];
-            let sequence = u32::from_le_bytes(
-                sequence_le
-                    .try_into()
-                    .map_err(|e: core::array::TryFromSliceError| serde::ser::Error::custom(e))?,
-            );
+            // Sequence is stored little-endian in the wire buffer; convert back to
+            // big-endian for the mpt_issuance_id output.
+            let sequence_le: [u8; 4] = bytes[40..44]
+                .try_into()
+                .map_err(|e: core::array::TryFromSliceError| serde::ser::Error::custom(e))?;
+            let sequence_be = u32::from_le_bytes(sequence_le).to_be_bytes();
 
             // Reconstruct mpt_issuance_id: sequence(BE, 4) + issuer(20) = 24 bytes
-            let sequence_be = sequence.to_be_bytes();
             let mut mpt_id = Vec::with_capacity(24);
             mpt_id.extend_from_slice(&sequence_be);
             mpt_id.extend_from_slice(issuer_account);

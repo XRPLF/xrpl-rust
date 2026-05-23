@@ -1041,6 +1041,73 @@ fn test_encode_for_signing_invalid_transaction_type() {
     assert!(encode_for_signing(&tx).is_err());
 }
 
+// ============================================================
+// Issue type: endianness and NO_ACCOUNT collision guard tests
+// ============================================================
+
+/// MPT round-trip with an explicit sequence value, verifying that the sequence
+/// survives the JSON -> binary -> JSON trip unchanged. The sequence is stored
+/// little-endian in the wire buffer and converted back to big-endian for the
+/// mpt_issuance_id output.
+#[test]
+fn test_issue_mpt_sequence_roundtrip_endian() {
+    use types::{Issue, TryFromParser};
+
+    // mpt_issuance_id: 4-byte sequence (BE) = 0x000002DF, followed by 20-byte issuer.
+    // This is the same ID used in the MPToken ledger entry fixture above.
+    let mpt_json = serde_json::json!({
+        "mpt_issuance_id": "000002DF71CAE59C9B7E56587FFF74D4EA5830D9BE3CE0CC"
+    });
+    let issue = Issue::try_from(mpt_json.clone()).expect("Issue::try_from MPT failed");
+
+    // The 4-byte sequence is stored little-endian at offset 40 in the 44-byte
+    // buffer (issuer[0..20] + NO_ACCOUNT[20..40] + sequence_le[40..44]).
+    let buf = issue.as_ref();
+    assert_eq!(buf.len(), 44, "MPT buffer must be exactly 44 bytes");
+    let stored_seq_le: [u8; 4] = buf[40..44].try_into().unwrap();
+    let stored_seq = u32::from_le_bytes(stored_seq_le);
+    assert_eq!(
+        stored_seq, 0x000002DF,
+        "sequence must round-trip correctly (stored LE, value unchanged)"
+    );
+
+    // Full round-trip through from_parser must recover the original JSON.
+    let mut parser = BinaryParser::from(buf);
+    let parsed = Issue::from_parser(&mut parser, None).expect("from_parser failed");
+    let result: serde_json::Value = serde_json::to_value(&parsed).expect("serialize failed");
+    assert_eq!(result, mpt_json);
+}
+
+/// `from_parser` must return an error when an IOU issuer equals the NO_ACCOUNT
+/// sentinel (rrrrrrrrrrrrrrrrrrrrBZbvji, bytes all-zero except last byte = 0x01).
+/// Without the guard this would silently misparse the IOU as an MPT issue.
+#[test]
+fn test_issue_from_parser_no_account_issuer_collision_returns_error() {
+    use types::{Issue, TryFromParser};
+
+    // Build raw bytes for: currency=USD + issuer=NO_ACCOUNT
+    // USD currency: 20 bytes, byte[0] == 0x00 (standard IOU layout)
+    let usd_currency_hex = "0000000000000000000000005553440000000000";
+    // NO_ACCOUNT: 20 bytes, all zero except last = 0x01
+    let no_account_hex = "0000000000000000000000000000000000000001";
+
+    let mut raw: Vec<u8> = Vec::with_capacity(40);
+    raw.extend_from_slice(&hex::decode(usd_currency_hex).unwrap());
+    raw.extend_from_slice(&hex::decode(no_account_hex).unwrap());
+
+    let mut parser = BinaryParser::from(raw.as_slice());
+    let result = Issue::from_parser(&mut parser, None);
+    assert!(
+        result.is_err(),
+        "Expected error for IOU with NO_ACCOUNT issuer, got Ok"
+    );
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("Ambiguous Issue type"),
+        "Error message should describe the collision: {err_msg}"
+    );
+}
+
 /// Regression test: IOU amounts with positive exponents (value >= 1e16) must
 /// round-trip correctly. Previously `unsigned_abs()` discarded the exponent sign,
 /// causing values like "12345678901234560" to decode as "123456789012345.6".
