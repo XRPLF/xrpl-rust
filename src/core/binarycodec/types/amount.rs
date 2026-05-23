@@ -268,10 +268,10 @@ impl Amount {
         !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
-    /// Returns true if 2nd bit in 1st byte is set to 1
-    /// (positive amount). Returns false on short buffer.
+    /// Returns true if the positive-sign bit (0x40) in byte 0 is set.
+    /// Returns false on empty buffer.
     pub fn is_positive(&self) -> bool {
-        self.0.len() >= 2 && self.0[1] & 0x40 > 0
+        !self.0.is_empty() && self.0[0] & 0x40 > 0
     }
 }
 
