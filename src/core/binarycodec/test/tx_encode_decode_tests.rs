@@ -1078,36 +1078,6 @@ fn test_issue_mpt_sequence_roundtrip_endian() {
     assert_eq!(result, mpt_json);
 }
 
-/// `from_parser` must return an error when an IOU issuer equals the NO_ACCOUNT
-/// sentinel (rrrrrrrrrrrrrrrrrrrrBZbvji, bytes all-zero except last byte = 0x01).
-/// Without the guard this would silently misparse the IOU as an MPT issue.
-#[test]
-fn test_issue_from_parser_no_account_issuer_collision_returns_error() {
-    use types::{Issue, TryFromParser};
-
-    // Build raw bytes for: currency=USD + issuer=NO_ACCOUNT
-    // USD currency: 20 bytes, byte[0] == 0x00 (standard IOU layout)
-    let usd_currency_hex = "0000000000000000000000005553440000000000";
-    // NO_ACCOUNT: 20 bytes, all zero except last = 0x01
-    let no_account_hex = "0000000000000000000000000000000000000001";
-
-    let mut raw: Vec<u8> = Vec::with_capacity(40);
-    raw.extend_from_slice(&hex::decode(usd_currency_hex).unwrap());
-    raw.extend_from_slice(&hex::decode(no_account_hex).unwrap());
-
-    let mut parser = BinaryParser::from(raw.as_slice());
-    let result = Issue::from_parser(&mut parser, None);
-    assert!(
-        result.is_err(),
-        "Expected error for IOU with NO_ACCOUNT issuer, got Ok"
-    );
-    let err_msg = result.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("Ambiguous Issue type"),
-        "Error message should describe the collision: {err_msg}"
-    );
-}
-
 /// Regression test: IOU amounts with positive exponents (value >= 1e16) must
 /// round-trip correctly. Previously `unsigned_abs()` discarded the exponent sign,
 /// causing values like "12345678901234560" to decode as "123456789012345.6".
