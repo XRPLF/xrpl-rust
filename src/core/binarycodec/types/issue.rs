@@ -17,14 +17,9 @@ const MPT_WIDTH: usize = 44;
 
 /// Sentinel used in the wire format to distinguish MPT issues from IOU issues.
 ///
-/// This equals the XRPL address `rrrrrrrrrrrrrrrrrrrrBZbvji`. A known ambiguity
-/// exists: an IOU whose issuer is exactly this address cannot be distinguished
-/// from an MPT issue at the binary codec level. `from_parser` guards against
-/// silent misclassification by checking byte 0 of the first 20-byte field.
-/// Standard IOU currency codes have byte 0 == 0x00 (leading zero pad); a field
-/// starting with 0x00 followed by NO_ACCOUNT as issuer is the colliding case.
-/// When that combination is detected, `from_parser` returns an explicit error
-/// rather than silently misparsing the IOU as an MPT issue.
+/// This equals the XRPL address `rrrrrrrrrrrrrrrrrrrrBZbvji`. The XRPL ledger
+/// prevents any account from holding this address, so it is safe to use as an
+/// unambiguous MPT type tag in the binary codec.
 const NO_ACCOUNT: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 #[derive(Debug, Clone)]
@@ -59,30 +54,11 @@ impl TryFromParser for Issue {
             // Read next 20 bytes (issuer for IOU, or NO_ACCOUNT sentinel for MPT)
             let next_20 = parser.read(20)?;
             if next_20 == NO_ACCOUNT {
-                // The NO_ACCOUNT sentinel signals MPT in most cases, but a standard IOU
-                // currency (bytes[0] == 0x00, i.e. the standard 20-byte IOU layout with
-                // 12 zero pad bytes, 3 ASCII currency chars, and 5 zero pad bytes) can
-                // collide if its issuer happens to equal NO_ACCOUNT
-                // (the XRPL address rrrrrrrrrrrrrrrrrrrrBZbvji, bytes all-zero except
-                // the last byte which is 0x01). Silently misparsing such an IOU as MPT
-                // would read 4 extra bytes from the parser and corrupt the field, so we
-                // return an explicit error for that ambiguous combination.
-                //
-                // MPT issuer account IDs are raw 20-byte account hashes. They can start
-                // with any byte value except 0x00 in the standard-IOU-currency sense —
-                // in practice the only case that triggers a collision is when the first
-                // 20 bytes follow the standard IOU currency layout (leading byte 0x00).
-                if bytes[0] == 0x00 {
-                    return Err(XRPLCoreException::XRPLUtilsError(
-                        "Ambiguous Issue type: issuer equals NO_ACCOUNT sentinel \
-                         (rrrrrrrrrrrrrrrrrrrrBZbvji) for an IOU whose currency \
-                         byte[0] is 0x00 (standard currency layout); this issuer \
-                         cannot be used in the binary codec without colliding with \
-                         the MPT type marker"
-                            .to_string(),
-                    ));
-                }
-                // MPT: read 4 more bytes for sequence
+                // NO_ACCOUNT is the XRPL protocol's wire-level type tag for MPT issues.
+                // The XRPL ledger itself prevents any account from being assigned the
+                // address rrrrrrrrrrrrrrrrrrrrBZbvji (the bytes of NO_ACCOUNT), so a
+                // legitimate IOU with that issuer cannot appear in a well-formed stream.
+                // We treat NO_ACCOUNT as unambiguously MPT and read the 4-byte sequence.
                 let sequence = parser.read(4)?;
                 bytes.extend_from_slice(&next_20);
                 bytes.extend_from_slice(&sequence);
