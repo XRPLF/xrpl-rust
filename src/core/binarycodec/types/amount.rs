@@ -200,9 +200,10 @@ fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[
         ));
     }
 
-    // Parse the value - can be decimal string or hex string (0x prefix)
-    let amount: u64 = if value.starts_with("0x") || value.starts_with("0X") {
-        u64::from_str_radix(&value[2..], 16).map_err(|_| {
+    // Parse the value - can be decimal string or hex string (lowercase 0x prefix only;
+    // uppercase 0X is intentionally rejected to match xrpl.js behaviour).
+    let amount: u64 = if let Some(hex_digits) = value.strip_prefix("0x") {
+        u64::from_str_radix(hex_digits, 16).map_err(|_| {
             XRPLCoreException::XRPLUtilsError("Value has bad hex character".to_string())
         })?
     } else if value == "-0" {
@@ -259,18 +260,18 @@ impl Amount {
 
     /// Returns True if this amount is a native XRP amount.
     pub fn is_native(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
+        !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
     }
 
     /// Returns True if this amount is an MPT amount.
     pub fn is_mpt(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
+        !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
     /// Returns true if 2nd bit in 1st byte is set to 1
-    /// (positive amount).
+    /// (positive amount). Returns false on short buffer.
     pub fn is_positive(&self) -> bool {
-        self.0[1] & 0x40 > 0
+        self.0.len() >= 2 && self.0[1] & 0x40 > 0
     }
 }
 
@@ -379,17 +380,23 @@ impl Serialize for Amount {
         if self.is_native() {
             serializer.serialize_str(&self._deserialize_native_amount())
         } else if self.is_mpt() {
-            // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id
+            // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id = 33 bytes total.
             let bytes = self.as_ref();
+            if bytes.len() < 33 {
+                return Err(S::Error::custom("MPT amount buffer too short"));
+            }
             let leading = bytes[0];
             let is_positive = leading & 0x40 != 0;
-            let sign = if is_positive { "" } else { "-" };
+            // MPT amounts are unsigned; a cleared positive bit indicates a malformed payload.
+            if !is_positive {
+                return Err(S::Error::custom("MPT amount has negative sign bit set"));
+            }
             let mut amount_bytes = [0u8; 8];
             amount_bytes.copy_from_slice(&bytes[1..9]);
             let amount_val = u64::from_be_bytes(amount_bytes);
             let mpt_id = hex::encode_upper(&bytes[9..33]);
 
-            let value_str = alloc::format!("{}{}", sign, amount_val);
+            let value_str = alloc::format!("{}", amount_val);
             let mut builder = serializer.serialize_map(Some(2))?;
             builder.serialize_entry("value", &value_str)?;
             builder.serialize_entry("mpt_issuance_id", &mpt_id)?;
@@ -603,5 +610,69 @@ mod test {
                 assert!(amount.is_err());
             }
         }
+    }
+
+    // Issue #258: uppercase 0X prefix must be rejected (only lowercase 0x is valid).
+    #[test]
+    fn test_mpt_reject_uppercase_hex_prefix() {
+        let mpt_id =
+            "A000000000000000000000000000000000000000000000000000000000000000"[..48].to_string();
+        // A valid 48-char mpt_issuance_id (all zeros).
+        let mpt_id_zeros = "000000000000000000000000000000000000000000000000";
+        let json = serde_json::json!({
+            "value": "0X1F",
+            "mpt_issuance_id": mpt_id_zeros,
+        });
+        let result = Amount::try_from(json);
+        assert!(
+            result.is_err(),
+            "0X uppercase hex prefix should be rejected"
+        );
+    }
+
+    // Issue #259: a wire payload with the positive bit cleared must produce an error on
+    // serialization, not a negative-string value.
+    #[test]
+    fn test_mpt_negative_sign_bit_rejected_on_serialize() {
+        // Build a 33-byte MPT buffer with leading byte 0x20 (MPT flag set, positive bit clear).
+        let mut buf = [0u8; 33];
+        buf[0] = 0x20; // MPT flag (0x20) but positive bit (0x40) deliberately absent
+        buf[1..9].copy_from_slice(&31u64.to_be_bytes()); // amount = 31
+                                                         // mpt_issuance_id bytes stay as zeroes
+        let amount = Amount::new(Some(&buf)).unwrap();
+        let result = serde_json::to_string(&amount);
+        assert!(
+            result.is_err(),
+            "MPT amount with cleared positive bit must be a serialization error"
+        );
+    }
+
+    // Issue #262: all bool methods must return false on an empty buffer rather than panicking.
+    #[test]
+    fn test_amount_bool_methods_empty_buffer() {
+        let amount = Amount::new(Some(&[])).unwrap();
+        assert!(
+            !amount.is_native(),
+            "is_native on empty buffer must be false"
+        );
+        assert!(!amount.is_mpt(), "is_mpt on empty buffer must be false");
+        assert!(
+            !amount.is_positive(),
+            "is_positive on empty buffer must be false"
+        );
+    }
+
+    // Issue #262: a short MPT buffer (< 33 bytes) must produce an error on serialization.
+    #[test]
+    fn test_mpt_short_buffer_serialize_error() {
+        // 5 bytes with leading byte 0x60 (MPT flag + positive bit): valid leading byte, but
+        // the buffer is far too short to contain the full MPT payload.
+        let buf: [u8; 5] = [0x60, 0x00, 0x00, 0x00, 0x01];
+        let amount = Amount::new(Some(&buf)).unwrap();
+        let result = serde_json::to_string(&amount);
+        assert!(
+            result.is_err(),
+            "Serializing a short MPT buffer must return an error"
+        );
     }
 }
