@@ -99,9 +99,20 @@ where
         };
         decoded_tx_signers.push(tx_signer.clone());
     }
-    decoded_tx_signers
-        .sort_by_key(|signer| decode_classic_address(signer.account.as_ref()).unwrap());
-    transaction.get_mut_common_fields().signers = Some(decoded_tx_signers);
+    let mut signers_with_keys: Vec<(Vec<u8>, Signer)> = decoded_tx_signers
+        .into_iter()
+        .map(|signer| {
+            let account = signer.account.to_string();
+            decode_classic_address(signer.account.as_ref())
+                .map(|key| (key, signer))
+                .map_err(|_| {
+                    XRPLMultisignException::InvalidSignerAccount { account }.into()
+                })
+        })
+        .collect::<XRPLHelperResult<Vec<_>>>()?;
+    signers_with_keys.sort_by(|a, b| a.0.cmp(&b.0));
+    transaction.get_mut_common_fields().signers =
+        Some(signers_with_keys.into_iter().map(|(_, signer)| signer).collect());
     transaction.get_mut_common_fields().signing_pub_key = Some("".into());
 
     Ok(())
