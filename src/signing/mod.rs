@@ -99,9 +99,14 @@ where
         };
         decoded_tx_signers.push(tx_signer.clone());
     }
-    decoded_tx_signers
-        .sort_by_key(|signer| decode_classic_address(signer.account.as_ref()).unwrap());
-    transaction.get_mut_common_fields().signers = Some(decoded_tx_signers);
+    let mut signers_with_keys = Vec::with_capacity(decoded_tx_signers.len());
+    for signer in decoded_tx_signers {
+        let key = decode_classic_address(signer.account.as_ref())?;
+        signers_with_keys.push((key, signer));
+    }
+    signers_with_keys.sort_by(|a, b| a.0.cmp(&b.0));
+    let sorted_signers: Vec<_> = signers_with_keys.into_iter().map(|(_, signer)| signer).collect();
+    transaction.get_mut_common_fields().signers = Some(sorted_signers);
     transaction.get_mut_common_fields().signing_pub_key = Some("".into());
 
     Ok(())
