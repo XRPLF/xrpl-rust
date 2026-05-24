@@ -23,7 +23,7 @@ where
             let flag_vec_result: Result<Vec<u32>, serde_json::Error> =
                 serde_json::from_value(flags_as_value);
             match flag_vec_result {
-                Ok(flags_vec) => s.serialize_u32(flags_vec.iter().sum()),
+                Ok(flags_vec) => s.serialize_u32(flags_vec.iter().fold(0u32, |acc, f| acc | f)),
                 Err(_) => {
                     // TODO: Find a way to use custom errors
                     Err(ser::Error::custom("SerdeIntermediateStepError: Failed to turn flags into `Vec<u32>` during serialization"))
