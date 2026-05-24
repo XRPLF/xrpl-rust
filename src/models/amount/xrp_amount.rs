@@ -151,9 +151,42 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        let self_decimal: BigDecimal = self.clone().try_into().unwrap();
-        let other_decimal: BigDecimal = other.clone().try_into().unwrap();
-        self_decimal.cmp(&other_decimal)
+        match (
+            BigDecimal::from_str(&self.0),
+            BigDecimal::from_str(&other.0),
+        ) {
+            (Ok(a), Ok(b)) => a.cmp(&b),
+            (Err(_), Err(_)) => self.0.cmp(&other.0),
+            (Err(_), Ok(_)) => core::cmp::Ordering::Less,
+            (Ok(_), Err(_)) => core::cmp::Ordering::Greater,
+        }
+    }
+}
+
+#[cfg(test)]
+mod cmp_tests {
+    use super::*;
+
+    #[test]
+    fn xrp_amount_cmp_does_not_panic_on_garbage() {
+        let garbage = XRPAmount::from("garbage");
+        let valid = XRPAmount::from("1");
+        assert!(garbage.cmp(&valid).is_ne());
+        assert!(valid.cmp(&garbage).is_ne());
+    }
+
+    #[test]
+    fn xrp_amount_cmp_orders_parseable_values() {
+        let low = XRPAmount::from("100");
+        let high = XRPAmount::from("200");
+        assert_eq!(low.cmp(&high), core::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn xrp_amount_cmp_falls_back_to_lexicographic_for_unparseable() {
+        let a = XRPAmount::from("not-a-number");
+        let b = XRPAmount::from("also-invalid");
+        assert_eq!(a.cmp(&b), "not-a-number".cmp("also-invalid"));
     }
 }
 
