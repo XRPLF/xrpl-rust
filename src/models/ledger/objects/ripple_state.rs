@@ -34,6 +34,12 @@ pub enum RippleStateFlag {
     /// The high account has frozen the trust line, preventing the low account from
     /// transferring the asset.
     LsfHighFreeze = 0x00800000,
+    /// The low account has deep-frozen the trust line, preventing the high account from
+    /// sending and receiving the asset.
+    LsfLowDeepFreeze = 0x02000000,
+    /// The high account has deep-frozen the trust line, preventing the low account from
+    /// sending and receiving the asset.
+    LsfHighDeepFreeze = 0x04000000,
 }
 
 /// The RippleState object type connects two accounts in a single currency. Conceptually,
@@ -141,6 +147,15 @@ mod tests {
     use super::*;
     use crate::models::amount::IssuedCurrencyAmount;
     use alloc::{borrow::Cow, vec};
+
+    #[test]
+    fn test_ripple_state_deep_freeze_flags_roundtrip() {
+        let flag_bits: u32 = 0x02000000 | 0x04000000;
+        let collection = FlagCollection::<RippleStateFlag>::try_from(flag_bits)
+            .expect("construction via try_from");
+        let round_tripped: u32 = u32::try_from(collection).unwrap();
+        assert_eq!(round_tripped, flag_bits);
+    }
 
     #[test]
     fn test_serde() {
