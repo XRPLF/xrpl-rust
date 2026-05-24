@@ -10,6 +10,8 @@ mod cli_tests {
     use std::process::{Command, Stdio};
     use std::str;
 
+    use xrpl::core::binarycodec::decode;
+
     /// Test-specific constants
     mod constants {
         // Docker standalone JSON-RPC endpoint
@@ -107,6 +109,15 @@ mod cli_tests {
                 ),
             ))
         }
+    }
+
+    fn extract_signed_transaction_blob(output: &str) -> &str {
+        output
+            .lines()
+            .find(|l| l.contains("Signed transaction blob:"))
+            .and_then(|l| l.split_once(':'))
+            .map(|(_, blob)| blob.trim())
+            .expect("No signed transaction blob found")
     }
 
     /// Helper function to run a CLI command and check for expected output or known errors
@@ -519,6 +530,10 @@ mod cli_tests {
             "Output should contain signed transaction blob, got: {}",
             output
         );
+        let tx_blob = extract_signed_transaction_blob(&output);
+        let decoded = decode(tx_blob).expect("Failed to decode signed transaction blob");
+        assert_eq!(decoded["ClearFlag"], serde_json::json!(2));
+        assert!(decoded.get("SetFlag").is_none());
         assert!(
             output.contains("To submit, use: xrpl transaction submit"),
             "Output should contain submit hint"
