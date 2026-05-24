@@ -707,11 +707,11 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     None,            // signers
                     None,            // source_tag
                     None,            // ticket_sequence
-                    None,            // clear_flag
+                    Some(flag_enum), // clear_flag
                     None,            // domain
                     None,            // email_hash
                     None,            // message_key
-                    Some(flag_enum), // set_flag
+                    None,            // set_flag
                     None,            // transfer_rate
                     None,            // tick_size
                     None,            // nftoken_minter
@@ -752,11 +752,11 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     None,            // signers
                     None,            // source_tag
                     None,            // ticket_sequence
-                    None,            // clear_flag
+                    Some(flag_enum), // clear_flag
                     None,            // domain
                     None,            // email_hash
                     None,            // message_key
-                    Some(flag_enum), // set_flag
+                    None,            // set_flag
                     None,            // transfer_rate
                     None,            // tick_size
                     None,            // nftoken_minter
