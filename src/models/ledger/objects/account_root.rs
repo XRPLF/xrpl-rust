@@ -22,6 +22,8 @@ use super::{CommonFields, LedgerObject};
 pub enum AccountRootFlag {
     /// This account is an Automated Market Maker instance.
     LsfAmm = 0x02000000,
+    /// Allow trustline clawback for tokens issued by this account.
+    LsfAllowTrustLineClawback = 0x80000000,
     /// Enable rippling on this addresses's trust lines by default.
     /// Required for issuing addresses; discouraged for others.
     LsfDefaultRipple = 0x00800000,
@@ -187,6 +189,15 @@ mod tests {
     use super::*;
     use alloc::borrow::Cow;
     use alloc::vec;
+
+    #[test]
+    fn test_lsf_allow_trustline_clawback_flag_roundtrip() {
+        let flag_bit: u32 = 0x80000000;
+        let collection = FlagCollection::<AccountRootFlag>::try_from(flag_bit)
+            .expect("construction via try_from");
+        let round_tripped: u32 = u32::try_from(collection).unwrap();
+        assert_eq!(round_tripped, flag_bit);
+    }
 
     #[test]
     fn test_account_root_serde() {
