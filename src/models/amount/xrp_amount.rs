@@ -87,6 +87,20 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
     type Error = XRPLModelException;
 
     fn try_from(value: Value) -> XRPLModelResult<Self, Self::Error> {
+        if !value.is_string() && !value.is_number() {
+            return Err(XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: "string or number".into(),
+                found: match &value {
+                    Value::Object(_) => "object".into(),
+                    Value::Array(_) => "array".into(),
+                    Value::Null => "null".into(),
+                    Value::Bool(_) => "boolean".into(),
+                    _ => "unknown".into(),
+                },
+            });
+        }
+
         match serde_json::to_string(&value) {
             Ok(amount_string) => {
                 let amount_string = amount_string.clone().replace("\"", "");
@@ -140,5 +154,62 @@ impl<'a> Ord for XRPAmount<'a> {
         let self_decimal: BigDecimal = self.clone().try_into().unwrap();
         let other_decimal: BigDecimal = other.clone().try_into().unwrap();
         self_decimal.cmp(&other_decimal)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_try_from_value_rejects_object() {
+        let obj_value = serde_json::json!({"key": "value"});
+        let result = XRPAmount::try_from(obj_value);
+        assert!(result.is_err(), "Object should be rejected");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains("object"));
+    }
+
+    #[test]
+    fn test_try_from_value_rejects_array() {
+        let array_value = serde_json::json!([1, 2, 3]);
+        let result = XRPAmount::try_from(array_value);
+        assert!(result.is_err(), "Array should be rejected");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains("array"));
+    }
+
+    #[test]
+    fn test_try_from_value_rejects_null() {
+        let null_value = serde_json::Value::Null;
+        let result = XRPAmount::try_from(null_value);
+        assert!(result.is_err(), "Null should be rejected");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains("null"));
+    }
+
+    #[test]
+    fn test_try_from_value_rejects_boolean() {
+        let bool_value = serde_json::json!(true);
+        let result = XRPAmount::try_from(bool_value);
+        assert!(result.is_err(), "Boolean should be rejected");
+        let error_msg = format!("{}", result.unwrap_err());
+        assert!(error_msg.contains("boolean"));
+    }
+
+    #[test]
+    fn test_try_from_value_accepts_string() {
+        let string_value = serde_json::json!("100");
+        let result = XRPAmount::try_from(string_value);
+        assert!(result.is_ok(), "String should be accepted");
+        assert_eq!(result.unwrap().0.as_ref(), "100");
+    }
+
+    #[test]
+    fn test_try_from_value_accepts_number() {
+        let number_value = serde_json::json!(100);
+        let result = XRPAmount::try_from(number_value);
+        assert!(result.is_ok(), "Number should be accepted");
     }
 }
