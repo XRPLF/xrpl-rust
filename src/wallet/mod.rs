@@ -10,7 +10,7 @@ use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::generate_seed;
 use alloc::string::String;
-use core::fmt::Display;
+use core::fmt::{Debug, Display};
 use exceptions::XRPLWalletResult;
 use zeroize::Zeroize;
 
@@ -19,7 +19,6 @@ use zeroize::Zeroize;
 ///
 /// See Cryptographic Keys:
 /// `<https://xrpl.org/cryptographic-keys.html>`
-#[derive(Debug)]
 pub struct Wallet {
     /// The seed from which the public and private keys
     /// are derived.
@@ -88,13 +87,49 @@ impl Wallet {
     }
 }
 
+impl Debug for Wallet {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Wallet")
+            .field("seed", &"-HIDDEN-")
+            .field("public_key", &self.public_key)
+            .field("private_key", &"-HIDDEN-")
+            .field("classic_address", &self.classic_address)
+            .field("sequence", &self.sequence)
+            .finish()
+    }
+}
+
 impl Display for Wallet {
     /// Returns a string representation of a Wallet.
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(
             f,
-            "Wallet {{ public_key: {}, private_key: -HIDDEN-, classic_address: {} }}",
-            self.public_key, self.classic_address
+            "Wallet {{ public_key: {}, private_key: -HIDDEN-, classic_address: {}, sequence: {} }}",
+            self.public_key, self.classic_address, self.sequence
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::format;
+
+    #[test]
+    fn test_wallet_debug_redacts_secrets() {
+        let wallet = Wallet {
+            seed: "sEdSecretSeed123".into(),
+            public_key: "ED1234".into(),
+            private_key: "secret-private-key".into(),
+            classic_address: "rTestAddress".into(),
+            sequence: 1,
+        };
+
+        let debug_output = format!("{wallet:?}");
+        assert!(debug_output.contains("-HIDDEN-"));
+        assert!(!debug_output.contains("sEdSecretSeed123"));
+        assert!(!debug_output.contains("secret-private-key"));
+        assert!(debug_output.contains("ED1234"));
+        assert!(debug_output.contains("rTestAddress"));
     }
 }
