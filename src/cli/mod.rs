@@ -440,7 +440,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
                     // Print derived address, public key, etc.
                 } else {
                     let wallet = crate::wallet::Wallet::create(None)?;
-                    alloc::println!("Generated wallet: {:#?}", wallet);
+                    alloc::println!("Generated wallet: {}", wallet);
                     if *save {
                         alloc::println!("Saving wallet functionality not implemented yet");
                     }
@@ -449,7 +449,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
             }
             WalletCommands::FromSeed { seed, sequence } => {
                 let wallet = crate::wallet::Wallet::new(seed, *sequence)?;
-                alloc::println!("Wallet from seed: {:#?}", wallet);
+                alloc::println!("Wallet from seed: {}", wallet);
                 Ok(())
             }
             #[cfg(feature = "std")]
@@ -468,7 +468,7 @@ pub fn execute_command(command: &Commands) -> Result<(), CliError> {
 
                 match result {
                     Ok(wallet) => {
-                        alloc::println!("Generated faucet wallet: {:#?}", wallet);
+                        alloc::println!("Generated faucet wallet: {}", wallet);
                         Ok(())
                     }
                     Err(e) => Err(CliError::Other(format!(
