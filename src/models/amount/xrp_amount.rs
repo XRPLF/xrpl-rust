@@ -87,12 +87,16 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
     type Error = XRPLModelException;
 
     fn try_from(value: Value) -> XRPLModelResult<Self, Self::Error> {
-        match serde_json::to_string(&value) {
-            Ok(amount_string) => {
-                let amount_string = amount_string.clone().replace("\"", "");
-                Ok(Self(amount_string.into()))
+        match value {
+            Value::String(amount) => Ok(Self(amount.into())),
+            Value::Number(number) => Ok(Self(number.to_string().into())),
+            Value::Object(_) | Value::Array(_) | Value::Null | Value::Bool(_) => {
+                Err(XRPLModelException::InvalidValue {
+                    field: "XRPAmount".into(),
+                    expected: "a JSON string or number".into(),
+                    found: value.to_string(),
+                })
             }
-            Err(serde_error) => Err(serde_error.into()),
         }
     }
 }
@@ -140,5 +144,43 @@ impl<'a> Ord for XRPAmount<'a> {
         let self_decimal: BigDecimal = self.clone().try_into().unwrap();
         let other_decimal: BigDecimal = other.clone().try_into().unwrap();
         self_decimal.cmp(&other_decimal)
+    }
+}
+
+#[cfg(test)]
+mod try_from_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn xrp_amount_try_from_rejects_object() {
+        assert!(XRPAmount::try_from(json!({"drops": "100"})).is_err());
+    }
+
+    #[test]
+    fn xrp_amount_try_from_rejects_array() {
+        assert!(XRPAmount::try_from(json!(["100"])).is_err());
+    }
+
+    #[test]
+    fn xrp_amount_try_from_rejects_null() {
+        assert!(XRPAmount::try_from(Value::Null).is_err());
+    }
+
+    #[test]
+    fn xrp_amount_try_from_rejects_bool() {
+        assert!(XRPAmount::try_from(Value::Bool(true)).is_err());
+    }
+
+    #[test]
+    fn xrp_amount_try_from_accepts_string() {
+        let result = XRPAmount::try_from(json!("100")).unwrap();
+        assert_eq!(result.0, "100");
+    }
+
+    #[test]
+    fn xrp_amount_try_from_accepts_number() {
+        let result = XRPAmount::try_from(json!(100)).unwrap();
+        assert_eq!(result.0, "100");
     }
 }
