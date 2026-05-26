@@ -114,7 +114,7 @@ cargo llvm-cov --summary-only
 The CI enforces the following minimum thresholds (current baseline is ~78% lines / ~68% regions / ~75% functions, measured with default features only — integration tests are excluded from coverage):
 
 | Metric    | Minimum |
-|-----------|---------|
+| --------- | ------- |
 | Lines     | 75%     |
 | Regions   | 65%     |
 | Functions | 72%     |

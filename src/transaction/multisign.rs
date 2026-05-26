@@ -1,6 +1,7 @@
 // `multisign` now lives in `crate::signing`. Re-exported here for backward
 // compatibility.
 pub use crate::signing::multisign;
+
 #[cfg(test)]
 mod test {
     use alloc::borrow::Cow;

@@ -1,58 +1,7 @@
 use alloc::borrow::Cow;
 
 use serde::{Deserialize, Serialize};
-
-/// Represents an AccountRoot ledger object in the XRP Ledger.
-/// This object type represents a single account, its settings, and XRP balance.
-///
-/// See AccountRoot:
-/// `<https://xrpl.org/accountroot.html>`
-#[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-#[serde(rename_all = "PascalCase")]
-pub struct Node<'a> {
-    /// The identifying address of this account
-    pub account: Cow<'a, str>,
-    /// The identifying hash of the transaction that most recently modified
-    /// this object. Only present if the account has the asfAccountTxnID flag
-    /// enabled.
-    #[serde(rename = "AccountTxnID")]
-    pub account_txn_id: Option<Cow<'a, str>>,
-    /// The account's current XRP balance in drops
-    pub balance: Cow<'a, str>,
-    /// The domain associated with this account. The raw domain value is a
-    /// hex string representing the ASCII for the domain
-    pub domain: Option<Cow<'a, str>>,
-    /// Hash of an email address to be used for generating an avatar image
-    pub email_hash: Option<Cow<'a, str>>,
-    /// Various boolean flags enabled for this account
-    pub flags: u32,
-    /// The type of ledger object. For AccountRoot objects, this is always
-    /// "AccountRoot"
-    pub ledger_entry_type: Cow<'a, str>,
-    /// Public key for sending encrypted messages to this account
-    pub message_key: Option<Cow<'a, str>>,
-    /// Number of objects this account owns in the ledger, which contributes
-    /// to its owner reserve
-    pub owner_count: u32,
-    /// Identifying hash of the previous transaction that modified this object
-    #[serde(rename = "PreviousTxnID")]
-    pub previous_txn_id: Cow<'a, str>,
-    /// Ledger index of the ledger containing the previous transaction that
-    /// modified this object
-    pub previous_txn_lgr_seq: u32,
-    /// The identifying address of a key pair that can be used to authorize
-    /// transactions for this account instead of the master key
-    pub regular_key: Option<Cow<'a, str>>,
-    /// The sequence number of the next valid transaction for this account
-    pub sequence: u32,
-    /// The rate to charge when users transfer this account's issued currencies,
-    /// represented as billionths of a unit. A value of 0 means no fee
-    pub transfer_rate: Option<u32>,
-    /// The unique ID of this ledger entry
-    #[serde(rename = "index")]
-    pub index: Cow<'a, str>,
-}
+use serde_json::Value;
 
 /// Response format for the ledger_entry method, which returns a single ledger
 /// object from the XRP Ledger in its raw format.
@@ -60,7 +9,7 @@ pub struct Node<'a> {
 /// See Ledger Entry:
 /// `<https://xrpl.org/ledger_entry.html>`
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct LedgerEntry<'a> {
     /// The unique ID of this ledger entry.
     pub index: Cow<'a, str>,
@@ -70,7 +19,9 @@ pub struct LedgerEntry<'a> {
     pub ledger_hash: Option<Cow<'a, str>>,
     /// Object containing the data of this ledger entry, according to the
     /// ledger format. Omitted if "binary": true specified.
-    pub node: Option<Node<'a>>,
+    /// This is a generic JSON value because `ledger_entry` can return any
+    /// ledger object type (AccountRoot, DirectoryNode, Offer, etc.).
+    pub node: Option<Value>,
     /// The binary representation of the ledger object, as hexadecimal.
     /// Only present if "binary": true specified.
     pub node_binary: Option<Cow<'a, str>>,
@@ -125,37 +76,28 @@ mod tests {
         assert_eq!(result.validated, Some(true));
 
         let node = result.node.unwrap();
-        assert_eq!(node.account, "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
+        assert_eq!(node["Account"], "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn");
         assert_eq!(
-            node.account_txn_id,
-            Some("4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB".into())
-        );
-        assert_eq!(node.balance, "424021949");
-        assert_eq!(node.domain, Some("6D64756F31332E636F6D".into()));
-        assert_eq!(
-            node.email_hash,
-            Some("98B4375E1D753E5B91627516F6D70977".into())
-        );
-        assert_eq!(node.flags, 9568256);
-        assert_eq!(node.ledger_entry_type, "AccountRoot");
-        assert_eq!(
-            node.message_key,
-            Some("0000000000000000000000070000000300".into())
-        );
-        assert_eq!(node.owner_count, 12);
-        assert_eq!(
-            node.previous_txn_id,
+            node["AccountTxnID"],
             "4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB"
         );
-        assert_eq!(node.previous_txn_lgr_seq, 61965653);
+        assert_eq!(node["Balance"], "424021949");
+        assert_eq!(node["Domain"], "6D64756F31332E636F6D");
+        assert_eq!(node["EmailHash"], "98B4375E1D753E5B91627516F6D70977");
+        assert_eq!(node["Flags"], 9568256);
+        assert_eq!(node["LedgerEntryType"], "AccountRoot");
+        assert_eq!(node["MessageKey"], "0000000000000000000000070000000300");
+        assert_eq!(node["OwnerCount"], 12);
         assert_eq!(
-            node.regular_key,
-            Some("rD9iJmieYHn8jTtPjwwkW2Wm9sVDvPXLoJ".into())
+            node["PreviousTxnID"],
+            "4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB"
         );
-        assert_eq!(node.sequence, 385);
-        assert_eq!(node.transfer_rate, Some(4294967295));
+        assert_eq!(node["PreviousTxnLgrSeq"], 61965653);
+        assert_eq!(node["RegularKey"], "rD9iJmieYHn8jTtPjwwkW2Wm9sVDvPXLoJ");
+        assert_eq!(node["Sequence"], 385);
+        assert_eq!(node["TransferRate"], 4294967295u64);
         assert_eq!(
-            node.index,
+            node["index"],
             "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8"
         );
     }
@@ -168,24 +110,18 @@ mod tests {
             ledger_hash: Some(
                 "31850E8E48E76D1064651DF39DF4E9542E8C90A9A9B629F4DE339EB3FA74F726".into(),
             ),
-            node: Some(Node {
-                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
-                account_txn_id: None,
-                balance: "424021949".into(),
-                domain: Some("6D64756F31332E636F6D".into()),
-                email_hash: None,
-                flags: 9568256,
-                ledger_entry_type: "AccountRoot".into(),
-                message_key: None,
-                owner_count: 12,
-                previous_txn_id: "4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB"
-                    .into(),
-                previous_txn_lgr_seq: 61965653,
-                regular_key: None,
-                sequence: 385,
-                transfer_rate: None,
-                index: "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8".into(),
-            }),
+            node: Some(serde_json::json!({
+                "Account": "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn",
+                "Balance": "424021949",
+                "Domain": "6D64756F31332E636F6D",
+                "Flags": 9568256,
+                "LedgerEntryType": "AccountRoot",
+                "OwnerCount": 12,
+                "PreviousTxnID": "4E0AA11CBDD1760DE95B68DF2ABBE75C9698CEB548BEA9789053FCB3EBD444FB",
+                "PreviousTxnLgrSeq": 61965653,
+                "Sequence": 385,
+                "index": "13F1A95D7AAB7108D5CE7EEAF504B2894B8C674E6D68499076441C4837282BF8"
+            })),
             node_binary: None,
             deleted_ledger_index: None,
             validated: Some(true),
@@ -215,5 +151,29 @@ mod tests {
         assert_eq!(entry.node_binary.as_deref(), Some("AABBCC"));
         assert!(entry.node.is_none());
         assert_eq!(entry.validated, Some(false));
+    }
+
+    #[test]
+    fn test_ledger_entry_directory_node() {
+        let json = r#"{
+            "index": "A832B09498B80B1B1BB0E2B31B41B8A3A4B57B8C1C23DAF43A76C6B1B3F7CD60",
+            "ledger_index": 100,
+            "node": {
+                "Flags": 0,
+                "Indexes": ["AAB..."],
+                "IndexNext": "0",
+                "IndexPrevious": "0",
+                "LedgerEntryType": "DirectoryNode",
+                "Owner": "rN7n3473SaZBCG4dFL83w7p1W9cgPLAPkS",
+                "RootIndex": "A832B09498B80B1B1BB0E2B31B41B8A3A4B57B8C1C23DAF43A76C6B1B3F7CD60",
+                "index": "A832B09498B80B1B1BB0E2B31B41B8A3A4B57B8C1C23DAF43A76C6B1B3F7CD60"
+            },
+            "validated": true
+        }"#;
+
+        let result: LedgerEntry = serde_json::from_str(json).unwrap();
+        let node = result.node.unwrap();
+        assert_eq!(node["LedgerEntryType"], "DirectoryNode");
+        assert_eq!(node["Owner"], "rN7n3473SaZBCG4dFL83w7p1W9cgPLAPkS");
     }
 }

@@ -51,8 +51,6 @@ jobs:
       # `websocket`/`cli` features, so it simply isn't compiled here and
       # doesn't appear in the coverage report. Those files are exercised by
       # the integration-test workflow against a live rippled.
-      # Mirrors xrpl-py's split between tests/unit/ (--fail-under=85) and
-      # tests/integration/ (--fail-under=70).
       - name: Generate coverage report
         run: |
           cargo llvm-cov \

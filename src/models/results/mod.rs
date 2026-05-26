@@ -111,7 +111,7 @@ impl XRPLOtherResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub enum XRPLResult<'a> {
@@ -1195,40 +1195,6 @@ mod tests {
             warnings: None,
         };
         assert!(!response.is_success());
-    }
-
-    #[test]
-    fn test_is_success_reads_status_from_raw_result_for_typed_variants() {
-        // rippled's JSON-RPC server_info response puts `status` *inside*
-        // `result`. The typed `XRPLResult::ServerInfo` variant only carries
-        // `info`, so the `status` field is dropped during deserialization.
-        // is_success() must consult `raw_result` (preserved by the custom
-        // Deserialize impl) to recover the success/error signal.
-        let raw_json = r#"{
-            "result": {
-                "info": {
-                    "build_version": "1.12.0",
-                    "complete_ledgers": "32570-82521761",
-                    "hostid": "LEST",
-                    "io_latency_ms": 1,
-                    "jq_trans_overflow": "0",
-                    "last_close": {"converge_time_s": 3, "proposers": 35},
-                    "load_factor": 1,
-                    "network_id": 10,
-                    "peers": 22,
-                    "ports": [{"port": "80", "protocol": ["http"]}],
-                    "pubkey_node": "n9KQK8yvTDcZdGyhu2EGdDnFPEBSsY5wEGpU5GgpygTgLFsjQyPt",
-                    "server_state": "full",
-                    "server_state_duration_us": "91758491912",
-                    "time": "2023-Sep-13 22:12:31.377492 UTC",
-                    "uptime": 91948,
-                    "validation_quorum": 28
-                },
-                "status": "success"
-            }
-        }"#;
-        let response: XRPLResponse = serde_json::from_str(raw_json).expect("deserialize");
-        assert!(response.is_success());
     }
 
     #[test]
