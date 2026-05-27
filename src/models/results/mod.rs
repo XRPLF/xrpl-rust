@@ -1215,4 +1215,66 @@ mod tests {
         };
         assert!(!response.is_success());
     }
+
+    #[test]
+    fn test_is_success_uses_raw_result_branch() {
+        // raw_result with `status: "success"` returns true even when `status`
+        // and `result` are absent — this is the path typed XRPLResult
+        // variants (e.g. ServerInfo) rely on, since they drop unknown fields
+        // like `status` during deserialization.
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: None,
+            raw_result: Some(json!({"status": "success", "info": "x"})),
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        assert!(response.is_success());
+
+        // raw_result without a `status` field falls through to false.
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: None,
+            raw_result: Some(json!({"info": "no status"})),
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        assert!(!response.is_success());
+    }
+
+    #[test]
+    fn test_is_success_falls_through_when_typed_result_lacks_status() {
+        // A typed result variant serializes without a `status` field, so the
+        // inner pattern in the `result` fallback branch never matches and
+        // control falls through to `false`.
+        let response = XRPLResponse {
+            id: None,
+            error: None,
+            error_code: None,
+            error_message: None,
+            forwarded: None,
+            request: None,
+            result: Some(XRPLResult::Fee(fee_result())),
+            raw_result: None,
+            status: None,
+            r#type: None,
+            warning: None,
+            warnings: None,
+        };
+        assert!(!response.is_success());
+    }
 }
