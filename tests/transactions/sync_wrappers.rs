@@ -48,11 +48,14 @@ fn test_sync_get_latest_ledger_sequences() {
         .expect("sync get_latest_validated_ledger_sequence");
     assert!(validated > 0);
 
-    // get_latest_open_ledger_sequence currently fails to deserialize the OPEN
-    // ledger response against the untagged XRPLResult enum (tracked by PR #296,
-    // which adds a raw_result fallback). Exercise the sync wrapper anyway so its
-    // body is covered; tighten this to .expect() once #296 lands.
-    let _ = xrpl::ledger::get_latest_open_ledger_sequence(&client);
+    let open = xrpl::ledger::get_latest_open_ledger_sequence(&client)
+        .expect("sync get_latest_open_ledger_sequence");
+    assert!(
+        open > validated,
+        "open ledger sequence ({}) must be > validated ({})",
+        open,
+        validated
+    );
 }
 
 #[test]
