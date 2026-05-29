@@ -15,6 +15,13 @@ coverage:
       default:
         target: 80%
         threshold: 1%
+        flags:
+          - unit
+      integration:
+        target: 80%
+        threshold: 1%
+        flags:
+          - integration
 
 comment:
   layout: "reach, diff, flags, files"
