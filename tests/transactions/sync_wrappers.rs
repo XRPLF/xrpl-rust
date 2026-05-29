@@ -193,11 +193,12 @@ fn test_sync_account_root_and_latest_transaction() {
         .expect("sync get_account_root");
     assert_eq!(root.account.as_ref(), genesis);
 
-    // Discard the result intentionally: the untagged XRPLResult enum currently
-    // mis-deserializes some valid account_tx responses (PR #296's raw_result
-    // fallback fixes this). Calling the wrapper here still covers its block_on
-    // body for the coverage gate.
-    let _ = xrpl::account::get_latest_transaction(genesis.into(), &client);
+    // account_tx responses deserialize via the untagged XRPLResult's
+    // `Other(Value)` fallback; assert the sync wrapper succeeds rather than
+    // discarding the result. The validated transaction list can legitimately
+    // be empty in standalone, so we don't assert on its contents.
+    xrpl::account::get_latest_transaction(genesis.into(), &client)
+        .expect("sync get_latest_transaction");
 }
 
 #[test]
