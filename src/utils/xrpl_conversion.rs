@@ -5,11 +5,17 @@ use alloc::format;
 use alloc::string::String;
 use alloc::string::ToString;
 use bigdecimal::BigDecimal;
+use lazy_static::lazy_static;
 use regex::Regex;
 use rust_decimal::prelude::*;
 use rust_decimal::Decimal;
 
 use super::exceptions::XRPLUtilsResult;
+
+lazy_static! {
+    /// Matches every character that is not a significant digit (`1`-`9`).
+    static ref PRECISION_RE: Regex = Regex::new("[^1-9]").expect("valid precision regex");
+}
 
 /// Indivisible unit of XRP
 pub(crate) const _ONE_DROP: Decimal = Decimal::from_parts(1, 0, 0, false, 6);
@@ -76,16 +82,15 @@ fn checked_mul(first: &BigDecimal, second: &BigDecimal) -> Option<BigDecimal> {
 /// Get the precision of a number.
 fn _calculate_precision(value: &str) -> XRPLUtilsResult<usize> {
     let decimal = BigDecimal::from_str(value)?.normalized();
-    let regex = Regex::new("[^1-9]").expect("_calculate_precision");
 
     if checked_rem(&decimal, &BigDecimal::one()).is_some() {
-        let stripped = regex
+        let stripped = PRECISION_RE
             .replace(&decimal.to_string(), "")
             .replace(['.', '0'], "");
         Ok(stripped.len())
     } else {
         let quantized = decimal.with_scale(2);
-        let stripped = regex
+        let stripped = PRECISION_RE
             .replace(&quantized.to_string(), "")
             .replace(['.', '0'], "");
         Ok(stripped.len())

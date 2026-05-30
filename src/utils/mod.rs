@@ -22,7 +22,15 @@ pub use self::xrpl_conversion::*;
 
 use crate::constants::*;
 use alloc::vec::Vec;
+use lazy_static::lazy_static;
 use regex::Regex;
+
+lazy_static! {
+    /// Matches a 40-character uppercase-hex currency code.
+    static ref HEX_CURRENCY_RE: Regex = Regex::new(HEX_CURRENCY_REGEX).expect("valid HEX_CURRENCY_REGEX");
+    /// Matches a 3-character ISO currency code.
+    static ref ISO_CURRENCY_RE: Regex = Regex::new(ISO_CURRENCY_REGEX).expect("valid ISO_CURRENCY_REGEX");
+}
 
 /// Determine if the address string is a hex address.
 ///
@@ -38,8 +46,7 @@ use regex::Regex;
 /// assert!(is_hex_address(value));
 /// ```
 pub fn is_hex_address(value: &str) -> bool {
-    let regex = Regex::new(HEX_CURRENCY_REGEX).expect("is_hex_address");
-    regex.is_match(value)
+    HEX_CURRENCY_RE.is_match(value)
 }
 
 /// Tests if value is a valid 3-char iso code.
@@ -56,8 +63,7 @@ pub fn is_hex_address(value: &str) -> bool {
 /// assert!(is_iso_code(value));
 /// ```
 pub fn is_iso_code(value: &str) -> bool {
-    let regex = Regex::new(ISO_CURRENCY_REGEX).expect("is_iso_code");
-    regex.is_match(value)
+    ISO_CURRENCY_RE.is_match(value)
 }
 
 /// Tests if value is a valid 40-char hex currency string.
@@ -74,8 +80,7 @@ pub fn is_iso_code(value: &str) -> bool {
 /// assert!(is_iso_hex(value));
 /// ```
 pub fn is_iso_hex(value: &str) -> bool {
-    let regex = Regex::new(HEX_CURRENCY_REGEX).expect("_is_hex");
-    regex.is_match(value)
+    HEX_CURRENCY_RE.is_match(value)
 }
 
 /// Converter to byte array with endianness.
