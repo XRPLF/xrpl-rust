@@ -38,8 +38,8 @@ pub enum XRPLWebSocketException {
     MissingRequestReceiver,
     #[error("Invalid message.")]
     InvalidMessage,
-    #[error("Failed to send message through channel: {0:?}")]
-    MessageChannelError(String),
+    #[error("Failed to send message through channel: the receiver was dropped")]
+    MessageChannelError,
     #[error("Failed to receive message through channel: {0:?}")]
     Canceled(#[from] Canceled),
     #[cfg(feature = "std")]
