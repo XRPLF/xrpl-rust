@@ -10,8 +10,11 @@ use super::exceptions::XRPLUtilsResult;
 
 /// The "Ripple Epoch" of 2000-01-01T00:00:00 UTC
 pub const RIPPLE_EPOCH: i64 = 946684800;
-/// The maximum time that can be expressed on the XRPL
-pub const MAX_XRPL_TIME: i64 = i64::pow(2, 32);
+/// The maximum time that can be expressed on the XRPL.
+///
+/// XRPL time is an unsigned 32-bit seconds-since-Ripple-epoch value, so the
+/// largest representable instant is `2^32 - 1`.
+pub const MAX_XRPL_TIME: i64 = i64::pow(2, 32) - 1;
 
 /// Ensures time does not exceed max representable on XRPL.
 fn _ripple_check_max<T>(time: i64, ok: T) -> XRPLUtilsResult<T> {
@@ -134,6 +137,15 @@ mod test {
     #[test]
     fn test_posix_to_ripple_time() {
         assert_eq!(posix_to_ripple_time(RIPPLE_EPOCH), Ok(0_i64));
+    }
+
+    /// XRPL time is an unsigned 32-bit value, so `2^32` is out of range while
+    /// `2^32 - 1` is the largest representable Ripple time.
+    #[test]
+    fn bug_5_24_max_xrpl_time_off_by_one() {
+        let out_of_range: i64 = 1i64 << 32;
+        assert!(ripple_time_to_posix(out_of_range).is_err());
+        assert!(ripple_time_to_posix(out_of_range - 1).is_ok());
     }
 
     #[test]
