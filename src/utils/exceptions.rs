@@ -39,8 +39,8 @@ pub enum XRPLUtilsException {
     FromHexError(#[from] hex::FromHexError),
     #[error("ParseInt error: {0}")]
     ParseIntError(#[from] core::num::ParseIntError),
-    #[error("Invalid UTF-8")]
-    Utf8Error,
+    #[error("Invalid UTF-8: {0}")]
+    Utf8Error(#[from] core::str::Utf8Error),
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -117,12 +117,6 @@ pub enum ISOCodeException {
     InvalidXRPBytes,
     #[error("Invalid Currency representation")]
     UnsupportedCurrencyRepresentation,
-}
-
-impl From<core::str::Utf8Error> for XRPLUtilsException {
-    fn from(_: core::str::Utf8Error) -> Self {
-        XRPLUtilsException::Utf8Error
-    }
 }
 
 impl From<serde_json::Error> for XRPLUtilsException {
