@@ -61,3 +61,37 @@ impl<'a> Bridge<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::currency::XRP;
+
+    #[test]
+    fn test_bridge_serde_round_trip() {
+        let bridge = Bridge::new(
+            Some("AABBCC".into()),
+            Some("DDEEFF".into()),
+            "rPV4mZjsXfH2HvUSPLNmqz1J8d3Lpv7tpe".into(),
+            "100".into(),
+            7,
+            3,
+            XChainBridge {
+                locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+                locking_chain_issue: XRP::new().into(),
+                issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                issuing_chain_issue: XRP::new().into(),
+            },
+            "13f".into(),
+            Some("100000".into()),
+        );
+        let serialized = serde_json::to_string(&bridge).unwrap();
+        let deserialized: Bridge = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(bridge, deserialized);
+        assert!(serialized.contains("\"LedgerEntryType\":\"Bridge\""));
+        assert!(serialized.contains("\"XChainAccountClaimCount\":7"));
+        assert!(serialized.contains("\"XChainAccountCreateCount\":3"));
+        assert!(serialized.contains("\"XChainClaimID\":\"13f\""));
+        assert_eq!(bridge.get_ledger_entry_type(), LedgerEntryType::Bridge);
+    }
+}

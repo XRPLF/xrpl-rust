@@ -97,3 +97,36 @@ impl<'a> SetFee<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let txn = SetFee::new(
+            "rrrrrrrrrrrrrrrrrrrrrhoLvTp".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "10".into(),
+            10,
+            20_000_000,
+            5_000_000,
+            56865245,
+        );
+        let serialized = serde_json::to_string(&txn).unwrap();
+        let deserialized: SetFee = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(txn, deserialized);
+        assert!(serialized.contains("\"TransactionType\":\"SetFee\""));
+        assert!(serialized.contains("\"BaseFee\":\"10\""));
+        assert!(serialized.contains("\"ReferenceFeeUnits\":10"));
+        assert!(serialized.contains("\"ReserveBase\":20000000"));
+        assert_eq!(txn.get_transaction_type(), &TransactionType::SetFee);
+    }
+}

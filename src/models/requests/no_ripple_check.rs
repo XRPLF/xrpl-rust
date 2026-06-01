@@ -12,7 +12,6 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Display)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
-#[serde(tag = "role")]
 #[derive(Default)]
 pub enum NoRippleCheckRole {
     #[default]
@@ -90,5 +89,28 @@ impl<'a> NoRippleCheck<'a> {
             transactions,
             limit,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = NoRippleCheck::new(
+            Some("nrc-1".into()),
+            "rIssuer11111111111111111111111111".into(),
+            NoRippleCheckRole::Gateway,
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+            Some(100),
+            Some(true),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: NoRippleCheck = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"noripple_check\""));
+        assert!(serialized.contains("\"role\":\"gateway\""));
     }
 }
