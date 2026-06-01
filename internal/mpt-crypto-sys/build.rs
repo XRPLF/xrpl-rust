@@ -24,8 +24,7 @@ const MPT_CRYPTO_VERSION: &str = "0.3.0-rc2";
 /// Computed at release time; verified on every download.
 ///
 /// Update via `scripts/fetch_upstream.sh` which prints the new value.
-const BUNDLE_SHA256: &str =
-    "486c775b5b3c1fc18c3a9e8cbd4b458802b49eb307475df695fc899127226c0d";
+const BUNDLE_SHA256: &str = "486c775b5b3c1fc18c3a9e8cbd4b458802b49eb307475df695fc899127226c0d";
 
 fn main() {
     let target = env::var("TARGET").expect("cargo did not set TARGET");

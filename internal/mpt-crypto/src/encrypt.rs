@@ -1,6 +1,9 @@
 //! EC-ElGamal encryption / decryption and blinding-factor generation.
 
-use crate::{Error, Result, types::{BlindingFactor, Ciphertext, Privkey, Pubkey}};
+use crate::{
+    Error, Result,
+    types::{BlindingFactor, Ciphertext, Privkey, Pubkey},
+};
 use mpt_crypto_sys as sys;
 
 /// Generates a fresh 32-byte blinding factor (the ElGamal randomness `r`).

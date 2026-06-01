@@ -8,6 +8,11 @@
 //!
 //! See [`build.rs`] for how the native library is located on the filesystem.
 
-#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case, dead_code)]
+#![allow(
+    non_upper_case_globals,
+    non_camel_case_types,
+    non_snake_case,
+    dead_code
+)]
 
 include!("bindings.rs");

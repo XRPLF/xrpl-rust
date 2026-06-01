@@ -30,9 +30,7 @@ fn generates_an_elgamal_keypair_with_nonzero_bytes() {
     // SAFETY: mpt_generate_keypair writes 32 bytes to privkey and 33 bytes
     //         to pubkey; buffer sizes match upstream's constants
     //         kMPT_PRIVKEY_SIZE and kMPT_PUBKEY_SIZE.
-    let rc = unsafe {
-        sys::mpt_generate_keypair(privkey.as_mut_ptr(), pubkey.as_mut_ptr())
-    };
+    let rc = unsafe { sys::mpt_generate_keypair(privkey.as_mut_ptr(), pubkey.as_mut_ptr()) };
     assert_eq!(rc, 0, "mpt_generate_keypair returned {rc}");
 
     // Non-deterministic: all zeros would indicate the RNG did nothing.
@@ -100,7 +98,10 @@ fn bulletproof_base_sizes() {
 /// the bindings will silently agree with the wrong one.
 #[test]
 fn schnorr_proof_aliases_are_consistent() {
-    assert_eq!(sys::kMPT_SCHNORR_PROOF_SIZE, sys::SECP256K1_POK_SK_PROOF_SIZE);
+    assert_eq!(
+        sys::kMPT_SCHNORR_PROOF_SIZE,
+        sys::SECP256K1_POK_SK_PROOF_SIZE
+    );
     assert_eq!(sys::kMPT_SCHNORR_PROOF_SIZE, 64);
 }
 
@@ -116,16 +117,19 @@ fn total_proof_sizes_per_xls_0096() {
     assert_eq!(64, sys::SECP256K1_POK_SK_PROOF_SIZE);
 
     // Send: 192 (compact sigma) + 754 (aggregated Bulletproof) = 946.  §8.2.
-    let send_total =
-        sys::SECP256K1_COMPACT_STANDARD_PROOF_SIZE + sys::kMPT_DOUBLE_BULLETPROOF_SIZE;
-    assert_eq!(send_total, 946,
-        "Send proof composes to 192 + 754 = 946 per §5.4 / §14.1");
+    let send_total = sys::SECP256K1_COMPACT_STANDARD_PROOF_SIZE + sys::kMPT_DOUBLE_BULLETPROOF_SIZE;
+    assert_eq!(
+        send_total, 946,
+        "Send proof composes to 192 + 754 = 946 per §5.4 / §14.1"
+    );
 
     // ConvertBack: 128 (compact sigma) + 688 (single Bulletproof) = 816.  §10.3.
     let convert_back_total =
         sys::SECP256K1_COMPACT_CONVERTBACK_PROOF_SIZE + sys::kMPT_SINGLE_BULLETPROOF_SIZE;
-    assert_eq!(convert_back_total, 816,
-        "ConvertBack proof composes to 128 + 688 = 816 per §5.4 / §10.3");
+    assert_eq!(
+        convert_back_total, 816,
+        "ConvertBack proof composes to 128 + 688 = 816 per §5.4 / §10.3"
+    );
 
     // Clawback: just the compact sigma.  §11.2.
     assert_eq!(64, sys::SECP256K1_COMPACT_CLAWBACK_PROOF_SIZE);
@@ -148,7 +152,7 @@ fn wire_size_primitives() {
     // 32-byte secret scalar — Privkey, BlindingFactor, ContextHash all share.
     assert_eq!(sys::kMPT_PRIVKEY_SIZE, 32);
     assert_eq!(sys::kMPT_BLINDING_FACTOR_SIZE, 32);
-    assert_eq!(sys::kMPT_HALF_SHA_SIZE, 32);     // SHA-256 / 2 (truncated 32 B output)
+    assert_eq!(sys::kMPT_HALF_SHA_SIZE, 32); // SHA-256 / 2 (truncated 32 B output)
 
     // ElGamal ciphertext = (R, S), each a compressed point.
     //   R alone = 33 B; (R, S) total = 66 B.
@@ -186,9 +190,9 @@ fn ledger_identifier_sizes() {
 #[test]
 fn transaction_type_ids_match_xls_0096() {
     // §4.1 of the spec assigns these directly.
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_CONVERT,      85);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_MERGE_INBOX,  86);
+    assert_eq!(sys::ttCONFIDENTIAL_MPT_CONVERT, 85);
+    assert_eq!(sys::ttCONFIDENTIAL_MPT_MERGE_INBOX, 86);
     assert_eq!(sys::ttCONFIDENTIAL_MPT_CONVERT_BACK, 87);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_SEND,         88);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_CLAWBACK,     89);
+    assert_eq!(sys::ttCONFIDENTIAL_MPT_SEND, 88);
+    assert_eq!(sys::ttCONFIDENTIAL_MPT_CLAWBACK, 89);
 }

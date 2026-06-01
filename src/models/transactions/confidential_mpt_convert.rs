@@ -164,9 +164,8 @@ mod tests {
                 transaction_type: TransactionType::ConfidentialMPTConvert,
                 ..Default::default()
             },
-            mptoken_issuance_id:
-                "610F33B8EBF7EC795F822A454FB852156AEFE50BE0CB8326338A81CD74801864"
-                    .into(),
+            mptoken_issuance_id: "610F33B8EBF7EC795F822A454FB852156AEFE50BE0CB8326338A81CD74801864"
+                .into(),
             mpt_amount: "1000".into(),
             holder_encrypted_amount: "AD3F".repeat(33).into(),
             issuer_encrypted_amount: "BC2E".repeat(33).into(),

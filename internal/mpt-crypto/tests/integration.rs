@@ -28,8 +28,11 @@ fn encrypt_with_same_blinding_is_deterministic() {
 
     let ct1 = encrypt::encrypt(42, &pk, &r).unwrap();
     let ct2 = encrypt::encrypt(42, &pk, &r).unwrap();
-    assert_eq!(ct1.as_bytes(), ct2.as_bytes(),
-        "same (m, r, pk) should produce identical ciphertext");
+    assert_eq!(
+        ct1.as_bytes(),
+        ct2.as_bytes(),
+        "same (m, r, pk) should produce identical ciphertext"
+    );
 }
 
 #[test]
@@ -48,11 +51,16 @@ fn pubkey_debug_is_truncated_for_readability() {
 fn privkey_debug_does_not_leak_bytes() {
     let (sk, _pk) = keypair::generate().unwrap();
     let s = format!("{sk:?}");
-    assert!(s.contains("redacted"), "Privkey Debug must not expose bytes");
+    assert!(
+        s.contains("redacted"),
+        "Privkey Debug must not expose bytes"
+    );
     // The hex of any bit of the actual key should not appear in the Debug output.
     let hex: String = sk.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
-    assert!(!s.contains(&hex[0..8]),
-        "Privkey Debug output appears to contain key bytes");
+    assert!(
+        !s.contains(&hex[0..8]),
+        "Privkey Debug output appears to contain key bytes"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -87,16 +95,18 @@ fn context_hashes_differ_per_transaction_type() {
     let seq = 100;
     let ver = 5;
 
-    let h_convert      = context::convert(&acc, &iss, seq).unwrap();
+    let h_convert = context::convert(&acc, &iss, seq).unwrap();
     let h_convert_back = context::convert_back(&acc, &iss, seq, ver).unwrap();
-    let h_send         = context::send(&acc, &iss, seq, &dst, ver).unwrap();
-    let h_clawback     = context::clawback(&acc, &iss, seq, &dst).unwrap();
+    let h_send = context::send(&acc, &iss, seq, &dst, ver).unwrap();
+    let h_clawback = context::clawback(&acc, &iss, seq, &dst).unwrap();
 
     let all = [h_convert, h_convert_back, h_send, h_clawback];
     for i in 0..all.len() {
         for j in (i + 1)..all.len() {
-            assert_ne!(all[i], all[j],
-                "context hashes for different tx types collided ({i} vs {j})");
+            assert_ne!(
+                all[i], all[j],
+                "context hashes for different tx types collided ({i} vs {j})"
+            );
         }
     }
 }
@@ -105,8 +115,8 @@ fn context_hashes_differ_per_transaction_type() {
 fn send_context_hash_binds_to_destination() {
     let snd = AccountId::new([1; 20]);
     let iss = IssuanceId::new([2; 24]);
-    let d1  = AccountId::new([3; 20]);
-    let d2  = AccountId::new([4; 20]);
+    let d1 = AccountId::new([3; 20]);
+    let d2 = AccountId::new([4; 20]);
     let h1 = context::send(&snd, &iss, 1, &d1, 0).unwrap();
     let h2 = context::send(&snd, &iss, 1, &d2, 0).unwrap();
     assert_ne!(h1, h2, "Send proof must be unforgeable across destinations");
@@ -146,8 +156,8 @@ fn convert_proof_rejects_wrong_pubkey() {
     // z·G == R + c·pk. This is the binding property that makes a Convert
     // proof unforgeable against another holder's account.
 
-    let (sk_a, pk_a)   = keypair::generate().unwrap();   // the real keypair
-    let (_, wrong_pk)  = keypair::generate().unwrap();   // an unrelated pubkey
+    let (sk_a, pk_a) = keypair::generate().unwrap(); // the real keypair
+    let (_, wrong_pk) = keypair::generate().unwrap(); // an unrelated pubkey
 
     let acc = AccountId::new([1; 20]);
     let iss = IssuanceId::new([2; 24]);
@@ -177,8 +187,10 @@ fn convert_proof_rejects_wrong_pubkey() {
             ctx.as_bytes().as_ptr(),
         )
     };
-    assert_ne!(rc_wrong, 0,
-        "verifier accepted a valid proof against an unrelated pubkey");
+    assert_ne!(
+        rc_wrong, 0,
+        "verifier accepted a valid proof against an unrelated pubkey"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -194,10 +206,10 @@ fn clawback_proof_verifies() {
     let amount = 500u64;
     let mirror = encrypt::encrypt(amount, &issuer_pk, &r).unwrap();
 
-    let acc    = AccountId::new([10; 20]);
-    let iss    = IssuanceId::new([20; 24]);
+    let acc = AccountId::new([10; 20]);
+    let iss = IssuanceId::new([20; 24]);
     let holder = AccountId::new([30; 20]);
-    let ctx    = context::clawback(&acc, &iss, 7, &holder).unwrap();
+    let ctx = context::clawback(&acc, &iss, 7, &holder).unwrap();
 
     let proof = prove::clawback(&issuer_sk, &issuer_pk, &ctx, amount, &mirror).unwrap();
 
@@ -250,7 +262,7 @@ fn convert_back_proof_verifies() {
     let (holder_privkey, holder_pubkey) = keypair::generate().unwrap();
 
     let current_balance = 1_000u64;
-    let withdraw_amount =   250u64;
+    let withdraw_amount = 250u64;
 
     // The holder's on-ledger `ConfidentialBalanceSpending` (CB_S):
     // ElGamal encryption of `current_balance` under `holder_pubkey` with
@@ -260,34 +272,37 @@ fn convert_back_proof_verifies() {
         current_balance,
         &holder_pubkey,
         &balance_ciphertext_randomness,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Pedersen commitment to the same balance, but with an INDEPENDENT
     // blinding (conventionally written ρ; unrelated to the ElGamal `r`
     // above). The proof binds these two views of the balance via the
     // sender's secret key — see XLS-0096 §10 / §5.4.
-    let balance_blinding   = encrypt::random_blinding_factor().unwrap();
+    let balance_blinding = encrypt::random_blinding_factor().unwrap();
     let balance_commitment = commit::pedersen(current_balance, &balance_blinding).unwrap();
 
     let holder_account = AccountId::new([5; 20]);
-    let issuance_id    = IssuanceId::new([6; 24]);
-    let context_hash   = context::convert_back(
+    let issuance_id = IssuanceId::new([6; 24]);
+    let context_hash = context::convert_back(
         &holder_account,
         &issuance_id,
         /* sequence */ 1,
         /* version  */ 0,
-    ).unwrap();
+    )
+    .unwrap();
 
     let proof = prove::convert_back(prove::ConvertBackProofParams {
-        holder_privkey:     &holder_privkey,
-        holder_pubkey:      &holder_pubkey,
-        amount:             withdraw_amount,
+        holder_privkey: &holder_privkey,
+        holder_pubkey: &holder_pubkey,
+        amount: withdraw_amount,
         current_balance,
-        context_hash:       &context_hash,
+        context_hash: &context_hash,
         balance_commitment: &balance_commitment,
-        balance_blinding:   &balance_blinding,
+        balance_blinding: &balance_blinding,
         balance_ciphertext: &balance_ciphertext,
-    }).unwrap();
+    })
+    .unwrap();
 
     // SAFETY: fixed-size buffers per the FFI contract.
     let rc = unsafe {
@@ -326,35 +341,37 @@ fn convert_back_proof_rejects_withdrawal_exceeding_balance() {
     let (holder_privkey, holder_pubkey) = keypair::generate().unwrap();
 
     let current_balance = 100u64;
-    let withdraw_amount = 200u64;   // strictly greater than current_balance
+    let withdraw_amount = 200u64; // strictly greater than current_balance
 
     let balance_ciphertext_randomness = encrypt::random_blinding_factor().unwrap();
     let balance_ciphertext = encrypt::encrypt(
         current_balance,
         &holder_pubkey,
         &balance_ciphertext_randomness,
-    ).unwrap();
+    )
+    .unwrap();
 
-    let balance_blinding   = encrypt::random_blinding_factor().unwrap();
+    let balance_blinding = encrypt::random_blinding_factor().unwrap();
     let balance_commitment = commit::pedersen(current_balance, &balance_blinding).unwrap();
 
     let holder_account = AccountId::new([5; 20]);
-    let issuance_id    = IssuanceId::new([6; 24]);
-    let context_hash   = context::convert_back(
+    let issuance_id = IssuanceId::new([6; 24]);
+    let context_hash = context::convert_back(
         &holder_account,
         &issuance_id,
         /* sequence */ 1,
         /* version  */ 0,
-    ).unwrap();
+    )
+    .unwrap();
 
     let prove_result = prove::convert_back(prove::ConvertBackProofParams {
-        holder_privkey:     &holder_privkey,
-        holder_pubkey:      &holder_pubkey,
-        amount:             withdraw_amount,
+        holder_privkey: &holder_privkey,
+        holder_pubkey: &holder_pubkey,
+        amount: withdraw_amount,
         current_balance,
-        context_hash:       &context_hash,
+        context_hash: &context_hash,
         balance_commitment: &balance_commitment,
-        balance_blinding:   &balance_blinding,
+        balance_blinding: &balance_blinding,
         balance_ciphertext: &balance_ciphertext,
     });
 
@@ -379,8 +396,10 @@ fn convert_back_proof_rejects_withdrawal_exceeding_balance() {
             context_hash.as_bytes().as_ptr(),
         )
     };
-    assert_ne!(rc, 0,
-        "verifier accepted a ConvertBack proof where withdraw > balance");
+    assert_ne!(
+        rc, 0,
+        "verifier accepted a ConvertBack proof where withdraw > balance"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -390,11 +409,11 @@ fn convert_back_proof_rejects_withdrawal_exceeding_balance() {
 #[test]
 fn send_proof_verifies_three_participants() {
     let (sender_sk, sender_pk) = keypair::generate().unwrap();
-    let (_recv_sk,  recv_pk)   = keypair::generate().unwrap();
-    let (_iss_sk,   iss_pk)    = keypair::generate().unwrap();
+    let (_recv_sk, recv_pk) = keypair::generate().unwrap();
+    let (_iss_sk, iss_pk) = keypair::generate().unwrap();
 
     let balance = 1_000u64;
-    let amount  =   400u64;
+    let amount = 400u64;
 
     // Sender's on-ledger CB_S.
     let r_balance = encrypt::random_blinding_factor().unwrap();
@@ -407,46 +426,59 @@ fn send_proof_verifies_three_participants() {
     // Shared `r` across all three recipient ciphertexts AND the amount commitment.
     let tx_r = encrypt::random_blinding_factor().unwrap();
     let sender_amount_ct = encrypt::encrypt(amount, &sender_pk, &tx_r).unwrap();
-    let recv_amount_ct   = encrypt::encrypt(amount, &recv_pk,   &tx_r).unwrap();
-    let iss_amount_ct    = encrypt::encrypt(amount, &iss_pk,    &tx_r).unwrap();
+    let recv_amount_ct = encrypt::encrypt(amount, &recv_pk, &tx_r).unwrap();
+    let iss_amount_ct = encrypt::encrypt(amount, &iss_pk, &tx_r).unwrap();
     let amount_commitment = commit::pedersen(amount, &tx_r).unwrap();
 
     let snd_addr = AccountId::new([1; 20]);
     let dst_addr = AccountId::new([2; 20]);
-    let iss_id   = IssuanceId::new([3; 24]);
+    let iss_id = IssuanceId::new([3; 24]);
     let ctx = context::send(&snd_addr, &iss_id, 1, &dst_addr, 0).unwrap();
 
-    let sender_part = prove::Participant { pubkey: &sender_pk, ciphertext: &sender_amount_ct };
-    let recv_part   = prove::Participant { pubkey: &recv_pk,   ciphertext: &recv_amount_ct };
-    let iss_part    = prove::Participant { pubkey: &iss_pk,    ciphertext: &iss_amount_ct };
+    let sender_part = prove::Participant {
+        pubkey: &sender_pk,
+        ciphertext: &sender_amount_ct,
+    };
+    let recv_part = prove::Participant {
+        pubkey: &recv_pk,
+        ciphertext: &recv_amount_ct,
+    };
+    let iss_part = prove::Participant {
+        pubkey: &iss_pk,
+        ciphertext: &iss_amount_ct,
+    };
 
     let proof = prove::send(prove::SendProofParams {
-        sender_privkey:     &sender_sk,
-        sender_pubkey:      &sender_pk,
+        sender_privkey: &sender_sk,
+        sender_pubkey: &sender_pk,
         amount,
-        current_balance:    balance,
+        current_balance: balance,
         tx_blinding_factor: &tx_r,
-        context_hash:       &ctx,
-        amount_commitment:  &amount_commitment,
+        context_hash: &ctx,
+        amount_commitment: &amount_commitment,
         balance_commitment: &balance_commitment,
-        balance_blinding:   &rho_balance,
+        balance_blinding: &rho_balance,
         balance_ciphertext: &sender_balance_ct,
-        sender:             sender_part,
-        destination:        recv_part,
-        issuer:             iss_part,
-        auditor:            None,
-    }).unwrap();
+        sender: sender_part,
+        destination: recv_part,
+        issuer: iss_part,
+        auditor: None,
+    })
+    .unwrap();
 
     // The C verifier expects participants in the same order we passed them.
     let participants_for_verify = [
         sys::mpt_confidential_participant {
-            pubkey: *sender_pk.as_bytes(), ciphertext: *sender_amount_ct.as_bytes(),
+            pubkey: *sender_pk.as_bytes(),
+            ciphertext: *sender_amount_ct.as_bytes(),
         },
         sys::mpt_confidential_participant {
-            pubkey: *recv_pk.as_bytes(),   ciphertext: *recv_amount_ct.as_bytes(),
+            pubkey: *recv_pk.as_bytes(),
+            ciphertext: *recv_amount_ct.as_bytes(),
         },
         sys::mpt_confidential_participant {
-            pubkey: *iss_pk.as_bytes(),    ciphertext: *iss_amount_ct.as_bytes(),
+            pubkey: *iss_pk.as_bytes(),
+            ciphertext: *iss_amount_ct.as_bytes(),
         },
     ];
 

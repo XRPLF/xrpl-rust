@@ -126,9 +126,8 @@ mod tests {
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
-            mptoken_issuance_id:
-                "610F33B8EBF7EC795F822A454FB852156AEFE50BE0CB8326338A81CD74801864"
-                    .into(),
+            mptoken_issuance_id: "610F33B8EBF7EC795F822A454FB852156AEFE50BE0CB8326338A81CD74801864"
+                .into(),
         };
 
         let json = serde_json::to_string(&tx).unwrap();

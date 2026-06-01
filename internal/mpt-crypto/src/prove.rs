@@ -27,7 +27,7 @@ use mpt_crypto_sys as sys;
 /// ciphertext of the transfer amount under that key.
 #[derive(Debug, Clone, Copy)]
 pub struct Participant<'a> {
-    pub pubkey:     &'a Pubkey,
+    pub pubkey: &'a Pubkey,
     pub ciphertext: &'a Ciphertext,
 }
 
@@ -78,32 +78,33 @@ pub fn convert(privkey: &Privkey, pubkey: &Pubkey, ctx: &ContextHash) -> Result<
 /// links the new `balance_commitment` to this on-chain ciphertext via the
 /// holder's secret key.
 pub struct SendProofParams<'a> {
-    pub sender_privkey:     &'a Privkey,
-    pub sender_pubkey:      &'a Pubkey,
-    pub amount:             u64,
-    pub current_balance:    u64,
+    pub sender_privkey: &'a Privkey,
+    pub sender_pubkey: &'a Pubkey,
+    pub amount: u64,
+    pub current_balance: u64,
     pub tx_blinding_factor: &'a BlindingFactor,
-    pub context_hash:       &'a ContextHash,
-    pub amount_commitment:  &'a Commitment,
+    pub context_hash: &'a ContextHash,
+    pub amount_commitment: &'a Commitment,
     pub balance_commitment: &'a Commitment,
-    pub balance_blinding:   &'a BlindingFactor,
+    pub balance_blinding: &'a BlindingFactor,
     pub balance_ciphertext: &'a Ciphertext,
-    pub sender:             Participant<'a>,
-    pub destination:        Participant<'a>,
-    pub issuer:             Participant<'a>,
-    pub auditor:            Option<Participant<'a>>,
+    pub sender: Participant<'a>,
+    pub destination: Participant<'a>,
+    pub issuer: Participant<'a>,
+    pub auditor: Option<Participant<'a>>,
 }
 
 /// Generates the 946-byte `ConfidentialMPTSend` proof bundle.
 pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
     // The C side expects a contiguous array of `mpt_confidential_participant`.
     // We build it on the stack — at most 4 entries.
-    let mut participants = [
-        sys::mpt_confidential_participant { pubkey: [0; 33], ciphertext: [0; 66] }; 4
-    ];
+    let mut participants = [sys::mpt_confidential_participant {
+        pubkey: [0; 33],
+        ciphertext: [0; 66],
+    }; 4];
 
     fn fill(slot: &mut sys::mpt_confidential_participant, p: Participant<'_>) {
-        slot.pubkey     = *p.pubkey.as_bytes();
+        slot.pubkey = *p.pubkey.as_bytes();
         slot.ciphertext = *p.ciphertext.as_bytes();
     }
 
@@ -120,9 +121,9 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
 
     let balance_params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
-        amount:              p.current_balance,
-        ciphertext:          *p.balance_ciphertext.as_bytes(),
-        blinding_factor:     *p.balance_blinding.as_bytes(),
+        amount: p.current_balance,
+        ciphertext: *p.balance_ciphertext.as_bytes(),
+        blinding_factor: *p.balance_blinding.as_bytes(),
     };
 
     let mut out = [0u8; 946];
@@ -165,13 +166,13 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
 /// same constraint as in [`SendProofParams`]. `amount` is the publicly
 /// revealed plaintext withdrawal amount.
 pub struct ConvertBackProofParams<'a> {
-    pub holder_privkey:     &'a Privkey,
-    pub holder_pubkey:      &'a Pubkey,
-    pub amount:             u64,
-    pub current_balance:    u64,
-    pub context_hash:       &'a ContextHash,
+    pub holder_privkey: &'a Privkey,
+    pub holder_pubkey: &'a Pubkey,
+    pub amount: u64,
+    pub current_balance: u64,
+    pub context_hash: &'a ContextHash,
     pub balance_commitment: &'a Commitment,
-    pub balance_blinding:   &'a BlindingFactor,
+    pub balance_blinding: &'a BlindingFactor,
     pub balance_ciphertext: &'a Ciphertext,
 }
 
@@ -179,9 +180,9 @@ pub struct ConvertBackProofParams<'a> {
 pub fn convert_back(p: ConvertBackProofParams<'_>) -> Result<ConvertBackProof> {
     let params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
-        amount:              p.current_balance,
-        ciphertext:          *p.balance_ciphertext.as_bytes(),
-        blinding_factor:     *p.balance_blinding.as_bytes(),
+        amount: p.current_balance,
+        ciphertext: *p.balance_ciphertext.as_bytes(),
+        blinding_factor: *p.balance_blinding.as_bytes(),
     };
     let mut out = [0u8; 816];
     // SAFETY: see `send`.

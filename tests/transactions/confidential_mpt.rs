@@ -91,9 +91,7 @@ async fn merge_inbox_jsonrpc_round_trip() {
         // not a binary-codec / malformed-transaction failure (tem*).
         let code = &resp.engine_result;
         assert!(
-            code.starts_with("tec")
-                || code.starts_with("tef")
-                || code == "tesSUCCESS",
+            code.starts_with("tec") || code.starts_with("tef") || code == "tesSUCCESS",
             "Expected tec*/tef* or tesSUCCESS, got `{code}` — {}",
             resp.engine_result_message
         );
@@ -135,9 +133,7 @@ async fn merge_inbox_websocket_round_trip() {
 
         let code = &resp.engine_result;
         assert!(
-            code.starts_with("tec")
-                || code.starts_with("tef")
-                || code == "tesSUCCESS",
+            code.starts_with("tec") || code.starts_with("tef") || code == "tesSUCCESS",
             "Expected tec*/tef* or tesSUCCESS, got `{code}` — {}",
             resp.engine_result_message
         );
@@ -146,4 +142,3 @@ async fn merge_inbox_websocket_round_trip() {
     })
     .await;
 }
-

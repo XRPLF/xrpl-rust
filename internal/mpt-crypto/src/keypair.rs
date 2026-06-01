@@ -1,6 +1,9 @@
 //! ElGamal/secp256k1 keypair generation.
 
-use crate::{Error, Result, types::{Privkey, Pubkey}};
+use crate::{
+    Error, Result,
+    types::{Privkey, Pubkey},
+};
 use mpt_crypto_sys as sys;
 
 /// Generates a fresh ElGamal keypair.

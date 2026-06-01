@@ -25,11 +25,17 @@ macro_rules! public_bytes {
 
         impl $name {
             #[inline]
-            pub const fn new(bytes: [u8; $size]) -> Self { Self(bytes) }
+            pub const fn new(bytes: [u8; $size]) -> Self {
+                Self(bytes)
+            }
             #[inline]
-            pub const fn as_bytes(&self) -> &[u8; $size] { &self.0 }
+            pub const fn as_bytes(&self) -> &[u8; $size] {
+                &self.0
+            }
             #[inline]
-            pub const fn into_bytes(self) -> [u8; $size] { self.0 }
+            pub const fn into_bytes(self) -> [u8; $size] {
+                self.0
+            }
         }
 
         impl fmt::Debug for $name {
@@ -49,9 +55,13 @@ macro_rules! secret_bytes {
 
         impl $name {
             #[inline]
-            pub fn new(bytes: [u8; $size]) -> Self { Self(bytes) }
+            pub fn new(bytes: [u8; $size]) -> Self {
+                Self(bytes)
+            }
             #[inline]
-            pub fn as_bytes(&self) -> &[u8; $size] { &self.0 }
+            pub fn as_bytes(&self) -> &[u8; $size] {
+                &self.0
+            }
         }
 
         impl fmt::Debug for $name {
@@ -66,33 +76,65 @@ macro_rules! secret_bytes {
 //  Identity / addressing
 // ─────────────────────────────────────────────────────────────────────────
 
-public_bytes!(AccountId,   20, "20-byte XRPL AccountID.");
-public_bytes!(IssuanceId,  24, "24-byte XRPL `MPTokenIssuanceID`.");
+public_bytes!(AccountId, 20, "20-byte XRPL AccountID.");
+public_bytes!(IssuanceId, 24, "24-byte XRPL `MPTokenIssuanceID`.");
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Key material
 // ─────────────────────────────────────────────────────────────────────────
 
-secret_bytes!(Privkey,        32, "32-byte ElGamal/secp256k1 secret key. Zeroized on drop.");
-public_bytes!(Pubkey,         33, "33-byte compressed secp256k1 public key.");
-secret_bytes!(BlindingFactor, 32, "32-byte ElGamal randomness / Pedersen blinding factor. Zeroized on drop.");
+secret_bytes!(
+    Privkey,
+    32,
+    "32-byte ElGamal/secp256k1 secret key. Zeroized on drop."
+);
+public_bytes!(Pubkey, 33, "33-byte compressed secp256k1 public key.");
+secret_bytes!(
+    BlindingFactor,
+    32,
+    "32-byte ElGamal randomness / Pedersen blinding factor. Zeroized on drop."
+);
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Cryptographic objects
 // ─────────────────────────────────────────────────────────────────────────
 
-public_bytes!(Ciphertext,  66, "66-byte EC-ElGamal ciphertext (two compressed points: R || S).");
-public_bytes!(Commitment,  33, "33-byte Pedersen commitment.");
-public_bytes!(ContextHash, 32, "32-byte SHA-256 transcript hash binding a proof to its transaction.");
+public_bytes!(
+    Ciphertext,
+    66,
+    "66-byte EC-ElGamal ciphertext (two compressed points: R || S)."
+);
+public_bytes!(Commitment, 33, "33-byte Pedersen commitment.");
+public_bytes!(
+    ContextHash,
+    32,
+    "32-byte SHA-256 transcript hash binding a proof to its transaction."
+);
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Proof blobs (sized exactly per XLS-0096 §5.4)
 // ─────────────────────────────────────────────────────────────────────────
 
-public_bytes!(ConvertProof,      64,  "64-byte Schnorr Proof of Knowledge (ConfidentialMPTConvert).");
-public_bytes!(SendProof,         946, "946-byte ConfidentialMPTSend proof: 192 B compact sigma + 754 B aggregated Bulletproof.");
-public_bytes!(ConvertBackProof,  816, "816-byte ConfidentialMPTConvertBack proof: 128 B compact sigma + 688 B Bulletproof.");
-public_bytes!(ClawbackProof,     64,  "64-byte ConfidentialMPTClawback compact sigma proof.");
+public_bytes!(
+    ConvertProof,
+    64,
+    "64-byte Schnorr Proof of Knowledge (ConfidentialMPTConvert)."
+);
+public_bytes!(
+    SendProof,
+    946,
+    "946-byte ConfidentialMPTSend proof: 192 B compact sigma + 754 B aggregated Bulletproof."
+);
+public_bytes!(
+    ConvertBackProof,
+    816,
+    "816-byte ConfidentialMPTConvertBack proof: 128 B compact sigma + 688 B Bulletproof."
+);
+public_bytes!(
+    ClawbackProof,
+    64,
+    "64-byte ConfidentialMPTClawback compact sigma proof."
+);
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Helpers
@@ -101,10 +143,16 @@ public_bytes!(ClawbackProof,     64,  "64-byte ConfidentialMPTClawback compact s
 /// Hex-encode the first 4 and last 4 bytes for a Debug summary.
 fn hex_short(bytes: &[u8]) -> String {
     if bytes.len() <= 8 {
-        bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>()
+        bytes
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()
     } else {
         let head: String = bytes[..4].iter().map(|b| format!("{:02x}", b)).collect();
-        let tail: String = bytes[bytes.len()-4..].iter().map(|b| format!("{:02x}", b)).collect();
+        let tail: String = bytes[bytes.len() - 4..]
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect();
         format!("0x{head}…{tail}")
     }
 }

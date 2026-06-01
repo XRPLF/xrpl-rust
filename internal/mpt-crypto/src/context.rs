@@ -16,17 +16,24 @@
 //! | [`send`]         | `sender, issuance, sequence, destination, version` |
 //! | [`clawback`]     | `issuer, issuance, sequence, holder` |
 
-use crate::{Error, Result, types::{AccountId, ContextHash, IssuanceId}};
+use crate::{
+    Error, Result,
+    types::{AccountId, ContextHash, IssuanceId},
+};
 use mpt_crypto_sys as sys;
 
 #[inline]
 fn into_sys_account(id: &AccountId) -> sys::account_id {
-    sys::account_id { bytes: *id.as_bytes() }
+    sys::account_id {
+        bytes: *id.as_bytes(),
+    }
 }
 
 #[inline]
 fn into_sys_issuance(id: &IssuanceId) -> sys::mpt_issuance_id {
-    sys::mpt_issuance_id { bytes: *id.as_bytes() }
+    sys::mpt_issuance_id {
+        bytes: *id.as_bytes(),
+    }
 }
 
 /// Context hash for `ConfidentialMPTConvert`.
