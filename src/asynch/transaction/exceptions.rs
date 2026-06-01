@@ -3,6 +3,10 @@ use core::num::ParseIntError;
 use alloc::string::String;
 use thiserror_no_std::Error;
 
+// XRPLSignTransactionException now lives in `crate::signing::exceptions`.
+// Re-exported here for backward compatibility.
+pub use crate::signing::exceptions::XRPLSignTransactionException;
+
 #[derive(Error, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum XRPLTransactionHelperException {
@@ -16,17 +20,6 @@ pub enum XRPLTransactionHelperException {
     XRPLSignTransactionError(#[from] XRPLSignTransactionException),
     #[error("XRPL Submit and Wait error: {0}")]
     XRPLSubmitAndWaitError(#[from] XRPLSubmitAndWaitException),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[non_exhaustive]
-pub enum XRPLSignTransactionException {
-    #[error("{0:?} value does not match X-Address tag")]
-    TagFieldMismatch(String),
-    #[error("Fee value of {0:?} is likely entered incorrectly, since it is much larger than the typical XRP transaction cost. If this is intentional, use `check_fee=Some(false)`.")]
-    FeeTooHigh(String),
-    #[error("Wallet is required to sign transaction")]
-    WalletRequired,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]

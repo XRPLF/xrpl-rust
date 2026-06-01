@@ -42,3 +42,17 @@ impl<'a> LedgerClosed<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = LedgerClosed::new(Some("lc-1".into()));
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerClosed = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"ledger_closed\""));
+    }
+}
