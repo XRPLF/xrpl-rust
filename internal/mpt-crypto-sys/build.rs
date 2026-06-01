@@ -120,10 +120,10 @@ fn download_and_extract(target: &str, dest: &Path, out_dir: &Path) {
         let s = path.to_string_lossy();
         let prefix_with_dot = format!("./{upstream}/");
         let prefix = format!("{upstream}/");
-        if s.starts_with(&prefix_with_dot) || s.starts_with(&prefix) {
-            if let Some(filename) = path.file_name() {
-                entry.unpack(dest.join(filename)).unwrap();
-            }
+        if (s.starts_with(&prefix_with_dot) || s.starts_with(&prefix))
+            && let Some(filename) = path.file_name()
+        {
+            entry.unpack(dest.join(filename)).unwrap();
         }
     }
 }
