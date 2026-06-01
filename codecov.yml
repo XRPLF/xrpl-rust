@@ -6,10 +6,22 @@ coverage:
         threshold: 1%
         flags:
           - unit
+      integration:
+        target: 65%
+        threshold: 1%
+        flags:
+          - integration
     patch:
       default:
         target: 80%
         threshold: 1%
+        flags:
+          - unit
+      integration:
+        target: 80%
+        threshold: 1%
+        flags:
+          - integration
 
 comment:
   layout: "reach, diff, flags, files"
@@ -17,5 +29,8 @@ comment:
 
 flags:
   unit:
+    paths:
+      - src/
+  integration:
     paths:
       - src/
