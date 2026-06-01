@@ -31,7 +31,6 @@ jobs:
         run: |
           docker run \
             --detach \
-            --rm \
             --publish 5005:5005 \
             --publish 6006:6006 \
             --volume "${{ github.workspace }}/.ci-config/":"/etc/xrpld/" \
