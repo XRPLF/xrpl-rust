@@ -5,6 +5,9 @@
 //! Faucet tests use the public testnet since Docker standalone doesn't have a faucet.
 
 #[cfg(all(feature = "integration", feature = "std", feature = "cli"))]
+mod common;
+
+#[cfg(all(feature = "integration", feature = "std", feature = "cli"))]
 mod cli_tests {
     use std::io::{self};
     use std::process::{Command, Stdio};
@@ -12,8 +15,10 @@ mod cli_tests {
 
     /// Test-specific constants
     mod constants {
-        // Docker standalone JSON-RPC endpoint
-        pub const TEST_URL: &str = "http://localhost:5005";
+        // Docker standalone JSON-RPC endpoint — canonical definition lives in
+        // tests/common/constants.rs; re-exported here so existing TEST_URL
+        // references keep working.
+        pub use crate::common::constants::STANDALONE_URL as TEST_URL;
 
         // Public testnet for faucet tests only
         pub const TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234";

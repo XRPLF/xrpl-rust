@@ -2,6 +2,7 @@
 
 pub mod amm;
 pub mod constants;
+pub mod payment;
 pub mod xchain;
 
 use anyhow::Result;
@@ -25,10 +26,6 @@ use xrpl::{asynch::clients::AsyncJsonRpcClient, wallet::Wallet};
 /// Address: rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh
 #[cfg(feature = "std")]
 const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
-
-/// HTTP JSON-RPC endpoint for local Docker standalone mode.
-#[cfg(feature = "std")]
-const STANDALONE_URL: &str = "http://localhost:5005";
 
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub async fn open_websocket(
@@ -77,7 +74,9 @@ static TEST_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 #[cfg(feature = "std")]
 pub async fn get_client() -> &'static AsyncJsonRpcClient {
     CLIENT
-        .get_or_init(|| async { AsyncJsonRpcClient::connect(Url::parse(STANDALONE_URL).unwrap()) })
+        .get_or_init(|| async {
+            AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap())
+        })
         .await
 }
 
@@ -125,7 +124,7 @@ pub async fn generate_funded_wallet() -> Wallet {
 #[cfg(feature = "std")]
 pub async fn ledger_accept() {
     let _ = reqwest::Client::new()
-        .post(STANDALONE_URL)
+        .post(constants::STANDALONE_URL)
         .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
         .send()
         .await;
