@@ -60,6 +60,15 @@ pub mod wallet;
 
 pub extern crate serde_json;
 
+/// Re-export of the [`mpt_crypto`] safe-wrapper crate (XLS-0096 Confidential
+/// MPT cryptography). The `ConfidentialMPT*` transaction models accept
+/// pre-computed proof and ciphertext bytes, so callers need this crate to
+/// generate that material: ElGamal holder keys, encrypted amounts, blinding
+/// factors, and the per-transaction-type zero-knowledge proofs. Available only
+/// with the `confidential-mpt` feature.
+#[cfg(feature = "confidential-mpt")]
+pub extern crate mpt_crypto;
+
 #[cfg(feature = "models")]
 mod _serde;
 
