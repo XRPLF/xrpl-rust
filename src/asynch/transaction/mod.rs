@@ -42,6 +42,11 @@ const OWNER_RESERVE: &str = "2000000"; // 2 XRP
 const RESTRICTED_NETWORKS: u16 = 1024;
 const REQUIRED_NETWORKID_VERSION: &str = "1.11.0";
 const LEDGER_OFFSET: u8 = 20;
+/// ConfidentialMPT transactions pay 10× the reference base fee, covering the
+/// cost of verifying the transaction's zero-knowledge proof. Mirrors rippled's
+/// cMPT transactors (`Transactor::calculateBaseFee + base ×
+/// kCONFIDENTIAL_FEE_MULTIPLIER`), whose total is `10 × base`.
+const CONFIDENTIAL_MPT_FEE_MULTIPLIER: u64 = 10;
 
 pub async fn sign_and_submit<'a, 'b, T, F, C>(
     transaction: &mut T,
@@ -156,6 +161,13 @@ where
             TransactionType::AMMCreate | TransactionType::AccountDelete => {
                 get_owner_reserve_from_response(client).await?
             }
+            TransactionType::ConfidentialMPTConvert
+            | TransactionType::ConfidentialMPTConvertBack
+            | TransactionType::ConfidentialMPTSend
+            | TransactionType::ConfidentialMPTClawback
+            | TransactionType::ConfidentialMPTMergeInbox => {
+                calculate_base_fee_for_confidential_mpt(net_fee.clone())?
+            }
             _ => net_fee.clone(),
         };
     } else {
@@ -168,6 +180,13 @@ where
             )?,
             TransactionType::AMMCreate | TransactionType::AccountDelete => {
                 XRPAmount::from(OWNER_RESERVE)
+            }
+            TransactionType::ConfidentialMPTConvert
+            | TransactionType::ConfidentialMPTConvertBack
+            | TransactionType::ConfidentialMPTSend
+            | TransactionType::ConfidentialMPTClawback
+            | TransactionType::ConfidentialMPTMergeInbox => {
+                calculate_base_fee_for_confidential_mpt(net_fee.clone())?
             }
             _ => net_fee.clone(),
         };
@@ -217,6 +236,19 @@ fn calculate_based_on_fulfillment<'a>(
     let base_fee: XRPAmount = base_fee_string.into();
     let base_fee_decimal: BigDecimal = base_fee.try_into()?;
 
+    Ok(base_fee_decimal
+        .with_scale_round(0, RoundingMode::Down)
+        .into())
+}
+
+/// ConfidentialMPT transactions pay [`CONFIDENTIAL_MPT_FEE_MULTIPLIER`]× the
+/// reference base fee (rippled's `kCONFIDENTIAL_FEE_MULTIPLIER`), reflecting the
+/// cost of verifying the transaction's zero-knowledge proof.
+fn calculate_base_fee_for_confidential_mpt<'a: 'b, 'b>(
+    net_fee: XRPAmount<'a>,
+) -> XRPLHelperResult<XRPAmount<'b>> {
+    let net_fee_decimal: BigDecimal = net_fee.try_into()?;
+    let base_fee_decimal = net_fee_decimal * BigDecimal::from(CONFIDENTIAL_MPT_FEE_MULTIPLIER);
     Ok(base_fee_decimal
         .with_scale_round(0, RoundingMode::Down)
         .into())
@@ -515,4 +547,83 @@ mod test_sign {
         assert_eq!(common_fields.account, wallet.classic_address);
         assert!(!common_fields.is_signed()); // Should not be signed yet
     }
+}
+
+#[cfg(all(feature = "json-rpc", feature = "std"))]
+#[cfg(test)]
+mod test_calculate_fee {
+    use super::calculate_base_fee_for_confidential_mpt;
+    use crate::models::XRPAmount;
+
+    #[test]
+    fn confidential_mpt_base_fee_is_ten_times_base() {
+        let fee = calculate_base_fee_for_confidential_mpt(XRPAmount::from("200")).unwrap();
+        assert_eq!(fee, XRPAmount::from("2000"));
+    }
+}
+
+// Autofill flow for every ConfidentialMPT transaction (akin to `test_autofill`'s
+// OfferCreate test). These tests use `AsyncJsonRpcClient` against `localhost:5005`. They
+// assert autofill populates the common fields and applies the 10× cMPT fee.
+#[cfg(all(
+    feature = "json-rpc",
+    feature = "std",
+    feature = "integration",
+    feature = "confidential-mpt"
+))]
+#[cfg(test)]
+mod test_autofill_confidential_mpt {
+    use super::autofill;
+    use crate::asynch::clients::AsyncJsonRpcClient;
+    use crate::models::transactions::{
+        confidential_mpt_clawback::ConfidentialMPTClawback,
+        confidential_mpt_convert::ConfidentialMPTConvert,
+        confidential_mpt_convert_back::ConfidentialMPTConvertBack,
+        confidential_mpt_merge_inbox::ConfidentialMPTMergeInbox,
+        confidential_mpt_send::ConfidentialMPTSend, CommonFields, Transaction, TransactionType,
+    };
+    use crate::models::XRPAmount;
+
+    // Genesis account on the standalone node — exists + funded, so autofill can
+    // resolve its sequence. autofill never submits, so each transaction's
+    // cMPT-specific fields are left at their defaults.
+    const GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    const STANDALONE_URL: &str = "http://localhost:5005";
+
+    // Each ConfidentialMPT transaction autofills to 10× the reference base fee
+    // (rippled's kCONFIDENTIAL_FEE_MULTIPLIER); the node's 200-drop base → 2000,
+    // alongside an autofilled sequence + last_ledger_sequence.
+    macro_rules! autofill_fee_test {
+        ($name:ident, $ty:ident) => {
+            #[tokio::test]
+            async fn $name() {
+                let mut tx = $ty {
+                    common_fields: CommonFields {
+                        account: GENESIS.into(),
+                        transaction_type: TransactionType::$ty,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                let client = AsyncJsonRpcClient::connect(STANDALONE_URL.parse().unwrap());
+                autofill(&mut tx, &client, None)
+                    .await
+                    .expect("autofill should populate the common fields");
+
+                let common = tx.get_common_fields();
+                assert!(common.sequence.is_some(), "autofill should set sequence");
+                assert!(
+                    common.last_ledger_sequence.is_some(),
+                    "autofill should set last_ledger_sequence"
+                );
+                assert_eq!(common.fee, Some(XRPAmount::from("2000")));
+            }
+        };
+    }
+
+    autofill_fee_test!(merge_inbox_autofill, ConfidentialMPTMergeInbox);
+    autofill_fee_test!(convert_autofill, ConfidentialMPTConvert);
+    autofill_fee_test!(convert_back_autofill, ConfidentialMPTConvertBack);
+    autofill_fee_test!(send_autofill, ConfidentialMPTSend);
+    autofill_fee_test!(clawback_autofill, ConfidentialMPTClawback);
 }

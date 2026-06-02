@@ -1,13 +1,8 @@
-use anyhow::Result;
-use url::Url;
-
 use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
 use xrpl::asynch::account::get_next_valid_seq_number;
-use xrpl::asynch::clients::{AsyncWebSocketClient, SingleExecutorMutex, WebSocketOpen};
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::transactions::confidential_mpt_convert::ConfidentialMPTConvert;
 use xrpl::models::transactions::confidential_mpt_merge_inbox::ConfidentialMPTMergeInbox;
-use xrpl::models::XRPAmount;
 
 // ─────────────────────────────────────────────────────────────────────────
 //  ConfidentialMPTMergeInbox — proof-free; runs end-to-end
@@ -23,14 +18,14 @@ async fn merge_inbox_jsonrpc_round_trip() {
 
         let mut tx = ConfidentialMPTMergeInbox::new(
             wallet.classic_address.clone().into(),
-            None,                            // account_txn_id
-            Some(XRPAmount::from("100000")), // fee — cMPT requires elevated fee
-            None,                            // last_ledger_sequence
-            None,                            // memos
-            None,                            // sequence
-            None,                            // signers
-            None,                            // source_tag
-            None,                            // ticket_sequence
+            None, // account_txn_id
+            None, // fee — autofilled; cMPT pays 10× the base fee
+            None, // last_ledger_sequence
+            None, // memos
+            None, // sequence
+            None, // signers
+            None, // source_tag
+            None, // ticket_sequence
             // 24-byte MPTokenIssuanceID — points at a non-existent issuance
             // for this test; the network will surface an OBJECT_NOT_FOUND-
             // class error, not a malformed-tx error.
@@ -167,14 +162,14 @@ async fn conf_mpt_convert_transaction() {
 
         let mut tx = ConfidentialMPTConvert::new(
             wallet.classic_address.clone().into(),
-            None,                            // account_txn_id
-            Some(XRPAmount::from("100000")), // fee — cMPT proof verification is priced above base
-            None,                            // last_ledger_sequence
-            None,                            // memos
-            Some(sequence),                  // bound into the proof context above
-            None,                            // signers
-            None,                            // source_tag
-            None,                            // ticket_sequence
+            None,           // account_txn_id
+            None,           // fee — autofilled; cMPT pays 10× the base fee
+            None,           // last_ledger_sequence
+            None,           // memos
+            Some(sequence), // bound into the proof context above
+            None,           // signers
+            None,           // source_tag
+            None,           // ticket_sequence
             m.issuance_id.into(),
             "1000".into(), // MPTAmount (public amount being converted)
             m.holder_encrypted_amount.into(),
