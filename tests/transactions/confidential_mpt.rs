@@ -16,12 +16,12 @@ use crate::common::{
 };
 use xrpl::asynch::account::get_next_valid_seq_number;
 use xrpl::asynch::clients::AsyncJsonRpcClient;
-use xrpl::mpt_crypto::{Privkey, Pubkey};
 use xrpl::models::transactions::confidential_mpt_clawback::ConfidentialMPTClawback;
 use xrpl::models::transactions::confidential_mpt_convert::ConfidentialMPTConvert;
 use xrpl::models::transactions::confidential_mpt_convert_back::ConfidentialMPTConvertBack;
 use xrpl::models::transactions::confidential_mpt_merge_inbox::ConfidentialMPTMergeInbox;
 use xrpl::models::transactions::confidential_mpt_send::ConfidentialMPTSend;
+use xrpl::mpt_crypto::{Privkey, Pubkey};
 use xrpl::wallet::Wallet;
 
 // Fee for the prerequisite MPT transactions. None of these transactors
@@ -83,7 +83,10 @@ async fn rpc(body: serde_json::Value) -> serde_json::Value {
 /// Submit a server-signed `tx_json` (`secret` = wallet seed), assert
 /// `tesSUCCESS`, and advance the ledger. Used only for prerequisite setup.
 async fn submit_signed(seed: &str, tx_json: serde_json::Value) {
-    let tx_type = tx_json["TransactionType"].as_str().unwrap_or("?").to_string();
+    let tx_type = tx_json["TransactionType"]
+        .as_str()
+        .unwrap_or("?")
+        .to_string();
     let result = rpc(serde_json::json!({
         "method": "submit",
         "params": [{ "secret": seed, "tx_json": tx_json }],
@@ -91,7 +94,8 @@ async fn submit_signed(seed: &str, tx_json: serde_json::Value) {
     .await;
     let code = result["engine_result"].as_str().unwrap_or("<none>");
     assert_eq!(
-        code, "tesSUCCESS",
+        code,
+        "tesSUCCESS",
         "prerequisite {tx_type} failed: {code} — {}",
         result["engine_result_message"].as_str().unwrap_or("")
     );
@@ -299,10 +303,13 @@ fn build_convert_material(
 
     let account = account_id_bytes(holder_account);
     let issuance = issuance_id_bytes(issuance_id_hex);
-    let ctx = context::convert(&AccountId::new(account), &IssuanceId::new(issuance), sequence)
-        .expect("convert context hash");
-    let proof =
-        prove::convert(holder_elgamal_sk, holder_elgamal_pk, &ctx).expect("convert proof");
+    let ctx = context::convert(
+        &AccountId::new(account),
+        &IssuanceId::new(issuance),
+        sequence,
+    )
+    .expect("convert context hash");
+    let proof = prove::convert(holder_elgamal_sk, holder_elgamal_pk, &ctx).expect("convert proof");
 
     ConfidentialMPTConvertBundle {
         holder_encrypted_amount: uppercase_hex(holder_ct.as_bytes()),
@@ -422,7 +429,10 @@ async fn confidential_mpt_convert() {
                 .expect("ConfidentialBalanceInbox present"),
             &setup.holder_elgamal_sk,
         );
-        assert_eq!(inbox, amount, "confidential inbox should decrypt to {amount}");
+        assert_eq!(
+            inbox, amount,
+            "confidential inbox should decrypt to {amount}"
+        );
     })
     .await;
 }
@@ -456,7 +466,10 @@ async fn confidential_mpt_merge_inbox() {
                 .expect("ConfidentialBalanceInbox present"),
             &setup.holder_elgamal_sk,
         );
-        assert_eq!(spending, amount, "spending should decrypt to {amount} after merge");
+        assert_eq!(
+            spending, amount,
+            "spending should decrypt to {amount} after merge"
+        );
         assert_eq!(inbox, 0, "inbox should decrypt to 0 (reset) after merge");
         // The first Convert leaves the version at 0 (omitted); MergeInbox bumps it.
         assert_eq!(
@@ -517,7 +530,10 @@ async fn confidential_mpt_clawback() {
                 .expect("ConfidentialBalanceInbox present"),
             &setup.holder_elgamal_sk,
         );
-        assert_eq!(inbox, 0, "clawback should zero the holder's confidential inbox");
+        assert_eq!(
+            inbox, 0,
+            "clawback should zero the holder's confidential inbox"
+        );
     })
     .await;
 }
@@ -781,8 +797,15 @@ async fn confidential_mpt_send() {
             get_next_valid_seq_number(setup.holder.classic_address.clone().into(), client, None)
                 .await
                 .expect("fetch sender sequence");
-        let m = build_send_material(&setup, &dest.classic_address, &dest_pk, sequence, amount, sender_balance)
-            .await;
+        let m = build_send_material(
+            &setup,
+            &dest.classic_address,
+            &dest_pk,
+            sequence,
+            amount,
+            sender_balance,
+        )
+        .await;
 
         let mut tx = ConfidentialMPTSend::new(
             setup.holder.classic_address.clone().into(),
