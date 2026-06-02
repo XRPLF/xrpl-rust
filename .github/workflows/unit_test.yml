@@ -33,6 +33,18 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+      # confidential-mpt is not a default feature (it links the mpt-crypto
+      # native library via FFI), so the cMPT transaction-model unit tests and
+      # the mpt-crypto safe-wrapper tests are not covered by the step above.
+      # Run them explicitly. Kept separate from the coverage step so the
+      # unexercised FFI crate does not affect the unit coverage threshold.
+      - name: Test confidential-mpt (models + mpt-crypto wrapper)
+        run: |
+          cargo test --release --features confidential-mpt --lib
+          cargo test --release -p mpt-crypto
+        env:
+          RUST_BACKTRACE: 1
+
       - name: Test for no_std
         run: cargo test --release --no-default-features --features
           embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
