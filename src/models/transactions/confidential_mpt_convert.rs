@@ -207,4 +207,72 @@ mod tests {
         assert!(!json.contains("\"HolderEncryptionKey\""));
         assert!(!json.contains("\"ZKProof\""));
     }
+
+    #[test]
+    fn test_new_builder_and_accessors() {
+        let mut tx = ConfidentialMPTConvert::new(
+            "rUserAccount11111111111111111111".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "610F33".repeat(4).into(),
+            "1000".into(),
+            "AD3F".repeat(33).into(),
+            "BC2E".repeat(33).into(),
+            "EE".repeat(32).into(),
+            None,
+            None,
+            None,
+        )
+        .with_fee(XRPAmount::from("20000"))
+        .with_sequence(7);
+
+        // with_fee/with_sequence route through the builder's
+        // get_mut_common_fields() + into_self().
+        assert_eq!(tx.get_common_fields().sequence, Some(7));
+        assert_eq!(tx.get_common_fields().fee, Some(XRPAmount::from("20000")));
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::ConfidentialMPTConvert
+        );
+        // No currency amounts to validate, so Model::get_errors succeeds.
+        assert!(tx.get_errors().is_ok());
+
+        // Transaction::get_mut_common_fields (distinct from the builder's
+        // same-named method) — disambiguate via UFCS.
+        let common =
+            <ConfidentialMPTConvert as Transaction<'_, NoFlags>>::get_mut_common_fields(&mut tx);
+        assert_eq!(common.sequence, Some(7));
+    }
+
+    #[test]
+    fn test_serialize_with_auditor_mirror() {
+        let tx = ConfidentialMPTConvert {
+            common_fields: CommonFields {
+                account: "rUserAccount11111111111111111111".into(),
+                transaction_type: TransactionType::ConfidentialMPTConvert,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "610F33".repeat(4).into(),
+            mpt_amount: "750".into(),
+            holder_encrypted_amount: "AD3F".repeat(33).into(),
+            issuer_encrypted_amount: "BC2E".repeat(33).into(),
+            blinding_factor: "EE".repeat(32).into(),
+            holder_encryption_key: None,
+            // Issuance with a registered AuditorEncryptionKey requires the mirror.
+            auditor_encrypted_amount: Some("CD".repeat(66).into()),
+            zk_proof: None,
+        };
+
+        let json = serde_json::to_string(&tx).unwrap();
+        assert!(json.contains("\"AuditorEncryptedAmount\""));
+
+        let round_tripped: ConfidentialMPTConvert = serde_json::from_str(&json).unwrap();
+        assert_eq!(round_tripped, tx);
+    }
 }
