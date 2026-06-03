@@ -12,7 +12,8 @@
 
 use crate::common::constants::STANDALONE_URL;
 use crate::common::{
-    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
+    generate_funded_wallet, get_client, ledger_accept, test_transaction,
+    test_transaction_with_result, with_blockchain_lock,
 };
 use xrpl::asynch::account::get_next_valid_seq_number;
 use xrpl::asynch::clients::AsyncJsonRpcClient;
@@ -30,9 +31,15 @@ const MPT_TXN_FEE: &str = "200";
 // Public MPT balance the issuer funds each holder with (something to convert).
 const FUNDED_MPT: &str = "1000";
 // MPTokenIssuance create-time flags
+const TF_MPT_CAN_LOCK: u32 = 0x0000_0002;
+const TF_MPT_REQUIRE_AUTH: u32 = 0x0000_0004;
 const TF_MPT_CAN_TRANSFER: u32 = 0x0000_0020;
 const TF_MPT_CAN_CLAWBACK: u32 = 0x0000_0040;
 const TF_MPT_CAN_CONFIDENTIAL_AMOUNT: u32 = 0x0000_0080;
+// MPTokenIssuanceSet flag: lock the whole issuance, or a single holder's token.
+const TF_MPT_LOCK: u32 = 0x0000_0001;
+// MPTokenAuthorize flag: issuer revokes a holder's authorization.
+const TF_MPT_UNAUTHORIZE: u32 = 0x0000_0001;
 
 // ─────────────────────────────────────────────────────────────────────────
 //  Raw JSON-RPC helpers (no SDK models needed for the prerequisites)
@@ -241,6 +248,22 @@ async fn setup_confidential_issuance(issuance_flags: u32) -> ConfidentialSetup {
         }),
     )
     .await;
+
+    // 3b. Under RequireAuth, the issuer must also authorize the holder before
+    //     the holder can hold or convert the token.
+    if issuance_flags & TF_MPT_REQUIRE_AUTH != 0 {
+        submit_signed(
+            &issuer.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenAuthorize",
+                "Account": issuer.classic_address,
+                "Holder": holder.classic_address,
+                "MPTokenIssuanceID": issuance_id,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+    }
 
     // 4. Issuer sends the holder a public MPT balance to convert.
     submit_signed(
@@ -477,6 +500,289 @@ async fn confidential_mpt_merge_inbox() {
             Some(1),
             "merge should bump ConfidentialBalanceVersion to 1"
         );
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #2: `ConfidentialMPTMergeInbox` on
+/// an issuance that lacks `lsfMPTCanConfidentialAmount` must be rejected with
+/// `tecNO_PERMISSION`. The issuance is created without the confidential flag and
+/// the holder is authorized, so the `MPTokenIssuance` and `MPToken` both exist
+/// (preclaim check #1 passes) — only the missing-capability check (#2) fires.
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_non_confidential_issuance() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let holder = generate_funded_wallet().await;
+
+        // Plain (non-confidential) issuance: no tfMPTCanConfidentialAmount.
+        submit_signed(
+            &issuer.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenIssuanceCreate",
+                "Account": issuer.classic_address,
+                "Flags": 0,
+                "AssetScale": 0,
+                "MaximumAmount": "1000000000",
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+        let issuance_id = sole_issuance_id(&issuer.classic_address).await;
+
+        // Holder opts in, so the MPToken exists (check #1 passes).
+        submit_signed(
+            &holder.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenAuthorize",
+                "Account": holder.classic_address,
+                "MPTokenIssuanceID": issuance_id,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            issuance_id.clone().into(),
+        );
+        test_transaction_with_result(&mut tx, &holder, "tecNO_PERMISSION").await;
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #3: `ConfidentialMPTMergeInbox` on a
+/// confidential-capable issuance whose holder has not yet Converted must be
+/// rejected with `tecNO_PERMISSION`. The holder is authorized (MPToken exists,
+/// confidential flag set — checks #1 and #2 pass) but has never Converted, so
+/// `ConfidentialBalanceInbox`/`Spending` are absent — the uninitialized check
+/// (#3) fires.
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_uninitialized_mptoken() {
+    with_blockchain_lock(|| async {
+        // Authorizes the holder but performs no Convert — confidential balances
+        // remain uninitialized.
+        let setup = setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT).await;
+
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            setup.holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            setup.issuance_id.clone().into(),
+        );
+        test_transaction_with_result(&mut tx, &setup.holder, "tecNO_PERMISSION").await;
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #1: `ConfidentialMPTMergeInbox`
+/// referencing a non-existent `MPTokenIssuance` must be rejected with
+/// `tecOBJECT_NOT_FOUND`. We fabricate a valid-format `MPTokenIssuanceID` whose
+/// embedded issuer (bytes 4..24) is a real account distinct from the submitter,
+/// so preflight's account-is-not-issuer check passes — but the (sequence,
+/// issuer) pair was never used to create an issuance, so the lookup fails.
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_missing_issuance() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let holder = generate_funded_wallet().await;
+
+        // 24-byte MPTokenIssuanceID = 4-byte sequence ++ 20-byte issuer AccountID.
+        let mut id = [0u8; 24];
+        id[..4].copy_from_slice(&1u32.to_be_bytes());
+        id[4..].copy_from_slice(&account_id_bytes(&issuer.classic_address));
+        let missing_issuance_id = uppercase_hex(&id);
+
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            missing_issuance_id.into(),
+        );
+        test_transaction_with_result(&mut tx, &holder, "tecOBJECT_NOT_FOUND").await;
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #4: `ConfidentialMPTMergeInbox` by a
+/// holder whose authorization has been revoked must be rejected with
+/// `tecNO_AUTH`. rippled checks auth *last*, so the holder must first reach a
+/// valid state (authorized + Converted) before the issuer unauthorizes it.
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_unauthorized_holder() {
+    with_blockchain_lock(|| async {
+        let setup =
+            setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT | TF_MPT_REQUIRE_AUTH).await;
+        let client = get_client().await;
+
+        // Initialize the holder's confidential balances (passes checks #1–#3).
+        convert_public_to_confidential(&setup, client, 50).await;
+
+        // Issuer revokes the holder's authorization.
+        submit_signed(
+            &setup.issuer.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenAuthorize",
+                "Account": setup.issuer.classic_address,
+                "Holder": setup.holder.classic_address,
+                "MPTokenIssuanceID": setup.issuance_id,
+                "Flags": TF_MPT_UNAUTHORIZE,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            setup.holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            setup.issuance_id.clone().into(),
+        );
+        test_transaction_with_result(&mut tx, &setup.holder, "tecNO_AUTH").await;
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #5: `ConfidentialMPTMergeInbox` on a
+/// holder whose token has been individually locked must be rejected with
+/// `tecLOCKED`. The holder Converts first (passes #1–#3); rippled's frozen check
+/// runs before the auth check.
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_locked_holder() {
+    with_blockchain_lock(|| async {
+        let setup =
+            setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT | TF_MPT_CAN_LOCK).await;
+        let client = get_client().await;
+
+        convert_public_to_confidential(&setup, client, 50).await;
+
+        // Issuer locks the holder's MPToken (Holder field present).
+        submit_signed(
+            &setup.issuer.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenIssuanceSet",
+                "Account": setup.issuer.classic_address,
+                "MPTokenIssuanceID": setup.issuance_id,
+                "Holder": setup.holder.classic_address,
+                "Flags": TF_MPT_LOCK,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            setup.holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            setup.issuance_id.clone().into(),
+        );
+        test_transaction_with_result(&mut tx, &setup.holder, "tecLOCKED").await;
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #6: `ConfidentialMPTMergeInbox` while
+/// the entire issuance is locked must be rejected with `tecLOCKED`. Same as #5
+/// but the issuer locks the issuance globally (no `Holder` field).
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_locked_issuance() {
+    with_blockchain_lock(|| async {
+        let setup =
+            setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT | TF_MPT_CAN_LOCK).await;
+        let client = get_client().await;
+
+        convert_public_to_confidential(&setup, client, 50).await;
+
+        // Issuer locks the entire issuance (no Holder field → global lock).
+        submit_signed(
+            &setup.issuer.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenIssuanceSet",
+                "Account": setup.issuer.classic_address,
+                "MPTokenIssuanceID": setup.issuance_id,
+                "Flags": TF_MPT_LOCK,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            setup.holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            setup.issuance_id.clone().into(),
+        );
+        test_transaction_with_result(&mut tx, &setup.holder, "tecLOCKED").await;
+    })
+    .await;
+}
+
+/// XLS-0096 §9.2.1.2 protocol-level failure #7: the issuer attempting to merge
+/// its own issuance.
+///
+/// The spec frames this as a `tefINTERNAL` invariant, but rippled's preclaim
+/// check for it is an unreachable defensive backstop (marked `LCOV_EXCL_LINE`):
+/// preflight already rejects an issuer-submitted merge with `temMALFORMED`
+/// ("issuer cannot merge"), so `temMALFORMED` is the *observable* result. We
+/// assert the real behavior rather than the unreachable invariant code.
+#[tokio::test]
+async fn confidential_mpt_merge_inbox_rejects_issuer_as_merger() {
+    with_blockchain_lock(|| async {
+        let setup = setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT).await;
+
+        // Account == the issuance's embedded issuer, tripping preflight's
+        // "issuer cannot merge" check before any ledger state is consulted.
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            setup.issuer.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            setup.issuance_id.clone().into(),
+        );
+        test_transaction_with_result(&mut tx, &setup.issuer, "temMALFORMED").await;
     })
     .await;
 }

@@ -138,4 +138,39 @@ mod tests {
         let round_tripped: ConfidentialMPTMergeInbox = serde_json::from_str(&json).unwrap();
         assert_eq!(round_tripped, tx);
     }
+
+    #[test]
+    fn test_new_builder_and_accessors() {
+        let mut tx = ConfidentialMPTMergeInbox::new(
+            "rUserAccount111111111111111111111".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "610F33".repeat(4).into(),
+        )
+        .with_fee(XRPAmount::from("20000"))
+        .with_sequence(7);
+
+        // with_fee/with_sequence route through the builder's
+        // get_mut_common_fields() + into_self().
+        assert_eq!(tx.get_common_fields().sequence, Some(7));
+        assert_eq!(tx.get_common_fields().fee, Some(XRPAmount::from("20000")));
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::ConfidentialMPTMergeInbox
+        );
+        // No currency amounts to validate, so Model::get_errors succeeds.
+        assert!(tx.get_errors().is_ok());
+
+        // Transaction::get_mut_common_fields (distinct from the builder's
+        // same-named method) — disambiguate via UFCS.
+        let common =
+            <ConfidentialMPTMergeInbox as Transaction<'_, NoFlags>>::get_mut_common_fields(&mut tx);
+        assert_eq!(common.sequence, Some(7));
+    }
 }

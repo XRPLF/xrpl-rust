@@ -263,15 +263,35 @@ where
         + core::fmt::Debug,
     F: strum::IntoEnumIterator + serde::Serialize + core::fmt::Debug + PartialEq + Clone + 'a,
 {
+    test_transaction_with_result(tx, wallet, "tesSUCCESS").await;
+}
+
+/// Sign, submit, assert the engine result equals `expected_engine_result`, then
+/// advance the ledger. Pass `"tesSUCCESS"` for happy paths, or a specific
+/// `tec`/`tem`/`tef` code (e.g. `"tecNO_PERMISSION"`) to validate an expected
+/// failure case.
+pub async fn test_transaction_with_result<'a, T, F>(
+    tx: &mut T,
+    wallet: &Wallet,
+    expected_engine_result: &str,
+) where
+    T: xrpl::models::transactions::Transaction<'a, F>
+        + xrpl::models::Model
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Clone
+        + core::fmt::Debug,
+    F: strum::IntoEnumIterator + serde::Serialize + core::fmt::Debug + PartialEq + Clone + 'a,
+{
     use xrpl::asynch::transaction::sign_and_submit;
     let client = get_client().await;
     let result = sign_and_submit(tx, client, wallet, true, true)
         .await
         .expect("test_transaction: sign_and_submit failed");
     assert_eq!(
-        result.engine_result, "tesSUCCESS",
-        "Expected tesSUCCESS but got: {} — {}",
-        result.engine_result, result.engine_result_message
+        result.engine_result, expected_engine_result,
+        "Expected {} but got: {} — {}",
+        expected_engine_result, result.engine_result, result.engine_result_message
     );
     ledger_accept().await;
 }
