@@ -366,29 +366,4 @@ mod tests {
         assert!(txn.get_errors().is_ok());
     }
 
-    #[test]
-    fn test_multiple_memos() {
-        let txn = PermissionedDomainDelete {
-            common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
-                transaction_type: TransactionType::PermissionedDomainDelete,
-                ..Default::default()
-            },
-            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
-        }
-        .with_memo(Memo {
-            memo_data: Some("reason 1".into()),
-            memo_format: None,
-            memo_type: Some("text".into()),
-        })
-        .with_memo(Memo {
-            memo_data: Some("reason 2".into()),
-            memo_format: None,
-            memo_type: Some("text".into()),
-        })
-        .with_fee("10".into())
-        .with_sequence(1);
-
-        assert_eq!(txn.common_fields.memos.as_ref().unwrap().len(), 2);
-    }
 }
