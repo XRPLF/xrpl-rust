@@ -69,15 +69,20 @@ async fn test_permissioned_domain_delete_base() {
             )
             .await
             .expect("account_objects request should succeed");
-        let account_objects: results::account_objects::AccountObjects<'_> = account_objects_response
-            .try_into()
-            .expect("account_objects response should deserialize");
+        let account_objects: results::account_objects::AccountObjects<'_> =
+            account_objects_response
+                .try_into()
+                .expect("account_objects response should deserialize");
 
         let domain_id = account_objects
             .account_objects
             .iter()
             .find(|object| object["LedgerEntryType"] == "PermissionedDomain")
-            .and_then(|object| object["index"].as_str().or_else(|| object["LedgerIndex"].as_str()))
+            .and_then(|object| {
+                object["index"]
+                    .as_str()
+                    .or_else(|| object["LedgerIndex"].as_str())
+            })
             .expect("created PermissionedDomain object should be returned by account_objects")
             .to_string();
 
