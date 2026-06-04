@@ -9,7 +9,7 @@ use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model, XRPLModelException, XRPLModelResult,
 };
-use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
+use crate::models::{FlagCollection, NoFlags};
 
 use super::CommonTransactionBuilder;
 
@@ -18,16 +18,7 @@ use super::CommonTransactionBuilder;
 /// See CredentialDelete:
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0070-credentials>`
 #[skip_serializing_none]
-#[derive(
-    Debug,
-    Default,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    Clone,
-    xrpl_rust_macros::ValidateCurrencies,
-)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct CredentialDelete<'a> {
     /// The base fields for all transaction models.
@@ -46,8 +37,7 @@ pub struct CredentialDelete<'a> {
 impl<'a> Model for CredentialDelete<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_subject_or_issuer_error()?;
-        self._get_credential_type_error()?;
-        self.validate_currencies()
+        self._get_credential_type_error()
     }
 }
 
@@ -134,22 +124,7 @@ impl<'a> CredentialDeleteError for CredentialDelete<'a> {
     }
 
     fn _get_credential_type_error(&self) -> XRPLModelResult<()> {
-        let len = self.credential_type.len();
-        if len == 0 {
-            Err(XRPLModelException::ValueTooShort {
-                field: "credential_type".into(),
-                min: 1,
-                found: 0,
-            })
-        } else if len > 128 {
-            Err(XRPLModelException::ValueTooLong {
-                field: "credential_type".into(),
-                max: 128,
-                found: len,
-            })
-        } else {
-            Ok(())
-        }
+        super::validate_credential_type(&self.credential_type)
     }
 }
 
@@ -161,7 +136,7 @@ pub trait CredentialDeleteError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Model;
+    use crate::models::{Model, XRPLModelException};
     use alloc::borrow::Cow;
 
     #[test]
@@ -327,7 +302,36 @@ mod tests {
             issuer: None,
             credential_type: Cow::from(""),
         };
-        assert!(tx.get_errors().is_err());
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooShort {
+                field: "credential_type".into(),
+                min: 1,
+                found: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_credential_type_non_hex_error() {
+        let tx = CredentialDelete {
+            common_fields: CommonFields {
+                account: "rSubject11111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialDelete,
+                ..Default::default()
+            },
+            subject: Some("rSubject11111111111111111111111111".into()),
+            issuer: None,
+            credential_type: "NOT_HEX".into(),
+        };
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "credential_type".into(),
+                format: "hexadecimal".into(),
+                found: "NOT_HEX".into(),
+            }
+        );
     }
 
     #[test]
@@ -343,7 +347,14 @@ mod tests {
             issuer: None,
             credential_type: too_long,
         };
-        assert!(tx.get_errors().is_err());
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooLong {
+                field: "credential_type".into(),
+                max: 128,
+                found: 129,
+            }
+        );
     }
 
     #[test]

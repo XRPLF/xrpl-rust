@@ -77,6 +77,7 @@ mod tests {
             "rDest11111111111111111111111111111".into(),
             "rSrc111111111111111111111111111111".into(),
             None,
+            None,
             Some(LedgerIndex::Str("validated".into())),
         );
         let serialized = serde_json::to_string(&req).unwrap();

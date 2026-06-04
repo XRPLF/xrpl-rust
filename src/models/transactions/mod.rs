@@ -67,6 +67,49 @@ use strum_macros::{AsRefStr, Display};
 
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
+fn is_hex(value: &str) -> bool {
+    value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Validate that a `CredentialType` field is a non-empty hex string up to 64 bytes.
+pub fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
+    let len = credential_type.len();
+    if len == 0 {
+        Err(XRPLModelException::ValueTooShort {
+            field: "credential_type".into(),
+            min: 1,
+            found: 0,
+        })
+    } else if len > 128 {
+        Err(XRPLModelException::ValueTooLong {
+            field: "credential_type".into(),
+            max: 128,
+            found: len,
+        })
+    } else if !is_hex(credential_type) {
+        Err(XRPLModelException::InvalidValueFormat {
+            field: "credential_type".into(),
+            format: "hexadecimal".into(),
+            found: credential_type.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validate that a hex-encoded string contains only hexadecimal characters.
+pub fn validate_hex(field: &str, value: &str) -> XRPLModelResult<()> {
+    if !is_hex(value) {
+        Err(XRPLModelException::InvalidValueFormat {
+            field: field.into(),
+            format: "hexadecimal".into(),
+            found: value.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
 /// Validate that a `credential_ids` field, when present, contains 1..=8 unique entries
 /// as required by the XLS-70 specification (sections 8.1 and 8.2).
 pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XRPLModelResult<()> {
