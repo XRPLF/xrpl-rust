@@ -47,10 +47,13 @@ impl<'a> Model for PermissionedDomainDelete<'a> {
         // DomainID is the 32-byte hash of the PermissionedDomain ledger entry,
         // serialized as 64 uppercase hex chars.
         let domain_id = self.domain_id.as_ref();
-        if domain_id.len() != 64 || !domain_id.chars().all(|c| c.is_ascii_hexdigit()) {
+        if domain_id.len() != 64
+            || !domain_id.chars().all(|c| c.is_ascii_hexdigit())
+            || domain_id.chars().all(|c| c == '0')
+        {
             return Err(XRPLModelException::InvalidValue {
                 field: "DomainID".into(),
-                expected: "64-character hex string".into(),
+                expected: "non-zero 64-character hex string".into(),
                 found: domain_id.into(),
             });
         }
@@ -330,6 +333,23 @@ mod tests {
         assert!(matches!(
             non_hex.get_errors().unwrap_err(),
             XRPLModelException::InvalidValue { .. }
+        ));
+    }
+
+    #[test]
+    fn test_delete_all_zero_domain_id_rejected() {
+        let txn = PermissionedDomainDelete {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainDelete,
+                ..Default::default()
+            },
+            domain_id: "0".repeat(64).into(),
+        };
+
+        assert!(matches!(
+            txn.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
         ));
     }
 
