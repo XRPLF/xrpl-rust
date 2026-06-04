@@ -7,6 +7,9 @@
 // oracles (XLS-47). These tests validate type construction and serialization
 // without submitting to a network.
 
+use crate::common::{
+    generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
+};
 use xrpl::models::transactions::oracle_set::OracleSet;
 use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
 
@@ -69,4 +72,38 @@ fn test_oracle_set_serde_roundtrip() {
     let json = serde_json::to_string(&oracle_set).unwrap();
     let deserialized: OracleSet = serde_json::from_str(&json).unwrap();
     assert_eq!(oracle_set, deserialized);
+}
+
+#[tokio::test]
+async fn test_oracle_set_submit() {
+    with_blockchain_lock(|| async {
+        let wallet = generate_funded_wallet().await;
+        let last_update_time = get_ledger_close_time().await as u32;
+
+        let mut oracle_set = OracleSet::new(
+            wallet.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            1,
+            Some("chainlink".into()),
+            Some("68747470733A2F2F6578616D706C652E636F6D".into()),
+            Some("63757272656E6379".into()),
+            last_update_time,
+            vec![PriceData {
+                base_asset: "XRP".into(),
+                quote_asset: "USD".into(),
+                asset_price: Some("740".into()),
+                scale: Some(1),
+            }],
+        );
+
+        test_transaction(&mut oracle_set, &wallet).await;
+    })
+    .await;
 }
