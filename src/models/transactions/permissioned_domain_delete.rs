@@ -365,5 +365,4 @@ mod tests {
         };
         assert!(txn.get_errors().is_ok());
     }
-
 }
