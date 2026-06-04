@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -66,8 +67,16 @@ impl<'a> Model for PermissionedDomainSet<'a> {
                 found: self.accepted_credentials.len(),
             });
         }
+        let mut credentials = BTreeSet::new();
         for credential in &self.accepted_credentials {
             validate_credential(credential)?;
+            if !credentials.insert((&credential.issuer, &credential.credential_type)) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "AcceptedCredentials".into(),
+                    expected: "unique Issuer/CredentialType pairs".into(),
+                    found: credential.credential_type.clone(),
+                });
+            }
         }
         if let Some(domain_id) = &self.domain_id {
             validate_domain_id(domain_id.as_ref())?;
@@ -589,6 +598,28 @@ mod tests {
         assert!(matches!(
             result.unwrap_err(),
             XRPLModelException::ValueTooLong { max: 128, .. }
+        ));
+    }
+
+    #[test]
+    fn test_duplicate_credentials_rejected() {
+        let duplicate = Credential {
+            issuer: "rIssuer".to_string(),
+            credential_type: "4B5943".to_string(),
+        };
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: vec![duplicate.clone(), duplicate],
+        };
+
+        assert!(matches!(
+            txn.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
         ));
     }
 
