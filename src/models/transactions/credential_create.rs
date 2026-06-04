@@ -10,7 +10,7 @@ use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model, XRPLModelException, XRPLModelResult,
 };
-use crate::models::{FlagCollection, NoFlags, ValidateCurrencies};
+use crate::models::{FlagCollection, NoFlags};
 
 use super::CommonTransactionBuilder;
 
@@ -19,16 +19,7 @@ use super::CommonTransactionBuilder;
 /// See CredentialCreate:
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0070-credentials>`
 #[skip_serializing_none]
-#[derive(
-    Debug,
-    Default,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    Clone,
-    xrpl_rust_macros::ValidateCurrencies,
-)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct CredentialCreate<'a> {
     /// The base fields for all transaction models.
@@ -48,8 +39,7 @@ pub struct CredentialCreate<'a> {
 impl<'a> Model for CredentialCreate<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self._get_credential_type_error()?;
-        self._get_uri_error()?;
-        self.validate_currencies()
+        self._get_uri_error()
     }
 }
 
@@ -131,22 +121,7 @@ impl<'a> CredentialCreate<'a> {
 
 impl<'a> CredentialCreateError for CredentialCreate<'a> {
     fn _get_credential_type_error(&self) -> XRPLModelResult<()> {
-        let len = self.credential_type.len();
-        if len == 0 {
-            Err(XRPLModelException::ValueTooShort {
-                field: "credential_type".into(),
-                min: 1,
-                found: 0,
-            })
-        } else if len > 128 {
-            Err(XRPLModelException::ValueTooLong {
-                field: "credential_type".into(),
-                max: 128,
-                found: len,
-            })
-        } else {
-            Ok(())
-        }
+        super::validate_credential_type(&self.credential_type)
     }
 
     fn _get_uri_error(&self) -> XRPLModelResult<()> {
@@ -165,6 +140,7 @@ impl<'a> CredentialCreateError for CredentialCreate<'a> {
                     found: uri.len(),
                 });
             }
+            super::validate_hex("uri", uri)?;
         }
         Ok(())
     }
@@ -178,7 +154,7 @@ pub trait CredentialCreateError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Model;
+    use crate::models::{Model, XRPLModelException};
     use alloc::borrow::Cow;
 
     #[test]
@@ -210,22 +186,6 @@ mod tests {
     }
 
     #[test]
-    fn test_credential_type_length_validation() {
-        let tx = CredentialCreate {
-            common_fields: CommonFields {
-                account: "rIssuer111111111111111111111111111".into(),
-                transaction_type: TransactionType::CredentialCreate,
-                ..Default::default()
-            },
-            subject: "rSubject11111111111111111111111111".into(),
-            credential_type: "".into(),
-            expiration: None,
-            uri: None,
-        };
-        assert!(tx.get_errors().is_err());
-    }
-
-    #[test]
     fn test_credential_type_empty_error() {
         let tx = CredentialCreate {
             common_fields: CommonFields {
@@ -238,7 +198,37 @@ mod tests {
             expiration: None,
             uri: None,
         };
-        assert!(tx.get_errors().is_err());
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooShort {
+                field: "credential_type".into(),
+                min: 1,
+                found: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_credential_type_non_hex_error() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "NOT_HEX".into(),
+            expiration: None,
+            uri: None,
+        };
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "credential_type".into(),
+                format: "hexadecimal".into(),
+                found: "NOT_HEX".into(),
+            }
+        );
     }
 
     #[test]
@@ -274,7 +264,14 @@ mod tests {
             expiration: None,
             uri: None,
         };
-        assert!(tx.get_errors().is_err());
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooLong {
+                field: "credential_type".into(),
+                max: 128,
+                found: 129,
+            }
+        );
     }
 
     #[test]
@@ -309,7 +306,14 @@ mod tests {
             expiration: None,
             uri: Some(too_long),
         };
-        assert!(tx.get_errors().is_err());
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooLong {
+                field: "uri".into(),
+                max: MAX_URI_LENGTH,
+                found: MAX_URI_LENGTH + 1,
+            }
+        );
     }
 
     #[test]
@@ -326,7 +330,37 @@ mod tests {
             expiration: None,
             uri: Some(Cow::from("")),
         };
-        assert!(tx.get_errors().is_err());
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooShort {
+                field: "uri".into(),
+                min: 1,
+                found: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_uri_non_hex_error() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: Some(Cow::from("NOT_HEX")),
+        };
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "uri".into(),
+                format: "hexadecimal".into(),
+                found: "NOT_HEX".into(),
+            }
+        );
     }
 
     #[test]

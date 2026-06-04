@@ -40,6 +40,7 @@ async fn test_ledger_entry_base() {
             None,                      // account_root
             None,                      // binary
             None,                      // check
+            None,                      // credential
             None,                      // deposit_preauth
             None,                      // directory
             None,                      // escrow

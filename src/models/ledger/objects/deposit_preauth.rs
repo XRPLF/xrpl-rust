@@ -395,6 +395,13 @@ mod tests {
             ),
             previous_txn_lgr_seq: 8,
         };
-        assert!(deposit_preauth.get_errors().is_err());
+        assert_eq!(
+            deposit_preauth.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooLong {
+                field: "authorize_credentials".into(),
+                max: 8,
+                found: 9,
+            }
+        );
     }
 }

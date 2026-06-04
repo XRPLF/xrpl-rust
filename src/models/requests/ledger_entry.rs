@@ -188,6 +188,33 @@ impl<'a> Request<'a> for LedgerEntry<'a> {
     }
 }
 
+impl<'a> Default for LedgerEntry<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
+                id: None,
+            },
+            account_root: None,
+            binary: None,
+            check: None,
+            credential: None,
+            deposit_preauth: None,
+            directory: None,
+            escrow: None,
+            index: None,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash: None,
+                ledger_index: None,
+            }),
+            offer: None,
+            payment_channel: None,
+            ripple_state: None,
+            ticket: None,
+        }
+    }
+}
+
 impl<'a> LedgerEntry<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
@@ -248,27 +275,14 @@ mod test_ledger_entry_errors {
 
     #[test]
     fn test_fields_error() {
-        let ledger_entry = LedgerEntry::new(
-            None,
-            Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(Offer {
+        let ledger_entry = LedgerEntry {
+            account_root: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
+            offer: Some(Offer {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
-            None,
-            None,
-            None,
-            None,
-        );
+            ..Default::default()
+        };
         let _expected = XRPLModelException::ExpectedOneOf(&[
             "index",
             "account_root",
@@ -290,27 +304,14 @@ mod test_ledger_entry_errors {
 
     #[test]
     fn test_serde() {
-        let req = LedgerEntry::new(
-            None,
-            Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(Offer {
+        let req = LedgerEntry {
+            account_root: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
+            offer: Some(Offer {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
-            None,
-            None,
-            None,
-            None,
-        );
+            ..Default::default()
+        };
         let serialized = serde_json::to_string(&req).unwrap();
 
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();

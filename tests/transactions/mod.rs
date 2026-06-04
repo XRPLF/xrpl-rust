@@ -10,6 +10,7 @@ pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
 pub mod clawback;
+pub mod credential;
 pub mod deposit_preauth;
 pub mod escrow_cancel;
 pub mod escrow_create;
