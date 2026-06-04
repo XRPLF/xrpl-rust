@@ -27,22 +27,27 @@ pub struct Oracle<'a> {
     /// An arbitrary value that identifies an oracle provider.
     pub provider: Cow<'a, str>,
     /// Describes the type of asset, such as "currency", "commodity", or "NFT".
-    pub asset_class: Option<Cow<'a, str>>,
+    pub asset_class: Cow<'a, str>,
     /// An array of up to 10 PriceData objects, representing the price information.
-    pub price_data_series: Option<Vec<PriceData>>,
+    pub price_data_series: Vec<PriceData>,
     /// The time the data was last updated, represented in the ripple epoch.
     pub last_update_time: u32,
     /// An optional Universal Resource Identifier to reference price data off-chain.
     #[serde(rename = "URI")]
     pub uri: Option<Cow<'a, str>>,
     /// A hint indicating which page of the owner directory links to this entry.
-    pub owner_node: Option<Cow<'a, str>>,
+    #[serde(with = "owner_node_hex")]
+    pub owner_node: u64,
     /// The identifying hash of the transaction that most recently modified this entry.
     #[serde(rename = "PreviousTxnID")]
     pub previous_txn_id: Cow<'a, str>,
     /// The index of the ledger that contains the transaction that most recently
     /// modified this entry.
     pub previous_txn_lgr_seq: u32,
+    /// A unique identifier of the price oracle for the account, if present in
+    /// the ledger entry returned by the server.
+    #[serde(rename = "OracleDocumentID")]
+    pub oracle_document_id: Option<u32>,
 }
 
 impl Model for Oracle<'_> {}
@@ -59,13 +64,14 @@ impl<'a> Oracle<'a> {
         ledger_index: Option<Cow<'a, str>>,
         owner: Cow<'a, str>,
         provider: Cow<'a, str>,
-        asset_class: Option<Cow<'a, str>>,
-        price_data_series: Option<Vec<PriceData>>,
+        asset_class: Cow<'a, str>,
+        price_data_series: Vec<PriceData>,
         last_update_time: u32,
         uri: Option<Cow<'a, str>>,
-        owner_node: Option<Cow<'a, str>>,
+        owner_node: u64,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
+        oracle_document_id: Option<u32>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -83,6 +89,52 @@ impl<'a> Oracle<'a> {
             owner_node,
             previous_txn_id,
             previous_txn_lgr_seq,
+            oracle_document_id,
+        }
+    }
+}
+
+mod owner_node_hex {
+    use alloc::format;
+    use core::fmt;
+    use serde::de::{self, Visitor};
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&format!("{value:016X}"))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(OwnerNodeVisitor)
+    }
+
+    struct OwnerNodeVisitor;
+
+    impl<'de> Visitor<'de> for OwnerNodeVisitor {
+        type Value = u64;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a u64 or 16-character hexadecimal owner node string")
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            Ok(value)
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            u64::from_str_radix(value, 16).map_err(E::custom)
         }
     }
 }
@@ -102,18 +154,19 @@ mod test_serde {
             None,
             Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
             Cow::from("chainlink"),
-            Some(Cow::from("63757272656E6379")),
-            Some(vec![PriceData {
+            Cow::from("63757272656E6379"),
+            vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
-            }]),
+            }],
             743609014,
             Some(Cow::from("https://example.com/oracle1")),
-            Some(Cow::from("0")),
+            0,
             Cow::from("ABC123DEF456"),
             12345678,
+            Some(1),
         );
 
         let serialized = serde_json::to_string(&oracle).unwrap();
@@ -128,22 +181,28 @@ mod test_serde {
             None,
             Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
             Cow::from("provider1"),
-            None,
-            None,
+            Cow::from("63757272656E6379"),
+            vec![PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("740".to_string()),
+                scale: Some(1),
+            }],
             743609014,
             None,
-            None,
+            0,
             Cow::from("ABC123"),
             100,
+            None,
         );
 
         assert_eq!(oracle.owner, "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW");
         assert_eq!(oracle.provider, "provider1");
-        assert!(oracle.asset_class.is_none());
-        assert!(oracle.price_data_series.is_none());
+        assert_eq!(oracle.asset_class, "63757272656E6379");
+        assert_eq!(oracle.price_data_series.len(), 1);
         assert_eq!(oracle.last_update_time, 743609014);
         assert!(oracle.uri.is_none());
-        assert!(oracle.owner_node.is_none());
+        assert_eq!(oracle.owner_node, 0);
         assert_eq!(oracle.previous_txn_id, "ABC123");
         assert_eq!(oracle.previous_txn_lgr_seq, 100);
     }
@@ -155,13 +214,19 @@ mod test_serde {
             None,
             Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
             Cow::from("provider1"),
-            None,
-            None,
+            Cow::from("63757272656E6379"),
+            vec![PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("740".to_string()),
+                scale: Some(1),
+            }],
             0,
             None,
-            None,
+            0,
             Cow::from("ABC123"),
             0,
+            None,
         );
 
         assert_eq!(oracle.get_ledger_entry_type(), LedgerEntryType::Oracle);
@@ -174,8 +239,8 @@ mod test_serde {
             None,
             Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
             Cow::from("chainlink"),
-            Some(Cow::from("63757272656E6379")),
-            Some(vec![
+            Cow::from("63757272656E6379"),
+            vec![
                 PriceData {
                     base_asset: "XRP".to_string(),
                     quote_asset: "USD".to_string(),
@@ -194,15 +259,16 @@ mod test_serde {
                     asset_price: Some("160000".to_string()),
                     scale: Some(2),
                 },
-            ]),
+            ],
             743609014,
             Some(Cow::from("https://example.com")),
-            Some(Cow::from("0")),
+            0,
             Cow::from("DEF789"),
             99999,
+            None,
         );
 
-        let series = oracle.price_data_series.as_ref().unwrap();
+        let series = oracle.price_data_series;
         assert_eq!(series.len(), 3);
         assert_eq!(series[0].base_asset, "XRP");
         assert_eq!(series[1].base_asset, "BTC");
