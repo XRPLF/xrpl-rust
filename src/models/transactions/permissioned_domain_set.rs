@@ -75,8 +75,8 @@ impl<'a> Model for PermissionedDomainSet<'a> {
 
 /// Validate a `Credential` entry per XLS-80 / rippled `LedgerFormats.cpp`:
 /// `Issuer` must be non-empty and `CredentialType` is an `sfBlob` (hex),
-/// so it must be non-empty, even-length, hex-only, and at most 64 hex
-/// chars (32 bytes, rippled's `MaxCredentialTypeLength`).
+/// so it must be non-empty, even-length, hex-only, and at most 128 hex
+/// chars (64 bytes, rippled's `MaxCredentialTypeLength`).
 pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRPLModelResult<()> {
     if credential.issuer.is_empty() {
         return Err(XRPLModelException::MissingField("Credential.Issuer".into()));
@@ -87,17 +87,17 @@ pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRP
             "Credential.CredentialType".into(),
         ));
     }
-    if ct.len() > 64 {
+    if ct.len() > 128 {
         return Err(XRPLModelException::ValueTooLong {
             field: "Credential.CredentialType".into(),
-            max: 64,
+            max: 128,
             found: ct.len(),
         });
     }
     if !ct.len().is_multiple_of(2) || !ct.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(XRPLModelException::InvalidValue {
             field: "Credential.CredentialType".into(),
-            expected: "even-length hex string (<=64 chars)".into(),
+            expected: "even-length hex string (<=128 chars)".into(),
             found: ct.clone(),
         });
     }
@@ -542,9 +542,19 @@ mod tests {
     }
 
     #[test]
-    fn test_credential_type_too_long_rejected() {
-        // rippled MaxCredentialTypeLength = 32 bytes (64 hex chars).
-        let too_long = "A".repeat(66); // 66 hex chars
+    fn test_credential_type_64_bytes_accepted() {
+        // 64 bytes hex-encoded = 128 chars; this is the rippled maximum.
+        let credential = Credential {
+            issuer: "rIssuer".to_string(),
+            credential_type: "A".repeat(128),
+        };
+
+        assert!(validate_credential(&credential).is_ok());
+    }
+
+    #[test]
+    fn test_credential_type_over_64_bytes_rejected() {
+        let too_long = "A".repeat(130);
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
                 account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
@@ -561,7 +571,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
-            XRPLModelException::ValueTooLong { max: 64, .. }
+            XRPLModelException::ValueTooLong { max: 128, .. }
         ));
     }
 
