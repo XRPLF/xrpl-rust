@@ -46,7 +46,6 @@ impl<'a> DepositAuthorized<'a> {
         id: Option<Cow<'a, str>>,
         destination_account: Cow<'a, str>,
         source_account: Cow<'a, str>,
-        credentials: Option<Vec<Cow<'a, str>>>,
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
     ) -> Self {
@@ -57,12 +56,17 @@ impl<'a> DepositAuthorized<'a> {
             },
             source_account,
             destination_account,
-            credentials,
+            credentials: None,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,
             }),
         }
+    }
+
+    pub fn with_credentials(mut self, credentials: Vec<Cow<'a, str>>) -> Self {
+        self.credentials = Some(credentials);
+        self
     }
 }
 
@@ -77,12 +81,29 @@ mod tests {
             "rDest11111111111111111111111111111".into(),
             "rSrc111111111111111111111111111111".into(),
             None,
-            None,
             Some(LedgerIndex::Str("validated".into())),
         );
         let serialized = serde_json::to_string(&req).unwrap();
         let deserialized: DepositAuthorized = serde_json::from_str(&serialized).unwrap();
         assert_eq!(req, deserialized);
         assert!(serialized.contains("\"command\":\"deposit_authorized\""));
+        assert!(!serialized.contains("\"credentials\""));
+    }
+
+    #[test]
+    fn test_with_credentials() {
+        let req = DepositAuthorized::new(
+            Some("da-1".into()),
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+        )
+        .with_credentials(vec![
+            "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+        ]);
+
+        let serialized = serde_json::to_string(&req).unwrap();
+        assert!(serialized.contains("\"credentials\":[\"DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001\"]"));
     }
 }

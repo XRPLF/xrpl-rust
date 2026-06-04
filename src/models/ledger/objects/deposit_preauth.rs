@@ -1,3 +1,4 @@
+use crate::models::transactions::validate_credential_type;
 use crate::models::CredentialAuthorization;
 use crate::models::FlagCollection;
 use crate::models::Model;
@@ -149,6 +150,7 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
                 });
             }
             for (i, cred) in creds.iter().enumerate() {
+                validate_credential_type(&cred.credential.credential_type)?;
                 if creds[..i].contains(cred) {
                     return Err(XRPLModelException::ValueEqualsValue {
                         field1: "authorize_credentials".into(),
@@ -169,7 +171,7 @@ pub trait DepositPreauthError {
 mod tests {
     use super::*;
     use crate::models::CredentialAuthorizationFields;
-    use crate::models::Model;
+    use crate::models::{Model, XRPLModelException};
     use alloc::vec;
 
     #[test]
@@ -341,6 +343,39 @@ mod tests {
             previous_txn_lgr_seq: 8,
         };
         assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_credentials_non_hex_credential_type_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::DepositPreauth,
+                index: None,
+                ledger_index: None,
+            },
+            account: Cow::from("rOwner1111111111111111111111111111"),
+            authorize: None,
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                CredentialAuthorizationFields::new(
+                    Cow::from("rIssuer111111111111111111111111111"),
+                    Cow::from("NOT_HEX"),
+                ),
+            )]),
+            owner_node: Cow::from("0000000000000001"),
+            previous_txn_id: Cow::from(
+                "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            ),
+            previous_txn_lgr_seq: 8,
+        };
+        assert_eq!(
+            deposit_preauth.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "credential_type".into(),
+                format: "hexadecimal".into(),
+                found: "NOT_HEX".into(),
+            }
+        );
     }
 
     #[test]
