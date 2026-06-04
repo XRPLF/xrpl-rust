@@ -69,6 +69,9 @@ impl<'a> Model for PermissionedDomainSet<'a> {
         for credential in &self.accepted_credentials {
             validate_credential(credential)?;
         }
+        if let Some(domain_id) = &self.domain_id {
+            validate_domain_id(domain_id.as_ref())?;
+        }
         self.validate_currencies()
     }
 }
@@ -77,6 +80,20 @@ impl<'a> Model for PermissionedDomainSet<'a> {
 /// `Issuer` must be non-empty and `CredentialType` is an `sfBlob` (hex),
 /// so it must be non-empty, even-length, hex-only, and at most 128 hex
 /// chars (64 bytes, rippled's `MaxCredentialTypeLength`).
+fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelResult<()> {
+    if domain_id.len() != 64
+        || !domain_id.chars().all(|c| c.is_ascii_hexdigit())
+        || domain_id.chars().all(|c| c == '0')
+    {
+        return Err(XRPLModelException::InvalidValue {
+            field: "DomainID".into(),
+            expected: "non-zero 64-character hex string".into(),
+            found: domain_id.into(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRPLModelResult<()> {
     if credential.issuer.is_empty() {
         return Err(XRPLModelException::MissingField("Credential.Issuer".into()));
@@ -572,6 +589,27 @@ mod tests {
         assert!(matches!(
             result.unwrap_err(),
             XRPLModelException::ValueTooLong { max: 128, .. }
+        ));
+    }
+
+    #[test]
+    fn test_set_all_zero_domain_id_rejected() {
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: Some("0".repeat(64).into()),
+            accepted_credentials: vec![Credential {
+                issuer: "rIssuer".to_string(),
+                credential_type: "4B5943".to_string(),
+            }],
+        };
+
+        assert!(matches!(
+            txn.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
         ));
     }
 
