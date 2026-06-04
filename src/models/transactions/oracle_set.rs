@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::collections::BTreeSet;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -11,6 +12,9 @@ use super::{CommonFields, CommonTransactionBuilder};
 
 /// Maximum number of PriceData entries allowed in a single OracleSet transaction.
 const MAX_ORACLE_DATA_SERIES: u32 = 10;
+const MAX_ORACLE_PROVIDER_BYTES: usize = 256;
+const MAX_ORACLE_URI_BYTES: usize = 256;
+const MAX_ORACLE_ASSET_CLASS_BYTES: usize = 16;
 
 /// An OracleSet transaction creates or updates an Oracle ledger entry.
 ///
@@ -43,35 +47,79 @@ pub struct OracleSet<'a> {
     pub asset_class: Option<Cow<'a, str>>,
     /// The time the data was last updated, represented in the ripple epoch.
     pub last_update_time: u32,
-    /// An array of up to 10 PriceData objects, each representing one
+    /// An array of 1 to 10 PriceData objects, each representing one
     /// price data entry.
-    pub price_data_series: Option<Vec<PriceData>>,
+    pub price_data_series: Vec<PriceData>,
 }
 
 impl Model for OracleSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        if let Some(ref series) = self.price_data_series {
-            // rippled requires at least one entry when the field is present.
-            if series.is_empty() {
-                return Err(XRPLModelException::ValueTooLow {
-                    field: "price_data_series".into(),
-                    min: 1,
-                    found: 0,
+        validate_optional_length(
+            "provider",
+            self.provider.as_deref(),
+            MAX_ORACLE_PROVIDER_BYTES,
+        )?;
+        validate_optional_length("uri", self.uri.as_deref(), MAX_ORACLE_URI_BYTES)?;
+        validate_optional_length(
+            "asset_class",
+            self.asset_class.as_deref(),
+            MAX_ORACLE_ASSET_CLASS_BYTES,
+        )?;
+
+        let series = &self.price_data_series;
+        if series.is_empty() {
+            return Err(XRPLModelException::ValueTooLow {
+                field: "price_data_series".into(),
+                min: 1,
+                found: 0,
+            });
+        }
+        if series.len() as u32 > MAX_ORACLE_DATA_SERIES {
+            return Err(XRPLModelException::ValueTooHigh {
+                field: "price_data_series".into(),
+                max: MAX_ORACLE_DATA_SERIES,
+                found: series.len() as u32,
+            });
+        }
+
+        let mut pairs = BTreeSet::new();
+        for entry in series {
+            entry.validate()?;
+            if entry.base_asset == entry.quote_asset {
+                return Err(XRPLModelException::ValueEqualsValue {
+                    field1: "base_asset".into(),
+                    field2: "quote_asset".into(),
                 });
             }
-            if series.len() as u32 > MAX_ORACLE_DATA_SERIES {
-                return Err(XRPLModelException::ValueTooHigh {
+            let pair = (entry.base_asset.clone(), entry.quote_asset.clone());
+            if !pairs.insert(pair) {
+                return Err(XRPLModelException::InvalidValue {
                     field: "price_data_series".into(),
-                    max: MAX_ORACLE_DATA_SERIES,
-                    found: series.len() as u32,
+                    expected: "unique BaseAsset/QuoteAsset pairs".into(),
+                    found: alloc::format!("{}/{}", entry.base_asset, entry.quote_asset),
                 });
-            }
-            for entry in series {
-                entry.validate()?;
             }
         }
         Ok(())
     }
+}
+
+fn validate_optional_length(
+    field: &'static str,
+    value: Option<&str>,
+    max: usize,
+) -> XRPLModelResult<()> {
+    if let Some(value) = value {
+        let found = value.len();
+        if found > max {
+            return Err(XRPLModelException::ValueTooLong {
+                field: field.into(),
+                max,
+                found,
+            });
+        }
+    }
+    Ok(())
 }
 
 impl<'a> Transaction<'a, NoFlags> for OracleSet<'a> {
@@ -114,7 +162,7 @@ impl<'a> OracleSet<'a> {
         uri: Option<Cow<'a, str>>,
         asset_class: Option<Cow<'a, str>>,
         last_update_time: u32,
-        price_data_series: Option<Vec<PriceData>>,
+        price_data_series: Vec<PriceData>,
     ) -> Self {
         Self {
             common_fields: CommonFields::new(
@@ -174,7 +222,7 @@ impl<'a> OracleSet<'a> {
 
     /// Set the price data series
     pub fn with_price_data_series(mut self, series: Vec<PriceData>) -> Self {
-        self.price_data_series = Some(series);
+        self.price_data_series = series;
         self
     }
 }
@@ -201,12 +249,12 @@ mod tests {
             uri: Some("https://example.com/oracle1".into()),
             asset_class: Some("63757272656E6379".into()),
             last_update_time: 743609014,
-            price_data_series: Some(vec![PriceData {
+            price_data_series: vec![PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
-            }]),
+            }],
         };
 
         let serialized = serde_json::to_string(&oracle_set).unwrap();
@@ -271,7 +319,7 @@ mod tests {
         assert!(oracle_set.uri.is_none());
         assert!(oracle_set.asset_class.is_none());
         assert_eq!(oracle_set.last_update_time, 0);
-        assert!(oracle_set.price_data_series.is_none());
+        assert!(oracle_set.price_data_series.is_empty());
     }
 
     #[test]
@@ -301,7 +349,7 @@ mod tests {
         }
         .with_price_data_series(price_data.clone());
 
-        let series = oracle_set.price_data_series.as_ref().unwrap();
+        let series = oracle_set.price_data_series;
         assert_eq!(series.len(), 2);
         assert_eq!(series[0].base_asset, "EUR");
         assert_eq!(series[0].quote_asset, "USD");
@@ -327,7 +375,7 @@ mod tests {
             None,
             None,
             743609014,
-            None,
+            vec![],
         );
 
         assert_eq!(
@@ -365,7 +413,7 @@ mod tests {
             Some("https://example.com/oracle1".into()),
             Some("63757272656E6379".into()),
             743609014,
-            Some(price_data),
+            price_data,
         );
 
         assert_eq!(
@@ -377,7 +425,7 @@ mod tests {
         assert_eq!(oracle_set.oracle_document_id, 1);
         assert_eq!(oracle_set.provider.as_deref(), Some("chainlink"));
         assert_eq!(oracle_set.last_update_time, 743609014);
-        assert_eq!(oracle_set.price_data_series.as_ref().unwrap().len(), 1);
+        assert_eq!(oracle_set.price_data_series.len(), 1);
     }
 
     #[test]
@@ -462,7 +510,7 @@ mod tests {
         }
         .with_price_data_series(vec![price_data]);
 
-        let series = oracle_set.price_data_series.as_ref().unwrap();
+        let series = oracle_set.price_data_series;
         assert_eq!(series[0].base_asset, "EUR");
         assert_eq!(series[0].quote_asset, "USD");
         assert!(series[0].asset_price.is_none());
@@ -641,5 +689,85 @@ mod tests {
         }]);
 
         assert!(oracle_set.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_oracle_metadata_lengths_rejected() {
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            provider: Some(alloc::format!("{}x", "a".repeat(MAX_ORACLE_PROVIDER_BYTES)).into()),
+            price_data_series: vec![PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            }],
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            oracle_set.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooLong { ref field, max, .. }
+                if field == "provider" && max == MAX_ORACLE_PROVIDER_BYTES
+        ));
+    }
+
+    #[test]
+    fn test_duplicate_price_data_pair_rejected() {
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![
+            PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            },
+            PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("101".to_string()),
+                scale: Some(1),
+            },
+        ]);
+
+        assert!(matches!(
+            oracle_set.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValue { ref field, .. } if field == "price_data_series"
+        ));
+    }
+
+    #[test]
+    fn test_same_base_quote_rejected() {
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: "XRP".to_string(),
+            quote_asset: "XRP".to_string(),
+            asset_price: Some("100".to_string()),
+            scale: Some(1),
+        }]);
+
+        assert!(matches!(
+            oracle_set.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue { ref field1, ref field2 }
+                if field1 == "base_asset" && field2 == "quote_asset"
+        ));
     }
 }

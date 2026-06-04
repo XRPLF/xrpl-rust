@@ -25,12 +25,12 @@ fn test_oracle_set_construction() {
         uri: Some("https://example.com/oracle".into()),
         asset_class: Some("63757272656E6379".into()),
         last_update_time: 743609014,
-        price_data_series: Some(vec![PriceData {
+        price_data_series: vec![PriceData {
             base_asset: "EUR".into(),
             quote_asset: "USD".into(),
             asset_price: Some("740".into()),
             scale: Some(1),
-        }]),
+        }],
     };
 
     assert_eq!(
@@ -38,7 +38,7 @@ fn test_oracle_set_construction() {
         TransactionType::OracleSet
     );
     assert_eq!(oracle_set.oracle_document_id, 1);
-    assert_eq!(oracle_set.price_data_series.as_ref().unwrap().len(), 1);
+    assert_eq!(oracle_set.price_data_series.len(), 1);
 }
 
 #[test]
@@ -58,7 +58,12 @@ fn test_oracle_set_serde_roundtrip() {
         None,
         None,
         743609014,
-        None,
+        vec![PriceData {
+            base_asset: "EUR".into(),
+            quote_asset: "USD".into(),
+            asset_price: Some("740".into()),
+            scale: Some(1),
+        }],
     );
 
     let json = serde_json::to_string(&oracle_set).unwrap();
