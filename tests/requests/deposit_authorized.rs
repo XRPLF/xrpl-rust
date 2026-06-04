@@ -18,7 +18,6 @@ async fn test_deposit_authorized_base() {
             None,                                   // id
             wallet2.classic_address.clone().into(), // destination_account
             wallet1.classic_address.clone().into(), // source_account
-            None,                                   // credentials
             None,                                   // ledger_hash
             None,                                   // ledger_index
         );

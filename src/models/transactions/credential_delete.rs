@@ -110,16 +110,12 @@ impl<'a> CredentialDeleteError for CredentialDelete<'a> {
         if self.subject.is_none() && self.issuer.is_none() {
             return Err(XRPLModelException::ExpectedOneOf(&["subject", "issuer"]));
         }
-        // When both are explicitly provided, account must match one of them.
-        // When only one is provided, account implicitly fills the other role.
-        if let (Some(subject), Some(issuer)) = (&self.subject, &self.issuer) {
-            if self.common_fields.account != *subject && self.common_fields.account != *issuer {
-                return Err(XRPLModelException::InvalidFieldCombination {
-                    field: "account",
-                    other_fields: &["subject", "issuer"],
-                });
-            }
-        }
+        // When only one is provided, Account implicitly fills the other role.
+        // When both are explicitly provided, rippled decides whether Account may delete
+        // the credential from ledger state: issuer/subject can delete active credentials,
+        // and any account can delete expired credentials. The model cannot know whether
+        // the on-ledger credential is expired, so match xrpl.js and do not reject third-
+        // party submitters here.
         Ok(())
     }
 
@@ -170,7 +166,10 @@ mod tests {
     }
 
     #[test]
-    fn test_account_must_match_subject_or_issuer() {
+    fn test_both_provided_allows_third_party_submitter() {
+        // Match xrpl.js and the spec: when both Subject and Issuer are provided,
+        // rippled may allow a third-party Account to delete an expired credential.
+        // Model validation cannot know the credential's expiration state.
         let tx = CredentialDelete {
             common_fields: CommonFields {
                 account: "rSubmitter111111111111111111111111".into(),
@@ -181,7 +180,7 @@ mod tests {
             issuer: Some("rIssuer111111111111111111111111111".into()),
             credential_type: "4B5943".into(),
         };
-        assert!(tx.get_errors().is_err());
+        assert!(tx.get_errors().is_ok());
     }
 
     #[test]

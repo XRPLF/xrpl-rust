@@ -77,7 +77,7 @@ fn is_hex(value: &str) -> bool {
 }
 
 /// Validate that a `CredentialType` field is a non-empty hex string up to 64 bytes.
-pub fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
+pub(crate) fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
     let len = credential_type.len();
     if len == 0 {
         Err(XRPLModelException::ValueTooShort {
@@ -103,7 +103,7 @@ pub fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
 }
 
 /// Validate that a hex-encoded string contains only hexadecimal characters.
-pub fn validate_hex(field: &str, value: &str) -> XRPLModelResult<()> {
+fn validate_hex(field: &str, value: &str) -> XRPLModelResult<()> {
     if !is_hex(value) {
         Err(XRPLModelException::InvalidValueFormat {
             field: field.into(),

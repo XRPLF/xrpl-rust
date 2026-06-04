@@ -5,6 +5,8 @@
 //! and the shared `validate_credential_ids` helper using randomly generated
 //! inputs via proptest.
 
+#![cfg(feature = "models")]
+
 use std::borrow::Cow;
 
 use proptest::prelude::*;
@@ -157,15 +159,16 @@ proptest! {
         prop_assert!(tx.get_errors().is_ok());
     }
 
-    /// When both subject and issuer are provided, the account must equal one.
+    /// When both subject and issuer are provided, model validation accepts any submitter.
+    /// Rippled uses ledger state to decide whether non-subject/non-issuer submitters may
+    /// delete expired credentials, which the model cannot determine locally.
     #[test]
-    fn credential_delete_both_account_must_match(
-        use_subject in proptest::bool::ANY,
+    fn credential_delete_both_allows_any_submitter(
+        acct_idx in 0_usize..3,
     ) {
-        // account matches whichever field `use_subject` picks
-        let acct = if use_subject { ACCOUNT_A } else { ACCOUNT_B };
+        let accounts = [ACCOUNT_A, ACCOUNT_B, ACCOUNT_C];
         let tx = CredentialDelete {
-            common_fields: common_fields(acct, TransactionType::CredentialDelete),
+            common_fields: common_fields(accounts[acct_idx], TransactionType::CredentialDelete),
             subject: Some(Cow::Borrowed(ACCOUNT_A)),
             issuer: Some(Cow::Borrowed(ACCOUNT_B)),
             credential_type: Cow::Borrowed("4B5943"),
@@ -186,19 +189,21 @@ fn credential_delete_none_none_fails() {
 }
 
 #[test]
-fn credential_delete_both_mismatch_fails() {
-    // account (C) matches neither subject (A) nor issuer (B)
+fn credential_delete_both_third_party_submitter_ok() {
+    // Account (C) matches neither subject (A) nor issuer (B). This can still be valid
+    // on-ledger for expired credentials, so local validation should match xrpl.js and
+    // defer that decision to rippled.
     let tx = CredentialDelete {
         common_fields: common_fields(ACCOUNT_C, TransactionType::CredentialDelete),
         subject: Some(Cow::Borrowed(ACCOUNT_A)),
         issuer: Some(Cow::Borrowed(ACCOUNT_B)),
         credential_type: Cow::Borrowed("4B5943"),
     };
-    assert!(tx.get_errors().is_err());
+    assert!(tx.get_errors().is_ok());
 }
 
 // ---------------------------------------------------------------------------
-// 3. CredentialIDs length property (via Payment, which calls validate_credential_ids)
+// 3. CredentialIDs length property (via AccountDelete, which calls validate_credential_ids)
 //    None => Ok, 1..=8 => Ok, 0 => Err, >8 => Err.
 // ---------------------------------------------------------------------------
 

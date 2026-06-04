@@ -172,6 +172,7 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
                 });
             }
             for (i, cred) in credentials.iter().enumerate() {
+                super::validate_credential_type(&cred.credential.credential_type)?;
                 if credentials[..i].contains(cred) {
                     return Err(XRPLModelException::ValueEqualsValue {
                         field1: field.into(),
@@ -203,6 +204,22 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
             });
         }
 
+        if let Some(authorize) = &self.authorize {
+            if self.common_fields.account == *authorize {
+                return Err(XRPLModelException::ValueEqualsValue {
+                    field1: "account".into(),
+                    field2: "authorize".into(),
+                });
+            }
+        }
+        if let Some(unauthorize) = &self.unauthorize {
+            if self.common_fields.account == *unauthorize {
+                return Err(XRPLModelException::ValueEqualsValue {
+                    field1: "account".into(),
+                    field2: "unauthorize".into(),
+                });
+            }
+        }
         if let Some(credentials) = &self.authorize_credentials {
             validate_credential_list(credentials, "authorize_credentials")?;
         }
@@ -222,7 +239,7 @@ pub trait DepositPreauthError {
 mod tests {
     use super::*;
     use crate::models::CredentialAuthorizationFields;
-    use crate::models::Model;
+    use crate::models::{Model, XRPLModelException};
     use alloc::vec;
 
     #[test]
@@ -291,6 +308,54 @@ mod tests {
         };
 
         assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_self_error() {
+        let account = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb";
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: Some(account.into()),
+            authorize_credentials: None,
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+
+        assert_eq!(
+            deposit_preauth.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "account".into(),
+                field2: "authorize".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_unauthorize_self_error() {
+        let account = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb";
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: None,
+            unauthorize: Some(account.into()),
+            unauthorize_credentials: None,
+        };
+
+        assert_eq!(
+            deposit_preauth.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "account".into(),
+                field2: "unauthorize".into(),
+            }
+        );
     }
 
     #[test]
@@ -530,6 +595,34 @@ mod tests {
             unauthorize_credentials: None,
         };
         assert!(deposit_preauth.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_authorize_credentials_non_hex_credential_type_error() {
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            authorize_credentials: Some(vec![CredentialAuthorization::new(
+                crate::models::CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "NOT_HEX".into(),
+                ),
+            )]),
+            unauthorize: None,
+            unauthorize_credentials: None,
+        };
+        assert_eq!(
+            deposit_preauth.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "credential_type".into(),
+                format: "hexadecimal".into(),
+                found: "NOT_HEX".into(),
+            }
+        );
     }
 
     #[test]
