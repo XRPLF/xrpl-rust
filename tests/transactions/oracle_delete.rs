@@ -7,8 +7,12 @@
 // oracles (XLS-47). These tests validate type construction and serialization
 // without submitting to a network.
 
+use crate::common::{
+    generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
+};
 use xrpl::models::transactions::oracle_delete::OracleDelete;
-use xrpl::models::transactions::{CommonFields, TransactionType};
+use xrpl::models::transactions::oracle_set::OracleSet;
+use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
 
 #[test]
 fn test_oracle_delete_construction() {
@@ -48,4 +52,52 @@ fn test_oracle_delete_serde_roundtrip() {
     let json = serde_json::to_string(&oracle_delete).unwrap();
     let deserialized: OracleDelete = serde_json::from_str(&json).unwrap();
     assert_eq!(oracle_delete, deserialized);
+}
+
+#[tokio::test]
+async fn test_oracle_delete_submit() {
+    with_blockchain_lock(|| async {
+        let wallet = generate_funded_wallet().await;
+        let last_update_time = get_ledger_close_time().await as u32;
+        let oracle_document_id = 2;
+
+        let mut oracle_set = OracleSet::new(
+            wallet.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            oracle_document_id,
+            Some("chainlink".into()),
+            Some("68747470733A2F2F6578616D706C652E636F6D".into()),
+            Some("63757272656E6379".into()),
+            last_update_time,
+            vec![PriceData {
+                base_asset: "XRP".into(),
+                quote_asset: "USD".into(),
+                asset_price: Some("740".into()),
+                scale: Some(1),
+            }],
+        );
+        test_transaction(&mut oracle_set, &wallet).await;
+
+        let mut oracle_delete = OracleDelete::new(
+            wallet.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            oracle_document_id,
+        );
+        test_transaction(&mut oracle_delete, &wallet).await;
+    })
+    .await;
 }
