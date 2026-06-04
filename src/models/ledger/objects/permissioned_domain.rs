@@ -1,7 +1,6 @@
 use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::transactions::Credential;
 use crate::models::FlagCollection;
-use crate::models::Model;
 use crate::models::NoFlags;
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
@@ -44,8 +43,6 @@ pub struct PermissionedDomain<'a> {
     /// recently modified this object.
     pub previous_txn_lgr_seq: u32,
 }
-
-impl<'a> Model for PermissionedDomain<'a> {}
 
 impl<'a> LedgerObject<NoFlags> for PermissionedDomain<'a> {
     fn get_ledger_entry_type(&self) -> LedgerEntryType {
