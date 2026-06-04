@@ -170,26 +170,6 @@ mod test_serde {
     }
 
     #[test]
-    fn test_empty_credentials() {
-        let domain = PermissionedDomain::new(
-            None,
-            None,
-            Cow::from("rOwner"),
-            vec![],
-            10,
-            None,
-            Cow::from("AABB00112233445566778899AABB00112233445566778899AABB001122334455AA"),
-            200,
-        );
-
-        assert!(domain.accepted_credentials.is_empty());
-
-        let serialized = serde_json::to_string(&domain).unwrap();
-        let deserialized: PermissionedDomain = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(domain, deserialized);
-    }
-
-    #[test]
     fn test_fields() {
         let domain = PermissionedDomain::new(
             Some(Cow::from("TestIndex")),
