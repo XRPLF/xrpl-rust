@@ -2,7 +2,6 @@ on:
   push:
     branches:
       - main
-      - dev
   pull_request:
     branches:
       - main
@@ -11,8 +10,13 @@ on:
 name: Integration Test
 
 env:
-  # Pin to known-good digest; rippleci/rippled:develop broke after 2026-04-01
-  RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop@sha256:328175bf14b7b83db9e5e6b50c7458bf828b02b2855453efc038233094aa8d85
+  # rippled binary was renamed to xrpld; use the new image name.
+  # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
+  XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
+  # Files measured by the integration coverage gate are the inverse of this regex.
+  # Unit-test territory (models, core, utils, _serde) is excluded; integration territory
+  # (CLI, asynch::clients, account/, ledger/, transaction/, faucet) is what remains.
+  COVERAGE_IGNORE_REGEX: '(_serde|core|models|utils)/|constants\.rs$|macros\.rs$|lib\.rs$|wallet/(mod|exceptions)\.rs$|tests/'
 
 jobs:
   integration_test:
@@ -23,43 +27,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start rippled standalone
+      - name: Run xrpld in standalone mode
         run: |
-          docker run --detach --rm \
-            -p 5005:5005 \
-            -p 6006:6006 \
-            --volume "${{ github.workspace }}/.ci-config/":"/etc/opt/ripple/" \
-            --name rippled-service \
-            --health-cmd="rippled server_info || exit 1" \
-            --health-interval=5s \
-            --health-retries=10 \
-            --health-timeout=2s \
-            --env GITHUB_ACTIONS=true \
-            --env CI=true \
-            --entrypoint bash \
-            ${{ env.RIPPLED_DOCKER_IMAGE }} \
-            -c "mkdir -p /var/lib/rippled/db/ && rippled -a"
-
-      - name: Wait for rippled to be healthy
-        run: |
-          for i in $(seq 1 30); do
-            if ! docker ps -q -f name=rippled-service | grep -q .; then
-              echo "Container exited unexpectedly"
-              docker logs rippled-service 2>&1 || true
-              exit 1
-            fi
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' rippled-service 2>/dev/null || echo "unknown")
-            echo "Attempt $i/30: $STATUS"
-            if [ "$STATUS" = "healthy" ]; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Timed out waiting for rippled"
-          docker logs rippled-service 2>&1 || true
-          exit 1
+          docker run \
+            --detach \
+            --rm \
+            --publish 5005:5005 \
+            --publish 6006:6006 \
+            --volume "${{ github.workspace }}/.ci-config/":"/etc/xrpld/" \
+            --name xrpld-service \
+            ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
 
       - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2.79.3
+        with:
+          tool: cargo-llvm-cov
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -72,11 +56,42 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-integration-
 
-      - name: Run integration tests
-        run: cargo test --release --features std,json-rpc,helpers,integration --test integration_test -- --test-threads=1
+      - name: Run integration tests under coverage
+        run: |
+          cargo llvm-cov --no-report --release \
+            --features std,json-rpc,helpers,cli,websocket,integration \
+            --test integration_test \
+            --test cli_integration \
+            --test funding \
+            --test utils \
+            --test test_utils \
+            -- --test-threads=1
         env:
           RUST_BACKTRACE: 1
 
-      - name: Stop rippled
+      - name: Generate lcov report (scoped to integration territory)
+        run: |
+          cargo llvm-cov report --release \
+            --lcov --output-path lcov.info \
+            --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5.5.4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          flags: integration
+          fail_ci_if_error: true
+
+      - name: Upload coverage report
         if: always()
-        run: docker stop rippled-service
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-lcov-report
+          path: lcov.info
+
+      - name: Dump xrpld logs and stop container
+        if: always()
+        run: |
+          docker logs xrpld-service 2>&1 || echo "::warning::xrpld-service container not present for logs"
+          docker stop xrpld-service 2>/dev/null || true
