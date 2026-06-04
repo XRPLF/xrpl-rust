@@ -35,7 +35,7 @@ pub struct PermissionedDomain<'a> {
     pub sequence: u32,
     /// A hint indicating which page of the owner directory links to this object,
     /// in case the directory consists of multiple pages.
-    pub owner_node: Option<Cow<'a, str>>,
+    pub owner_node: Cow<'a, str>,
     /// The identifying hash of the transaction that most recently modified
     /// this object.
     #[serde(rename = "PreviousTxnID")]
@@ -60,7 +60,7 @@ impl<'a> PermissionedDomain<'a> {
         owner: Cow<'a, str>,
         accepted_credentials: Vec<Credential>,
         sequence: u32,
-        owner_node: Option<Cow<'a, str>>,
+        owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
     ) -> Self {
@@ -105,7 +105,7 @@ mod test_serde {
                 },
             ],
             1,
-            Some(Cow::from("0")),
+            Cow::from("0"),
             Cow::from("A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2"),
             1000,
         );
@@ -126,31 +126,6 @@ mod test_serde {
     }
 
     #[test]
-    fn test_serialize_without_owner_node() {
-        let domain = PermissionedDomain::new(
-            Some(Cow::from("IndexHash")),
-            None,
-            Cow::from("rOwnerAccount123"),
-            vec![Credential {
-                issuer: "rIssuer".to_string(),
-                credential_type: "4B5943".to_string(), // hex("KYC")
-            }],
-            5,
-            None,
-            Cow::from("DEADBEEF01234567DEADBEEF01234567DEADBEEF01234567DEADBEEF01234567"),
-            500,
-        );
-
-        let serialized = serde_json::to_string(&domain).unwrap();
-
-        // OwnerNode should not appear when None
-        assert!(!serialized.contains("OwnerNode"));
-
-        let deserialized: PermissionedDomain = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(domain, deserialized);
-    }
-
-    #[test]
     fn test_ledger_entry_type() {
         let domain = PermissionedDomain::new(
             None,
@@ -158,7 +133,7 @@ mod test_serde {
             Cow::from("rOwner"),
             vec![],
             1,
-            None,
+            Cow::from("0"),
             Cow::from("0000000000000000000000000000000000000000000000000000000000000000"),
             1,
         );
@@ -180,14 +155,14 @@ mod test_serde {
                 credential_type: "41434352454449544544".to_string(), // hex("ACCREDITED")
             }],
             42,
-            Some(Cow::from("7")),
+            Cow::from("7"),
             Cow::from("1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"),
             999,
         );
 
         assert_eq!(domain.owner, "rOwnerXYZ");
         assert_eq!(domain.sequence, 42);
-        assert_eq!(domain.owner_node, Some(Cow::from("7")));
+        assert_eq!(domain.owner_node, Cow::from("7"));
         assert_eq!(
             domain.previous_txn_id,
             "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"
