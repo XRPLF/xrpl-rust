@@ -583,8 +583,10 @@ serde_with_tag! {
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/oracleset>`
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct PriceData {
-    pub base_asset: Option<String>,
-    pub quote_asset: Option<String>,
+    pub base_asset: String,
+    pub quote_asset: String,
+    /// The token pair's price. When omitted on an OracleSet update, rippled
+    /// deletes the existing price data entry for this base/quote pair.
     pub asset_price: Option<String>,
     pub scale: Option<u8>,
 }
@@ -592,8 +594,8 @@ pub struct PriceData {
 
 /// Maximum allowed value for the `scale` field of a `PriceData` entry.
 ///
-/// Per XLS-47, rippled enforces `0 <= scale <= 10`.
-pub const MAX_PRICE_DATA_SCALE: u8 = 10;
+/// Per rippled, `scale` must be in the inclusive range `0..=20`.
+pub const MAX_PRICE_DATA_SCALE: u8 = 20;
 
 impl crate::models::Model for PriceData {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
@@ -606,41 +608,26 @@ impl crate::models::Model for PriceData {
                 });
             }
         }
-        if let Some(ref base_asset) = self.base_asset {
-            validate_oracle_currency("base_asset", base_asset)?;
-        }
-        if let Some(ref quote_asset) = self.quote_asset {
-            validate_oracle_currency("quote_asset", quote_asset)?;
-        }
+        validate_oracle_currency("base_asset", &self.base_asset)?;
+        validate_oracle_currency("quote_asset", &self.quote_asset)?;
         Ok(())
     }
 }
 
 /// Validate a currency code used in a `PriceData` entry.
 ///
-/// Accepts either a 3-character ISO-style code (uppercase letters and digits)
-/// or a 40-character hex code. The reserved symbol `"XRP"` is rejected
-/// because an XRP oracle price is not meaningful (XRP is the ledger's native
-/// asset and is quoted directly, not via an IOU currency code).
+/// Accepts either a 3-character ISO-style code (uppercase letters and digits,
+/// including `"XRP"`) or a 40-character hex code.
 fn validate_oracle_currency(
     field: &'static str,
     value: &str,
 ) -> crate::models::XRPLModelResult<()> {
-    if value == "XRP" {
-        return Err(crate::models::XRPLModelException::InvalidValue {
-            field: field.into(),
-            expected:
-                "a 3-character ISO currency code (excluding \"XRP\") or 40-character hex code"
-                    .into(),
-            found: value.into(),
-        });
-    }
     if crate::utils::is_iso_code(value) || crate::utils::is_iso_hex(value) {
         return Ok(());
     }
     Err(crate::models::XRPLModelException::InvalidValue {
         field: field.into(),
-        expected: "a 3-character ISO currency code (excluding \"XRP\") or 40-character hex code"
+        expected: "a 3-character ISO currency code (including \"XRP\") or 40-character hex code"
             .into(),
         found: value.into(),
     })

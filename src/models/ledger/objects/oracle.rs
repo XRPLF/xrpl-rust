@@ -104,8 +104,8 @@ mod test_serde {
             Cow::from("chainlink"),
             Some(Cow::from("63757272656E6379")),
             Some(vec![PriceData {
-                base_asset: Some("XRP".to_string()),
-                quote_asset: Some("USD".to_string()),
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
             }]),
@@ -177,20 +177,20 @@ mod test_serde {
             Some(Cow::from("63757272656E6379")),
             Some(vec![
                 PriceData {
-                    base_asset: Some("XRP".to_string()),
-                    quote_asset: Some("USD".to_string()),
+                    base_asset: "XRP".to_string(),
+                    quote_asset: "USD".to_string(),
                     asset_price: Some("740".to_string()),
                     scale: Some(1),
                 },
                 PriceData {
-                    base_asset: Some("BTC".to_string()),
-                    quote_asset: Some("USD".to_string()),
+                    base_asset: "BTC".to_string(),
+                    quote_asset: "USD".to_string(),
                     asset_price: Some("2600000".to_string()),
                     scale: Some(2),
                 },
                 PriceData {
-                    base_asset: Some("ETH".to_string()),
-                    quote_asset: Some("USD".to_string()),
+                    base_asset: "ETH".to_string(),
+                    quote_asset: "USD".to_string(),
                     asset_price: Some("160000".to_string()),
                     scale: Some(2),
                 },
@@ -204,8 +204,8 @@ mod test_serde {
 
         let series = oracle.price_data_series.as_ref().unwrap();
         assert_eq!(series.len(), 3);
-        assert_eq!(series[0].base_asset.as_deref(), Some("XRP"));
-        assert_eq!(series[1].base_asset.as_deref(), Some("BTC"));
-        assert_eq!(series[2].base_asset.as_deref(), Some("ETH"));
+        assert_eq!(series[0].base_asset, "XRP");
+        assert_eq!(series[1].base_asset, "BTC");
+        assert_eq!(series[2].base_asset, "ETH");
     }
 }
