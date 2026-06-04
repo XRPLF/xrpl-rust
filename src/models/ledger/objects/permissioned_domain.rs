@@ -128,7 +128,10 @@ mod test_serde {
             None,
             None,
             Cow::from("rOwner"),
-            vec![],
+            vec![Credential {
+                issuer: "rIssuer".to_string(),
+                credential_type: "4B5943".to_string(),
+            }],
             1,
             Cow::from("0"),
             Cow::from("0000000000000000000000000000000000000000000000000000000000000000"),
