@@ -72,7 +72,8 @@ async fn test_oracle_delete_submit() {
             None,
             None,
             oracle_document_id,
-            Some("chainlink".into()),
+            // Provider is a Blob, so it must be hex-encoded ("chainlink").
+            Some("636861696E6C696E6B".into()),
             Some("68747470733A2F2F6578616D706C652E636F6D".into()),
             Some("63757272656E6379".into()),
             last_update_time,
