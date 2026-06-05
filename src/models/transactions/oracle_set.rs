@@ -54,13 +54,13 @@ pub struct OracleSet<'a> {
 
 impl Model for OracleSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        validate_optional_length(
+        validate_optional_blob(
             "provider",
             self.provider.as_deref(),
             MAX_ORACLE_PROVIDER_BYTES,
         )?;
-        validate_optional_length("uri", self.uri.as_deref(), MAX_ORACLE_URI_BYTES)?;
-        validate_optional_length(
+        validate_optional_blob("uri", self.uri.as_deref(), MAX_ORACLE_URI_BYTES)?;
+        validate_optional_blob(
             "asset_class",
             self.asset_class.as_deref(),
             MAX_ORACLE_ASSET_CLASS_BYTES,
@@ -104,20 +104,25 @@ impl Model for OracleSet<'_> {
     }
 }
 
-fn validate_optional_length(
+fn validate_optional_blob(
     field: &'static str,
     value: Option<&str>,
-    max: usize,
+    max_bytes: usize,
 ) -> XRPLModelResult<()> {
-    if let Some(value) = value {
-        let found = value.len();
-        if found > max {
-            return Err(XRPLModelException::ValueTooLong {
-                field: field.into(),
-                max,
-                found,
-            });
-        }
+    let Some(value) = value else {
+        return Ok(());
+    };
+    let bytes = hex::decode(value).map_err(|_| XRPLModelException::InvalidValue {
+        field: field.into(),
+        expected: "a hex-encoded Blob string".into(),
+        found: value.into(),
+    })?;
+    if bytes.len() > max_bytes {
+        return Err(XRPLModelException::ValueTooLong {
+            field: field.into(),
+            max: max_bytes,
+            found: bytes.len(),
+        });
     }
     Ok(())
 }
@@ -245,8 +250,8 @@ mod tests {
                 ..Default::default()
             },
             oracle_document_id: 1,
-            provider: Some("chainlink".into()),
-            uri: Some("https://example.com/oracle1".into()),
+            provider: Some("636861696E6C696E6B".into()),
+            uri: Some("68747470733A2F2F6578616D706C652E636F6D2F6F7261636C6531".into()),
             asset_class: Some("63757272656E6379".into()),
             last_update_time: 743609014,
             price_data_series: vec![PriceData {
@@ -699,7 +704,7 @@ mod tests {
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
-            provider: Some(alloc::format!("{}x", "a".repeat(MAX_ORACLE_PROVIDER_BYTES)).into()),
+            provider: Some("AA".repeat(MAX_ORACLE_PROVIDER_BYTES + 1).into()),
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
@@ -713,6 +718,30 @@ mod tests {
             oracle_set.get_errors().unwrap_err(),
             XRPLModelException::ValueTooLong { ref field, max, .. }
                 if field == "provider" && max == MAX_ORACLE_PROVIDER_BYTES
+        ));
+    }
+
+    #[test]
+    fn test_oracle_metadata_must_be_hex() {
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            provider: Some("chainlink".into()),
+            price_data_series: vec![PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            }],
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            oracle_set.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValue { ref field, .. } if field == "provider"
         ));
     }
 
