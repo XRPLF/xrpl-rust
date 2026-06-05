@@ -1,8 +1,10 @@
 //! Shared validation helpers for XLS-65 Vault transactions.
 
 use alloc::string::ToString;
+use bigdecimal::BigDecimal;
+use core::str::FromStr;
 
-use crate::models::{XRPLModelException, XRPLModelResult};
+use crate::models::{Amount, XRPLModelException, XRPLModelResult};
 
 /// The canonical length, in hex characters, of a VaultID.
 ///
@@ -29,6 +31,13 @@ pub(crate) fn validate_vault_id(vault_id: &str) -> XRPLModelResult<()> {
             found: vault_id.to_string(),
         });
     }
+    if vault_id.bytes().all(|b| b == b'0') {
+        return Err(XRPLModelException::InvalidValue {
+            field: "vault_id".to_string(),
+            expected: "nonzero 256-bit hash".to_string(),
+            found: vault_id.to_string(),
+        });
+    }
     Ok(())
 }
 
@@ -39,6 +48,13 @@ pub(crate) fn validate_hex_blob(
     value: &str,
     max_hex_chars: usize,
 ) -> XRPLModelResult<()> {
+    if value.is_empty() || value.len() % 2 != 0 {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "non-empty even-length ASCII hexadecimal".to_string(),
+            found: value.to_string(),
+        });
+    }
     if value.len() > max_hex_chars {
         return Err(XRPLModelException::ValueTooLong {
             field: field.to_string(),
@@ -50,6 +66,37 @@ pub(crate) fn validate_hex_blob(
         return Err(XRPLModelException::InvalidValueFormat {
             field: field.to_string(),
             format: "ASCII hexadecimal".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_nonnegative_number(field: &'static str, value: &str) -> XRPLModelResult<()> {
+    let parsed = BigDecimal::from_str(value)?;
+    if parsed < BigDecimal::from(0) {
+        return Err(XRPLModelException::InvalidValue {
+            field: field.to_string(),
+            expected: "a nonnegative number".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_positive_amount(
+    field: &'static str,
+    amount: &Amount<'_>,
+) -> XRPLModelResult<()> {
+    let value = match amount {
+        Amount::IssuedCurrencyAmount(amount) => amount.value.as_ref(),
+        Amount::XRPAmount(amount) => amount.0.as_ref(),
+    };
+    let parsed = BigDecimal::from_str(value)?;
+    if parsed <= BigDecimal::from(0) {
+        return Err(XRPLModelException::InvalidValue {
+            field: field.to_string(),
+            expected: "a positive amount".to_string(),
             found: value.to_string(),
         });
     }
@@ -82,7 +129,6 @@ mod tests {
     #[test]
     fn test_validate_hex_blob_accepts_valid() {
         assert!(validate_hex_blob("data", "48656C6C6F", 512).is_ok());
-        assert!(validate_hex_blob("data", "", 512).is_ok());
     }
 
     #[test]
@@ -94,5 +140,11 @@ mod tests {
     #[test]
     fn test_validate_hex_blob_rejects_non_hex() {
         assert!(validate_hex_blob("data", "XYZ", 512).is_err());
+    }
+
+    #[test]
+    fn test_validate_hex_blob_rejects_empty_or_odd_length() {
+        assert!(validate_hex_blob("data", "", 512).is_err());
+        assert!(validate_hex_blob("data", "ABC", 512).is_err());
     }
 }

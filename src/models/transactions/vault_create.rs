@@ -6,9 +6,11 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::amount::XRPAmount;
-use crate::models::{Currency, FlagCollection, Model, ValidateCurrencies, XRPLModelResult};
+use crate::models::{
+    Currency, FlagCollection, Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
 
-use super::vault_common::validate_hex_blob;
+use super::vault_common::{validate_hex_blob, validate_nonnegative_number, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 /// Maximum length, in hex characters, of the VaultCreate `Data` field.
@@ -19,6 +21,8 @@ const MAX_VAULT_DATA_HEX_LEN: usize = 512;
 /// field. Per XLS-65, share-token metadata is capped at 1024 bytes
 /// = 2048 hex chars.
 const MAX_VAULT_MPTOKEN_METADATA_HEX_LEN: usize = 2048;
+const MAX_VAULT_SCALE: u8 = 18;
+const FIRST_COME_FIRST_SERVE_POLICY: u8 = 1;
 
 /// Transactions of the VaultCreate type support additional values in the
 /// Flags field. This enum represents those options.
@@ -91,12 +95,50 @@ impl Model for VaultCreate<'_> {
         if let Some(data) = self.data.as_deref() {
             validate_hex_blob("data", data, MAX_VAULT_DATA_HEX_LEN)?;
         }
+        if let Some(maximum) = self.assets_maximum.as_deref() {
+            validate_nonnegative_number("assets_maximum", maximum)?;
+        }
         if let Some(metadata) = self.mptoken_metadata.as_deref() {
             validate_hex_blob(
                 "mptoken_metadata",
                 metadata,
                 MAX_VAULT_MPTOKEN_METADATA_HEX_LEN,
             )?;
+        }
+        if let Some(domain_id) = self.domain_id.as_deref() {
+            validate_vault_id(domain_id)?;
+            if !self.has_flag(&VaultCreateFlag::TfVaultPrivate) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "domain_id".into(),
+                    expected: "only present when tfVaultPrivate is set".into(),
+                    found: domain_id.into(),
+                });
+            }
+        }
+        if let Some(policy) = self.withdrawal_policy {
+            if policy != FIRST_COME_FIRST_SERVE_POLICY {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "withdrawal_policy".into(),
+                    expected: "1 (first-come-first-serve)".into(),
+                    found: policy.to_string(),
+                });
+            }
+        }
+        if let Some(scale) = self.scale {
+            if matches!(self.asset, Currency::XRP(_)) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "scale".into(),
+                    expected: "omitted for XRP vault assets".into(),
+                    found: scale.to_string(),
+                });
+            }
+            if scale > MAX_VAULT_SCALE {
+                return Err(XRPLModelException::ValueTooHigh {
+                    field: "scale".into(),
+                    max: MAX_VAULT_SCALE as u32,
+                    found: scale as u32,
+                });
+            }
         }
         Ok(())
     }
@@ -390,10 +432,10 @@ mod tests {
         }
         .with_fee("15".into())
         .with_sequence(200)
-        .with_withdrawal_policy(0);
+        .with_withdrawal_policy(1);
 
         assert!(matches!(token_vault.asset, Currency::IssuedCurrency(_)));
-        assert_eq!(token_vault.withdrawal_policy, Some(0));
+        assert_eq!(token_vault.withdrawal_policy, Some(1));
         assert!(token_vault.validate().is_ok());
     }
 

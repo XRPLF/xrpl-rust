@@ -4,10 +4,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
+use crate::models::{FlagCollection, Model, NoFlags, XRPLModelException, XRPLModelResult};
 
-use super::vault_common::validate_vault_id;
+use super::vault_common::{validate_hex_blob, validate_nonnegative_number, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
+
+const MAX_VAULT_DATA_HEX_LEN: usize = 512;
 
 /// Update the settings of an existing vault on the XRP Ledger (XLS-65).
 ///
@@ -40,7 +42,22 @@ pub struct VaultSet<'a> {
 
 impl Model for VaultSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        validate_vault_id(&self.vault_id)
+        validate_vault_id(&self.vault_id)?;
+        if self.data.is_none() && self.assets_maximum.is_none() && self.domain_id.is_none() {
+            return Err(XRPLModelException::MissingField(
+                "data, assets_maximum, or domain_id".into(),
+            ));
+        }
+        if let Some(data) = self.data.as_deref() {
+            validate_hex_blob("data", data, MAX_VAULT_DATA_HEX_LEN)?;
+        }
+        if let Some(maximum) = self.assets_maximum.as_deref() {
+            validate_nonnegative_number("assets_maximum", maximum)?;
+        }
+        if let Some(domain_id) = self.domain_id.as_deref() {
+            validate_vault_id(domain_id)?;
+        }
+        Ok(())
     }
 }
 
@@ -333,7 +350,8 @@ mod tests {
             ..Default::default()
         }
         .with_fee("12".into())
-        .with_sequence(300);
+        .with_sequence(300)
+        .with_data("48656C6C6F".into());
 
         assert!(vault_set.validate().is_ok());
     }
