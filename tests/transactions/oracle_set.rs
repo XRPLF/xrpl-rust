@@ -10,6 +10,10 @@
 use crate::common::{
     generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
 };
+use xrpl::asynch::clients::XRPLAsyncClient;
+use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
+use xrpl::models::requests::LedgerIndex;
+use xrpl::models::results::account_objects::AccountObjects as AccountObjectsResult;
 use xrpl::models::transactions::oracle_set::OracleSet;
 use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
 
@@ -108,6 +112,46 @@ async fn test_oracle_set_submit() {
         );
 
         test_transaction(&mut oracle_set, &wallet).await;
+
+        let client = crate::common::get_client().await;
+        let response = client
+            .request(
+                AccountObjects::new(
+                    None,
+                    wallet.classic_address.clone().into(),
+                    None,
+                    Some(LedgerIndex::Str("validated".into())),
+                    Some(AccountObjectType::Oracle),
+                    None,
+                    None,
+                    None,
+                )
+                .into(),
+            )
+            .await
+            .expect("account_objects oracle request failed");
+        let result: AccountObjectsResult = response
+            .try_into()
+            .expect("failed to parse account_objects result");
+        assert_eq!(result.account_objects.len(), 1);
+        let oracle = &result.account_objects[0];
+        assert_eq!(oracle["LedgerEntryType"], "Oracle");
+        assert_eq!(oracle["Owner"], wallet.classic_address);
+        assert_eq!(oracle["Provider"], "636861696E6C696E6B");
+        assert_eq!(oracle["AssetClass"], "63757272656E6379");
+        assert_eq!(
+            oracle["PriceDataSeries"][0]["PriceData"]["BaseAsset"],
+            "XRP"
+        );
+        assert_eq!(
+            oracle["PriceDataSeries"][0]["PriceData"]["QuoteAsset"],
+            "USD"
+        );
+        assert_eq!(
+            oracle["PriceDataSeries"][0]["PriceData"]["AssetPrice"],
+            "2e4"
+        );
+        assert_eq!(oracle["PriceDataSeries"][0]["PriceData"]["Scale"], 1);
     })
     .await;
 }
