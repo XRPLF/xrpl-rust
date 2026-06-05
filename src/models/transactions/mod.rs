@@ -594,8 +594,8 @@ pub struct PriceData {
 
 /// Maximum allowed value for the `scale` field of a `PriceData` entry.
 ///
-/// Per rippled, `scale` must be in the inclusive range `0..=20`.
-pub const MAX_PRICE_DATA_SCALE: u8 = 20;
+/// Per rippled, `scale` must be in the inclusive range `0..=10`.
+pub const MAX_PRICE_DATA_SCALE: u8 = 10;
 
 impl crate::models::Model for PriceData {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {

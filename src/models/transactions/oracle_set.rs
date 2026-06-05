@@ -581,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_scale_too_high_rejected() {
-        // Per rippled, `scale` must be in the inclusive range 0..=20.
+        // Per rippled, `scale` must be in the inclusive range 0..=10.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
                 account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
@@ -594,7 +594,7 @@ mod tests {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
             asset_price: Some("100".to_string()),
-            scale: Some(21),
+            scale: Some(11),
         }]);
 
         let err = oracle_set.get_errors().unwrap_err();
@@ -602,15 +602,15 @@ mod tests {
             err,
             XRPLModelException::ValueTooHigh {
                 field: "scale".into(),
-                max: 20,
-                found: 21,
+                max: 10,
+                found: 11,
             }
         );
     }
 
     #[test]
     fn test_scale_at_max_ok() {
-        // Boundary: scale = 20 is explicitly permitted.
+        // Boundary: scale = 10 is explicitly permitted.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
                 account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
@@ -623,7 +623,7 @@ mod tests {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
             asset_price: Some("100".to_string()),
-            scale: Some(20),
+            scale: Some(10),
         }]);
 
         assert!(oracle_set.get_errors().is_ok());
