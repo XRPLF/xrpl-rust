@@ -10,6 +10,10 @@
 use crate::common::{
     generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
 };
+use xrpl::asynch::clients::XRPLAsyncClient;
+use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
+use xrpl::models::requests::LedgerIndex;
+use xrpl::models::results::account_objects::AccountObjects as AccountObjectsResult;
 use xrpl::models::transactions::oracle_delete::OracleDelete;
 use xrpl::models::transactions::oracle_set::OracleSet;
 use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
@@ -102,6 +106,31 @@ async fn test_oracle_delete_submit() {
             oracle_document_id,
         );
         test_transaction(&mut oracle_delete, &wallet).await;
+
+        let client = crate::common::get_client().await;
+        let response = client
+            .request(
+                AccountObjects::new(
+                    None,
+                    wallet.classic_address.clone().into(),
+                    None,
+                    Some(LedgerIndex::Str("validated".into())),
+                    Some(AccountObjectType::Oracle),
+                    None,
+                    None,
+                    None,
+                )
+                .into(),
+            )
+            .await
+            .expect("account_objects oracle request failed");
+        let result: AccountObjectsResult = response
+            .try_into()
+            .expect("failed to parse account_objects result");
+        assert!(
+            result.account_objects.is_empty(),
+            "Oracle object should be deleted"
+        );
     })
     .await;
 }
