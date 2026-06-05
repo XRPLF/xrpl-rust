@@ -9,12 +9,15 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 use crate::models::{
     amount::Amount,
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, ValidateCurrencies,
+    Model, ValidateCurrencies, XRPLModelException,
 };
 
 use crate::models::amount::XRPAmount;
 
-use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
+use super::{
+    permissioned_domain_set::validate_domain_id, CommonFields, CommonTransactionBuilder,
+    FlagCollection,
+};
 
 /// Transactions of the OfferCreate type support additional values
 /// in the Flags field. This enum represents those options.
@@ -45,6 +48,9 @@ pub enum OfferCreateFlag {
     /// Exchange the entire TakerGets amount, even if it means obtaining more than
     /// the TakerPays amount in exchange.
     TfSell = 0x00080000,
+    /// Place the offer in both the permissioned DEX and open DEX books.
+    /// Requires DomainID.
+    TfHybrid = 0x00100000,
 }
 
 /// Places an Offer in the decentralized exchange.
@@ -78,10 +84,21 @@ pub struct OfferCreate<'a> {
     pub expiration: Option<u32>,
     /// An Offer to delete first, specified in the same way as OfferCancel.
     pub offer_sequence: Option<u32>,
+    /// The PermissionedDomain ledger entry ID for a permissioned DEX offer.
+    #[serde(rename = "DomainID")]
+    pub domain_id: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for OfferCreate<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        if let Some(domain_id) = self.domain_id.as_deref() {
+            validate_domain_id(domain_id)?;
+        } else if self.has_flag(&OfferCreateFlag::TfHybrid) {
+            return Err(XRPLModelException::FieldRequiresField {
+                field1: "tfHybrid".into(),
+                field2: "DomainID".into(),
+            });
+        }
         self.validate_currencies()
     }
 }
@@ -152,6 +169,7 @@ impl<'a> OfferCreate<'a> {
             taker_pays,
             expiration,
             offer_sequence,
+            domain_id: None,
         }
     }
 
@@ -164,6 +182,12 @@ impl<'a> OfferCreate<'a> {
     /// Set offer sequence to cancel
     pub fn with_offer_sequence(mut self, offer_sequence: u32) -> Self {
         self.offer_sequence = Some(offer_sequence);
+        self
+    }
+
+    /// Set DomainID for a permissioned DEX offer.
+    pub fn with_domain_id(mut self, domain_id: Cow<'a, str>) -> Self {
+        self.domain_id = Some(domain_id);
         self
     }
 
@@ -439,5 +463,50 @@ mod tests {
         assert_eq!(ticket_offer.common_fields.ticket_sequence, Some(789));
         // When using tickets, sequence should be None or 0
         assert!(ticket_offer.common_fields.sequence.is_none());
+    }
+
+    #[test]
+    fn test_domain_id_and_hybrid_flag() {
+        let offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "1".into(),
+            )),
+            ..Default::default()
+        }
+        .with_domain_id("AABB00112233445566778899AABB00112233445566778899AABB001122334455".into())
+        .with_flag(OfferCreateFlag::TfHybrid);
+
+        assert!(offer.validate().is_ok());
+        let serialized = serde_json::to_string(&offer).unwrap();
+        assert!(serialized.contains("\"DomainID\""));
+    }
+
+    #[test]
+    fn test_hybrid_requires_domain_id() {
+        let offer = OfferCreate {
+            common_fields: CommonFields {
+                account: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+                transaction_type: TransactionType::OfferCreate,
+                ..Default::default()
+            },
+            taker_gets: Amount::XRPAmount(XRPAmount::from("1000000")),
+            taker_pays: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "1".into(),
+            )),
+            ..Default::default()
+        }
+        .with_flag(OfferCreateFlag::TfHybrid);
+
+        assert!(offer.validate().is_err());
     }
 }

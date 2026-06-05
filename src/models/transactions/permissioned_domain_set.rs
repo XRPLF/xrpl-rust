@@ -89,7 +89,7 @@ impl<'a> Model for PermissionedDomainSet<'a> {
 /// `Issuer` must be non-empty and `CredentialType` is an `sfBlob` (hex),
 /// so it must be non-empty, even-length, hex-only, and at most 128 hex
 /// chars (64 bytes, rippled's `MaxCredentialTypeLength`).
-fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelResult<()> {
+pub(crate) fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelResult<()> {
     if domain_id.len() != 64
         || !domain_id.chars().all(|c| c.is_ascii_hexdigit())
         || domain_id.chars().all(|c| c == '0')
