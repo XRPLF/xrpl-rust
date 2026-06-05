@@ -42,7 +42,8 @@ pub struct Credential<'a> {
     #[serde(rename = "URI")]
     pub uri: Option<Cow<'a, str>>,
     /// A hint indicating which page of the subject's owner directory links to this object.
-    pub subject_node: Cow<'a, str>,
+    /// Omitted for self-issued credentials, which only appear in the issuer's owner directory.
+    pub subject_node: Option<Cow<'a, str>>,
     /// A hint indicating which page of the issuer's owner directory links to this object.
     pub issuer_node: Cow<'a, str>,
     /// The identifying hash of the transaction that most recently modified this object.
@@ -70,7 +71,7 @@ impl<'a> Credential<'a> {
         credential_type: Cow<'a, str>,
         expiration: Option<u32>,
         uri: Option<Cow<'a, str>>,
-        subject_node: Cow<'a, str>,
+        subject_node: Option<Cow<'a, str>>,
         issuer_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
@@ -113,7 +114,7 @@ mod tests {
             Some(Cow::from(
                 "69736162656C2E636F6D2F63726564656E7469616C732F6B79632F616C696365",
             )),
-            Cow::from("0000000000000000"),
+            Some(Cow::from("0000000000000000")),
             Cow::from("0000000000000000"),
             Cow::from("3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702"),
             8,
@@ -144,7 +145,7 @@ mod tests {
             uri: Some(Cow::from(
                 "69736162656C2E636F6D2F63726564656E7469616C732F6B79632F616C696365",
             )),
-            subject_node: Cow::from("0000000000000000"),
+            subject_node: Some(Cow::from("0000000000000000")),
             issuer_node: Cow::from("0000000000000001"),
             previous_txn_id: Cow::from(
                 "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
@@ -173,7 +174,7 @@ mod tests {
             credential_type: Cow::from("4B5943"),
             expiration: None,
             uri: None,
-            subject_node: Cow::from("0000000000000000"),
+            subject_node: Some(Cow::from("0000000000000000")),
             issuer_node: Cow::from("0000000000000000"),
             previous_txn_id: Cow::from(
                 "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
@@ -189,6 +190,24 @@ mod tests {
         assert_eq!(credential, deserialized);
         assert!(deserialized.expiration.is_none());
         assert!(deserialized.uri.is_none());
+    }
+
+    #[test]
+    fn test_self_issued_credential_allows_missing_subject_node() {
+        let json = r#"{
+            "LedgerEntryType":"Credential",
+            "Flags":65536,
+            "Subject":"rSELF11111111111111111111111111111",
+            "Issuer":"rSELF11111111111111111111111111111",
+            "CredentialType":"4B5943",
+            "IssuerNode":"0000000000000000",
+            "PreviousTxnID":"3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
+            "PreviousTxnLgrSeq":10
+        }"#;
+
+        let credential: Credential = serde_json::from_str(json).unwrap();
+        assert!(credential.subject_node.is_none());
+        assert_eq!(credential.subject, credential.issuer);
     }
 
     #[test]
@@ -216,7 +235,7 @@ mod tests {
             credential_type: Cow::from("4B5943"),
             expiration: None,
             uri: None,
-            subject_node: Cow::from("0000000000000000"),
+            subject_node: Some(Cow::from("0000000000000000")),
             issuer_node: Cow::from("0000000000000000"),
             previous_txn_id: Cow::from(
                 "3E8964D5A86B3CD6B9ECB33310D4E073D64C865A5B866200AD2B7E29F8326702",
