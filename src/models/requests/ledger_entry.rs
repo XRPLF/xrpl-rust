@@ -1,18 +1,72 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
+use crate::models::{
+    requests::RequestMethod, transactions::validate_credential_type, Model, XRPLModelException,
+    XRPLModelResult,
+};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
+/// Required credential selector for credential-based DepositPreauth lookup.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct AuthorizedCredential<'a> {
+    pub issuer: Cow<'a, str>,
+    pub credential_type: Cow<'a, str>,
+}
+
 /// Required fields for requesting a DepositPreauth if not
 /// querying by object ID.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
 pub struct DepositPreauth<'a> {
-    pub authorized: Cow<'a, str>,
     pub owner: Cow<'a, str>,
+    pub authorized: Option<Cow<'a, str>>,
+    pub authorized_credentials: Option<Vec<AuthorizedCredential<'a>>>,
+}
+
+impl Model for DepositPreauth<'_> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        match (&self.authorized, &self.authorized_credentials) {
+            (Some(_), None) => Ok(()),
+            (None, Some(credentials)) => {
+                if credentials.is_empty() {
+                    return Err(XRPLModelException::ValueTooShort {
+                        field: "authorized_credentials".into(),
+                        min: 1,
+                        found: 0,
+                    });
+                }
+                if credentials.len() > 8 {
+                    return Err(XRPLModelException::ValueTooLong {
+                        field: "authorized_credentials".into(),
+                        max: 8,
+                        found: credentials.len(),
+                    });
+                }
+                for (idx, credential) in credentials.iter().enumerate() {
+                    validate_credential_type(&credential.credential_type)?;
+                    if credentials[..idx].iter().any(|previous| {
+                        previous.issuer == credential.issuer
+                            && previous.credential_type == credential.credential_type
+                    }) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "authorized_credentials".into(),
+                            expected: "unique issuer and credential_type pairs".into(),
+                            found: credential.credential_type.to_string(),
+                        });
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(XRPLModelException::ExpectedOneOf(&[
+                "authorized",
+                "authorized_credentials",
+            ])),
+        }
+    }
 }
 
 /// Required fields for requesting a Credential if not
@@ -114,7 +168,11 @@ pub struct LedgerEntry<'a> {
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self._get_field_error()
+        self._get_field_error()?;
+        if let Some(deposit_preauth) = &self.deposit_preauth {
+            deposit_preauth.get_errors()?;
+        }
+        Ok(())
     }
 }
 
@@ -317,5 +375,67 @@ mod test_ledger_entry_errors {
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(req, deserialized);
+    }
+
+    #[test]
+    fn test_deposit_preauth_with_authorized_credentials_serde() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: Some(vec![AuthorizedCredential {
+                    issuer: "rIssuer".into(),
+                    credential_type: "4B5943".into(),
+                }]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_ok());
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"authorized_credentials\""));
+        assert!(json.contains("\"credential_type\":\"4B5943\""));
+        let deserialized: LedgerEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(req, deserialized);
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_duplicate_authorized_credentials() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: Some(vec![
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4B5943".into(),
+                    },
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4B5943".into(),
+                    },
+                ]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_authorized_and_credentials() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: Some("rAuthorized".into()),
+                authorized_credentials: Some(vec![AuthorizedCredential {
+                    issuer: "rIssuer".into(),
+                    credential_type: "4B5943".into(),
+                }]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_err());
     }
 }
