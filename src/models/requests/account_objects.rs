@@ -18,6 +18,7 @@ pub enum AccountObjectType {
     Escrow,
     Offer,
     PaymentChannel,
+    PermissionedDomain,
     SignerList,
     State,
     Ticket,
@@ -43,8 +44,8 @@ pub struct AccountObjects<'a> {
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     /// If included, filter results to include only this type
     /// of ledger object. The valid types are: check, deposit_preauth,
-    /// escrow, offer, payment_channel, signer_list, ticket,
-    /// and state (trust line).
+    /// escrow, offer, payment_channel, permissioned_domain, signer_list,
+    /// ticket, and state (trust line).
     pub r#type: Option<AccountObjectType>,
     /// If true, the response only includes objects that would block
     /// this account from being deleted. The default is false.
@@ -96,5 +97,27 @@ impl<'a> AccountObjects<'a> {
             limit,
             marker,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_permissioned_domain_type_serializes() {
+        let request = AccountObjects::new(
+            None,
+            "rOwner".into(),
+            None,
+            None,
+            Some(AccountObjectType::PermissionedDomain),
+            None,
+            None,
+            None,
+        );
+
+        let serialized = serde_json::to_string(&request).unwrap();
+        assert!(serialized.contains("\"type\":\"permissioned_domain\""));
     }
 }
