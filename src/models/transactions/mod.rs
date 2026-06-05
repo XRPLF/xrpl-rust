@@ -608,6 +608,17 @@ impl crate::models::Model for PriceData {
                 });
             }
         }
+        if self.asset_price.is_some() != self.scale.is_some() {
+            return Err(crate::models::XRPLModelException::InvalidValue {
+                field: "price_data".into(),
+                expected: "AssetPrice and Scale both present or both omitted".into(),
+                found: alloc::format!(
+                    "asset_price_present={}, scale_present={}",
+                    self.asset_price.is_some(),
+                    self.scale.is_some()
+                ),
+            });
+        }
         validate_oracle_currency("base_asset", &self.base_asset)?;
         validate_oracle_currency("quote_asset", &self.quote_asset)?;
         validate_oracle_asset_price(&self.asset_price)?;
