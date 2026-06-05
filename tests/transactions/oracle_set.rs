@@ -78,7 +78,9 @@ fn test_oracle_set_serde_roundtrip() {
 async fn test_oracle_set_submit() {
     with_blockchain_lock(|| async {
         let wallet = generate_funded_wallet().await;
-        let last_update_time = get_ledger_close_time().await as u32;
+        // OracleSet LastUpdateTime is POSIX/Unix time. The ledger response uses
+        // Ripple epoch seconds, so convert before submitting.
+        let last_update_time = (get_ledger_close_time().await + 946_684_800) as u32;
 
         let mut oracle_set = OracleSet::new(
             wallet.classic_address.clone().into(),
