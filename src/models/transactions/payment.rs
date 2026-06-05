@@ -14,7 +14,10 @@ use crate::models::{
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::exceptions::XRPLPaymentException;
 
-use super::{CommonFields, CommonTransactionBuilder, FlagCollection};
+use super::{
+    permissioned_domain_set::validate_domain_id, CommonFields, CommonTransactionBuilder,
+    FlagCollection,
+};
 
 /// Transactions of the Payment type support additional values
 /// in the Flags field. This enum represents those options.
@@ -97,6 +100,9 @@ pub struct Payment<'a> {
     /// Minimum amount of destination currency this transaction should deliver. Only valid
     /// if this is a partial payment. For non-XRP amounts, the nested field names are lower-case.
     pub deliver_min: Option<Amount<'a>>,
+    /// The PermissionedDomain ledger entry ID to use for permissioned DEX pathfinding.
+    #[serde(rename = "DomainID")]
+    pub domain_id: Option<Cow<'a, str>>,
 }
 
 impl<'a: 'static> Model for Payment<'a> {
@@ -104,6 +110,9 @@ impl<'a: 'static> Model for Payment<'a> {
         self._get_xrp_transaction_error()?;
         self._get_partial_payment_error()?;
         self._get_exchange_error()?;
+        if let Some(domain_id) = self.domain_id.as_deref() {
+            validate_domain_id(domain_id)?;
+        }
         self.validate_currencies()
     }
 }
@@ -252,6 +261,7 @@ impl<'a> Payment<'a> {
             paths,
             send_max,
             deliver_min,
+            domain_id: None,
         }
     }
 
@@ -276,6 +286,12 @@ impl<'a> Payment<'a> {
     /// Set deliver min
     pub fn with_deliver_min(mut self, deliver_min: Amount<'a>) -> Self {
         self.deliver_min = Some(deliver_min);
+        self
+    }
+
+    /// Set DomainID for permissioned DEX pathfinding.
+    pub fn with_domain_id(mut self, domain_id: Cow<'a, str>) -> Self {
+        self.domain_id = Some(domain_id);
         self
     }
 
@@ -596,5 +612,29 @@ mod tests {
 
         assert_eq!(payment.paths.as_ref().unwrap().len(), 2);
         assert!(payment.validate().is_ok());
+    }
+
+    #[test]
+    fn test_domain_id_serializes_and_validates() {
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rhub8VRN55s94qWKDv6jmDy1pUykJzF3wq".into(),
+                "100".into(),
+            )),
+            destination: "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX".into(),
+            ..Default::default()
+        }
+        .with_domain_id("AABB00112233445566778899AABB00112233445566778899AABB001122334455".into())
+        .with_send_max(Amount::XRPAmount("110000000".into()));
+
+        assert!(payment.validate().is_ok());
+        let serialized = serde_json::to_string(&payment).unwrap();
+        assert!(serialized.contains("\"DomainID\""));
     }
 }
