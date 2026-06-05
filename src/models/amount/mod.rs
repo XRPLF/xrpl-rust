@@ -1,7 +1,9 @@
 mod issued_currency_amount;
+mod mpt_amount;
 mod xrp_amount;
 
 pub use issued_currency_amount::*;
+pub use mpt_amount::*;
 pub use xrp_amount::*;
 
 use alloc::string::ToString;
@@ -18,6 +20,7 @@ use super::{XRPLModelException, XRPLModelResult};
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Display)]
 #[serde(untagged)]
 pub enum Amount<'a> {
+    MPTAmount(MPTAmount<'a>),
     IssuedCurrencyAmount(IssuedCurrencyAmount<'a>),
     XRPAmount(XRPAmount<'a>),
 }
@@ -27,6 +30,7 @@ impl<'a> TryInto<BigDecimal> for Amount<'a> {
 
     fn try_into(self) -> XRPLModelResult<BigDecimal, Self::Error> {
         match self {
+            Amount::MPTAmount(amount) => amount.try_into(),
             Amount::IssuedCurrencyAmount(amount) => amount.try_into(),
             Amount::XRPAmount(amount) => amount.try_into(),
         }
@@ -36,6 +40,7 @@ impl<'a> TryInto<BigDecimal> for Amount<'a> {
 impl<'a> Model for Amount<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         match self {
+            Amount::MPTAmount(amount) => amount.get_errors(),
             Amount::IssuedCurrencyAmount(amount) => amount.get_errors(),
             Amount::XRPAmount(amount) => amount.get_errors(),
         }
@@ -51,13 +56,24 @@ impl<'a> Default for Amount<'a> {
 impl<'a> Amount<'a> {
     pub fn is_xrp(&self) -> bool {
         match self {
+            Amount::MPTAmount(_) => false,
             Amount::IssuedCurrencyAmount(_) => false,
             Amount::XRPAmount(_) => true,
         }
     }
 
     pub fn is_issued_currency(&self) -> bool {
-        !self.is_xrp()
+        matches!(self, Amount::IssuedCurrencyAmount(_))
+    }
+
+    pub fn is_mpt(&self) -> bool {
+        matches!(self, Amount::MPTAmount(_))
+    }
+}
+
+impl<'a> From<MPTAmount<'a>> for Amount<'a> {
+    fn from(value: MPTAmount<'a>) -> Self {
+        Self::MPTAmount(value)
     }
 }
 
