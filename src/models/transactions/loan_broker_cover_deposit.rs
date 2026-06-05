@@ -82,7 +82,7 @@ impl<'a> LoanBrokerCoverDeposit<'a> {
         LoanBrokerCoverDeposit {
             common_fields: CommonFields::new(
                 account,
-                TransactionType::LoanBrokerSet,
+                TransactionType::LoanBrokerCoverDeposit,
                 account_txn_id,
                 fee,
                 Some(FlagCollection::default()),

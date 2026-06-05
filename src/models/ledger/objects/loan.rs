@@ -66,7 +66,7 @@ pub struct Loan<'a> {
     pub close_payment_fee: Cow<'a, str>,
     /// A fee charged on overpayments in 1/10th
     /// basis points. Valid values are between 0 and 100000 inclusive. (0 - 100%)
-    pub overpaymnet_fee: Cow<'a, str>,
+    pub overpayment_fee: Cow<'a, str>,
     /// Annualized interest rate of the Loan in 1/10th basis points.
     pub interest_rate: u32,
     /// A premium is added to the interest rate for
@@ -135,7 +135,7 @@ impl<'a> Loan<'a> {
         loan_service_fee: Cow<'a, str>,
         late_payment_fee: Cow<'a, str>,
         close_payment_fee: Cow<'a, str>,
-        overpaymnet_fee: Cow<'a, str>,
+        overpayment_fee: Cow<'a, str>,
         interest_rate: u32,
         late_interest_rate: u32,
         close_interest_rate: u32,
@@ -155,7 +155,7 @@ impl<'a> Loan<'a> {
         Loan {
             common_fields: CommonFields {
                 flags,
-                ledger_entry_type: LedgerEntryType::LoanBroker,
+                ledger_entry_type: LedgerEntryType::Loan,
                 index,
                 ledger_index: Some(ledger_index),
             },
@@ -170,7 +170,7 @@ impl<'a> Loan<'a> {
             loan_service_fee,
             late_payment_fee,
             close_payment_fee,
-            overpaymnet_fee,
+            overpayment_fee,
             interest_rate,
             late_interest_rate,
             close_interest_rate,

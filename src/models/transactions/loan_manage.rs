@@ -109,7 +109,7 @@ impl<'a> LoanManage<'a> {
         LoanManage {
             common_fields: CommonFields::new(
                 account,
-                TransactionType::LoanSet,
+                TransactionType::LoanManage,
                 account_txn_id,
                 fee,
                 flags,
