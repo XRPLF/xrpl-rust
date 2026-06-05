@@ -10,14 +10,9 @@ on:
 name: Integration Test
 
 env:
-<<<<<<< feat/xls-65-single-asset-vault
-  # Pin to known-good digest; rippleci/rippled:develop broke after 2026-04-01
-  RIPPLED_DOCKER_IMAGE: rippleci/rippled:develop@sha256:328175bf14b7b83db9e5e6b50c7458bf828b02b2855453efc038233094aa8d85
-=======
   # rippled binary was renamed to xrpld; use the new image name.
   # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
   XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
->>>>>>> main
 
 jobs:
   integration_test:
@@ -30,24 +25,6 @@ jobs:
 
       - name: Run xrpld in standalone mode
         run: |
-<<<<<<< feat/xls-65-single-asset-vault
-          for i in $(seq 1 30); do
-            if ! docker ps -q -f name=rippled-service | grep -q .; then
-              echo "Container exited unexpectedly"
-              docker logs rippled-service 2>&1 || true
-              exit 1
-            fi
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' rippled-service 2>/dev/null || echo "unknown")
-            echo "Attempt $i/30: $STATUS"
-            if [ "$STATUS" = "healthy" ]; then
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Timed out waiting for rippled"
-          docker logs rippled-service 2>&1 || true
-          exit 1
-=======
           docker run \
             --detach \
             --rm \
@@ -56,7 +33,23 @@ jobs:
             --volume "${{ github.workspace }}/.ci-config/":"/etc/xrpld/" \
             --name xrpld-service \
             ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
->>>>>>> main
+
+          for i in $(seq 1 30); do
+            if ! docker ps -q -f name=xrpld-service | grep -q .; then
+              echo "Container exited unexpectedly"
+              docker logs xrpld-service 2>&1 || true
+              exit 1
+            fi
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' xrpld-service 2>/dev/null || echo "unknown")
+            echo "Attempt $i/30: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for xrpld"
+          docker logs xrpld-service 2>&1 || true
+          exit 1
 
       - uses: dtolnay/rust-toolchain@stable
 
