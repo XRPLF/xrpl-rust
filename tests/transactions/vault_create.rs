@@ -4,9 +4,9 @@
 // that the transaction type can be constructed and serialized correctly.
 // Live submission tests will be enabled once XLS-65 is available on devnet.
 
-use xrpl::models::transactions::vault_create::VaultCreate;
+use xrpl::models::transactions::vault_create::{VaultCreate, VaultCreateFlag};
 use xrpl::models::transactions::{CommonFields, Memo, TransactionType};
-use xrpl::models::{Currency, IssuedCurrency, Model, XRP};
+use xrpl::models::{Currency, FlagCollection, IssuedCurrency, Model};
 
 #[test]
 fn test_vault_create_serde_roundtrip() {
@@ -39,9 +39,10 @@ fn test_vault_create_with_all_optional_fields() {
             transaction_type: TransactionType::VaultCreate,
             fee: Some("12".into()),
             sequence: Some(100),
+            flags: FlagCollection::from(vec![VaultCreateFlag::TfVaultPrivate]),
             ..Default::default()
         },
-        asset: Currency::XRP(XRP::new()),
+        asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
         data: Some("48656C6C6F".into()),
         assets_maximum: Some("1000000000".into()),
         mptoken_metadata: Some("ABCDEF".into()),

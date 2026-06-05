@@ -65,6 +65,7 @@ fn test_vault_set_builder_pattern() {
     }
     .with_fee("12".into())
     .with_sequence(700)
+    .with_data("48656C6C6F".into())
     .with_memo(Memo {
         memo_data: Some("updating vault".into()),
         memo_format: None,

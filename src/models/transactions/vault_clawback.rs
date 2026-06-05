@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
+use crate::models::{Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelResult};
 
 use super::vault_common::validate_vault_id;
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
@@ -17,7 +17,16 @@ use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, T
 /// See VaultClawback transaction:
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0065d-single-asset-vault>`
 #[skip_serializing_none]
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    xrpl_rust_macros::ValidateCurrencies,
+)]
 #[serde(rename_all = "PascalCase")]
 pub struct VaultClawback<'a> {
     /// The base fields for all transaction models.
@@ -31,13 +40,14 @@ pub struct VaultClawback<'a> {
     pub vault_id: Cow<'a, str>,
     /// The account address of the holder whose assets are being clawed back.
     pub holder: Cow<'a, str>,
-    /// The asset amount to clawback as a string-encoded number.
-    /// When 0 or omitted, clawback all funds up to the total shares the Holder owns.
-    pub amount: Option<Cow<'a, str>>,
+    /// The asset amount to claw back. Omit to claw back all funds up to the
+    /// total shares the Holder owns.
+    pub amount: Option<Amount<'a>>,
 }
 
 impl Model for VaultClawback<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        self.validate_currencies()?;
         validate_vault_id(&self.vault_id)
     }
 }
@@ -79,7 +89,7 @@ impl<'a> VaultClawback<'a> {
         ticket_sequence: Option<u32>,
         vault_id: Cow<'a, str>,
         holder: Cow<'a, str>,
-        amount: Option<Cow<'a, str>>,
+        amount: Option<Amount<'a>>,
     ) -> VaultClawback<'a> {
         VaultClawback {
             common_fields: CommonFields::new(

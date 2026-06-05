@@ -6,7 +6,7 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelResult};
 
-use super::vault_common::validate_vault_id;
+use super::vault_common::{validate_positive_amount, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 /// Withdraw assets from a vault on the XRP Ledger (XLS-65).
@@ -49,7 +49,8 @@ pub struct VaultWithdraw<'a> {
 impl Model for VaultWithdraw<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
-        validate_vault_id(&self.vault_id)
+        validate_vault_id(&self.vault_id)?;
+        validate_positive_amount("amount", &self.amount)
     }
 }
 
