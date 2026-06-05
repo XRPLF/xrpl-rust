@@ -32,6 +32,11 @@ impl<'a: 'b, 'b> From<Amount<'a>> for Balance<'b> {
                 value: amount.value,
                 issuer: Some(amount.issuer),
             },
+            Amount::MPTAmount(amount) => Self {
+                currency: amount.mpt_issuance_id,
+                value: amount.value,
+                issuer: None,
+            },
         }
     }
 }

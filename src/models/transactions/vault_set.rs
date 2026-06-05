@@ -6,7 +6,9 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{FlagCollection, Model, NoFlags, XRPLModelException, XRPLModelResult};
 
-use super::vault_common::{validate_hex_blob, validate_nonnegative_number, validate_vault_id};
+use super::vault_common::{
+    validate_hash256, validate_hex_blob, validate_nonnegative_number, validate_vault_id,
+};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 const MAX_VAULT_DATA_HEX_LEN: usize = 512;
@@ -55,7 +57,7 @@ impl Model for VaultSet<'_> {
             validate_nonnegative_number("assets_maximum", maximum)?;
         }
         if let Some(domain_id) = self.domain_id.as_deref() {
-            validate_vault_id(domain_id)?;
+            validate_hash256("domain_id", domain_id)?;
         }
         Ok(())
     }

@@ -4,7 +4,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::{Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelResult};
+use bigdecimal::BigDecimal;
+use core::str::FromStr;
+
+use crate::models::{
+    Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
 
 use super::vault_common::validate_vault_id;
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
@@ -48,7 +53,28 @@ pub struct VaultClawback<'a> {
 impl Model for VaultClawback<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
-        validate_vault_id(&self.vault_id)
+        validate_vault_id(&self.vault_id)?;
+        if let Some(amount) = &self.amount {
+            let value = match amount {
+                Amount::MPTAmount(amount) => amount.value.as_ref(),
+                Amount::IssuedCurrencyAmount(amount) => amount.value.as_ref(),
+                Amount::XRPAmount(amount) => {
+                    return Err(XRPLModelException::InvalidValue {
+                        field: "amount".into(),
+                        expected: "an IOU or MPT amount, or omitted".into(),
+                        found: amount.0.to_string(),
+                    });
+                }
+            };
+            if BigDecimal::from_str(value)? < BigDecimal::from(0) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "amount".into(),
+                    expected: "a nonnegative amount".into(),
+                    found: value.into(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -322,7 +348,14 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             holder: "rValidateHolder888".into(),
-            amount: Some("1000000".into()),
+            amount: Some(
+                crate::models::IssuedCurrencyAmount::new(
+                    "USD".into(),
+                    "rIssuer".into(),
+                    "100".into(),
+                )
+                .into(),
+            ),
         }
         .with_fee("12".into())
         .with_sequence(300);

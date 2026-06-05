@@ -90,25 +90,13 @@ impl<'a> XChainClaim<'a> {
 
     fn get_amount_mismatch_error(&self) -> XRPLModelResult<()> {
         let bridge = &self.xchain_bridge;
-        match &self.amount {
-            Amount::XRPAmount(amount) => {
-                if Currency::from(amount) != bridge.locking_chain_issue
-                    && Currency::from(amount) != bridge.issuing_chain_issue
-                {
-                    Err(XRPLXChainClaimException::AmountMismatch.into())
-                } else {
-                    Ok(())
-                }
-            }
-            Amount::IssuedCurrencyAmount(amount) => {
-                if Currency::from(amount) != bridge.locking_chain_issue
-                    && Currency::from(amount) != bridge.issuing_chain_issue
-                {
-                    Err(XRPLXChainClaimException::AmountMismatch.into())
-                } else {
-                    Ok(())
-                }
-            }
+        let amount_currency = Currency::from(&self.amount);
+        if amount_currency != bridge.locking_chain_issue
+            && amount_currency != bridge.issuing_chain_issue
+        {
+            Err(XRPLXChainClaimException::AmountMismatch.into())
+        } else {
+            Ok(())
         }
     }
 }

@@ -5,7 +5,7 @@
 
 use xrpl::models::transactions::vault_clawback::VaultClawback;
 use xrpl::models::transactions::{CommonFields, Memo, TransactionType};
-use xrpl::models::Model;
+use xrpl::models::{IssuedCurrencyAmount, Model};
 
 const VAULT_ID: &str = "A0000000000000000000000000000000000000000000000000000000DEADBEEF";
 
@@ -20,7 +20,9 @@ fn test_vault_clawback_serde_roundtrip() {
         },
         vault_id: VAULT_ID.into(),
         holder: "rHolder456".into(),
-        amount: Some("500".into()),
+        amount: Some(
+            IssuedCurrencyAmount::new("USD".into(), "rIssuer123".into(), "500".into()).into(),
+        ),
     };
 
     let json_str = serde_json::to_string(&vault_clawback).unwrap();
@@ -60,7 +62,9 @@ fn test_vault_clawback_builder_pattern() {
         },
         vault_id: VAULT_ID.into(),
         holder: "rTarget".into(),
-        amount: Some("1000".into()),
+        amount: Some(
+            IssuedCurrencyAmount::new("USD".into(), "rClawBuilder".into(), "1000".into()).into(),
+        ),
     }
     .with_fee("12".into())
     .with_sequence(600)
