@@ -125,10 +125,10 @@ impl Model for VaultCreate<'_> {
             }
         }
         if let Some(scale) = self.scale {
-            if matches!(self.asset, Currency::XRP(_)) {
+            if matches!(self.asset, Currency::XRP(_) | Currency::MPTCurrency(_)) {
                 return Err(XRPLModelException::InvalidValue {
                     field: "scale".into(),
-                    expected: "omitted for XRP vault assets".into(),
+                    expected: "omitted for XRP or MPT vault assets".into(),
                     found: scale.to_string(),
                 });
             }

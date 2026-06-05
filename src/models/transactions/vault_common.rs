@@ -16,6 +16,24 @@ pub(crate) const VAULT_ID_HEX_LEN: usize = 64;
 ///
 /// Used by every vault transaction that references an existing vault
 /// (VaultSet, VaultDelete, VaultDeposit, VaultWithdraw, VaultClawback).
+pub(crate) fn validate_hash256(field: &'static str, value: &str) -> XRPLModelResult<()> {
+    if value.len() != VAULT_ID_HEX_LEN {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "64 hex characters (256-bit hash)".to_string(),
+            found: value.to_string(),
+        });
+    }
+    if !value.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "ASCII hexadecimal".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_vault_id(vault_id: &str) -> XRPLModelResult<()> {
     if vault_id.len() != VAULT_ID_HEX_LEN {
         return Err(XRPLModelException::InvalidValueFormat {
@@ -24,13 +42,7 @@ pub(crate) fn validate_vault_id(vault_id: &str) -> XRPLModelResult<()> {
             found: vault_id.to_string(),
         });
     }
-    if !vault_id.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Err(XRPLModelException::InvalidValueFormat {
-            field: "vault_id".to_string(),
-            format: "ASCII hexadecimal".to_string(),
-            found: vault_id.to_string(),
-        });
-    }
+    validate_hash256("vault_id", vault_id)?;
     if vault_id.bytes().all(|b| b == b'0') {
         return Err(XRPLModelException::InvalidValue {
             field: "vault_id".to_string(),
@@ -89,6 +101,7 @@ pub(crate) fn validate_positive_amount(
     amount: &Amount<'_>,
 ) -> XRPLModelResult<()> {
     let value = match amount {
+        Amount::MPTAmount(amount) => amount.value.as_ref(),
         Amount::IssuedCurrencyAmount(amount) => amount.value.as_ref(),
         Amount::XRPAmount(amount) => amount.0.as_ref(),
     };
