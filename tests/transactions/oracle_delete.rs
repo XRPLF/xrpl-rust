@@ -80,7 +80,8 @@ async fn test_oracle_delete_submit() {
             vec![PriceData {
                 base_asset: "XRP".into(),
                 quote_asset: "USD".into(),
-                asset_price: Some("740".into()),
+                // AssetPrice is a UInt64 hex string in XRPL binary JSON: 0x2E4 == 740.
+                asset_price: Some("2E4".into()),
                 scale: Some(1),
             }],
         );
