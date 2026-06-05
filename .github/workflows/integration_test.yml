@@ -38,6 +38,23 @@ jobs:
             --name xrpld-service \
             ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
 
+          for i in $(seq 1 30); do
+            if ! docker ps -q -f name=xrpld-service | grep -q .; then
+              echo "Container exited unexpectedly"
+              docker logs xrpld-service 2>&1 || true
+              exit 1
+            fi
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' xrpld-service 2>/dev/null || echo "unknown")
+            echo "Attempt $i/30: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Timed out waiting for xrpld"
+          docker logs xrpld-service 2>&1 || true
+          exit 1
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-llvm-cov

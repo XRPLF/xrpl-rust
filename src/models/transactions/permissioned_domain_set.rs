@@ -120,7 +120,7 @@ pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRP
             found: ct.len(),
         });
     }
-    if !ct.len().is_multiple_of(2) || !ct.chars().all(|c| c.is_ascii_hexdigit()) {
+    if ct.len() % 2 != 0 || !ct.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(XRPLModelException::InvalidValue {
             field: "Credential.CredentialType".into(),
             expected: "even-length hex string (<=128 chars)".into(),
