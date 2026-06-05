@@ -610,9 +610,15 @@ impl crate::models::Model for PriceData {
         }
         validate_oracle_currency("base_asset", &self.base_asset)?;
         validate_oracle_currency("quote_asset", &self.quote_asset)?;
+        validate_oracle_asset_price(&self.asset_price)?;
         Ok(())
     }
 }
+
+/// Maximum allowed value for `AssetPrice`.
+///
+/// `rippled` rejects prices above signed i64::MAX with `temBAD_PRICE`.
+pub const MAX_ORACLE_ASSET_PRICE: u64 = 0x7FFF_FFFF_FFFF_FFFF;
 
 /// Validate a currency code used in a `PriceData` entry.
 ///
@@ -631,6 +637,25 @@ fn validate_oracle_currency(
             .into(),
         found: value.into(),
     })
+}
+
+fn validate_oracle_asset_price(value: &Option<String>) -> crate::models::XRPLModelResult<()> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    match u64::from_str_radix(value, 16) {
+        Ok(price) if price <= MAX_ORACLE_ASSET_PRICE => Ok(()),
+        Ok(_) => Err(crate::models::XRPLModelException::InvalidValue {
+            field: "asset_price".into(),
+            expected: "a UInt64 hexadecimal string no greater than 0x7FFFFFFFFFFFFFFF".into(),
+            found: value.clone(),
+        }),
+        Err(_) => Err(crate::models::XRPLModelException::InvalidValue {
+            field: "asset_price".into(),
+            expected: "a UInt64 hexadecimal string no greater than 0x7FFFFFFFFFFFFFFF".into(),
+            found: value.clone(),
+        }),
+    }
 }
 
 /// Standard functions for transactions.

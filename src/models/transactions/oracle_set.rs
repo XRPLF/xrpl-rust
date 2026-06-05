@@ -746,6 +746,29 @@ mod tests {
     }
 
     #[test]
+    fn test_asset_price_too_high_rejected() {
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: "XRP".to_string(),
+            quote_asset: "USD".to_string(),
+            asset_price: Some("8000000000000000".to_string()),
+            scale: Some(1),
+        }]);
+
+        assert!(matches!(
+            oracle_set.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValue { ref field, .. } if field == "asset_price"
+        ));
+    }
+
+    #[test]
     fn test_duplicate_price_data_pair_rejected() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
