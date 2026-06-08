@@ -1,11 +1,13 @@
 [package]
 name = "mpt-crypto-sys"
-version = "0.1.0"
+version = "0.1.0-beta.1"
 edition = "2024"
 description = "Low-level FFI bindings to the mpt-crypto C library for XLS-0096 Confidential MPTs."
 license = "ISC"
 repository = "https://github.com/XRPLF/xrpl-rust"
-publish = false
+readme = "README.md"
+keywords = ["xrpl", "mpt", "confidential", "ffi", "secp256k1"]
+categories = ["external-ffi-bindings", "cryptography"]
 links = "mpt-crypto"
 
 # If this crate is ever published, the committed binaries would exceed

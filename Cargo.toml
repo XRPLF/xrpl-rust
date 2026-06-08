@@ -31,7 +31,7 @@ crate-type = ["lib"]
 xrpl-rust-macros = { version = "0.1.0", path = "xrpl-rust-macros" }
 # Optional: enabled by the `confidential-mpt` feature. The mpt-crypto crate
 # is std-only (FFI to the C library), so the feature also pulls in `std`.
-mpt-crypto       = { version = "0.1.0", path = "internal/mpt-crypto", optional = true }
+mpt-crypto       = { version = "0.1.0-beta.1", path = "internal/mpt-crypto", optional = true }
 
 lazy_static = "1.4.0"
 sha2 = { version = "0.10.2", default-features = false }
