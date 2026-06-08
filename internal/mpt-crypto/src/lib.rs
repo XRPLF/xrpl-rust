@@ -1,8 +1,8 @@
 //! Safe Rust wrappers around [`mpt_crypto_sys`] for XLS-0096 Confidential MPTs.
 //!
 //! The sys crate exposes ~88 raw `unsafe extern "C"` functions; this crate
-//! curates the ~12 a client library actually needs, with idiomatic Rust types,
-//! `Result`-based errors, and `Zeroize`-on-drop secrets.
+//! curates the subset a client library actually needs, with idiomatic Rust
+//! types, `Result`-based errors, and `Zeroize`-on-drop secrets.
 //!
 //! # Module map
 //!
@@ -13,6 +13,7 @@
 //! | [`commit`]  | Pedersen commitments |
 //! | [`context`] | Per-transaction-type context hashes (replay binding) |
 //! | [`prove`]   | Generate the four per-transaction-type proofs |
+//! | [`verify`]  | Verify the four proofs + revealed-amount / range checks |
 //! | [`types`]   | Strongly-typed byte-array wrappers (Privkey, Pubkey, etc.) |
 //! | [`error`]   | [`Error`] and [`Result`] |
 //!
@@ -38,6 +39,7 @@ pub mod error;
 pub mod keypair;
 pub mod prove;
 pub mod types;
+pub mod verify;
 
 pub use error::{Error, Result};
 pub use types::*;

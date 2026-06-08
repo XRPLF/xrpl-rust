@@ -60,9 +60,10 @@ Each layer has one job:
 | [`error`]   | Error enum + `Result` alias | `Error::NonZeroRc(i32)`, `Error::Invariant(&'static str)` |
 | [`keypair`] | ElGamal/secp256k1 keypair generation | `keypair::generate() -> Result<(Privkey, Pubkey)>` |
 | [`encrypt`] | EC-ElGamal encrypt / decrypt + RNG | `encrypt::{encrypt, decrypt, random_blinding_factor}` |
-| [`commit`]  | Pedersen commitments | `commit::pedersen(amount, blinding) -> Result<Commitment>` |
+| [`commit`]  | Pedersen commitments | `commit::pedersen(amount, blinding) -> Result<Commitment>`, `commit::convert_back_remainder` |
 | [`context`] | Per-transaction context hashes (replay-binding) | `context::{convert, convert_back, send, clawback}` |
 | [`prove`]   | The four per-transaction proof generators | `prove::{convert, send, convert_back, clawback}` plus `Participant`, `SendProofParams`, `ConvertBackProofParams` |
+| [`verify`]  | Proof verifiers (the counterparts to `prove`) | `verify::{convert, send, convert_back, clawback, revealed_amount, send_range_proof, aggregated_bulletproof}` plus `SendVerifyParams`, `ConvertBackVerifyParams` |
 
 `lib.rs` re-exports `Error`, `Result`, and everything in `types`, so most
 consumers can `use mpt_crypto::{Privkey, Pubkey, …}` directly without
@@ -175,10 +176,16 @@ cargo test -p mpt-crypto -v
 | **`convert_back_proof_rejects_withdrawal_exceeding_balance`** | **No overdraft proof can be generated AND accepted** |
 | `clawback_proof_verifies` | 64 B compact sigma round-trip |
 | `send_proof_verifies_three_participants` | 946 B composite proof round-trip (no auditor) |
+| `send_range_proof_verifies_extracted_subproof` | Lower-level range verifier on the Send proof's 754 B Bulletproof |
+| `revealed_amount_verifies_matching_ciphertexts` | Cross-participant amount consistency (and rejection of a wrong amount) |
+| `convert_back_remainder_matches_direct_commitment` | `pc_b − m·G` equals a direct commitment to `balance − m` |
+| `send_range_proof_rejects_wrong_length`, `aggregated_bulletproof_rejects_empty_commitments` | Input-validation guards on the lower-level verifiers |
 
-The proof tests use the C-side `mpt_verify_*` functions as oracles — if the
-verifier accepts the proof we generated, the FFI plumbing and the
-cryptographic algorithms are coherent.
+Each proof round-trip pairs a [`prove`] generator with its [`verify`]
+counterpart — both call into the same C primitives rippled uses, so a passing
+round-trip means the FFI plumbing and the cryptographic algorithms are
+coherent. The tests exercise only the safe surface (no `unsafe`, no direct
+`mpt_crypto_sys` calls).
 
 ### What's required to run tests
 

@@ -21,3 +21,24 @@ pub fn pedersen(amount: u64, blinding: &BlindingFactor) -> Result<Commitment> {
     }
     Ok(Commitment::new(out))
 }
+
+/// Subtracts a transparent `amount` from a hidden commitment, yielding the
+/// remainder commitment `pc_rem = commitment_in - amount·G`.
+///
+/// Lets a caller independently reconstruct the remainder a `ConvertBack`
+/// proves non-negative (see [`crate::verify::convert_back`]).
+pub fn convert_back_remainder(commitment_in: &Commitment, amount: u64) -> Result<Commitment> {
+    let mut out = [0u8; 33];
+    // SAFETY: 33-byte input + 33-byte output match the FFI contract.
+    let rc = unsafe {
+        sys::mpt_compute_convert_back_remainder(
+            commitment_in.as_bytes().as_ptr(),
+            amount,
+            out.as_mut_ptr(),
+        )
+    };
+    if rc != 0 {
+        return Err(Error::NonZeroRc(rc));
+    }
+    Ok(Commitment::new(out))
+}
