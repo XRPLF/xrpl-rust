@@ -245,11 +245,15 @@ async fn test_oracle_set_update_and_delete_pair() {
             .expect("failed to parse account_objects result");
         assert_eq!(result.account_objects.len(), 1);
         let oracle = &result.account_objects[0];
-        
+
         let series = oracle["PriceDataSeries"]
             .as_array()
             .expect("PriceDataSeries should be a JSON array in the Oracle ledger entry");
-        assert_eq!(series.len(), 2, "Expected 2 pairs after deleting one and adding one");
+        assert_eq!(
+            series.len(),
+            2,
+            "Expected 2 pairs after deleting one and adding one"
+        );
 
         // Find XRP/USD pair
         let usd_pair = series
@@ -257,8 +261,7 @@ async fn test_oracle_set_update_and_delete_pair() {
             .find(|p| p["PriceData"]["QuoteAsset"] == "USD")
             .expect("XRP/USD pair should be present after update");
         assert_eq!(
-            usd_pair["PriceData"]["AssetPrice"],
-            "2e5",
+            usd_pair["PriceData"]["AssetPrice"], "2e5",
             "XRP/USD AssetPrice should have been updated to 0x2E5"
         );
 
@@ -268,8 +271,7 @@ async fn test_oracle_set_update_and_delete_pair() {
             .find(|p| p["PriceData"]["QuoteAsset"] == "JPY")
             .expect("XRP/JPY pair should be present after being added");
         assert_eq!(
-            jpy_pair["PriceData"]["AssetPrice"],
-            "3a98",
+            jpy_pair["PriceData"]["AssetPrice"], "3a98",
             "XRP/JPY AssetPrice should be 0x3A98 (15000)"
         );
 
@@ -277,7 +279,10 @@ async fn test_oracle_set_update_and_delete_pair() {
         let eur_pair = series
             .iter()
             .find(|p| p["PriceData"]["QuoteAsset"] == "EUR");
-        assert!(eur_pair.is_none(), "XRP/EUR should have been deleted by omitting AssetPrice/Scale");
+        assert!(
+            eur_pair.is_none(),
+            "XRP/EUR should have been deleted by omitting AssetPrice/Scale"
+        );
     })
     .await;
 }
@@ -340,8 +345,7 @@ async fn test_oracle_set_tec_token_pair_not_found() {
         .await;
 
         assert_eq!(
-            engine_result,
-            "tecTOKEN_PAIR_NOT_FOUND",
+            engine_result, "tecTOKEN_PAIR_NOT_FOUND",
             "Deleting a pair that does not exist should return tecTOKEN_PAIR_NOT_FOUND"
         );
         // Advance the ledger so the consumed sequence number is finalised and
@@ -476,8 +480,7 @@ async fn test_oracle_set_tec_invalid_update_time() {
         .await;
 
         assert_eq!(
-            engine_result,
-            "tecINVALID_UPDATE_TIME",
+            engine_result, "tecINVALID_UPDATE_TIME",
             "LastUpdateTime older than the stored value should return tecINVALID_UPDATE_TIME"
         );
         crate::common::ledger_accept().await;

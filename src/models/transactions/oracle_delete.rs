@@ -154,7 +154,10 @@ mod tests {
         });
 
         assert_eq!(oracle_delete.oracle_document_id, TEST_DOC_ID);
-        assert_eq!(oracle_delete.common_fields.fee.as_ref().unwrap().0, TEST_FEE);
+        assert_eq!(
+            oracle_delete.common_fields.fee.as_ref().unwrap().0,
+            TEST_FEE
+        );
         assert_eq!(oracle_delete.common_fields.sequence, Some(TEST_SEQUENCE));
         assert_eq!(
             oracle_delete.common_fields.last_ledger_sequence,

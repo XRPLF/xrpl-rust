@@ -351,10 +351,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(
-            oracle_set.common_fields.account,
-            TEST_ACCOUNT
-        );
+        assert_eq!(oracle_set.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             oracle_set.common_fields.transaction_type,
             TransactionType::OracleSet

@@ -133,7 +133,10 @@ mod test_serde {
         assert_eq!(oracle.price_data_series[0].asset_price, Some("2E4".into()));
         assert_eq!(oracle.price_data_series[0].scale, Some(1));
         assert_eq!(oracle.last_update_time, 743609014);
-        assert_eq!(oracle.uri, Some("68747470733A2F2F6578616D706C652E636F6D".into()));
+        assert_eq!(
+            oracle.uri,
+            Some("68747470733A2F2F6578616D706C652E636F6D".into())
+        );
         assert_eq!(oracle.owner_node, "0000000000000000");
         assert_eq!(oracle.previous_txn_id, "ABC123DEF456");
         assert_eq!(oracle.previous_txn_lgr_seq, 12345678);

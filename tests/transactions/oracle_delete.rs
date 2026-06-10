@@ -140,8 +140,7 @@ async fn test_oracle_delete_not_found() {
         .await;
 
         assert_eq!(
-            engine_result,
-            "tecNO_ENTRY",
+            engine_result, "tecNO_ENTRY",
             "Deleting a non-existent Oracle (doc_id=999) should return tecNO_ENTRY"
         );
         crate::common::ledger_accept().await;
