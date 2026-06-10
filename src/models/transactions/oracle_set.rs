@@ -11,10 +11,18 @@ use crate::models::{FlagCollection, Model, NoFlags, XRPLModelException, XRPLMode
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// Maximum number of PriceData entries allowed in a single OracleSet transaction.
+/// Matches rippled `kMaxOracleDataSeries` in `Protocol.h`.
 const MAX_ORACLE_DATA_SERIES: u32 = 10;
-const MAX_ORACLE_PROVIDER_BYTES: usize = 256;
-const MAX_ORACLE_URI_BYTES: usize = 256;
-const MAX_ORACLE_ASSET_CLASS_BYTES: usize = 16;
+/// Maximum decoded byte length for the `Provider` Blob field.
+/// The hex string on the wire may therefore be up to 512 characters long.
+/// Matches rippled `kMaxOracleProvider = 256` in `Protocol.h`.
+const MAX_ORACLE_PROVIDER_DECODED_BYTES: usize = 256;
+/// Maximum decoded byte length for the `URI` Blob field.
+/// Matches rippled `kMaxOracleUri = 256` in `Protocol.h`.
+const MAX_ORACLE_URI_DECODED_BYTES: usize = 256;
+/// Maximum decoded byte length for the `AssetClass` Blob field.
+/// Matches rippled `kMaxOracleSymbolClass = 16` in `Protocol.h`.
+const MAX_ORACLE_ASSET_CLASS_DECODED_BYTES: usize = 16;
 
 /// An OracleSet transaction creates or updates an Oracle ledger entry.
 ///
@@ -57,13 +65,13 @@ impl Model for OracleSet<'_> {
         validate_optional_blob(
             "provider",
             self.provider.as_deref(),
-            MAX_ORACLE_PROVIDER_BYTES,
+            MAX_ORACLE_PROVIDER_DECODED_BYTES,
         )?;
-        validate_optional_blob("uri", self.uri.as_deref(), MAX_ORACLE_URI_BYTES)?;
+        validate_optional_blob("uri", self.uri.as_deref(), MAX_ORACLE_URI_DECODED_BYTES)?;
         validate_optional_blob(
             "asset_class",
             self.asset_class.as_deref(),
-            MAX_ORACLE_ASSET_CLASS_BYTES,
+            MAX_ORACLE_ASSET_CLASS_DECODED_BYTES,
         )?;
 
         let series = &self.price_data_series;
@@ -112,11 +120,29 @@ fn validate_optional_blob(
     let Some(value) = value else {
         return Ok(());
     };
-    let bytes = hex::decode(value).map_err(|_| XRPLModelException::InvalidValue {
-        field: field.into(),
-        expected: "a hex-encoded Blob string".into(),
-        found: value.into(),
+    let bytes = hex::decode(value).map_err(|e| {
+        use hex::FromHexError;
+        let reason = match e {
+            FromHexError::OddLength => "hex string has odd length (incomplete byte)",
+            FromHexError::InvalidHexCharacter { .. } => "non-hexadecimal character in string",
+            FromHexError::InvalidStringLength => "invalid hex string length",
+        };
+        XRPLModelException::InvalidValue {
+            field: field.into(),
+            expected: alloc::format!("a valid hex-encoded Blob string ({reason})"),
+            found: value.into(),
+        }
     })?;
+    // rippled `isInvalidLength` rejects empty blobs (length == 0) with
+    // `temMALFORMED`, matching the binary-codec requirement that Blob fields
+    // be non-empty when present.
+    if bytes.is_empty() {
+        return Err(XRPLModelException::InvalidValue {
+            field: field.into(),
+            expected: "a non-empty hex-encoded Blob string (empty strings are rejected)".into(),
+            found: value.into(),
+        });
+    }
     if bytes.len() > max_bytes {
         return Err(XRPLModelException::ValueTooLong {
             field: field.into(),
@@ -238,11 +264,23 @@ mod tests {
     use alloc::string::ToString;
     use alloc::vec;
 
+    /// Canonical test account used across all OracleSet unit tests.
+    const TEST_ACCOUNT: &str = "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW";
+    const TEST_FEE: &str = "12";
+    const TEST_SEQUENCE: u32 = 391;
+    const TEST_LAST_LEDGER: u32 = 596447;
+    const TEST_DOC_ID: u32 = 1;
+    const TEST_LAST_UPDATE_TIME: u32 = 743609014;
+    /// "chainlink" hex-encoded (Provider is a Blob field).
+    const TEST_PROVIDER: &str = "636861696E6C696E6B";
+    /// "currency" hex-encoded (AssetClass is a Blob field).
+    const TEST_ASSET_CLASS: &str = "63757272656E6379";
+
     #[test]
     fn test_serde() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 fee: Some("12".into()),
                 sequence: Some(391),
@@ -262,8 +300,10 @@ mod tests {
             }],
         };
 
-        let serialized = serde_json::to_string(&oracle_set).unwrap();
-        let deserialized: OracleSet = serde_json::from_str(&serialized).unwrap();
+        let serialized = serde_json::to_string(&oracle_set)
+            .expect("OracleSet should serialize to JSON without error");
+        let deserialized: OracleSet = serde_json::from_str(&serialized)
+            .expect("OracleSet should deserialize from its own JSON output");
         assert_eq!(oracle_set, deserialized);
         // `XRP` was rejected as a PriceData asset; ensure this model validates.
         assert!(oracle_set.get_errors().is_ok());
@@ -273,7 +313,7 @@ mod tests {
     fn test_builder_pattern() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -304,7 +344,7 @@ mod tests {
     fn test_default() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -313,7 +353,7 @@ mod tests {
 
         assert_eq!(
             oracle_set.common_fields.account,
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"
+            TEST_ACCOUNT
         );
         assert_eq!(
             oracle_set.common_fields.transaction_type,
@@ -346,7 +386,7 @@ mod tests {
 
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -365,71 +405,61 @@ mod tests {
 
     #[test]
     fn test_minimal() {
-        let oracle_set = OracleSet::new(
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            1,
-            None,
-            None,
-            None,
-            743609014,
-            vec![],
-        );
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            oracle_document_id: TEST_DOC_ID,
+            last_update_time: TEST_LAST_UPDATE_TIME,
+            price_data_series: vec![],
+            ..Default::default()
+        };
 
-        assert_eq!(
-            oracle_set.common_fields.account,
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"
-        );
+        assert_eq!(oracle_set.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             oracle_set.common_fields.transaction_type,
             TransactionType::OracleSet
         );
-        assert_eq!(oracle_set.oracle_document_id, 1);
+        assert_eq!(oracle_set.oracle_document_id, TEST_DOC_ID);
     }
 
     #[test]
     fn test_new_constructor() {
-        let price_data = vec![PriceData {
-            base_asset: "EUR".to_string(),
-            quote_asset: "USD".to_string(),
-            asset_price: Some("740".to_string()),
-            scale: Some(1),
-        }];
-
-        let oracle_set = OracleSet::new(
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            None,
-            Some("12".into()),
-            Some(596447),
-            None,
-            Some(391),
-            None,
-            None,
-            None,
-            1,
-            Some("chainlink".into()),
-            Some("https://example.com/oracle1".into()),
-            Some("63757272656E6379".into()),
-            743609014,
-            price_data,
-        );
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleSet,
+                fee: Some(TEST_FEE.into()),
+                last_ledger_sequence: Some(TEST_LAST_LEDGER),
+                sequence: Some(TEST_SEQUENCE),
+                ..Default::default()
+            },
+            oracle_document_id: TEST_DOC_ID,
+            // Non-hex plain string used here intentionally to test that the
+            // constructor stores values verbatim (validation is in get_errors).
+            provider: Some("chainlink".into()),
+            uri: Some("68747470733A2F2F6578616D706C652E636F6D2F6F7261636C6531".into()),
+            asset_class: Some(TEST_ASSET_CLASS.into()),
+            last_update_time: TEST_LAST_UPDATE_TIME,
+            price_data_series: vec![PriceData {
+                base_asset: "EUR".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("2E4".to_string()),
+                scale: Some(1),
+            }],
+        };
 
         assert_eq!(
             oracle_set.common_fields.transaction_type,
             TransactionType::OracleSet
         );
-        assert_eq!(oracle_set.common_fields.fee, Some("12".into()));
-        assert_eq!(oracle_set.common_fields.sequence, Some(391));
-        assert_eq!(oracle_set.oracle_document_id, 1);
+        assert_eq!(oracle_set.common_fields.fee, Some(TEST_FEE.into()));
+        assert_eq!(oracle_set.common_fields.sequence, Some(TEST_SEQUENCE));
+        assert_eq!(oracle_set.oracle_document_id, TEST_DOC_ID);
         assert_eq!(oracle_set.provider.as_deref(), Some("chainlink"));
-        assert_eq!(oracle_set.last_update_time, 743609014);
+        assert_eq!(oracle_set.last_update_time, TEST_LAST_UPDATE_TIME);
         assert_eq!(oracle_set.price_data_series.len(), 1);
     }
 
@@ -437,7 +467,7 @@ mod tests {
     fn test_transaction_type() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -454,7 +484,7 @@ mod tests {
     fn test_with_memos() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -475,7 +505,7 @@ mod tests {
         // When `price_data_series` is present, rippled requires at least 1 entry.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -507,7 +537,7 @@ mod tests {
 
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -536,7 +566,7 @@ mod tests {
 
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -560,7 +590,7 @@ mod tests {
 
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -581,10 +611,10 @@ mod tests {
 
     #[test]
     fn test_scale_too_high_rejected() {
-        // Per rippled, `scale` must be in the inclusive range 0..=10.
+        // Per rippled `kMaxPriceScale = 20` in Protocol.h; scale 21 is rejected.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -594,7 +624,7 @@ mod tests {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
             asset_price: Some("100".to_string()),
-            scale: Some(11),
+            scale: Some(21),
         }]);
 
         let err = oracle_set.get_errors().unwrap_err();
@@ -602,18 +632,18 @@ mod tests {
             err,
             XRPLModelException::ValueTooHigh {
                 field: "scale".into(),
-                max: 10,
-                found: 11,
+                max: 20,
+                found: 21,
             }
         );
     }
 
     #[test]
     fn test_scale_at_max_ok() {
-        // Boundary: scale = 10 is explicitly permitted.
+        // Boundary: scale = 20 is explicitly permitted (kMaxPriceScale = 20).
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -623,7 +653,28 @@ mod tests {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
             asset_price: Some("100".to_string()),
-            scale: Some(10),
+            scale: Some(20),
+        }]);
+
+        assert!(oracle_set.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_scale_mid_range_ok() {
+        // Values 11-20 must also pass; they were incorrectly rejected before.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: "EUR".to_string(),
+            quote_asset: "USD".to_string(),
+            asset_price: Some("100".to_string()),
+            scale: Some(15),
         }]);
 
         assert!(oracle_set.get_errors().is_ok());
@@ -633,7 +684,7 @@ mod tests {
     fn test_asset_price_and_scale_must_be_paired() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -657,7 +708,7 @@ mod tests {
         // A 4-character code is neither a valid ISO code nor a 40-char hex.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -682,7 +733,7 @@ mod tests {
         // XRP is valid as an oracle currency code.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -703,7 +754,7 @@ mod tests {
         // 40-character hex currency codes are valid.
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -723,11 +774,11 @@ mod tests {
     fn test_oracle_metadata_lengths_rejected() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
-            provider: Some("AA".repeat(MAX_ORACLE_PROVIDER_BYTES + 1).into()),
+            provider: Some("AA".repeat(MAX_ORACLE_PROVIDER_DECODED_BYTES + 1).into()),
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
@@ -740,7 +791,7 @@ mod tests {
         assert!(matches!(
             oracle_set.get_errors().unwrap_err(),
             XRPLModelException::ValueTooLong { ref field, max, .. }
-                if field == "provider" && max == MAX_ORACLE_PROVIDER_BYTES
+                if field == "provider" && max == MAX_ORACLE_PROVIDER_DECODED_BYTES
         ));
     }
 
@@ -748,7 +799,7 @@ mod tests {
     fn test_oracle_metadata_must_be_hex() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -769,10 +820,38 @@ mod tests {
     }
 
     #[test]
-    fn test_asset_price_too_high_rejected() {
+    fn test_asset_price_full_u64_range_accepted() {
+        // AssetPrice is a plain UInt64 — the full unsigned range is valid,
+        // including 0x8000000000000000..=0xFFFFFFFFFFFFFFFF.
+        // xrpl.js integration test uses "ffffffffffffffff" successfully.
+        for price in ["8000000000000000", "FFFFFFFFFFFFFFFF", "1", "0"] {
+            let oracle_set = OracleSet {
+                common_fields: CommonFields {
+                    account: TEST_ACCOUNT.into(),
+                    transaction_type: TransactionType::OracleSet,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .with_price_data_series(vec![PriceData {
+                base_asset: "XRP".to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some(price.to_string()),
+                scale: Some(1),
+            }]);
+
+            assert!(
+                oracle_set.get_errors().is_ok(),
+                "AssetPrice {price} should be valid"
+            );
+        }
+    }
+
+    #[test]
+    fn test_asset_price_non_hex_rejected() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -781,7 +860,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("8000000000000000".to_string()),
+            asset_price: Some("ZZZZZZZZZZZZZZZZ".to_string()),
             scale: Some(1),
         }]);
 
@@ -792,10 +871,79 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_blob_fields_rejected() {
+        // rippled rejects zero-length Provider/URI/AssetClass with temMALFORMED.
+        for (field_name, oracle) in [
+            (
+                "provider",
+                OracleSet {
+                    common_fields: CommonFields {
+                        account: TEST_ACCOUNT.into(),
+                        transaction_type: TransactionType::OracleSet,
+                        ..Default::default()
+                    },
+                    provider: Some("".into()),
+                    price_data_series: vec![PriceData {
+                        base_asset: "XRP".to_string(),
+                        quote_asset: "USD".to_string(),
+                        asset_price: Some("100".to_string()),
+                        scale: Some(1),
+                    }],
+                    ..Default::default()
+                },
+            ),
+            (
+                "uri",
+                OracleSet {
+                    common_fields: CommonFields {
+                        account: TEST_ACCOUNT.into(),
+                        transaction_type: TransactionType::OracleSet,
+                        ..Default::default()
+                    },
+                    uri: Some("".into()),
+                    price_data_series: vec![PriceData {
+                        base_asset: "XRP".to_string(),
+                        quote_asset: "USD".to_string(),
+                        asset_price: Some("100".to_string()),
+                        scale: Some(1),
+                    }],
+                    ..Default::default()
+                },
+            ),
+            (
+                "asset_class",
+                OracleSet {
+                    common_fields: CommonFields {
+                        account: TEST_ACCOUNT.into(),
+                        transaction_type: TransactionType::OracleSet,
+                        ..Default::default()
+                    },
+                    asset_class: Some("".into()),
+                    price_data_series: vec![PriceData {
+                        base_asset: "XRP".to_string(),
+                        quote_asset: "USD".to_string(),
+                        asset_price: Some("100".to_string()),
+                        scale: Some(1),
+                    }],
+                    ..Default::default()
+                },
+            ),
+        ] {
+            assert!(
+                matches!(
+                    oracle.get_errors().unwrap_err(),
+                    XRPLModelException::InvalidValue { ref field, .. } if field == field_name
+                ),
+                "empty {field_name} should be rejected"
+            );
+        }
+    }
+
+    #[test]
     fn test_duplicate_price_data_pair_rejected() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
@@ -826,7 +974,7 @@ mod tests {
     fn test_same_base_quote_rejected() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleSet,
                 ..Default::default()
             },
