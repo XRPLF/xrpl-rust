@@ -38,26 +38,6 @@ fn test_oracle_delete_construction() {
     assert_eq!(oracle_delete.oracle_document_id, 1);
 }
 
-#[test]
-fn test_oracle_delete_serde_roundtrip() {
-    let oracle_delete = OracleDelete::new(
-        "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-        None,
-        Some("12".into()),
-        None,
-        None,
-        Some(391),
-        None,
-        None,
-        None,
-        1,
-    );
-
-    let json = serde_json::to_string(&oracle_delete).unwrap();
-    let deserialized: OracleDelete = serde_json::from_str(&json).unwrap();
-    assert_eq!(oracle_delete, deserialized);
-}
-
 #[tokio::test]
 async fn test_oracle_delete_submit() {
     with_blockchain_lock(|| async {

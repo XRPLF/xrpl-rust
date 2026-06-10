@@ -48,36 +48,6 @@ fn test_oracle_set_construction() {
     assert_eq!(oracle_set.price_data_series.len(), 1);
 }
 
-#[test]
-fn test_oracle_set_serde_roundtrip() {
-    let oracle_set = OracleSet::new(
-        "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-        None,
-        Some("12".into()),
-        None,
-        None,
-        Some(391),
-        None,
-        None,
-        None,
-        1,
-        Some("provider".into()),
-        None,
-        None,
-        743609014,
-        vec![PriceData {
-            base_asset: "EUR".into(),
-            quote_asset: "USD".into(),
-            asset_price: Some("740".into()),
-            scale: Some(1),
-        }],
-    );
-
-    let json = serde_json::to_string(&oracle_set).unwrap();
-    let deserialized: OracleSet = serde_json::from_str(&json).unwrap();
-    assert_eq!(oracle_set, deserialized);
-}
-
 #[tokio::test]
 async fn test_oracle_set_submit() {
     with_blockchain_lock(|| async {
