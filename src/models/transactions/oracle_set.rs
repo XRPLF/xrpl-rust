@@ -196,22 +196,22 @@ impl<'a> OracleSet<'a> {
         price_data_series: Vec<PriceData>,
     ) -> Self {
         Self {
-            common_fields: CommonFields::new(
+            common_fields: CommonFields {
                 account,
-                TransactionType::OracleSet,
+                transaction_type: TransactionType::OracleSet,
                 account_txn_id,
                 fee,
-                Some(FlagCollection::default()),
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
-                None,
+                network_id: None,
                 sequence,
                 signers,
-                None,
+                signing_pub_key: None, // filled by the signing layer
                 source_tag,
                 ticket_sequence,
-                None,
-            ),
+                txn_signature: None, // filled by the signing layer
+            },
             oracle_document_id,
             provider,
             uri,

@@ -8,7 +8,9 @@
 // without submitting to a network.
 
 use crate::common::{
-    generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
+    constants::{ORACLE_ASSET_CLASS, ORACLE_PROVIDER, ORACLE_URI, TEST_ACCOUNT},
+    generate_funded_wallet, get_ledger_close_time, submit_tx, test_transaction,
+    with_blockchain_lock, SubmitOptions,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
@@ -22,7 +24,7 @@ use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
 fn test_oracle_delete_construction() {
     let oracle_delete = OracleDelete {
         common_fields: CommonFields {
-            account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+            account: TEST_ACCOUNT.into(),
             transaction_type: TransactionType::OracleDelete,
             fee: Some("12".into()),
             sequence: Some(391),
@@ -56,9 +58,9 @@ async fn test_oracle_delete_submit() {
             },
             oracle_document_id: 2,
             // Provider is a Blob, so it must be hex-encoded ("chainlink").
-            provider: Some("636861696E6C696E6B".into()),
-            uri: Some("68747470733A2F2F6578616D706C652E636F6D".into()),
-            asset_class: Some("63757272656E6379".into()),
+            provider: Some(ORACLE_PROVIDER.into()),
+            uri: Some(ORACLE_URI.into()),
+            asset_class: Some(ORACLE_ASSET_CLASS.into()),
             last_update_time,
             price_data_series: vec![PriceData {
                 base_asset: "XRP".into(),

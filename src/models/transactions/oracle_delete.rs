@@ -72,22 +72,22 @@ impl<'a> OracleDelete<'a> {
         oracle_document_id: u32,
     ) -> Self {
         Self {
-            common_fields: CommonFields::new(
+            common_fields: CommonFields {
                 account,
-                TransactionType::OracleDelete,
+                transaction_type: TransactionType::OracleDelete,
                 account_txn_id,
                 fee,
-                Some(FlagCollection::default()), // flags
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
-                None, // network_id
+                network_id: None,
                 sequence,
                 signers,
-                None, // signing_pub_key — filled by the signing layer
+                signing_pub_key: None, // filled by the signing layer
                 source_tag,
                 ticket_sequence,
-                None, // txn_signature — filled by the signing layer
-            ),
+                txn_signature: None, // filled by the signing layer
+            },
             oracle_document_id,
         }
     }
