@@ -1,6 +1,6 @@
 use crate::models::ledger::objects::LedgerEntryType;
 use crate::models::transactions::PriceData;
-use crate::models::{FlagCollection, Model, NoFlags};
+use crate::models::{Model, NoFlags};
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
@@ -36,8 +36,7 @@ pub struct Oracle<'a> {
     #[serde(rename = "URI")]
     pub uri: Option<Cow<'a, str>>,
     /// A hint indicating which page of the owner directory links to this entry.
-    #[serde(with = "owner_node_hex")]
-    pub owner_node: u64,
+    pub owner_node: Cow<'a, str>,
     /// The identifying hash of the transaction that most recently modified this entry.
     #[serde(rename = "PreviousTxnID")]
     pub previous_txn_id: Cow<'a, str>,
@@ -58,87 +57,6 @@ impl<'a> LedgerObject<NoFlags> for Oracle<'a> {
     }
 }
 
-impl<'a> Oracle<'a> {
-    pub fn new(
-        index: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
-        owner: Cow<'a, str>,
-        provider: Cow<'a, str>,
-        asset_class: Cow<'a, str>,
-        price_data_series: Vec<PriceData>,
-        last_update_time: u32,
-        uri: Option<Cow<'a, str>>,
-        owner_node: u64,
-        previous_txn_id: Cow<'a, str>,
-        previous_txn_lgr_seq: u32,
-        oracle_document_id: Option<u32>,
-    ) -> Self {
-        Self {
-            common_fields: CommonFields {
-                flags: FlagCollection::default(),
-                ledger_entry_type: LedgerEntryType::Oracle,
-                index,
-                ledger_index,
-            },
-            owner,
-            provider,
-            asset_class,
-            price_data_series,
-            last_update_time,
-            uri,
-            owner_node,
-            previous_txn_id,
-            previous_txn_lgr_seq,
-            oracle_document_id,
-        }
-    }
-}
-
-mod owner_node_hex {
-    use alloc::format;
-    use core::fmt;
-    use serde::de::{self, Visitor};
-    use serde::{Deserializer, Serializer};
-
-    pub fn serialize<S>(value: &u64, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&format!("{value:016X}"))
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(OwnerNodeVisitor)
-    }
-
-    struct OwnerNodeVisitor;
-
-    impl<'de> Visitor<'de> for OwnerNodeVisitor {
-        type Value = u64;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a u64 or 16-character hexadecimal owner node string")
-        }
-
-        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            Ok(value)
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            u64::from_str_radix(value, 16).map_err(E::custom)
-        }
-    }
-}
-
 #[cfg(test)]
 mod test_serde {
     use super::*;
@@ -149,25 +67,29 @@ mod test_serde {
 
     #[test]
     fn test_serialize() {
-        let oracle = Oracle::new(
-            Some(Cow::from("ForTest")),
-            None,
-            Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            Cow::from("chainlink"),
-            Cow::from("63757272656E6379"),
-            vec![PriceData {
+        let oracle = Oracle {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Oracle,
+                index: Some(Cow::from("ForTest")),
+                ledger_index: None,
+            },
+            owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+            provider: Cow::from("chainlink"),
+            asset_class: Cow::from("63757272656E6379"),
+            price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
             }],
-            743609014,
-            Some(Cow::from("https://example.com/oracle1")),
-            0,
-            Cow::from("ABC123DEF456"),
-            12345678,
-            Some(1),
-        );
+            last_update_time: 743609014,
+            uri: Some(Cow::from("https://example.com/oracle1")),
+            owner_node: Cow::from("0000000000000000"),
+            previous_txn_id: Cow::from("ABC123DEF456"),
+            previous_txn_lgr_seq: 12345678,
+            oracle_document_id: Some(1),
+        };
 
         let serialized = serde_json::to_string(&oracle).unwrap();
         let deserialized: Oracle = serde_json::from_str(&serialized).unwrap();
@@ -176,25 +98,29 @@ mod test_serde {
 
     #[test]
     fn test_new_minimal() {
-        let oracle = Oracle::new(
-            None,
-            None,
-            Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            Cow::from("provider1"),
-            Cow::from("63757272656E6379"),
-            vec![PriceData {
+        let oracle = Oracle {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Oracle,
+                index: None,
+                ledger_index: None,
+            },
+            owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+            provider: Cow::from("provider1"),
+            asset_class: Cow::from("63757272656E6379"),
+            price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
             }],
-            743609014,
-            None,
-            0,
-            Cow::from("ABC123"),
-            100,
-            None,
-        );
+            last_update_time: 743609014,
+            uri: None,
+            owner_node: Cow::from("0000000000000000"),
+            previous_txn_id: Cow::from("ABC123"),
+            previous_txn_lgr_seq: 100,
+            oracle_document_id: None,
+        };
 
         assert_eq!(oracle.owner, "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW");
         assert_eq!(oracle.provider, "provider1");
@@ -202,45 +128,53 @@ mod test_serde {
         assert_eq!(oracle.price_data_series.len(), 1);
         assert_eq!(oracle.last_update_time, 743609014);
         assert!(oracle.uri.is_none());
-        assert_eq!(oracle.owner_node, 0);
+        assert_eq!(oracle.owner_node, "0000000000000000");
         assert_eq!(oracle.previous_txn_id, "ABC123");
         assert_eq!(oracle.previous_txn_lgr_seq, 100);
     }
 
     #[test]
     fn test_ledger_entry_type() {
-        let oracle = Oracle::new(
-            None,
-            None,
-            Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            Cow::from("provider1"),
-            Cow::from("63757272656E6379"),
-            vec![PriceData {
+        let oracle = Oracle {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Oracle,
+                index: None,
+                ledger_index: None,
+            },
+            owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+            provider: Cow::from("provider1"),
+            asset_class: Cow::from("63757272656E6379"),
+            price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
                 asset_price: Some("740".to_string()),
                 scale: Some(1),
             }],
-            0,
-            None,
-            0,
-            Cow::from("ABC123"),
-            0,
-            None,
-        );
+            last_update_time: 0,
+            uri: None,
+            owner_node: Cow::from("0000000000000000"),
+            previous_txn_id: Cow::from("ABC123"),
+            previous_txn_lgr_seq: 0,
+            oracle_document_id: None,
+        };
 
         assert_eq!(oracle.get_ledger_entry_type(), LedgerEntryType::Oracle);
     }
 
     #[test]
     fn test_with_multiple_price_data() {
-        let oracle = Oracle::new(
-            Some(Cow::from("TestIndex")),
-            None,
-            Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            Cow::from("chainlink"),
-            Cow::from("63757272656E6379"),
-            vec![
+        let oracle = Oracle {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::Oracle,
+                index: Some(Cow::from("TestIndex")),
+                ledger_index: None,
+            },
+            owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
+            provider: Cow::from("chainlink"),
+            asset_class: Cow::from("63757272656E6379"),
+            price_data_series: vec![
                 PriceData {
                     base_asset: "XRP".to_string(),
                     quote_asset: "USD".to_string(),
@@ -260,13 +194,13 @@ mod test_serde {
                     scale: Some(2),
                 },
             ],
-            743609014,
-            Some(Cow::from("https://example.com")),
-            0,
-            Cow::from("DEF789"),
-            99999,
-            None,
-        );
+            last_update_time: 743609014,
+            uri: Some(Cow::from("https://example.com")),
+            owner_node: Cow::from("0000000000000000"),
+            previous_txn_id: Cow::from("DEF789"),
+            previous_txn_lgr_seq: 99999,
+            oracle_document_id: None,
+        };
 
         let series = oracle.price_data_series;
         assert_eq!(series.len(), 3);
