@@ -61,6 +61,7 @@ impl<'a> LedgerObject<NoFlags> for Oracle<'a> {
 mod test_serde {
     use super::*;
     use crate::models::transactions::PriceData;
+    use crate::models::FlagCollection;
     use alloc::borrow::Cow;
     use alloc::string::ToString;
     use alloc::vec;
@@ -75,16 +76,16 @@ mod test_serde {
                 ledger_index: None,
             },
             owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            provider: Cow::from("chainlink"),
+            provider: Cow::from("636861696E6C696E6B"),
             asset_class: Cow::from("63757272656E6379"),
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("2E4".to_string()),
                 scale: Some(1),
             }],
             last_update_time: 743609014,
-            uri: Some(Cow::from("https://example.com/oracle1")),
+            uri: Some(Cow::from("68747470733A2F2F6578616D706C652E636F6D")),
             owner_node: Cow::from("0000000000000000"),
             previous_txn_id: Cow::from("ABC123DEF456"),
             previous_txn_lgr_seq: 12345678,
@@ -97,6 +98,49 @@ mod test_serde {
     }
 
     #[test]
+    fn test_deserialize() {
+        let json = r#"{
+            "LedgerEntryType": "Oracle",
+            "Flags": 0,
+            "Owner": "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW",
+            "Provider": "636861696E6C696E6B",
+            "AssetClass": "63757272656E6379",
+            "PriceDataSeries": [
+                {
+                    "PriceData": {
+                        "BaseAsset": "XRP",
+                        "QuoteAsset": "USD",
+                        "AssetPrice": "2E4",
+                        "Scale": 1
+                    }
+                }
+            ],
+            "LastUpdateTime": 743609014,
+            "URI": "68747470733A2F2F6578616D706C652E636F6D",
+            "OwnerNode": "0000000000000000",
+            "PreviousTxnID": "ABC123DEF456",
+            "PreviousTxnLgrSeq": 12345678,
+            "OracleDocumentID": 1
+        }"#;
+
+        let oracle: Oracle = serde_json::from_str(json).unwrap();
+        assert_eq!(oracle.owner, "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW");
+        assert_eq!(oracle.provider, "636861696E6C696E6B");
+        assert_eq!(oracle.asset_class, "63757272656E6379");
+        assert_eq!(oracle.price_data_series.len(), 1);
+        assert_eq!(oracle.price_data_series[0].base_asset, "XRP");
+        assert_eq!(oracle.price_data_series[0].quote_asset, "USD");
+        assert_eq!(oracle.price_data_series[0].asset_price, Some("2E4".into()));
+        assert_eq!(oracle.price_data_series[0].scale, Some(1));
+        assert_eq!(oracle.last_update_time, 743609014);
+        assert_eq!(oracle.uri, Some("68747470733A2F2F6578616D706C652E636F6D".into()));
+        assert_eq!(oracle.owner_node, "0000000000000000");
+        assert_eq!(oracle.previous_txn_id, "ABC123DEF456");
+        assert_eq!(oracle.previous_txn_lgr_seq, 12345678);
+        assert_eq!(oracle.oracle_document_id, Some(1));
+    }
+
+    #[test]
     fn test_new_minimal() {
         let oracle = Oracle {
             common_fields: CommonFields {
@@ -106,12 +150,12 @@ mod test_serde {
                 ledger_index: None,
             },
             owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            provider: Cow::from("provider1"),
+            provider: Cow::from("70726F766964657231"),
             asset_class: Cow::from("63757272656E6379"),
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("2E4".to_string()),
                 scale: Some(1),
             }],
             last_update_time: 743609014,
@@ -123,7 +167,7 @@ mod test_serde {
         };
 
         assert_eq!(oracle.owner, "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW");
-        assert_eq!(oracle.provider, "provider1");
+        assert_eq!(oracle.provider, "70726F766964657231");
         assert_eq!(oracle.asset_class, "63757272656E6379");
         assert_eq!(oracle.price_data_series.len(), 1);
         assert_eq!(oracle.last_update_time, 743609014);
@@ -143,12 +187,12 @@ mod test_serde {
                 ledger_index: None,
             },
             owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            provider: Cow::from("provider1"),
+            provider: Cow::from("70726F766964657231"),
             asset_class: Cow::from("63757272656E6379"),
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("2E4".to_string()),
                 scale: Some(1),
             }],
             last_update_time: 0,
@@ -172,30 +216,30 @@ mod test_serde {
                 ledger_index: None,
             },
             owner: Cow::from("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"),
-            provider: Cow::from("chainlink"),
+            provider: Cow::from("636861696E6C696E6B"),
             asset_class: Cow::from("63757272656E6379"),
             price_data_series: vec![
                 PriceData {
                     base_asset: "XRP".to_string(),
                     quote_asset: "USD".to_string(),
-                    asset_price: Some("740".to_string()),
+                    asset_price: Some("2E4".to_string()),
                     scale: Some(1),
                 },
                 PriceData {
                     base_asset: "BTC".to_string(),
                     quote_asset: "USD".to_string(),
-                    asset_price: Some("2600000".to_string()),
+                    asset_price: Some("27AC40".to_string()),
                     scale: Some(2),
                 },
                 PriceData {
                     base_asset: "ETH".to_string(),
                     quote_asset: "USD".to_string(),
-                    asset_price: Some("160000".to_string()),
+                    asset_price: Some("27100".to_string()),
                     scale: Some(2),
                 },
             ],
             last_update_time: 743609014,
-            uri: Some(Cow::from("https://example.com")),
+            uri: Some(Cow::from("68747470733A2F2F6578616D706C652E636F6D")),
             owner_node: Cow::from("0000000000000000"),
             previous_txn_id: Cow::from("DEF789"),
             previous_txn_lgr_seq: 99999,
