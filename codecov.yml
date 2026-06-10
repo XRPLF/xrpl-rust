@@ -11,6 +11,14 @@ coverage:
         threshold: 1%
         flags:
           - integration
+        paths:
+          - src/account/
+          - src/asynch/
+          - src/bin/
+          - src/cli/
+          - src/clients/
+          - src/ledger/
+          - src/transaction/
     patch:
       default:
         target: 80%
@@ -22,6 +30,14 @@ coverage:
         threshold: 1%
         flags:
           - integration
+        paths:
+          - src/account/
+          - src/asynch/
+          - src/bin/
+          - src/cli/
+          - src/clients/
+          - src/ledger/
+          - src/transaction/
 
 comment:
   layout: "reach, diff, flags, files"
@@ -33,4 +49,10 @@ flags:
       - src/
   integration:
     paths:
-      - src/
+      - src/account/
+      - src/asynch/
+      - src/bin/
+      - src/cli/
+      - src/clients/
+      - src/ledger/
+      - src/transaction/

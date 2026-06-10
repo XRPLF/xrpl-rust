@@ -20,6 +20,7 @@ mod no_ripple_check;
 mod ping;
 mod random;
 mod ripple_path_find;
+mod rpc_errors;
 mod server_info;
 mod server_state;
 mod submit;

@@ -54,7 +54,6 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use amount::IssuedCurrency;
 use exceptions::XRPLTypeException;
 use serde::Deserialize;
 use serde_json::Map;
@@ -294,17 +293,8 @@ impl XRPLTypes {
             .map_err(|_| XRPLTypeException::TryFromStrError.into())
     }
 
-    fn amount_from_map<T>(value: Map<String, Value>) -> XRPLCoreResult<T>
-    where
-        T: TryFrom<IssuedCurrency>,
-        <T as TryFrom<IssuedCurrency>>::Error: Display,
-    {
-        match IssuedCurrency::try_from(Value::Object(value)) {
-            Ok(value) => value
-                .try_into()
-                .map_err(|_| XRPLTypeException::TryFromIssuedCurrencyError.into()),
-            Err(error) => Err(error),
-        }
+    fn amount_from_map(value: Map<String, Value>) -> XRPLCoreResult<Amount> {
+        Amount::try_from(Value::Object(value))
     }
 }
 

@@ -200,12 +200,8 @@ fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[
         ));
     }
 
-    // Parse the value - can be decimal string or hex string (0x prefix)
-    let amount: u64 = if value.starts_with("0x") || value.starts_with("0X") {
-        u64::from_str_radix(&value[2..], 16).map_err(|_| {
-            XRPLCoreException::XRPLUtilsError("Value has bad hex character".to_string())
-        })?
-    } else if value == "-0" {
+    // Parse the value as the decimal string accepted by the model layer.
+    let amount: u64 = if value == "-0" {
         0u64
     } else {
         // Check for decimal point
@@ -267,10 +263,10 @@ impl Amount {
         self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
-    /// Returns true if 2nd bit in 1st byte is set to 1
+    /// Returns true if the sign bit in the first byte is set to 1
     /// (positive amount).
     pub fn is_positive(&self) -> bool {
-        self.0[1] & 0x40 > 0
+        self.0[0] & 0x40 > 0
     }
 }
 
@@ -528,6 +524,7 @@ mod test {
     use crate::core::binarycodec::test_cases::load_data_tests;
     use crate::core::binarycodec::types::test_cases::IOUCase;
     use crate::core::binarycodec::types::test_cases::TEST_XRP_CASES;
+    use crate::models::transactions::test_fixtures::MPT_ISSUANCE_ID;
     use alloc::format;
 
     const IOU_TEST: &str = include_str!("../test_data/iou-tests.json");
@@ -588,6 +585,26 @@ mod test {
 
             assert_eq!(serialize, format!("\"{xrp}\""));
         }
+    }
+
+    #[test]
+    fn test_mpt_amount_is_positive_uses_leading_byte_sign_bit() {
+        let bytes = hex::decode(alloc::format!("600000000000000001{}", MPT_ISSUANCE_ID)).unwrap();
+        let amount = Amount::new(Some(&bytes)).unwrap();
+
+        assert!(amount.is_mpt());
+        assert!(amount.is_positive());
+    }
+
+    #[test]
+    fn test_mpt_amount_rejects_hex_value() {
+        let value = serde_json::json!({
+            "value": "0x01",
+            "mpt_issuance_id": MPT_ISSUANCE_ID,
+        });
+
+        let error = Amount::try_from(value).unwrap_err();
+        assert!(error.to_string().contains("bad character"));
     }
 
     #[test]

@@ -66,6 +66,7 @@ impl<'a> Bridge<'a> {
 mod tests {
     use super::*;
     use crate::models::currency::XRP;
+    use crate::models::transactions::test_fixtures::{GENESIS_ACCOUNT, LOCKING_CHAIN_DOOR_ACCOUNT};
 
     #[test]
     fn test_bridge_serde_round_trip() {
@@ -77,9 +78,9 @@ mod tests {
             7,
             3,
             XChainBridge {
-                locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+                locking_chain_door: LOCKING_CHAIN_DOOR_ACCOUNT.into(),
                 locking_chain_issue: XRP::new().into(),
-                issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                issuing_chain_door: GENESIS_ACCOUNT.into(),
                 issuing_chain_issue: XRP::new().into(),
             },
             "13f".into(),

@@ -112,10 +112,7 @@ mod test_faucet_wallet_generation {
     use crate::{
         asynch::clients::AsyncJsonRpcClient,
         handle_test_result,
-        utils::testing::{
-            assertions, is_known_network_error, test_constants, test_network_operation,
-            TestTimeouts,
-        },
+        utils::testing::{assertions, test_constants, test_network_operation, TestTimeouts},
     };
 
     #[cfg(feature = "integration")]
@@ -143,7 +140,8 @@ mod test_faucet_wallet_generation {
         // Test URL parsing
         let url1 = test_constants::TESTNET_URL.parse::<Url>().unwrap();
         assert_eq!(url1.scheme(), "https");
-        assert_eq!(url1.host_str(), Some("testnet.xrpl-labs.com"));
+        assert_eq!(url1.host_str(), Some("s.altnet.rippletest.net"));
+        assert_eq!(url1.port(), Some(51234));
 
         let url2 = test_constants::ALT_TESTNET_URL.parse::<Url>().unwrap();
         assert_eq!(url2.scheme(), "https");
@@ -167,21 +165,5 @@ mod test_faucet_wallet_generation {
         assert_eq!(url4.port_or_known_default(), Some(80));
 
         println!("✅ test_wallet_creation_parameters passed");
-    }
-
-    #[test]
-    fn test_error_detection() {
-        // Test that our error detection works correctly
-        assert!(is_known_network_error("dns error occurred"));
-        assert!(is_known_network_error(
-            "failed to lookup address information"
-        ));
-        assert!(is_known_network_error("Connection refused"));
-        assert!(is_known_network_error("Network is unreachable"));
-        assert!(is_known_network_error("expected value"));
-        assert!(is_known_network_error("ConnectError"));
-
-        assert!(!is_known_network_error("some other error"));
-        assert!(!is_known_network_error("validation failed"));
     }
 }

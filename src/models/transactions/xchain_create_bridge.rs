@@ -129,15 +129,18 @@ impl<'a> XChainCreateBridge<'a> {
 #[cfg(test)]
 mod test_xchain_create_bridge {
     use super::XChainCreateBridge;
+    use crate::models::transactions::test_fixtures::{
+        GENESIS_ACCOUNT, XCHAIN_ACCOUNT, XCHAIN_ACCOUNT_ALT, XCHAIN_ISSUER_ACCOUNT,
+    };
     use crate::models::{Amount, IssuedCurrency, Model, XChainBridge, XRPAmount, XRP};
     use alloc::borrow::Cow;
 
-    const ACCOUNT: &str = "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ";
-    const ACCOUNT2: &str = "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo";
+    const ACCOUNT: &str = XCHAIN_ACCOUNT;
+    const ACCOUNT2: &str = XCHAIN_ACCOUNT_ALT;
     const FEE: &str = "0.00001";
     const SEQUENCE: u32 = 19048;
-    const ISSUER: &str = "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf";
-    const GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    const ISSUER: &str = XCHAIN_ISSUER_ACCOUNT;
+    const GENESIS: &str = GENESIS_ACCOUNT;
 
     fn xrp_bridge<'a>() -> XChainBridge<'a> {
         XChainBridge {

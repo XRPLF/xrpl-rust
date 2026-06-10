@@ -109,6 +109,10 @@ impl<'a> XChainClaim<'a> {
                     Ok(())
                 }
             }
+            Amount::MPTAmount(_) => {
+                // Cross-chain bridges only support XRP or issued currency, not MPT.
+                Err(XRPLXChainClaimException::AmountMismatch.into())
+            }
         }
     }
 }
@@ -118,8 +122,14 @@ impl<'a> XChainClaim<'a> {
 mod test_sign {
     use crate::{
         models::{
-            transactions::xchain_claim::XChainClaim, IssuedCurrency, IssuedCurrencyAmount,
-            XChainBridge, XRP,
+            transactions::{
+                test_fixtures::{
+                    GENESIS_ACCOUNT, XCHAIN_ACCOUNT, XCHAIN_ACCOUNT_ALT, XCHAIN_CLAIM_DESTINATION,
+                    XCHAIN_CLAIM_SIGNING_SEED, XCHAIN_ISSUER_ACCOUNT,
+                },
+                xchain_claim::XChainClaim,
+            },
+            IssuedCurrency, IssuedCurrencyAmount, XChainBridge, XRP,
         },
         signing::sign,
         wallet::Wallet,
@@ -127,9 +137,9 @@ mod test_sign {
 
     #[test]
     fn test_sign_xchain_claim_xrp() {
-        let wallet = Wallet::new("sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd", 0).unwrap();
+        let wallet = Wallet::new(XCHAIN_CLAIM_SIGNING_SEED, 0).unwrap();
         let mut txn = XChainClaim::new(
-            "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+            XCHAIN_ACCOUNT.into(),
             None,
             Some("10".into()),
             None,
@@ -139,11 +149,11 @@ mod test_sign {
             None,
             None,
             "123456789".into(),
-            "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN".into(),
+            XCHAIN_CLAIM_DESTINATION.into(),
             XChainBridge::new(
-                "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                GENESIS_ACCOUNT.into(),
                 XRP::new().into(),
-                "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+                XCHAIN_ACCOUNT.into(),
                 XRP::new().into(),
             ),
             "3".into(),
@@ -162,9 +172,9 @@ mod test_sign {
 
     #[test]
     fn test_sign_xchain_claim_iou() {
-        let wallet = Wallet::new("sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd", 0).unwrap();
+        let wallet = Wallet::new(XCHAIN_CLAIM_SIGNING_SEED, 0).unwrap();
         let mut txn = XChainClaim::new(
-            "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
+            XCHAIN_ACCOUNT.into(),
             None,
             Some("10".into()),
             None,
@@ -173,20 +183,14 @@ mod test_sign {
             None,
             None,
             None,
-            IssuedCurrencyAmount::new(
-                "USD".into(),
-                "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf".into(),
-                "123".into(),
-            )
-            .into(),
-            "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN".into(),
+            IssuedCurrencyAmount::new("USD".into(), XCHAIN_ISSUER_ACCOUNT.into(), "123".into())
+                .into(),
+            XCHAIN_CLAIM_DESTINATION.into(),
             XChainBridge::new(
-                "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo".into(),
-                IssuedCurrency::new("USD".into(), "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo".into())
-                    .into(),
-                "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ".into(),
-                IssuedCurrency::new("USD".into(), "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf".into())
-                    .into(),
+                XCHAIN_ACCOUNT_ALT.into(),
+                IssuedCurrency::new("USD".into(), XCHAIN_ACCOUNT_ALT.into()).into(),
+                XCHAIN_ACCOUNT.into(),
+                IssuedCurrency::new("USD".into(), XCHAIN_ISSUER_ACCOUNT.into()).into(),
             ),
             "3".into(),
             None,

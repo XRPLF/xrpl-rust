@@ -15,12 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New `xrpl::signing` module containing the pure-crypto signing helpers (`sign`, `multisign`, `prepare_transaction`) extracted from `asynch::transaction` and `transaction`. Available with just `core + models + wallet` features (no `helpers`/runtime/client dependency). The legacy paths `asynch::transaction::sign` and `transaction::multisign` are preserved as re-exports for backward compatibility.
+- XLS-0033 Multi-Purpose Token amendment support, including MPT amount/currency models, MPToken issuance transactions, MPT ledger objects, and binary codec support.
 - Expanded unit-test coverage and raised CI thresholds: lines `73 → 83`, regions `75 → 85`, functions `67 → 73`.
 - Codecov integration with per-PR project (≥83%) and patch (≥80% on new/modified lines) gates.
 - Integration-test coverage gate: a CI workflow runs all five integration test binaries under `cargo-llvm-cov`, uploads to codecov under an `integration` flag, and gates the project at ≥65%.
 
 ### Changed
 
+- **Breaking:** `Amount::is_issued_currency()` now returns `false` for `MPTAmount`. Previously it returned `!is_xrp()`, so any non-XRP amount yielded `true`. With the introduction of the `MPTAmount` variant, callers that used `is_issued_currency()` as a proxy for "not XRP" must be updated to also check `is_mpt()`. Use the new `is_mpt()` helper for MPT-specific branches.
 - Unit-test and integration-test coverage are now scoped via Cargo feature flags rather than path regex. The unit-test workflow builds with `--no-default-features --features std,core,utils,wallet,models`, so integration-territory code (CLI, async clients, sync wrappers, faucet) simply isn't compiled and doesn't appear in the unit coverage report.
 - Network-dependent inline tests in `src/asynch/transaction/` and `src/asynch/wallet/` (`test_autofill_txn`, `test_autofill_and_sign`, `test_submit_and_wait`, `test_generate_faucet_wallet`) are now gated behind `feature = "integration"` so `cargo test --release` is hermetic by default.
 - Codecov **patch** coverage is now gated per flag (separate `unit` and `integration` sections) rather than a single combined gate.

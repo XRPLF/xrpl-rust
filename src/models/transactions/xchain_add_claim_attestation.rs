@@ -28,7 +28,8 @@ pub struct XChainAddClaimAttestation<'a> {
 
 impl Model for XChainAddClaimAttestation<'_> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+        super::reject_mpt_amount("amount", &self.amount)
     }
 }
 
@@ -104,12 +105,14 @@ mod tests {
     use super::*;
     use crate::models::amount::XRPAmount;
     use crate::models::currency::XRP;
+    use crate::models::transactions::test_fixtures::{GENESIS_ACCOUNT, LOCKING_CHAIN_DOOR_ACCOUNT};
+    use crate::models::MPTAmount;
 
     fn xrp_bridge<'a>() -> XChainBridge<'a> {
         XChainBridge {
-            locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+            locking_chain_door: LOCKING_CHAIN_DOOR_ACCOUNT.into(),
             locking_chain_issue: XRP::new().into(),
-            issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            issuing_chain_door: GENESIS_ACCOUNT.into(),
             issuing_chain_issue: XRP::new().into(),
         }
     }
@@ -174,5 +177,42 @@ mod tests {
             txn.get_transaction_type(),
             &TransactionType::XChainAddClaimAttestation
         );
+    }
+
+    #[test]
+    fn test_rejects_mpt_amount() {
+        let txn = XChainAddClaimAttestation {
+            common_fields: CommonFields::new(
+                "rPV4mZjsXfH2HvUSPLNmqz1J8d3Lpv7tpe".into(),
+                TransactionType::XChainAddClaimAttestation,
+                None,
+                None,
+                Some(FlagCollection::default()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            amount: MPTAmount::new(
+                "100".into(),
+                crate::models::transactions::test_fixtures::MPT_ISSUANCE_ID.into(),
+            )
+            .into(),
+            attestation_reward_account: "rPV4mZjsXfH2HvUSPLNmqz1J8d3Lpv7tpe".into(),
+            attestation_signer_account: "rPV4mZjsXfH2HvUSPLNmqz1J8d3Lpv7tpe".into(),
+            other_chain_source: "rSrc111111111111111111111111111111".into(),
+            public_key: "ED00".into(),
+            signature: "30".into(),
+            was_locking_chain_send: 0,
+            xchain_bridge: xrp_bridge(),
+            xchain_claim_id: "1".into(),
+            destination: None,
+        };
+        assert!(txn.get_errors().is_err());
     }
 }

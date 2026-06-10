@@ -3,8 +3,13 @@ version: "3"
 services:
   xrpld:
     image: rippleci/xrpld:develop
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     volumes:
-      - ./.ci-config:/etc/xrpld
+      - ./.ci-config:/etc/xrpld:ro
     ports:
       - "5005:5005"
       - "6006:6006"

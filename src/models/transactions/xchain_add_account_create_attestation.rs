@@ -31,7 +31,9 @@ pub struct XChainAddAccountCreateAttestation<'a> {
 
 impl Model for XChainAddAccountCreateAttestation<'_> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+        super::reject_mpt_amount("amount", &self.amount)?;
+        super::reject_mpt_amount("signature_reward", &self.signature_reward)
     }
 }
 
@@ -157,18 +159,26 @@ mod test_serde {
 #[cfg(test)]
 mod test_xchain_claim {
     use crate::models::{
-        transactions::xchain_claim::XChainClaim, Amount, IssuedCurrency, IssuedCurrencyAmount,
-        Model, XChainBridge, XRPAmount, XRP,
+        transactions::{
+            test_fixtures::{
+                GENESIS_ACCOUNT, XCHAIN_ACCOUNT, XCHAIN_ACCOUNT_ALT, XCHAIN_CLAIM_DESTINATION,
+                XCHAIN_ISSUER_ACCOUNT,
+            },
+            xchain_add_account_create_attestation::XChainAddAccountCreateAttestation,
+            xchain_claim::XChainClaim,
+        },
+        Amount, IssuedCurrency, IssuedCurrencyAmount, MPTAmount, Model, XChainBridge, XRPAmount,
+        XRP,
     };
     use alloc::{borrow::Cow, string::ToString};
 
-    const ACCOUNT: &str = "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ";
-    const ACCOUNT2: &str = "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo";
+    const ACCOUNT: &str = XCHAIN_ACCOUNT;
+    const ACCOUNT2: &str = XCHAIN_ACCOUNT_ALT;
     const FEE: &str = "0.00001";
     const SEQUENCE: u32 = 19048;
-    const ISSUER: &str = "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf";
-    const GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
-    const DESTINATION: &str = "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN";
+    const ISSUER: &str = XCHAIN_ISSUER_ACCOUNT;
+    const GENESIS: &str = GENESIS_ACCOUNT;
+    const DESTINATION: &str = XCHAIN_CLAIM_DESTINATION;
     const CLAIM_ID: u64 = 3;
     const XRP_AMOUNT: &str = "123456789";
 
@@ -334,5 +344,56 @@ mod test_xchain_claim {
             None,
         );
         claim.validate().unwrap();
+    }
+
+    fn mpt_amount<'a>() -> Amount<'a> {
+        MPTAmount::new(
+            "100".into(),
+            crate::models::transactions::test_fixtures::MPT_ISSUANCE_ID.into(),
+        )
+        .into()
+    }
+
+    fn base_account_create_attestation<'a>() -> XChainAddAccountCreateAttestation<'a> {
+        XChainAddAccountCreateAttestation {
+            common_fields: super::CommonFields::new(
+                Cow::Borrowed(ACCOUNT),
+                super::TransactionType::XChainAddAccountCreateAttestation,
+                None,
+                Some(XRPAmount::from(FEE)),
+                Some(super::FlagCollection::default()),
+                None,
+                None,
+                None,
+                Some(SEQUENCE),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            amount: XRPAmount::from(XRP_AMOUNT).into(),
+            attestation_reward_account: Cow::Borrowed(ACCOUNT),
+            attestation_signer_account: Cow::Borrowed(ACCOUNT2),
+            destination: Cow::Borrowed(DESTINATION),
+            other_chain_source: Cow::Borrowed(ACCOUNT),
+            public_key: Cow::Borrowed("ED00"),
+            signature: Cow::Borrowed("30"),
+            signature_reward: XRPAmount::from("200").into(),
+            was_locking_chain_send: 1,
+            xchain_account_create_count: CLAIM_ID.to_string().into(),
+            xchain_bridge: xrp_bridge(),
+        }
+    }
+
+    #[test]
+    fn test_account_create_attestation_rejects_mpt_amount_fields() {
+        let mut tx = base_account_create_attestation();
+        tx.amount = mpt_amount();
+        assert!(tx.validate().is_err());
+
+        let mut tx = base_account_create_attestation();
+        tx.signature_reward = mpt_amount();
+        assert!(tx.validate().is_err());
     }
 }

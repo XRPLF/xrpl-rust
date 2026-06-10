@@ -196,10 +196,13 @@ impl<'a> PaymentError for Payment<'a> {
     }
 
     fn _get_exchange_error(&self) -> XRPLModelResult<()> {
-        if self.common_fields.account == self.destination && self.send_max.is_none() {
+        if self.common_fields.account == self.destination
+            && self.amount.is_issued_currency()
+            && self.send_max.is_none()
+        {
             return Err(XRPLPaymentException::OptionRequired {
                 field: "send_max".into(),
-                context: "exchanges".into(),
+                context: "issued-currency exchanges".into(),
             }
             .into());
         }
@@ -318,7 +321,8 @@ mod tests {
     use alloc::string::ToString;
     use alloc::vec;
 
-    use crate::models::amount::{Amount, IssuedCurrencyAmount, XRPAmount};
+    use crate::models::amount::{Amount, IssuedCurrencyAmount, MPTAmount, XRPAmount};
+    use crate::models::transactions::test_fixtures::{MPT_ISSUANCE_ID, TEST_ACCOUNT};
     use crate::models::{Model, PathStep};
     #[cfg(feature = "wallet")]
     use crate::{
@@ -449,8 +453,24 @@ mod tests {
 
         assert_eq!(
             payment.validate().unwrap_err().to_string().as_str(),
-            "The optional field `\"send_max\"` is required to be defined for \"exchanges\""
+            "The optional field `\"send_max\"` is required to be defined for \"issued-currency exchanges\""
         );
+    }
+
+    #[test]
+    fn test_mpt_self_payment_does_not_use_issued_currency_exchange_validation() {
+        let payment = Payment {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::MPTAmount(MPTAmount::new("10".into(), MPT_ISSUANCE_ID.into())),
+            destination: TEST_ACCOUNT.into(),
+            ..Default::default()
+        };
+
+        assert!(payment._get_exchange_error().is_ok());
     }
 
     #[test]

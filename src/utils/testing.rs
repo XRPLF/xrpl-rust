@@ -1,55 +1,12 @@
 //! Test utilities for XRPL Rust library
 //!
 //! This module provides common utilities for testing, including:
-//! - Network error detection and handling
 //! - Test wallet creation
 //! - Common test patterns
 //! - Timeout helpers
 
 use alloc::string::{String, ToString};
 use core::time::Duration;
-
-/// Common network error patterns that should cause tests to skip rather than fail
-pub const COMMON_NETWORK_ERRORS: &[&str] = &[
-    // JSON parsing errors
-    "expected value",
-    "invalid type",
-    "EOF while parsing",
-    // Network connectivity errors
-    "network",
-    "connection",
-    "timeout",
-    "Connection refused",
-    "Connection reset",
-    "Connection timed out",
-    "No route to host",
-    "Network is unreachable",
-    "ConnectError",
-    // DNS resolution errors
-    "dns error",
-    "failed to lookup address",
-    "Name or service not known",
-    "nodename nor servname provided",
-    // HTTP client errors
-    "HttpError",
-    "EmptyResponse",
-    "hyper_util::client::legacy::Error",
-    "reqwest::Error",
-    // Runtime/async errors
-    "there is no reactor running",
-    "must be called from the context of a Tokio",
-    // Implementation status
-    "not yet implemented",
-    "unimplemented",
-];
-
-/// Check if an error message indicates a known network/infrastructure issue
-/// that should cause a test to skip rather than fail
-pub fn is_known_network_error(error_msg: &str) -> bool {
-    COMMON_NETWORK_ERRORS
-        .iter()
-        .any(|&pattern| error_msg.to_lowercase().contains(&pattern.to_lowercase()))
-}
 
 /// Standard timeout durations for different types of operations
 pub struct TestTimeouts;
@@ -65,30 +22,21 @@ impl TestTimeouts {
     pub const TRANSACTION: Duration = Duration::from_secs(120);
 }
 
-/// Result of a test operation that might skip due to network issues
+/// Result of a test operation.
 #[derive(Debug)]
 pub enum TestResult<T> {
     /// Test completed successfully
     Success(T),
-    /// Test was skipped due to known network issues
-    Skipped(String),
     /// Test failed with an unexpected error
     Failed(String),
 }
 
-/// Handle the test result and return the value if successful, or return from the test function
+/// Handle the test result and return the value if successful, or fail the test.
 #[macro_export]
 macro_rules! handle_test_result {
     ($result:expr, $test_name:expr) => {
         match $result {
             $crate::utils::testing::TestResult::Success(value) => value,
-            $crate::utils::testing::TestResult::Skipped(reason) => {
-                // For no_std compatibility, we can't use println! directly
-                #[cfg(feature = "std")]
-                alloc::println!("⏭️  {} skipped: {}", $test_name, reason);
-
-                return;
-            }
             $crate::utils::testing::TestResult::Failed(error) => {
                 panic!("❌ {} failed: {}", $test_name, error);
             }
@@ -102,39 +50,23 @@ impl<T> TestResult<T> {
         Self::Success(value)
     }
 
-    /// Create a skipped result with a reason
-    pub fn skipped(reason: impl Into<String>) -> Self {
-        Self::Skipped(reason.into())
-    }
-
     /// Create a failed result with an error message
     pub fn failed(error: impl Into<String>) -> Self {
         Self::Failed(error.into())
     }
 
-    /// Convert a Result into a TestResult, categorizing errors appropriately
+    /// Convert a Result into a TestResult, preserving errors as failures.
     pub fn from_result(result: Result<T, impl ToString>) -> Self {
         match result {
             Ok(value) => Self::Success(value),
-            Err(error) => {
-                let error_msg = error.to_string();
-                if is_known_network_error(&error_msg) {
-                    Self::Skipped(alloc::format!("Known network error: {}", error_msg))
-                } else {
-                    Self::Failed(error_msg)
-                }
-            }
+            Err(error) => Self::Failed(error.to_string()),
         }
     }
 
-    /// Handle the test result appropriately (skip, pass, or panic)
+    /// Handle the test result appropriately (pass or panic)
     pub fn handle(self, test_name: &str) {
         match self {
             Self::Success(_) => {}
-            Self::Skipped(reason) => {
-                #[cfg(feature = "std")]
-                alloc::println!("⏭️  {} skipped: {}", test_name, reason);
-            }
             Self::Failed(error) => {
                 panic!("❌ {} failed: {}", test_name, error);
             }
@@ -142,7 +74,7 @@ impl<T> TestResult<T> {
     }
 }
 
-/// Helper for testing network operations with timeout and error handling
+/// Helper for testing network operations with timeout handling.
 #[cfg(feature = "tokio-rt")]
 pub async fn test_network_operation<F, T, E>(
     operation: F,
@@ -158,11 +90,12 @@ where
     match result {
         Ok(Ok(value)) => TestResult::Success(value),
         Ok(Err(error)) => TestResult::from_result(Err(error)),
-        Err(_) => TestResult::Skipped(alloc::format!("{} timed out", operation_name)),
+        Err(_) => TestResult::Failed(alloc::format!("{} timed out", operation_name)),
     }
 }
 
 /// Test wallet credentials for deterministic testing
+#[cfg(feature = "wallet")]
 pub mod test_wallets {
     use crate::wallet::{exceptions::XRPLWalletException, Wallet};
 
@@ -187,7 +120,7 @@ pub mod test_constants {
     pub const EXAMPLE_COM_HEX: &str = "6578616d706c652e636f6d";
 
     /// Common test URLs
-    pub const TESTNET_URL: &str = "https://testnet.xrpl-labs.com/";
+    pub const TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234/";
     pub const ALT_TESTNET_URL: &str = "https://faucet.altnet.rippletest.net:443";
 }
 
@@ -249,6 +182,7 @@ pub mod assertions {
     }
 
     /// Assert that a wallet is valid
+    #[cfg(feature = "wallet")]
     pub fn assert_valid_wallet(wallet: &crate::wallet::Wallet) {
         assert!(
             !wallet.classic_address.is_empty(),
@@ -271,29 +205,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_error_detection() {
-        // Test that our error detection works correctly
-        assert!(is_known_network_error("dns error occurred"));
-        assert!(is_known_network_error(
-            "failed to lookup address information"
-        ));
-        assert!(is_known_network_error("Connection refused"));
-        assert!(is_known_network_error("Network is unreachable"));
-        assert!(is_known_network_error("expected value"));
-        assert!(is_known_network_error("ConnectError"));
-        assert!(is_known_network_error("not yet implemented"));
-
-        // Test case insensitivity
-        assert!(is_known_network_error("DNS ERROR OCCURRED"));
-        assert!(is_known_network_error("CONNECTION REFUSED"));
-
-        // Test negative cases
-        assert!(!is_known_network_error("some other error"));
-        assert!(!is_known_network_error("validation failed"));
-        assert!(!is_known_network_error("invalid transaction"));
-    }
-
-    #[test]
     fn test_result_handling() {
         // Test success case
         let result = TestResult::success("test_value");
@@ -302,23 +213,45 @@ mod tests {
             _ => panic!("Expected success"),
         }
 
-        // Test from_result with network error
-        let network_error: Result<(), &str> = Err("dns error occurred");
-        let result = TestResult::from_result(network_error);
-        match result {
-            TestResult::Skipped(_) => {} // Expected
-            _ => panic!("Expected skip for network error"),
-        }
-
-        // Test from_result with other error
+        // Test from_result with error
         let other_error: Result<(), &str> = Err("validation failed");
         let result = TestResult::from_result(other_error);
         match result {
             TestResult::Failed(_) => {} // Expected
-            _ => panic!("Expected failure for non-network error"),
+            _ => panic!("Expected failure for error"),
         }
     }
 
+    #[test]
+    fn test_result_failed_constructor_and_from_err() {
+        match TestResult::<()>::failed("boom") {
+            TestResult::Failed(error) => assert_eq!(error, "boom"),
+            TestResult::Success(_) => panic!("expected failed result"),
+        }
+
+        match TestResult::<()>::from_result(Err("nope")) {
+            TestResult::Failed(error) => assert_eq!(error, "nope"),
+            TestResult::Success(_) => panic!("expected failed result"),
+        }
+    }
+
+    #[test]
+    fn test_result_from_ok_and_success_handle() {
+        match TestResult::<u8>::from_result(Ok::<u8, &str>(7)) {
+            TestResult::Success(value) => assert_eq!(value, 7),
+            TestResult::Failed(error) => panic!("unexpected failure: {error}"),
+        }
+
+        TestResult::success(()).handle("success should not panic");
+    }
+
+    #[test]
+    #[should_panic(expected = "❌ expected-panic failed: nope")]
+    fn test_result_handle_failed_panics() {
+        TestResult::<()>::failed("nope").handle("expected-panic");
+    }
+
+    #[cfg(feature = "wallet")]
     #[test]
     fn test_wallet_creation() {
         let wallet = test_wallets::create_test_wallet().unwrap();

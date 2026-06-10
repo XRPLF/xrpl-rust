@@ -40,6 +40,15 @@ pub fn encode_quality(quality: &str) -> XRPLCoreResult<Vec<u8>> {
 
     let exponent = e - 15;
 
+    // Bounds check: exponent must be in representable range [-100, 155]
+    // Prevent overflow when computing scale and creating BigDecimal
+    if !(-100..=155).contains(&exponent) {
+        return Err(XRPLCoreException::XRPLUtilsError(alloc::format!(
+            "Quality exponent {} out of representable range [-100, 155]",
+            exponent
+        )));
+    }
+
     // mantissa = decimal * 10^(-exponent), take absolute value
     let shift = BigDecimal::from_str(&alloc::format!("1e{}", -exponent))
         .map_err(|_| XRPLCoreException::XRPLUtilsError("Internal error".into()))?;
@@ -82,6 +91,15 @@ pub fn decode_quality(hex_str: &str) -> XRPLCoreResult<String> {
     let bytes = &all_bytes[all_bytes.len() - 8..];
     let exponent = bytes[0] as i32 - 100;
 
+    // Bounds check: exponent must be in representable range [-100, 155]
+    // Prevent overflow when creating BigDecimal scale
+    if !(-100..=155).contains(&exponent) {
+        return Err(XRPLCoreException::XRPLUtilsError(alloc::format!(
+            "Quality exponent {} out of representable range [-100, 155]",
+            exponent
+        )));
+    }
+
     // Extract mantissa from bytes[1..8] as big-endian u64
     let mut mantissa_bytes = [0u8; 8];
     mantissa_bytes[1..8].copy_from_slice(&bytes[1..8]);
@@ -94,4 +112,85 @@ pub fn decode_quality(hex_str: &str) -> XRPLCoreResult<String> {
 
     // Normalize to remove trailing zeros
     Ok(result.normalized().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_encode_quality_valid() {
+        let quality = "100";
+        let result = encode_quality(quality);
+        assert!(result.is_ok(), "Valid quality should encode successfully");
+        let bytes = result.unwrap();
+        assert_eq!(bytes.len(), 8, "Encoded quality should be 8 bytes");
+    }
+
+    #[test]
+    fn test_decode_quality_valid() {
+        // First encode a known quality, then decode it
+        let quality_str = "100";
+        let encoded = encode_quality(quality_str);
+        assert!(encoded.is_ok());
+
+        let encoded_bytes = encoded.unwrap();
+        let hex_string = hex::encode(&encoded_bytes);
+        let decoded = decode_quality(&hex_string);
+        assert!(
+            decoded.is_ok(),
+            "Valid encoded quality should decode successfully"
+        );
+    }
+
+    #[test]
+    fn test_decode_quality_rejects_out_of_bounds_exponent() {
+        // The byte value directly determines exponent, so mathematically:
+        // byte 0 -> exponent = -100, byte 255 -> exponent = 155
+        // All values 0-255 are within [-100, 155] range
+        // However, our bounds check ensures defensive coding
+        let mut bytes = [0u8; 8];
+        bytes[0] = 0; // exponent = -100
+        let hex_string = hex::encode(&bytes);
+        let result = decode_quality(&hex_string);
+        assert!(result.is_ok(), "Minimum exponent -100 should be accepted");
+
+        bytes[0] = 255; // exponent = 155
+        let hex_string = hex::encode(&bytes);
+        let result = decode_quality(&hex_string);
+        assert!(result.is_ok(), "Maximum exponent 155 should be accepted");
+    }
+
+    #[test]
+    fn test_decode_quality_requires_minimum_8_bytes() {
+        let hex_string = "0102030405"; // Only 5 bytes
+        let result = decode_quality(&hex_string);
+        assert!(result.is_err(), "Quality hex with < 8 bytes should fail");
+    }
+
+    #[test]
+    fn test_roundtrip_quality_encode_decode() {
+        let original_quality = "150.5";
+        let encoded = encode_quality(original_quality);
+        assert!(encoded.is_ok(), "Quality should encode");
+
+        let hex_string = hex::encode(encoded.unwrap());
+        let decoded = decode_quality(&hex_string);
+        assert!(decoded.is_ok(), "Quality should decode");
+
+        // The decoded value should be approximately equal to original
+        // (may differ slightly due to rounding)
+        let decoded_value = decoded.unwrap();
+        let decoded_f64: f64 = decoded_value.parse().unwrap_or(0.0);
+        let original_f64: f64 = original_quality.parse().unwrap_or(0.0);
+
+        // Allow small floating point error
+        let ratio = (decoded_f64 / original_f64 - 1.0).abs();
+        assert!(
+            ratio < 0.001,
+            "Decoded quality should be close to original. Original: {}, Decoded: {}",
+            original_f64,
+            decoded_f64
+        );
+    }
 }

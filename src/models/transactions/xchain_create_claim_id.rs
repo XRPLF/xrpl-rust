@@ -95,14 +95,18 @@ impl<'a> XChainCreateClaimID<'a> {
 #[cfg(test)]
 mod test_xchain_create_claim_id {
     use super::XChainCreateClaimID;
+    use crate::models::transactions::test_fixtures::{
+        GENESIS_ACCOUNT, XCHAIN_ACCOUNT, XCHAIN_ACCOUNT_ALT, XCHAIN_CLAIM_DESTINATION,
+        XCHAIN_ISSUER_ACCOUNT,
+    };
     use crate::models::{Model, XChainBridge, XRP};
     use alloc::borrow::Cow;
 
-    const ACCOUNT: &str = "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ";
-    const ACCOUNT2: &str = "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo";
-    const ISSUER: &str = "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf";
-    const GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
-    const SOURCE: &str = "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN";
+    const ACCOUNT: &str = XCHAIN_ACCOUNT;
+    const ACCOUNT2: &str = XCHAIN_ACCOUNT_ALT;
+    const ISSUER: &str = XCHAIN_ISSUER_ACCOUNT;
+    const GENESIS: &str = GENESIS_ACCOUNT;
+    const SOURCE: &str = XCHAIN_CLAIM_DESTINATION;
     const SIGNATURE_REWARD: &str = "200";
 
     fn xrp_bridge<'a>() -> XChainBridge<'a> {

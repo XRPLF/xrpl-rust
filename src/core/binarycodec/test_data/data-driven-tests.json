@@ -2979,7 +2979,7 @@
                 "value": "a"
             },
             "type": "Amount",
-            "error": "Value has incorrect hex format"
+            "error": "Value has bad character"
         },
         {
             "test_json": {
@@ -2987,7 +2987,7 @@
                 "value": "0xy"
             },
             "type": "Amount",
-            "error": "Value has bad hex character"
+            "error": "Value has bad character"
         },
         {
             "test_json": {
@@ -3003,7 +3003,7 @@
                 "value": "0x8000000000000000"
             },
             "type": "Amount",
-            "error": "Hex value out of range"
+            "error": "Value has bad character"
         },
         {
             "test_json": {
@@ -3011,7 +3011,7 @@
                 "value": "0xFFFFFFFFFFFFFFFF"
             },
             "type": "Amount",
-            "error": "Hex value out of range"
+            "error": "Value has bad character"
         },
         {
             "test_json": {
@@ -3062,22 +3062,16 @@
                 "mpt_issuance_id":"00002403C84A0A28E0190E208E982C352BBD5006600555CF",
                 "value": "0xa"
             },
-            "type_id": 6,
-            "is_native": false,
             "type": "Amount",
-            "expected_hex": "60000000000000000A00002403C84A0A28E0190E208E982C352BBD5006600555CF",
-            "is_negative": false
+            "error": "Value has bad character"
         },
         {
             "test_json": {
                 "mpt_issuance_id":"00002403C84A0A28E0190E208E982C352BBD5006600555CF",
                 "value": "0x7FFFFFFFFFFFFFFF"
             },
-            "type_id": 6,
-            "is_native": false,
             "type": "Amount",
-            "expected_hex": "607FFFFFFFFFFFFFFF00002403C84A0A28E0190E208E982C352BBD5006600555CF",
-            "is_negative": false
+            "error": "Value has bad character"
         }
     ]
 }

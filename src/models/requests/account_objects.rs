@@ -21,6 +21,10 @@ pub enum AccountObjectType {
     SignerList,
     State,
     Ticket,
+    /// Filter for MPTokenIssuance objects (MPT issuances created by this account).
+    MptIssuance,
+    /// Filter for MPToken objects (MPT holdings owned by this account).
+    Mptoken,
 }
 
 /// This request returns the raw ledger format for all objects
@@ -102,23 +106,80 @@ impl<'a> AccountObjects<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::transactions::test_fixtures::GENESIS_ACCOUNT;
+    use alloc::string::ToString;
 
     #[test]
     fn test_serde_round_trip() {
-        let req = AccountObjects::new(
-            Some("ao-1".into()),
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
-            None,
-            None,
-            Some(AccountObjectType::Escrow),
-            Some(true),
-            Some(20),
-            None,
-        );
+        let req = AccountObjects {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id: Some("ao-1".into()),
+            },
+            account: GENESIS_ACCOUNT.into(),
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash: None,
+                ledger_index: None,
+            }),
+            r#type: Some(AccountObjectType::Escrow),
+            deletion_blockers_only: Some(true),
+            limit: Some(20),
+            marker: None,
+        };
         let serialized = serde_json::to_string(&req).unwrap();
         let deserialized: AccountObjects = serde_json::from_str(&serialized).unwrap();
         assert_eq!(req, deserialized);
         assert!(serialized.contains("\"command\":\"account_objects\""));
         assert!(serialized.contains("\"type\":\"escrow\""));
+    }
+
+    #[test]
+    fn test_serde_mpt_variants() {
+        let req_issuance = AccountObjects {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id: None,
+            },
+            account: GENESIS_ACCOUNT.into(),
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash: None,
+                ledger_index: None,
+            }),
+            r#type: Some(AccountObjectType::MptIssuance),
+            deletion_blockers_only: None,
+            limit: None,
+            marker: None,
+        };
+        let serialized_issuance = serde_json::to_string(&req_issuance).unwrap();
+        assert!(serialized_issuance.contains("\"type\":\"mpt_issuance\""));
+
+        let req_token = AccountObjects {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id: None,
+            },
+            account: GENESIS_ACCOUNT.into(),
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash: None,
+                ledger_index: None,
+            }),
+            r#type: Some(AccountObjectType::Mptoken),
+            deletion_blockers_only: None,
+            limit: None,
+            marker: None,
+        };
+        let serialized_token = serde_json::to_string(&req_token).unwrap();
+        assert!(serialized_token.contains("\"type\":\"mptoken\""));
+    }
+
+    #[test]
+    fn test_mpt_account_object_types_from_json_and_display() {
+        let issuance: AccountObjectType = serde_json::from_str("\"mpt_issuance\"").unwrap();
+        assert_eq!(issuance, AccountObjectType::MptIssuance);
+        assert_eq!(issuance.to_string(), "mpt_issuance");
+
+        let token: AccountObjectType = serde_json::from_str("\"mptoken\"").unwrap();
+        assert_eq!(token, AccountObjectType::Mptoken);
+        assert_eq!(token.to_string(), "mptoken");
     }
 }

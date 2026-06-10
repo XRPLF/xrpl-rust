@@ -346,15 +346,26 @@ mod test_autofill {
             exceptions::XRPLHelperResult,
         },
         models::{
-            transactions::{offer_create::OfferCreate, Transaction},
+            transactions::{
+                offer_create::OfferCreate, test_fixtures::GENESIS_ACCOUNT, Transaction,
+            },
             IssuedCurrencyAmount, XRPAmount,
         },
     };
 
     #[tokio::test]
     async fn test_autofill_txn() -> XRPLHelperResult<()> {
+        let ws_url = std::env::var("XRPL_WS_URL")
+            .unwrap_or_else(|_| "wss://s.altnet.rippletest.net:51233/".to_string());
+
+        let account = if ws_url.contains("localhost") || ws_url.contains("127.0.0.1") {
+            GENESIS_ACCOUNT
+        } else {
+            "r9mhdWo1NXVZr2pDnCtC1xwxE85kFtSzYR"
+        };
+
         let mut txn = OfferCreate::new(
-            "r9mhdWo1NXVZr2pDnCtC1xwxE85kFtSzYR".into(),
+            account.into(),
             None,
             None,
             None,
@@ -374,11 +385,8 @@ mod test_autofill {
             None,
             None,
         );
-        let client = AsyncWebSocketClient::<SingleExecutorMutex, _>::open(
-            "wss://testnet.xrpl-labs.com/".parse().unwrap(),
-        )
-        .await
-        .unwrap();
+        let client =
+            AsyncWebSocketClient::<SingleExecutorMutex, _>::open(ws_url.parse().unwrap()).await?;
         autofill(&mut txn, &client, None).await?;
 
         assert!(txn.get_common_fields().network_id.is_none());

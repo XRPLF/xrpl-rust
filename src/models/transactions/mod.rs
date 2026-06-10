@@ -9,12 +9,17 @@ pub mod amm_withdraw;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
+pub mod clawback;
 pub mod deposit_preauth;
 pub mod escrow_cancel;
 pub mod escrow_create;
 pub mod escrow_finish;
 pub mod exceptions;
 pub mod metadata;
+pub mod mptoken_authorize;
+pub mod mptoken_issuance_create;
+pub mod mptoken_issuance_destroy;
+pub mod mptoken_issuance_set;
 pub mod nftoken_accept_offer;
 pub mod nftoken_burn;
 pub mod nftoken_cancel_offer;
@@ -40,7 +45,42 @@ pub mod xchain_create_bridge;
 pub mod xchain_create_claim_id;
 pub mod xchain_modify_bridge;
 
-use super::{FlagCollection, XRPLModelResult};
+#[cfg(test)]
+pub(crate) mod test_fixtures {
+    pub const DESTINATION_ACCOUNT: &str = "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb";
+    pub const GENESIS_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    pub const HOLDER_ACCOUNT: &str = "rPcHbQ26o4Xrwb2bu5gLc3gWUsS52yx1pG";
+    pub const ISSUER_ACCOUNT: &str = "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B";
+    pub const ISSUER_ACCOUNT_ALT: &str = "rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd";
+    pub const LOCKING_CHAIN_DOOR_ACCOUNT: &str = "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4";
+    pub const TEST_ACCOUNT: &str = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH";
+    pub const TEST_HOLDER_ACCOUNT: &str = "rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh";
+    pub const XCHAIN_ACCOUNT: &str = "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ";
+    pub const XCHAIN_ACCOUNT_ALT: &str = "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo";
+    pub const XCHAIN_COMMIT_ACCOUNT: &str = "rwEqJ2UaQHe7jihxGqmx6J4xdbGiiyMaGa";
+    pub const XCHAIN_COMMIT_DESTINATION: &str = "rD323VyRjgzzhY4bFpo44rmyh2neB5d8Mo";
+    pub const XCHAIN_CLAIM_DESTINATION: &str = "rJrRMgiRgrU6hDF4pgu5DXQdWyPbY35ErN";
+    pub const XCHAIN_CLAIM_SIGNING_SEED: &str = "sEdVWgwiHxBmFoMGJBoPZf6H1XSLLGd";
+    pub const XCHAIN_COMMIT_TEST_ACCOUNT: &str = "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo";
+    pub const XCHAIN_ISSUER_ACCOUNT: &str = "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf";
+    pub const MPT_ISSUANCE_ID: &str = "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58";
+    pub const MPT_ISSUANCE_ID_ALT: &str = "00000001A407AF5856CEFBF81F3D4A00AABBCCDD11223344";
+    pub const INVALID_MPT_ISSUANCE_ID_SHORT: &str = "00000001A407AF5856CEFBF81F3D4A00";
+    pub const INVALID_MPT_ISSUANCE_ID_NON_HEX: &str =
+        "Z0000001A407AF5856CEFBF81F3D4A0000000000A407AF58";
+    pub const LEDGER_OBJECT_INDEX: &str =
+        "BFA9BE27383FA315651E26FDE1FA30815C5A5D0544EE10EC33D3E92532993769";
+    pub const MPT_ISSUANCE_LEDGER_INDEX: &str =
+        "A44128B79CAB60A1C97A72F5A4B0F43F04ABBE65B8B1C6AC24CF27E6DEA3B2A";
+    pub const MPTOKEN_LEDGER_INDEX: &str =
+        "CF9421C5E0A80C7BC5F52A3566CCBD2E8F14C3DA1E65F3F3AB1EC5B5A3BDFEA";
+    pub const PREVIOUS_TXN_ID: &str =
+        "E3FE6EA3D48F0C2B639448020EA4F03D4F4F8FFDB243A852A0F59177921B4879";
+    pub const ZERO_HASH_256: &str =
+        "0000000000000000000000000000000000000000000000000000000000000000";
+}
+
+use super::{Amount, FlagCollection, XRPLModelException, XRPLModelResult};
 use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
 use crate::{_serde::txn_flags, serde_with_tag};
@@ -60,6 +100,17 @@ use sha2::{Digest, Sha512};
 use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, Display};
 
+pub(crate) fn reject_mpt_amount(field: &'static str, amount: &Amount<'_>) -> XRPLModelResult<()> {
+    if matches!(amount, Amount::MPTAmount(_)) {
+        return Err(XRPLModelException::InvalidValue {
+            field: field.into(),
+            expected: "XRP or issued currency amount for cross-chain transactions".into(),
+            found: "MPTAmount".into(),
+        });
+    }
+    Ok(())
+}
+
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
 /// Enum containing the different Transaction types.
@@ -76,10 +127,15 @@ pub enum TransactionType {
     CheckCancel,
     CheckCash,
     CheckCreate,
+    Clawback,
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,
     EscrowFinish,
+    MPTokenAuthorize,
+    MPTokenIssuanceCreate,
+    MPTokenIssuanceDestroy,
+    MPTokenIssuanceSet,
     NFTokenAcceptOffer,
     NFTokenBurn,
     NFTokenCancelOffer,
@@ -648,6 +704,7 @@ pub enum Flag {
 mod tests {
     use alloc::borrow::Cow;
 
+    use super::test_fixtures::TEST_ACCOUNT;
     use super::*;
     use crate::models::transactions::payment::PaymentFlag;
     use crate::models::transactions::{account_set::AccountSet, payment::Payment};
@@ -709,7 +766,7 @@ mod tests {
 
     #[test]
     fn test_common_fields_from_str() {
-        let account = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH";
+        let account = TEST_ACCOUNT;
         let common_fields: CommonFields<payment::PaymentFlag> = account.parse().unwrap();
 
         assert_eq!(common_fields.account, account);
@@ -719,7 +776,7 @@ mod tests {
 
     #[test]
     fn test_common_fields_from_string() {
-        let account = String::from("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH");
+        let account = String::from(TEST_ACCOUNT);
         let common_fields: CommonFields<payment::PaymentFlag> = CommonFields::from(account.clone());
 
         assert_eq!(common_fields.account, account);
@@ -728,7 +785,7 @@ mod tests {
 
     #[test]
     fn test_common_fields_from_cow() {
-        let account: Cow<str> = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into();
+        let account: Cow<str> = TEST_ACCOUNT.into();
         let common_fields: CommonFields<payment::PaymentFlag> = CommonFields::from(account.clone());
 
         assert_eq!(common_fields.account, account);
@@ -736,7 +793,7 @@ mod tests {
 
     #[test]
     fn test_common_fields_builder_methods() {
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_transaction_type(TransactionType::Payment)
@@ -746,7 +803,7 @@ mod tests {
             .with_source_tag(42)
             .with_network_id(1025);
 
-        assert_eq!(common_fields.account, "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH");
+        assert_eq!(common_fields.account, TEST_ACCOUNT);
         assert_eq!(common_fields.transaction_type, TransactionType::Payment);
         assert_eq!(common_fields.fee, Some("12".into()));
         assert_eq!(common_fields.sequence, Some(100));
@@ -763,7 +820,7 @@ mod tests {
             memo_type: Some("test".to_string()),
         };
 
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_memo(memo.clone());
@@ -785,7 +842,7 @@ mod tests {
             memo_type: Some("note".to_string()),
         };
 
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_memo(memo1.clone())
@@ -808,7 +865,7 @@ mod tests {
             memo_type: None,
         };
 
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_memo(memo1)
@@ -820,9 +877,9 @@ mod tests {
     #[test]
     fn test_from_account_helper() {
         let common_fields: CommonFields<payment::PaymentFlag> =
-            CommonFields::from_account("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH");
+            CommonFields::from_account(TEST_ACCOUNT);
 
-        assert_eq!(common_fields.account, "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH");
+        assert_eq!(common_fields.account, TEST_ACCOUNT);
         assert_eq!(common_fields.transaction_type, TransactionType::Payment);
     }
 
@@ -834,7 +891,7 @@ mod tests {
             signing_pub_key: "pubkey123".to_string(),
         };
 
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_signers(alloc::vec![signer.clone()]);
@@ -844,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_signature_fields_builder() {
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_signing_pub_key("ED12345...".into())
@@ -857,7 +914,7 @@ mod tests {
     #[test]
     fn test_account_txn_id_builder() {
         let txn_id = "F1E2D3C4B5A69788";
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_account_txn_id(txn_id.into());
@@ -867,7 +924,7 @@ mod tests {
 
     #[test]
     fn test_ticket_sequence_builder() {
-        let common_fields = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH"
+        let common_fields = TEST_ACCOUNT
             .parse::<CommonFields<payment::PaymentFlag>>()
             .unwrap()
             .with_ticket_sequence(50);

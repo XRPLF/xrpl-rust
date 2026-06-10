@@ -63,6 +63,7 @@ mod tests {
     use super::*;
     use crate::models::amount::XRPAmount;
     use crate::models::currency::XRP;
+    use crate::models::transactions::test_fixtures::{GENESIS_ACCOUNT, LOCKING_CHAIN_DOOR_ACCOUNT};
     use alloc::vec;
 
     #[test]
@@ -82,9 +83,9 @@ mod tests {
             "rSrc111111111111111111111111111111".into(),
             Amount::XRPAmount(XRPAmount::from("100")),
             XChainBridge {
-                locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+                locking_chain_door: LOCKING_CHAIN_DOOR_ACCOUNT.into(),
                 locking_chain_issue: XRP::new().into(),
-                issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                issuing_chain_door: GENESIS_ACCOUNT.into(),
                 issuing_chain_issue: XRP::new().into(),
             },
             vec![attestation],

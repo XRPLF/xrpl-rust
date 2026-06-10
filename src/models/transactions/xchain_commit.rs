@@ -24,7 +24,8 @@ pub struct XChainCommit<'a> {
 
 impl Model for XChainCommit<'_> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+        super::reject_mpt_amount("amount", &self.amount)
     }
 }
 
@@ -87,38 +88,43 @@ impl<'a> XChainCommit<'a> {
 mod test_serde {
     use serde_json::Value;
 
-    use crate::models::transactions::xchain_commit::XChainCommit;
+    use crate::models::transactions::{
+        test_fixtures::{GENESIS_ACCOUNT, LOCKING_CHAIN_DOOR_ACCOUNT, XCHAIN_COMMIT_TEST_ACCOUNT},
+        xchain_commit::XChainCommit,
+    };
 
-    const EXAMPLE_JSON: &str = r#"{
-        "Account": "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo",
-        "Flags": 0,
-        "TransactionType": "XChainCommit",
-        "XChainBridge": {
-            "LockingChainDoor": "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4",
-            "LockingChainIssue": {
-                "currency": "XRP"
+    fn example_json() -> Value {
+        serde_json::json!({
+            "Account": XCHAIN_COMMIT_TEST_ACCOUNT,
+            "Flags": 0,
+            "TransactionType": "XChainCommit",
+            "XChainBridge": {
+                "LockingChainDoor": LOCKING_CHAIN_DOOR_ACCOUNT,
+                "LockingChainIssue": {
+                    "currency": "XRP"
+                },
+                "IssuingChainDoor": GENESIS_ACCOUNT,
+                "IssuingChainIssue": {
+                    "currency": "XRP"
+                }
             },
-            "IssuingChainDoor": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
-            "IssuingChainIssue": {
-                "currency": "XRP"
-            }
-        },
-        "Amount": "10000",
-        "XChainClaimID": "13f"
-    }"#;
+            "Amount": "10000",
+            "XChainClaimID": "13f"
+        })
+    }
 
     #[test]
     fn test_deserialize() {
-        let json = EXAMPLE_JSON;
-        let deserialized: Result<XChainCommit<'_>, _> = serde_json::from_str(json);
+        let json = example_json();
+        let deserialized: Result<XChainCommit<'_>, _> = serde_json::from_value(json);
         assert!(deserialized.is_ok());
     }
 
     #[test]
     fn test_serialize() {
-        let attestation: XChainCommit<'_> = serde_json::from_str(EXAMPLE_JSON).unwrap();
+        let expected = example_json();
+        let attestation: XChainCommit<'_> = serde_json::from_value(expected.clone()).unwrap();
         let actual = serde_json::to_value(&attestation).unwrap();
-        let expected: Value = serde_json::from_str(EXAMPLE_JSON).unwrap();
 
         assert_eq!(actual, expected);
     }
@@ -128,13 +134,17 @@ mod test_serde {
 mod tests {
     use super::*;
     use crate::models::currency::XRP;
-    use crate::models::transactions::Transaction;
+    use crate::models::transactions::{
+        test_fixtures::{GENESIS_ACCOUNT, LOCKING_CHAIN_DOOR_ACCOUNT, XCHAIN_COMMIT_TEST_ACCOUNT},
+        Transaction,
+    };
+    use crate::models::MPTAmount;
 
     fn xrp_bridge<'a>() -> XChainBridge<'a> {
         XChainBridge {
-            locking_chain_door: "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4".into(),
+            locking_chain_door: LOCKING_CHAIN_DOOR_ACCOUNT.into(),
             locking_chain_issue: XRP::new().into(),
-            issuing_chain_door: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            issuing_chain_door: GENESIS_ACCOUNT.into(),
             issuing_chain_issue: XRP::new().into(),
         }
     }
@@ -142,7 +152,7 @@ mod tests {
     #[test]
     fn test_constructor_round_trip() {
         let txn = XChainCommit::new(
-            "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo".into(),
+            XCHAIN_COMMIT_TEST_ACCOUNT.into(),
             None,
             Some(XRPAmount::from("10")),
             None,
@@ -170,7 +180,7 @@ mod tests {
     #[test]
     fn test_validate_currencies_ok() {
         let txn = XChainCommit::new(
-            "rMTi57fNy2UkUb4RcdoUeJm7gjxVQvxzUo".into(),
+            XCHAIN_COMMIT_TEST_ACCOUNT.into(),
             None,
             None,
             None,
@@ -185,5 +195,35 @@ mod tests {
             None,
         );
         assert!(txn.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_rejects_mpt_amount() {
+        let txn = XChainCommit {
+            common_fields: CommonFields::new(
+                XCHAIN_COMMIT_TEST_ACCOUNT.into(),
+                TransactionType::XChainCommit,
+                None,
+                None,
+                Some(FlagCollection::default()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            amount: Amount::MPTAmount(MPTAmount::new(
+                "100".into(),
+                crate::models::transactions::test_fixtures::MPT_ISSUANCE_ID.into(),
+            )),
+            xchain_bridge: xrp_bridge(),
+            xchain_claim_id: "1".into(),
+            other_chain_destination: None,
+        };
+        assert!(txn.get_errors().is_err());
     }
 }

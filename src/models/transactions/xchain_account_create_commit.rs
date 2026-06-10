@@ -26,7 +26,10 @@ pub struct XChainAccountCreateCommit<'a> {
 impl Model for XChainAccountCreateCommit<'_> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self.validate_currencies()?;
-
+        super::reject_mpt_amount("amount", &self.amount)?;
+        if let Some(signature_reward) = &self.signature_reward {
+            super::reject_mpt_amount("signature_reward", signature_reward)?;
+        }
         Ok(())
     }
 }
@@ -89,15 +92,19 @@ impl<'a> XChainAccountCreateCommit<'a> {
 #[cfg(test)]
 mod test {
     use super::XChainAccountCreateCommit;
-    use crate::models::{IssuedCurrency, XChainBridge, XRPAmount, XRP};
+    use crate::models::transactions::test_fixtures::{
+        GENESIS_ACCOUNT, LOCKING_CHAIN_DOOR_ACCOUNT, XCHAIN_ACCOUNT, XCHAIN_ACCOUNT_ALT,
+        XCHAIN_COMMIT_ACCOUNT, XCHAIN_COMMIT_DESTINATION, XCHAIN_ISSUER_ACCOUNT,
+    };
+    use crate::models::{IssuedCurrency, MPTAmount, XChainBridge, XRPAmount, XRP};
     use alloc::borrow::Cow;
 
     use super::*;
 
-    const ACCOUNT: &str = "r9LqNeG6qHxjeUocjvVki2XR35weJ9mZgQ";
-    const ACCOUNT2: &str = "rpZc4mVfWUif9CRoHRKKcmhu1nx2xktxBo";
-    const ISSUER: &str = "rGWrZyQqhTp9Xu7G5Pkayo7bXjH4k4QYpf";
-    const GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    const ACCOUNT: &str = XCHAIN_ACCOUNT;
+    const ACCOUNT2: &str = XCHAIN_ACCOUNT_ALT;
+    const ISSUER: &str = XCHAIN_ISSUER_ACCOUNT;
+    const GENESIS: &str = GENESIS_ACCOUNT;
 
     fn xrp_bridge<'a>() -> XChainBridge<'a> {
         XChainBridge {
@@ -127,24 +134,24 @@ mod test {
 
     #[test]
     fn test_deserialize() {
-        let json = r#"{
-                "Account": "rwEqJ2UaQHe7jihxGqmx6J4xdbGiiyMaGa",
-                "Destination": "rD323VyRjgzzhY4bFpo44rmyh2neB5d8Mo",
-                "TransactionType": "XChainAccountCreateCommit",
-                "Amount": "20000000",
-                "SignatureReward": "100",
-                "XChainBridge": {
-                    "LockingChainDoor": "rMAXACCrp3Y8PpswXcg3bKggHX76V3F8M4",
-                    "LockingChainIssue": {
-                        "currency": "XRP"
-                    },
-                    "IssuingChainDoor": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
-                    "IssuingChainIssue": {
-                        "currency": "XRP"
-                    }
+        let json = serde_json::json!({
+            "Account": XCHAIN_COMMIT_ACCOUNT,
+            "Destination": XCHAIN_COMMIT_DESTINATION,
+            "TransactionType": "XChainAccountCreateCommit",
+            "Amount": "20000000",
+            "SignatureReward": "100",
+            "XChainBridge": {
+                "LockingChainDoor": LOCKING_CHAIN_DOOR_ACCOUNT,
+                "LockingChainIssue": {
+                    "currency": "XRP"
+                },
+                "IssuingChainDoor": GENESIS_ACCOUNT,
+                "IssuingChainIssue": {
+                    "currency": "XRP"
                 }
-            }"#;
-        let txn: XChainAccountCreateCommit<'_> = serde_json::from_str(json).unwrap();
+            }
+        });
+        let txn: XChainAccountCreateCommit<'_> = serde_json::from_value(json).unwrap();
         assert_eq!(txn.amount, "20000000".into());
     }
 
@@ -213,5 +220,49 @@ mod test {
         );
 
         tx.validate().unwrap();
+    }
+
+    fn mpt_amount<'a>() -> Amount<'a> {
+        MPTAmount::new(
+            "100".into(),
+            crate::models::transactions::test_fixtures::MPT_ISSUANCE_ID.into(),
+        )
+        .into()
+    }
+
+    fn base_commit<'a>() -> XChainAccountCreateCommit<'a> {
+        XChainAccountCreateCommit {
+            common_fields: CommonFields::new(
+                Cow::Borrowed(ACCOUNT),
+                TransactionType::XChainAccountCreateCommit,
+                None,
+                None,
+                Some(FlagCollection::default()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+            amount: XRPAmount::from("1000000").into(),
+            destination: Cow::Borrowed(ACCOUNT2),
+            xchain_bridge: xrp_bridge(),
+            signature_reward: Some(XRPAmount::from("200").into()),
+        }
+    }
+
+    #[test]
+    fn test_rejects_mpt_amount_fields() {
+        let mut tx = base_commit();
+        tx.amount = mpt_amount();
+        assert!(tx.validate().is_err());
+
+        let mut tx = base_commit();
+        tx.signature_reward = Some(mpt_amount());
+        assert!(tx.validate().is_err());
     }
 }
