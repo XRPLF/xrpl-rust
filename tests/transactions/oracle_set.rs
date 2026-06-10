@@ -8,7 +8,9 @@
 // without submitting to a network.
 
 use crate::common::{
-    generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
+    constants::{ORACLE_ASSET_CLASS, ORACLE_PROVIDER, ORACLE_URI, TEST_ACCOUNT},
+    generate_funded_wallet, get_ledger_close_time, submit_tx, test_transaction,
+    with_blockchain_lock, SubmitOptions,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
@@ -22,16 +24,16 @@ use xrpl::models::Model;
 fn test_oracle_set_construction() {
     let oracle_set = OracleSet {
         common_fields: CommonFields {
-            account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+            account: TEST_ACCOUNT.into(),
             transaction_type: TransactionType::OracleSet,
             fee: Some("12".into()),
             sequence: Some(391),
             ..Default::default()
         },
         oracle_document_id: 1,
-        provider: Some("636861696E6C696E6B".into()),
-        uri: Some("68747470733A2F2F6578616D706C652E636F6D".into()),
-        asset_class: Some("63757272656E6379".into()),
+        provider: Some(ORACLE_PROVIDER.into()),
+        uri: Some(ORACLE_URI.into()),
+        asset_class: Some(ORACLE_ASSET_CLASS.into()),
         last_update_time: 743609014,
         price_data_series: vec![PriceData {
             base_asset: "EUR".into(),
@@ -66,9 +68,9 @@ async fn test_oracle_set_submit() {
             },
             oracle_document_id: 1234,
             // Provider is a Blob, so it must be hex-encoded ("chainlink").
-            provider: Some("636861696E6C696E6B".into()),
-            uri: Some("6469645F6578616D706C65".into()),
-            asset_class: Some("63757272656E6379".into()),
+            provider: Some(ORACLE_PROVIDER.into()),
+            uri: Some(ORACLE_URI.into()),
+            asset_class: Some(ORACLE_ASSET_CLASS.into()),
             last_update_time,
             price_data_series: vec![
                 PriceData {
@@ -118,8 +120,8 @@ async fn test_oracle_set_submit() {
         let oracle = &result.account_objects[0];
         assert_eq!(oracle["LedgerEntryType"], "Oracle");
         assert_eq!(oracle["Owner"], wallet.classic_address);
-        assert_eq!(oracle["Provider"], "636861696E6C696E6B");
-        assert_eq!(oracle["AssetClass"], "63757272656E6379");
+        assert_eq!(oracle["Provider"], ORACLE_PROVIDER);
+        assert_eq!(oracle["AssetClass"], ORACLE_ASSET_CLASS);
         assert_eq!(
             oracle["PriceDataSeries"][0]["PriceData"]["BaseAsset"],
             "XRP"
@@ -155,9 +157,9 @@ async fn test_oracle_set_update_and_delete_pair() {
                 ..Default::default()
             },
             oracle_document_id: 1234,
-            provider: Some("636861696E6C696E6B".into()),
-            uri: Some("6469645F6578616D706C65".into()),
-            asset_class: Some("63757272656E6379".into()),
+            provider: Some(ORACLE_PROVIDER.into()),
+            uri: Some(ORACLE_URI.into()),
+            asset_class: Some(ORACLE_ASSET_CLASS.into()),
             last_update_time,
             price_data_series: vec![
                 PriceData {
@@ -184,9 +186,9 @@ async fn test_oracle_set_update_and_delete_pair() {
                 ..Default::default()
             },
             oracle_document_id: 1234,
-            provider: Some("636861696E6C696E6B".into()),
-            uri: Some("6469645F6578616D706C65".into()),
-            asset_class: Some("63757272656E6379".into()),
+            provider: Some(ORACLE_PROVIDER.into()),
+            uri: Some(ORACLE_URI.into()),
+            asset_class: Some(ORACLE_ASSET_CLASS.into()),
             last_update_time: last_update_time + 10,
             price_data_series: vec![
                 // Update XRP/USD
