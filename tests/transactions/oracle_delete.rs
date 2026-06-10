@@ -44,7 +44,8 @@ async fn test_oracle_delete_submit() {
         let wallet = generate_funded_wallet().await;
         // OracleSet LastUpdateTime is POSIX/Unix time. The ledger response uses
         // Ripple epoch seconds, so convert before submitting.
-        let last_update_time = (get_ledger_close_time().await + 946_684_800) as u32;
+        let last_update_time = u32::try_from(get_ledger_close_time().await + 946_684_800)
+            .expect("LastUpdateTime overflows u32: ledger close time is too far in the future");
         let oracle_document_id = 2;
 
         let mut oracle_set = OracleSet {
@@ -108,6 +109,40 @@ async fn test_oracle_delete_submit() {
             result.account_objects.is_empty(),
             "Oracle object should be deleted"
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn test_oracle_delete_not_found() {
+    with_blockchain_lock(|| async {
+        let wallet = generate_funded_wallet().await;
+
+        let mut oracle_delete = OracleDelete {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::OracleDelete,
+                ..Default::default()
+            },
+            oracle_document_id: 999, // Does not exist
+        };
+
+        let engine_result = submit_tx(
+            &mut oracle_delete,
+            SubmitOptions {
+                wallet: &wallet,
+                autofill: true,
+                check_fee: true,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            engine_result,
+            "tecNO_ENTRY",
+            "Deleting a non-existent Oracle (doc_id=999) should return tecNO_ENTRY"
+        );
+        crate::common::ledger_accept().await;
     })
     .await;
 }

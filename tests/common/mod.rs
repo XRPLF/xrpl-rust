@@ -36,9 +36,12 @@ pub async fn open_websocket(
     use anyhow::anyhow;
 
     let port = uri.port().unwrap_or(80);
-    let url = format!("{}:{}", uri.host_str().unwrap(), port);
+    let host = uri.host_str().expect("open_websocket: URI has no host");
+    let url = format!("{host}:{port}");
 
-    let tcp = TcpStream::connect(&url).await.unwrap();
+    let tcp = TcpStream::connect(&url)
+        .await
+        .expect("open_websocket: TcpStream::connect failed");
     let stream = FromTokio::new(tcp);
     let rng = OsRng;
     match AsyncWebSocketClient::open(stream, uri, rng, None, None).await {
@@ -121,13 +124,19 @@ pub async fn generate_funded_wallet() -> Wallet {
 }
 
 /// Advance the ledger by one close.
+///
+/// Panics if the HTTP round-trip fails so test failures are surfaced
+/// immediately rather than silently proceeding with a stale ledger.
 #[cfg(feature = "std")]
 pub async fn ledger_accept() {
-    let _ = reqwest::Client::new()
+    reqwest::Client::new()
         .post(constants::STANDALONE_URL)
         .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
         .send()
-        .await;
+        .await
+        .expect("ledger_accept: HTTP request failed")
+        .error_for_status()
+        .expect("ledger_accept: server returned error status");
 }
 
 /// Return the `close_time` of the most-recent validated ledger in Ripple epoch seconds.
