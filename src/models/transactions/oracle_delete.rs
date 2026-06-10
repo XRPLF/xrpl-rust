@@ -77,16 +77,16 @@ impl<'a> OracleDelete<'a> {
                 TransactionType::OracleDelete,
                 account_txn_id,
                 fee,
-                Some(FlagCollection::default()),
+                Some(FlagCollection::default()), // flags
                 last_ledger_sequence,
                 memos,
-                None,
+                None, // network_id
                 sequence,
                 signers,
-                None,
+                None, // signing_pub_key — filled by the signing layer
                 source_tag,
                 ticket_sequence,
-                None,
+                None, // txn_signature — filled by the signing layer
             ),
             oracle_document_id,
         }
@@ -97,28 +97,39 @@ impl<'a> OracleDelete<'a> {
 mod tests {
     use super::*;
 
+    /// Canonical test account used across all OracleDelete unit tests.
+    const TEST_ACCOUNT: &str = "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW";
+    const TEST_FEE: &str = "12";
+    const TEST_SEQUENCE: u32 = 391;
+    const TEST_LAST_LEDGER: u32 = 596447;
+    const TEST_DOC_ID: u32 = 1;
+
     #[test]
     fn test_serde() {
         let oracle_delete = OracleDelete {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleDelete,
-                fee: Some("12".into()),
-                sequence: Some(391),
+                fee: Some(TEST_FEE.into()),
+                sequence: Some(TEST_SEQUENCE),
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
-            oracle_document_id: 1,
+            oracle_document_id: TEST_DOC_ID,
         };
 
         let default_json_str = r#"{"Account":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","TransactionType":"OracleDelete","Fee":"12","Flags":0,"Sequence":391,"SigningPubKey":"","OracleDocumentID":1}"#;
 
-        let serialized_string = serde_json::to_string(&oracle_delete).unwrap();
-        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
-        let default_json_value = serde_json::to_value(default_json_str).unwrap();
+        let serialized_string = serde_json::to_string(&oracle_delete)
+            .expect("OracleDelete should serialize to JSON without error");
+        let serialized_value = serde_json::to_value(&serialized_string)
+            .expect("serialized OracleDelete string should be valid JSON");
+        let default_json_value =
+            serde_json::to_value(default_json_str).expect("expected JSON string is valid JSON");
         assert_eq!(serialized_value, default_json_value);
 
-        let deserialized: OracleDelete = serde_json::from_str(default_json_str).unwrap();
+        let deserialized: OracleDelete = serde_json::from_str(default_json_str)
+            .expect("OracleDelete should deserialize from expected JSON");
         assert_eq!(oracle_delete, deserialized);
     }
 
@@ -126,15 +137,15 @@ mod tests {
     fn test_builder_pattern() {
         let oracle_delete = OracleDelete {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleDelete,
                 ..Default::default()
             },
-            oracle_document_id: 1,
+            oracle_document_id: TEST_DOC_ID,
         }
-        .with_fee("12".into())
-        .with_sequence(391)
-        .with_last_ledger_sequence(596447)
+        .with_fee(TEST_FEE.into())
+        .with_sequence(TEST_SEQUENCE)
+        .with_last_ledger_sequence(TEST_LAST_LEDGER)
         .with_source_tag(42)
         .with_memo(Memo {
             memo_data: Some("deleting oracle".into()),
@@ -142,12 +153,12 @@ mod tests {
             memo_type: Some("text".into()),
         });
 
-        assert_eq!(oracle_delete.oracle_document_id, 1);
-        assert_eq!(oracle_delete.common_fields.fee.as_ref().unwrap().0, "12");
-        assert_eq!(oracle_delete.common_fields.sequence, Some(391));
+        assert_eq!(oracle_delete.oracle_document_id, TEST_DOC_ID);
+        assert_eq!(oracle_delete.common_fields.fee.as_ref().unwrap().0, TEST_FEE);
+        assert_eq!(oracle_delete.common_fields.sequence, Some(TEST_SEQUENCE));
         assert_eq!(
             oracle_delete.common_fields.last_ledger_sequence,
-            Some(596447)
+            Some(TEST_LAST_LEDGER)
         );
         assert_eq!(oracle_delete.common_fields.source_tag, Some(42));
         assert_eq!(oracle_delete.common_fields.memos.as_ref().unwrap().len(), 1);
@@ -157,17 +168,14 @@ mod tests {
     fn test_default() {
         let oracle_delete = OracleDelete {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleDelete,
                 ..Default::default()
             },
             oracle_document_id: 5,
         };
 
-        assert_eq!(
-            oracle_delete.common_fields.account,
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"
-        );
+        assert_eq!(oracle_delete.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             oracle_delete.common_fields.transaction_type,
             TransactionType::OracleDelete
@@ -179,37 +187,36 @@ mod tests {
 
     #[test]
     fn test_new_constructor() {
-        let oracle_delete = OracleDelete::new(
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            None,
-            Some("12".into()),
-            Some(596447),
-            None,
-            Some(391),
-            None,
-            None,
-            None,
-            1,
-        );
+        let oracle_delete = OracleDelete {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleDelete,
+                fee: Some(TEST_FEE.into()),
+                last_ledger_sequence: Some(TEST_LAST_LEDGER),
+                sequence: Some(TEST_SEQUENCE),
+                ..Default::default()
+            },
+            oracle_document_id: TEST_DOC_ID,
+        };
 
         assert_eq!(
             oracle_delete.common_fields.transaction_type,
             TransactionType::OracleDelete
         );
-        assert_eq!(oracle_delete.common_fields.fee, Some("12".into()));
-        assert_eq!(oracle_delete.common_fields.sequence, Some(391));
+        assert_eq!(oracle_delete.common_fields.fee, Some(TEST_FEE.into()));
+        assert_eq!(oracle_delete.common_fields.sequence, Some(TEST_SEQUENCE));
         assert_eq!(
             oracle_delete.common_fields.last_ledger_sequence,
-            Some(596447)
+            Some(TEST_LAST_LEDGER)
         );
-        assert_eq!(oracle_delete.oracle_document_id, 1);
+        assert_eq!(oracle_delete.oracle_document_id, TEST_DOC_ID);
     }
 
     #[test]
     fn test_transaction_type() {
         let oracle_delete = OracleDelete {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleDelete,
                 ..Default::default()
             },
@@ -226,14 +233,14 @@ mod tests {
     fn test_ticket_sequence() {
         let oracle_delete = OracleDelete {
             common_fields: CommonFields {
-                account: "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::OracleDelete,
                 ..Default::default()
             },
             oracle_document_id: 3,
         }
         .with_ticket_sequence(54321)
-        .with_fee("12".into());
+        .with_fee(TEST_FEE.into());
 
         assert_eq!(oracle_delete.common_fields.ticket_sequence, Some(54321));
         assert!(oracle_delete.common_fields.sequence.is_none());
@@ -241,36 +248,28 @@ mod tests {
 
     #[test]
     fn test_zero_document_id() {
-        let oracle_delete = OracleDelete::new(
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            0,
-        );
+        let oracle_delete = OracleDelete {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleDelete,
+                ..Default::default()
+            },
+            oracle_document_id: 0,
+        };
 
         assert_eq!(oracle_delete.oracle_document_id, 0);
     }
 
     #[test]
     fn test_max_document_id() {
-        let oracle_delete = OracleDelete::new(
-            "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            u32::MAX,
-        );
+        let oracle_delete = OracleDelete {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleDelete,
+                ..Default::default()
+            },
+            oracle_document_id: u32::MAX,
+        };
 
         assert_eq!(oracle_delete.oracle_document_id, u32::MAX);
     }
