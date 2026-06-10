@@ -43,3 +43,20 @@ impl<'a> NftSellOffers<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = NftSellOffers::new(
+            Some("nso-1".into()),
+            "00080000B4F4AFC5FBCBD76873F18006173D2193467D3EE70000099B00000000".into(),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: NftSellOffers = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"nft_sell_offers\""));
+    }
+}

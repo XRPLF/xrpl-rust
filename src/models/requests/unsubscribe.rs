@@ -94,3 +94,44 @@ impl<'a> Unsubscribe<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::currency::{IssuedCurrency, XRP};
+    use alloc::vec;
+
+    #[test]
+    fn test_serde_round_trip_no_books() {
+        // UnsubscribeBook uses asymmetric serialize/deserialize naming
+        // (PascalCase vs snake_case), so a full round-trip with books does
+        // not work. Round-trip the request without books.
+        let req = Unsubscribe::new(
+            Some("uns-1".into()),
+            Some(vec!["rAcc1111111111111111111111111111".into()]),
+            None,
+            None,
+            None,
+            Some(vec![StreamParameter::Ledger]),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: Unsubscribe = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"unsubscribe\""));
+    }
+
+    #[test]
+    fn test_unsubscribe_book_serializes() {
+        let book = UnsubscribeBook::new(
+            Currency::XRP(XRP::new()),
+            Currency::IssuedCurrency(IssuedCurrency::new(
+                "USD".into(),
+                "rIssuer11111111111111111111111111".into(),
+            )),
+            Some(true),
+        );
+        let serialized = serde_json::to_string(&book).unwrap();
+        assert!(serialized.contains("\"TakerGets\""));
+        assert!(serialized.contains("\"TakerPays\""));
+    }
+}

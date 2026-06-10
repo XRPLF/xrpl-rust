@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/checkCreate.test.ts
-//
 // Scenarios:
 //   - base: create a Check for 50 drops and verify one check object exists on the ledger
 

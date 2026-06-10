@@ -289,4 +289,33 @@ mod tests {
         // When using tickets, sequence should be 0
         assert!(payment_channel_fund.common_fields.sequence.is_none());
     }
+
+    #[test]
+    fn test_new_constructor_and_trait_impls() {
+        let txn = PaymentChannelFund::new(
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            Some("12".into()),
+            Some(8_000_000),
+            None,
+            Some(123),
+            None,
+            None,
+            None,
+            XRPAmount::from("500000"),
+            "C1AE6DDDEEC05CF2978C0BAD6FE302948E9533691DC749DCDD3B9E5992CA6198".into(),
+            Some(543171558),
+        );
+        assert_eq!(
+            txn.get_transaction_type(),
+            &TransactionType::PaymentChannelFund
+        );
+        assert_eq!(txn.get_common_fields().sequence, Some(123));
+        assert_eq!(txn.amount.0, "500000");
+        assert_eq!(txn.expiration, Some(543171558));
+        assert!(txn.get_errors().is_ok());
+        let mut t = txn;
+        t.common_fields.source_tag = Some(11);
+        assert_eq!(t.common_fields.source_tag, Some(11));
+    }
 }
