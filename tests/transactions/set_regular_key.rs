@@ -1,5 +1,3 @@
-// xrpl.js reference: no dedicated test file in xrpl.js integration suite.
-//
 // Scenarios:
 //   - base: assign a regular key to a wallet
 //   - remove: remove the regular key from a wallet (regular_key = None)

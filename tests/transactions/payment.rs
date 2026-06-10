@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/payment.test.ts
-//
 // Scenarios:
 //   - base: XRP payment to a new (unfunded) address
 

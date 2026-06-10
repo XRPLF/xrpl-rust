@@ -68,3 +68,25 @@ impl<'a> LedgerData<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = LedgerData::new(
+            Some("ld-1".into()),
+            Some(true),
+            None,
+            Some(LedgerIndex::Int(42)),
+            Some(75),
+            Some(Marker::Int(7)),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerData = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"ledger_data\""));
+        assert!(serialized.contains("\"binary\":true"));
+    }
+}

@@ -320,15 +320,15 @@ mod tests {
 
     use crate::models::amount::{Amount, IssuedCurrencyAmount, XRPAmount};
     use crate::models::{Model, PathStep};
+    #[cfg(feature = "wallet")]
     use crate::{
-        asynch::{exceptions::XRPLHelperResult, transaction::sign},
-        models::transactions::Transaction,
+        asynch::exceptions::XRPLHelperResult, models::transactions::Transaction, signing::sign,
         wallet::Wallet,
     };
 
     use super::*;
 
-    #[cfg(all(feature = "helpers", feature = "wallet"))]
+    #[cfg(feature = "wallet")]
     #[test]
     fn test_payment_sign_with_memo() -> XRPLHelperResult<()> {
         let mut payment = Payment {
