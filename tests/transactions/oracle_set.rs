@@ -28,14 +28,14 @@ fn test_oracle_set_construction() {
             ..Default::default()
         },
         oracle_document_id: 1,
-        provider: Some("chainlink".into()),
-        uri: Some("https://example.com/oracle".into()),
+        provider: Some("636861696E6C696E6B".into()),
+        uri: Some("68747470733A2F2F6578616D706C652E636F6D".into()),
         asset_class: Some("63757272656E6379".into()),
         last_update_time: 743609014,
         price_data_series: vec![PriceData {
             base_asset: "EUR".into(),
             quote_asset: "USD".into(),
-            asset_price: Some("740".into()),
+            asset_price: Some("2E4".into()),
             scale: Some(1),
         }],
     };
@@ -56,46 +56,55 @@ async fn test_oracle_set_submit() {
         // Ripple epoch seconds, so convert before submitting.
         let last_update_time = (get_ledger_close_time().await + 946_684_800) as u32;
 
-        let mut oracle_set = OracleSet::new(
-            wallet.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            1,
+        let mut oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            oracle_document_id: 1234,
             // Provider is a Blob, so it must be hex-encoded ("chainlink").
-            Some("636861696E6C696E6B".into()),
-            Some("68747470733A2F2F6578616D706C652E636F6D".into()),
-            Some("63757272656E6379".into()),
+            provider: Some("636861696E6C696E6B".into()),
+            uri: Some("6469645F6578616D706C65".into()),
+            asset_class: Some("63757272656E6379".into()),
             last_update_time,
-            vec![PriceData {
-                base_asset: "XRP".into(),
-                quote_asset: "USD".into(),
-                // AssetPrice is a UInt64 hex string in XRPL binary JSON: 0x2E4 == 740.
-                asset_price: Some("2E4".into()),
-                scale: Some(1),
-            }],
-        );
+            price_data_series: vec![
+                PriceData {
+                    base_asset: "XRP".into(),
+                    quote_asset: "USD".into(),
+                    // AssetPrice is a UInt64 hex string in XRPL binary JSON: 0x2E4 == 740.
+                    asset_price: Some("2E4".into()),
+                    scale: Some(3),
+                },
+                PriceData {
+                    base_asset: "XRP".into(),
+                    quote_asset: "INR".into(),
+                    asset_price: Some("7FFFFFFFFFFFFFFF".into()),
+                    scale: Some(3),
+                },
+            ],
+        };
 
         test_transaction(&mut oracle_set, &wallet).await;
 
         let client = crate::common::get_client().await;
         let response = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    Some(LedgerIndex::Str("validated".into())),
-                    Some(AccountObjectType::Oracle),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: Some(xrpl::models::requests::LookupByLedgerRequest {
+                        ledger_hash: None,
+                        ledger_index: Some(LedgerIndex::Str("validated".into())),
+                    }),
+                    r#type: Some(AccountObjectType::Oracle),
+                    common_fields: xrpl::models::requests::CommonFields {
+                        command: xrpl::models::requests::RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await
@@ -121,7 +130,11 @@ async fn test_oracle_set_submit() {
             oracle["PriceDataSeries"][0]["PriceData"]["AssetPrice"],
             "2e4"
         );
-        assert_eq!(oracle["PriceDataSeries"][0]["PriceData"]["Scale"], 1);
+        assert_eq!(oracle["PriceDataSeries"][0]["PriceData"]["Scale"], 3);
+        assert_eq!(
+            oracle["PriceDataSeries"][1]["PriceData"]["AssetPrice"],
+            "7fffffffffffffff"
+        );
     })
     .await;
 }
