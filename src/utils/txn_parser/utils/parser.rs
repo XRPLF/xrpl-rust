@@ -66,3 +66,97 @@ pub fn group_offers_by_account(
 
     account_object_groups
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::transactions::offer_create::OfferCreateFlag;
+    use crate::models::XRPAmount;
+    use crate::models::{Amount, FlagCollection};
+    use crate::utils::txn_parser::utils::{OfferChange, OfferStatus};
+    use alloc::string::ToString;
+    use alloc::vec;
+
+    fn balance(account: &'static str, value: &'static str) -> AccountBalance<'static> {
+        AccountBalance {
+            account: account.into(),
+            balance: Balance {
+                currency: "XRP".into(),
+                value: value.into(),
+                issuer: None,
+            },
+        }
+    }
+
+    fn offer_change(account: &'static str, sequence: u32) -> AccountOfferChange<'static> {
+        AccountOfferChange {
+            maker_account: account.into(),
+            offer_change: OfferChange {
+                flags: FlagCollection::<OfferCreateFlag>::default(),
+                taker_gets: Amount::XRPAmount(XRPAmount::from("100")),
+                taker_pays: Amount::XRPAmount(XRPAmount::from("200")),
+                sequence,
+                status: OfferStatus::Created,
+                maker_exchange_rate: None,
+                expiration_time: None,
+            },
+        }
+    }
+
+    #[test]
+    fn test_get_value_parses_decimal() {
+        let bal = Balance {
+            currency: "XRP".into(),
+            value: "123.456".into(),
+            issuer: None,
+        };
+        let v = get_value(&bal).unwrap();
+        assert_eq!(v.to_string(), "123.456");
+    }
+
+    #[test]
+    fn test_get_value_invalid_returns_err() {
+        let bal = Balance {
+            currency: "XRP".into(),
+            value: "not-a-number".into(),
+            issuer: None,
+        };
+        assert!(get_value(&bal).is_err());
+    }
+
+    #[test]
+    fn test_group_balances_by_account_groups_same_account() {
+        let balances = vec![balance("rA", "1"), balance("rB", "2"), balance("rA", "3")];
+        let groups = group_balances_by_account(balances);
+        assert_eq!(groups.len(), 2);
+        let group_a = groups.iter().find(|g| g.account == "rA").unwrap();
+        assert_eq!(group_a.account_balances.len(), 2);
+        let group_b = groups.iter().find(|g| g.account == "rB").unwrap();
+        assert_eq!(group_b.account_balances.len(), 1);
+    }
+
+    #[test]
+    fn test_group_balances_by_account_empty() {
+        let groups = group_balances_by_account(vec![]);
+        assert!(groups.is_empty());
+    }
+
+    #[test]
+    fn test_group_offers_by_account_groups_same_account() {
+        let offers = vec![
+            offer_change("rA", 1),
+            offer_change("rB", 2),
+            offer_change("rA", 3),
+        ];
+        let groups = group_offers_by_account(offers);
+        assert_eq!(groups.len(), 2);
+        let group_a = groups.iter().find(|g| g.account == "rA").unwrap();
+        assert_eq!(group_a.account_offer_changes.len(), 2);
+    }
+
+    #[test]
+    fn test_group_offers_by_account_empty() {
+        let groups = group_offers_by_account(vec![]);
+        assert!(groups.is_empty());
+    }
+}

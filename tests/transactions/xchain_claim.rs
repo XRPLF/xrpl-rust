@@ -1,12 +1,10 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/xchainClaim.test.ts
-//
 // Scenarios:
 //   - base: full cross-chain claim flow:
 //       1. XChainCreateClaimID  — destination reserves claim ID 1, paying signature_reward
 //       2. XChainAddClaimAttestation — witness attests to a 10 XRP transfer (NO Destination)
 //       3. XChainClaim          — destination explicitly claims the 10 XRP
 //
-// The attestation does NOT include `Destination` — matching the xrpl.js test exactly.
+// The attestation does NOT include `Destination`.
 // When no Destination is in the attestation, rippled does NOT auto-deliver on quorum;
 // the claimant must submit XChainClaim to specify the destination.
 //
@@ -27,7 +25,7 @@ use xrpl::models::transactions::xchain_create_claim_id::XChainCreateClaimID;
 use xrpl::models::{Amount, Currency, XChainBridge, XRPAmount, XRP};
 use xrpl::wallet::Wallet;
 
-/// Attestation payload for XChainAddClaimAttestation (no Destination — mirrors xrpl.js).
+/// Attestation payload for XChainAddClaimAttestation (no Destination).
 #[derive(Serialize)]
 struct ClaimAttestation<'a> {
     #[serde(rename = "XChainBridge")]
@@ -79,7 +77,7 @@ async fn test_xchain_claim_base() {
 
         ledger_accept().await;
 
-        // Step 2: Build + sign attestation payload (NO Destination — matches xrpl.js)
+        // Step 2: Build + sign attestation payload (NO Destination)
         let attestation = ClaimAttestation {
             xchain_bridge: XChainBridge {
                 issuing_chain_door: crate::common::constants::GENESIS_ACCOUNT.into(),

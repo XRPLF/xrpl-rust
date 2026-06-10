@@ -1,8 +1,3 @@
-use thiserror_no_std::Error;
-
-#[derive(Debug, PartialEq, Error)]
-#[non_exhaustive]
-pub enum XRPLMultisignException {
-    #[error("No signers set in the transaction. Use `sign` function with `multisign = true`.")]
-    NoSigners,
-}
+// Re-exported for backward compatibility. The canonical location is
+// `crate::signing::exceptions`.
+pub use crate::signing::exceptions::XRPLMultisignException;

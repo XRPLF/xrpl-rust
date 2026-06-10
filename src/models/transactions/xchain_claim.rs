@@ -121,7 +121,7 @@ mod test_sign {
             transactions::xchain_claim::XChainClaim, IssuedCurrency, IssuedCurrencyAmount,
             XChainBridge, XRP,
         },
-        transaction::sign,
+        signing::sign,
         wallet::Wallet,
     };
 

@@ -1,5 +1,3 @@
-// xrpl.js reference: no dedicated test file in xrpl.js integration suite.
-//
 // Scenarios:
 //   - base: create 2 tickets and verify both ticket objects appear in account_objects
 
