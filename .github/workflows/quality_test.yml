@@ -1,13 +1,13 @@
 on:
   push:
     branches:
-      - dev
+      - main
   pull_request:
     branches:
       - main
       - dev
   schedule:
-    - cron: '0 0 * * *'
+    - cron: "0 0 * * *"
 
 name: Quality Check
 

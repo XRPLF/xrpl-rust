@@ -14,7 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- New `xrpl::signing` module containing the pure-crypto signing helpers (`sign`, `multisign`, `prepare_transaction`) extracted from `asynch::transaction` and `transaction`. Available with just `core + models + wallet` features (no `helpers`/runtime/client dependency). The legacy paths `asynch::transaction::sign` and `transaction::multisign` are preserved as re-exports for backward compatibility.
+- Expanded unit-test coverage and raised CI thresholds: lines `73 → 83`, regions `75 → 85`, functions `67 → 73`.
+- Codecov integration with per-PR project (≥83%) and patch (≥80% on new/modified lines) gates.
+- Integration-test coverage gate: a CI workflow runs all five integration test binaries under `cargo-llvm-cov`, uploads to codecov under an `integration` flag, and gates the project at ≥65%.
+
+### Changed
+
+- Unit-test and integration-test coverage are now scoped via Cargo feature flags rather than path regex. The unit-test workflow builds with `--no-default-features --features std,core,utils,wallet,models`, so integration-territory code (CLI, async clients, sync wrappers, faucet) simply isn't compiled and doesn't appear in the unit coverage report.
+- Network-dependent inline tests in `src/asynch/transaction/` and `src/asynch/wallet/` (`test_autofill_txn`, `test_autofill_and_sign`, `test_submit_and_wait`, `test_generate_faucet_wallet`) are now gated behind `feature = "integration"` so `cargo test --release` is hermetic by default.
+- Codecov **patch** coverage is now gated per flag (separate `unit` and `integration` sections) rather than a single combined gate.
+
 ### Fixed
+
+- `RipplePathFind::destination_amount` changed from `Currency<'a>` to `Amount<'a>` to match the XRPL wire format.
+- `NoRippleCheckRole` no longer serializes with the `#[serde(tag = "role")]` discriminator; now emits a plain `snake_case` string matching the XRPL wire format.
+- `is_success()` now reports success correctly for responses deserialized into typed `XRPLResult` variants (e.g. `ServerInfo`); it consults the preserved raw result JSON instead of the re-serialized typed value.
+- `get_latest_open_ledger_sequence` now uses the `ledger_current` request; it previously sent `ledger { ledger_index: "open" }`, which rippled rejects with `invalidParams`.
 
 ## [[v1.1.0]]
 

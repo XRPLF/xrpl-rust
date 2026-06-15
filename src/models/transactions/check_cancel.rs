@@ -189,4 +189,31 @@ mod tests {
             "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0"
         );
     }
+
+    #[test]
+    fn test_new_constructor_and_trait_impls() {
+        let txn = CheckCancel::new(
+            "rUn84CUYbNjRoTQ6mSW7BVJPSVJNLb1QLo".into(),
+            None,
+            Some("12".into()),
+            Some(7_000_000),
+            None,
+            Some(123),
+            None,
+            Some(99),
+            None,
+            "49647F0D748DC3FE26BDACBC57F251AADEFFF391403EC9BF87C97F67E9977FB0".into(),
+        );
+        assert_eq!(txn.get_transaction_type(), &TransactionType::CheckCancel);
+        assert_eq!(txn.get_common_fields().sequence, Some(123));
+        assert_eq!(
+            txn.get_common_fields().last_ledger_sequence,
+            Some(7_000_000)
+        );
+        assert!(txn.get_errors().is_ok());
+
+        let mut txn = txn;
+        txn.common_fields.source_tag = Some(42);
+        assert_eq!(txn.common_fields.source_tag, Some(42));
+    }
 }
