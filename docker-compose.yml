@@ -4,7 +4,7 @@ services:
   xrpld:
     image: rippleci/xrpld:develop
     volumes:
-      - ./.ci-config:/etc/opt/xrpld
+      - ./.ci-config:/etc/xrpld
     ports:
       - "5005:5005"
       - "6006:6006"

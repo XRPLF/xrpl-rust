@@ -1,12 +1,10 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/accountDelete.test.ts
-//
 // Scenarios:
 //   - base: submit AccountDelete and expect tecTOO_SOON
 //
 // NOTE: AccountDelete requires the account's sequence number to be at least 256 lower than the
 // current ledger index. A freshly funded account never satisfies this condition on testnet, so
-// this test asserts tecTOO_SOON rather than tesSUCCESS (matching xrpl.js behavior — it only
-// verifies the transaction is accepted by the node, not that the deletion succeeds).
+// this test asserts tecTOO_SOON rather than tesSUCCESS (it only verifies the transaction is
+// accepted by the node, not that the deletion succeeds).
 //
 // On Docker standalone mode, call ledger_accept() 256 times before submitting to satisfy the
 // condition and assert tesSUCCESS instead.

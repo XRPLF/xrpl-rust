@@ -198,4 +198,27 @@ mod tests {
         assert_eq!(ticket_create.common_fields.fee.as_ref().unwrap().0, "10");
         assert_eq!(ticket_create.common_fields.sequence, Some(381));
     }
+
+    #[test]
+    fn test_new_constructor_and_trait_impls() {
+        let txn = TicketCreate::new(
+            "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+            None,
+            Some("10".into()),
+            Some(8_000_000),
+            None,
+            Some(381),
+            None,
+            None,
+            None,
+            5,
+        );
+        assert_eq!(txn.get_transaction_type(), &TransactionType::TicketCreate);
+        assert_eq!(txn.get_common_fields().sequence, Some(381));
+        assert_eq!(txn.ticket_count, 5);
+        assert!(txn.get_errors().is_ok());
+        let mut t = txn;
+        t.common_fields.source_tag = Some(11);
+        assert_eq!(t.common_fields.source_tag, Some(11));
+    }
 }

@@ -1,46 +1,15 @@
-use core::fmt::Debug;
-
-use alloc::vec::Vec;
-use serde::Serialize;
-use strum::IntoEnumIterator;
-
-use crate::{
-    asynch::exceptions::XRPLHelperResult, core::addresscodec::decode_classic_address,
-    models::transactions::Transaction, transaction::exceptions::XRPLMultisignException,
-};
-
-pub fn multisign<'a, T, F>(transaction: &mut T, tx_list: &'a Vec<T>) -> XRPLHelperResult<()>
-where
-    F: IntoEnumIterator + Serialize + Debug + PartialEq + 'a,
-    T: Transaction<'a, F>,
-{
-    let mut decoded_tx_signers = Vec::new();
-    for tx in tx_list {
-        let tx_signers = match tx.get_common_fields().signers.as_ref() {
-            Some(signers) => signers,
-            None => return Err(XRPLMultisignException::NoSigners.into()),
-        };
-        let tx_signer = match tx_signers.first() {
-            Some(signer) => signer,
-            None => return Err(XRPLMultisignException::NoSigners.into()),
-        };
-        decoded_tx_signers.push(tx_signer.clone());
-    }
-    decoded_tx_signers
-        .sort_by_key(|signer| decode_classic_address(signer.account.as_ref()).unwrap());
-    transaction.get_mut_common_fields().signers = Some(decoded_tx_signers);
-    transaction.get_mut_common_fields().signing_pub_key = Some("".into());
-
-    Ok(())
-}
+// `multisign` now lives in `crate::signing`. Re-exported here for backward
+// compatibility.
+pub use crate::signing::multisign;
 
 #[cfg(test)]
 mod test {
     use alloc::borrow::Cow;
 
-    use super::*;
     use crate::asynch::transaction::sign;
     use crate::models::transactions::account_set::AccountSet;
+    use crate::models::transactions::Transaction;
+    use crate::signing::multisign;
     use crate::wallet::Wallet;
 
     #[tokio::test]

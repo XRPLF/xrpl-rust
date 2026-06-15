@@ -124,3 +124,32 @@ impl<'a> PathFind<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::currency::XRP;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = PathFind::new(
+            Some("pf-1".into()),
+            "rDest11111111111111111111111111111".into(),
+            Currency::XRP(XRP::new()),
+            "rSrc111111111111111111111111111111".into(),
+            PathFindSubcommand::Create,
+            None,
+            Some(Currency::XRP(XRP::new())),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: PathFind = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"path_find\""));
+        assert!(serialized.contains("\"subcommand\":\"create\""));
+    }
+
+    #[test]
+    fn test_subcommand_default() {
+        assert_eq!(PathFindSubcommand::default(), PathFindSubcommand::Create);
+    }
+}
