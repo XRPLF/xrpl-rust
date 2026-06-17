@@ -518,258 +518,20 @@ pub enum ResponseType {
 
 /// Structured XRPL RPC error codes returned by xrpld/Clio.
 ///
-/// Numeric values mirror xrpld's stable `ErrorCodeI` values. Use this enum
-/// instead of matching response `error` strings such as `"txnNotFound"`.
+/// Only codes consumed by library logic are defined here. Extend as needed
+/// rather than mirroring the full xrpld error list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(i32)]
 #[non_exhaustive]
 pub enum XRPLRpcError {
-    Unknown = -1,
-    BadSyntax = 1,
-    JsonRpc = 2,
-    Forbidden = 3,
-    WrongNetwork = 4,
-    NoPermission = 6,
-    NoEvents = 7,
-    TooBusy = 9,
-    SlowDown = 10,
-    HighFee = 11,
-    NotEnabled = 12,
-    NotReady = 13,
-    AmendmentBlocked = 14,
-    NoClosed = 15,
-    NoCurrent = 16,
-    NoNetwork = 17,
-    NotSynced = 18,
-    ActNotFound = 19,
-    LgrNotFound = 21,
-    LgrNotValidated = 22,
-    MasterDisabled = 23,
-    TxnNotFound = 29,
-    InvalidHotwallet = 30,
-    InvalidParams = 31,
-    UnknownCommand = 32,
-    NoPathRequest = 33,
-    ActMalformed = 35,
-    AlreadyMultisig = 36,
-    AlreadySingleSig = 37,
-    BadFeature = 40,
-    BadIssuer = 41,
-    BadMarket = 42,
-    BadSecret = 43,
-    BadSeed = 44,
-    ChannelMalformed = 45,
-    ChannelAmtMalformed = 46,
-    CommandMissing = 47,
-    DstActMalformed = 48,
-    DstActMissing = 49,
-    DstActNotFound = 50,
-    DstAmtMalformed = 51,
-    DstAmtMissing = 52,
-    DstIsrMalformed = 53,
-    LgrIdxsInvalid = 57,
-    LgrIdxMalformed = 58,
-    PublicMalformed = 62,
-    SigningMalformed = 63,
-    SendmaxMalformed = 64,
-    SrcActMalformed = 65,
-    SrcActMissing = 66,
-    SrcActNotFound = 67,
-    DelegateActNotFound = 68,
-    SrcCurMalformed = 69,
-    SrcIsrMalformed = 70,
-    StreamMalformed = 71,
-    AtxDeprecated = 72,
-    Internal = 73,
-    NotImpl = 74,
-    NotSupported = 75,
-    BadKeyType = 76,
-    DbDeserialization = 77,
-    ExcessiveLgrRange = 78,
-    InvalidLgrRange = 79,
-    ExpiredValidatorList = 80,
-    ReportingUnsupported = 91,
-    ObjectNotFound = 92,
-    IssueMalformed = 93,
-    OracleMalformed = 94,
-    BadCredentials = 95,
-    TxSigned = 96,
-    DomainMalformed = 97,
-    EntryNotFound = 98,
-    UnexpectedLedgerType = 99,
-}
-
-impl TryFrom<i32> for XRPLRpcError {
-    type Error = ();
-
-    fn try_from(code: i32) -> Result<Self, Self::Error> {
-        Ok(match code {
-            -1 => XRPLRpcError::Unknown,
-            1 => XRPLRpcError::BadSyntax,
-            2 => XRPLRpcError::JsonRpc,
-            3 => XRPLRpcError::Forbidden,
-            4 => XRPLRpcError::WrongNetwork,
-            6 => XRPLRpcError::NoPermission,
-            7 => XRPLRpcError::NoEvents,
-            9 => XRPLRpcError::TooBusy,
-            10 => XRPLRpcError::SlowDown,
-            11 => XRPLRpcError::HighFee,
-            12 => XRPLRpcError::NotEnabled,
-            13 => XRPLRpcError::NotReady,
-            14 => XRPLRpcError::AmendmentBlocked,
-            15 => XRPLRpcError::NoClosed,
-            16 => XRPLRpcError::NoCurrent,
-            17 => XRPLRpcError::NoNetwork,
-            18 => XRPLRpcError::NotSynced,
-            19 => XRPLRpcError::ActNotFound,
-            21 => XRPLRpcError::LgrNotFound,
-            22 => XRPLRpcError::LgrNotValidated,
-            23 => XRPLRpcError::MasterDisabled,
-            29 => XRPLRpcError::TxnNotFound,
-            30 => XRPLRpcError::InvalidHotwallet,
-            31 => XRPLRpcError::InvalidParams,
-            32 => XRPLRpcError::UnknownCommand,
-            33 => XRPLRpcError::NoPathRequest,
-            35 => XRPLRpcError::ActMalformed,
-            36 => XRPLRpcError::AlreadyMultisig,
-            37 => XRPLRpcError::AlreadySingleSig,
-            40 => XRPLRpcError::BadFeature,
-            41 => XRPLRpcError::BadIssuer,
-            42 => XRPLRpcError::BadMarket,
-            43 => XRPLRpcError::BadSecret,
-            44 => XRPLRpcError::BadSeed,
-            45 => XRPLRpcError::ChannelMalformed,
-            46 => XRPLRpcError::ChannelAmtMalformed,
-            47 => XRPLRpcError::CommandMissing,
-            48 => XRPLRpcError::DstActMalformed,
-            49 => XRPLRpcError::DstActMissing,
-            50 => XRPLRpcError::DstActNotFound,
-            51 => XRPLRpcError::DstAmtMalformed,
-            52 => XRPLRpcError::DstAmtMissing,
-            53 => XRPLRpcError::DstIsrMalformed,
-            57 => XRPLRpcError::LgrIdxsInvalid,
-            58 => XRPLRpcError::LgrIdxMalformed,
-            62 => XRPLRpcError::PublicMalformed,
-            63 => XRPLRpcError::SigningMalformed,
-            64 => XRPLRpcError::SendmaxMalformed,
-            65 => XRPLRpcError::SrcActMalformed,
-            66 => XRPLRpcError::SrcActMissing,
-            67 => XRPLRpcError::SrcActNotFound,
-            68 => XRPLRpcError::DelegateActNotFound,
-            69 => XRPLRpcError::SrcCurMalformed,
-            70 => XRPLRpcError::SrcIsrMalformed,
-            71 => XRPLRpcError::StreamMalformed,
-            72 => XRPLRpcError::AtxDeprecated,
-            73 => XRPLRpcError::Internal,
-            74 => XRPLRpcError::NotImpl,
-            75 => XRPLRpcError::NotSupported,
-            76 => XRPLRpcError::BadKeyType,
-            77 => XRPLRpcError::DbDeserialization,
-            78 => XRPLRpcError::ExcessiveLgrRange,
-            79 => XRPLRpcError::InvalidLgrRange,
-            80 => XRPLRpcError::ExpiredValidatorList,
-            91 => XRPLRpcError::ReportingUnsupported,
-            92 => XRPLRpcError::ObjectNotFound,
-            93 => XRPLRpcError::IssueMalformed,
-            94 => XRPLRpcError::OracleMalformed,
-            95 => XRPLRpcError::BadCredentials,
-            96 => XRPLRpcError::TxSigned,
-            97 => XRPLRpcError::DomainMalformed,
-            98 => XRPLRpcError::EntryNotFound,
-            99 => XRPLRpcError::UnexpectedLedgerType,
-            _ => return Err(()),
-        })
-    }
+    TxnNotFound,
 }
 
 impl XRPLRpcError {
     pub fn from_token(token: &str) -> Option<Self> {
-        Some(match token {
-            "badSyntax" => XRPLRpcError::BadSyntax,
-            "json_rpc" => XRPLRpcError::JsonRpc,
-            "forbidden" => XRPLRpcError::Forbidden,
-            "wrongNetwork" => XRPLRpcError::WrongNetwork,
-            "noPermission" => XRPLRpcError::NoPermission,
-            "noEvents" => XRPLRpcError::NoEvents,
-            "tooBusy" => XRPLRpcError::TooBusy,
-            "slowDown" => XRPLRpcError::SlowDown,
-            "highFee" => XRPLRpcError::HighFee,
-            "notEnabled" => XRPLRpcError::NotEnabled,
-            "notReady" => XRPLRpcError::NotReady,
-            "amendmentBlocked" => XRPLRpcError::AmendmentBlocked,
-            "noClosed" => XRPLRpcError::NoClosed,
-            "noCurrent" => XRPLRpcError::NoCurrent,
-            "noNetwork" => XRPLRpcError::NoNetwork,
-            "notSynced" => XRPLRpcError::NotSynced,
-            "actNotFound" => XRPLRpcError::ActNotFound,
-            "lgrNotFound" | "ledgerNotFound" => XRPLRpcError::LgrNotFound,
-            "lgrNotValidated" => XRPLRpcError::LgrNotValidated,
-            "masterDisabled" => XRPLRpcError::MasterDisabled,
-            "txnNotFound" => XRPLRpcError::TxnNotFound,
-            "invalidHotWallet" => XRPLRpcError::InvalidHotwallet,
-            "invalidParams" => XRPLRpcError::InvalidParams,
-            "unknownCmd" => XRPLRpcError::UnknownCommand,
-            "noPathRequest" => XRPLRpcError::NoPathRequest,
-            "actMalformed" => XRPLRpcError::ActMalformed,
-            "alreadyMultisig" => XRPLRpcError::AlreadyMultisig,
-            "alreadySingleSig" => XRPLRpcError::AlreadySingleSig,
-            "badFeature" => XRPLRpcError::BadFeature,
-            "badIssuer" => XRPLRpcError::BadIssuer,
-            "badMarket" => XRPLRpcError::BadMarket,
-            "badSecret" => XRPLRpcError::BadSecret,
-            "badSeed" => XRPLRpcError::BadSeed,
-            "channelMalformed" => XRPLRpcError::ChannelMalformed,
-            "channelAmtMalformed" => XRPLRpcError::ChannelAmtMalformed,
-            "commandMissing" => XRPLRpcError::CommandMissing,
-            "dstActMalformed" => XRPLRpcError::DstActMalformed,
-            "dstActMissing" => XRPLRpcError::DstActMissing,
-            "dstActNotFound" => XRPLRpcError::DstActNotFound,
-            "dstAmtMalformed" => XRPLRpcError::DstAmtMalformed,
-            "dstAmtMissing" => XRPLRpcError::DstAmtMissing,
-            "dstIsrMalformed" => XRPLRpcError::DstIsrMalformed,
-            "lgrIdxsInvalid" => XRPLRpcError::LgrIdxsInvalid,
-            "lgrIdxMalformed" => XRPLRpcError::LgrIdxMalformed,
-            "publicMalformed" => XRPLRpcError::PublicMalformed,
-            "signingMalformed" => XRPLRpcError::SigningMalformed,
-            "sendMaxMalformed" => XRPLRpcError::SendmaxMalformed,
-            "srcActMalformed" => XRPLRpcError::SrcActMalformed,
-            "srcActMissing" => XRPLRpcError::SrcActMissing,
-            "srcActNotFound" => XRPLRpcError::SrcActNotFound,
-            "delegateActNotFound" => XRPLRpcError::DelegateActNotFound,
-            "srcCurMalformed" => XRPLRpcError::SrcCurMalformed,
-            "srcIsrMalformed" => XRPLRpcError::SrcIsrMalformed,
-            "malformedStream" => XRPLRpcError::StreamMalformed,
-            "deprecated" => XRPLRpcError::AtxDeprecated,
-            "internal" => XRPLRpcError::Internal,
-            "notImpl" => XRPLRpcError::NotImpl,
-            "notSupported" => XRPLRpcError::NotSupported,
-            "badKeyType" => XRPLRpcError::BadKeyType,
-            "dbDeserialization" => XRPLRpcError::DbDeserialization,
-            "excessiveLgrRange" => XRPLRpcError::ExcessiveLgrRange,
-            "invalidLgrRange" => XRPLRpcError::InvalidLgrRange,
-            "unlBlocked" => XRPLRpcError::ExpiredValidatorList,
-            "objectNotFound" => XRPLRpcError::ObjectNotFound,
-            "issueMalformed" => XRPLRpcError::IssueMalformed,
-            "oracleMalformed" => XRPLRpcError::OracleMalformed,
-            "badCredentials" => XRPLRpcError::BadCredentials,
-            "transactionSigned" => XRPLRpcError::TxSigned,
-            "domainMalformed" => XRPLRpcError::DomainMalformed,
-            "entryNotFound" => XRPLRpcError::EntryNotFound,
-            "unexpectedLedgerType" => XRPLRpcError::UnexpectedLedgerType,
-            _ => return None,
-        })
-    }
-
-    pub fn is_server_network_state(self) -> bool {
-        matches!(
-            self,
-            XRPLRpcError::NoClosed
-                | XRPLRpcError::NoCurrent
-                | XRPLRpcError::NoNetwork
-                | XRPLRpcError::NotSynced
-                | XRPLRpcError::TooBusy
-                | XRPLRpcError::SlowDown
-        )
+        match token {
+            "txnNotFound" => Some(XRPLRpcError::TxnNotFound),
+            _ => None,
+        }
     }
 }
 
@@ -1143,9 +905,7 @@ impl<'a> TryInto<XRPLResult<'a>> for XRPLResponse<'a> {
 impl<'a> XRPLResponse<'a> {
     /// Return the structured RPC error code, if this response carries one.
     pub fn rpc_error(&self) -> Option<XRPLRpcError> {
-        self.error_code
-            .and_then(|code| XRPLRpcError::try_from(code).ok())
-            .or_else(|| self.error.as_deref().and_then(XRPLRpcError::from_token))
+        self.error.as_deref().and_then(XRPLRpcError::from_token)
     }
 
     pub fn is_success(&self) -> bool {
@@ -1334,7 +1094,7 @@ mod tests {
         assert_eq!(response.error.as_deref(), Some("noNetwork"));
         assert_eq!(response.error_code, Some(17));
         assert_eq!(response.status, Some(ResponseStatus::Error));
-        assert_eq!(response.rpc_error(), Some(XRPLRpcError::NoNetwork));
+        assert_eq!(response.rpc_error(), None);
 
         // Try-into Result reports the error message.
         let result: Result<XRPLResult, _> = response.try_into();
@@ -1399,127 +1159,13 @@ mod tests {
     }
 
     #[test]
-    fn test_rpc_error_mapping_by_token_and_code() {
-        let cases = [
-            (-1, None, XRPLRpcError::Unknown),
-            (1, Some("badSyntax"), XRPLRpcError::BadSyntax),
-            (2, Some("json_rpc"), XRPLRpcError::JsonRpc),
-            (3, Some("forbidden"), XRPLRpcError::Forbidden),
-            (4, Some("wrongNetwork"), XRPLRpcError::WrongNetwork),
-            (6, Some("noPermission"), XRPLRpcError::NoPermission),
-            (7, Some("noEvents"), XRPLRpcError::NoEvents),
-            (9, Some("tooBusy"), XRPLRpcError::TooBusy),
-            (10, Some("slowDown"), XRPLRpcError::SlowDown),
-            (11, Some("highFee"), XRPLRpcError::HighFee),
-            (12, Some("notEnabled"), XRPLRpcError::NotEnabled),
-            (13, Some("notReady"), XRPLRpcError::NotReady),
-            (14, Some("amendmentBlocked"), XRPLRpcError::AmendmentBlocked),
-            (15, Some("noClosed"), XRPLRpcError::NoClosed),
-            (16, Some("noCurrent"), XRPLRpcError::NoCurrent),
-            (17, Some("noNetwork"), XRPLRpcError::NoNetwork),
-            (18, Some("notSynced"), XRPLRpcError::NotSynced),
-            (19, Some("actNotFound"), XRPLRpcError::ActNotFound),
-            (21, Some("lgrNotFound"), XRPLRpcError::LgrNotFound),
-            (22, Some("lgrNotValidated"), XRPLRpcError::LgrNotValidated),
-            (23, Some("masterDisabled"), XRPLRpcError::MasterDisabled),
-            (29, Some("txnNotFound"), XRPLRpcError::TxnNotFound),
-            (30, Some("invalidHotWallet"), XRPLRpcError::InvalidHotwallet),
-            (31, Some("invalidParams"), XRPLRpcError::InvalidParams),
-            (32, Some("unknownCmd"), XRPLRpcError::UnknownCommand),
-            (33, Some("noPathRequest"), XRPLRpcError::NoPathRequest),
-            (35, Some("actMalformed"), XRPLRpcError::ActMalformed),
-            (36, Some("alreadyMultisig"), XRPLRpcError::AlreadyMultisig),
-            (37, Some("alreadySingleSig"), XRPLRpcError::AlreadySingleSig),
-            (40, Some("badFeature"), XRPLRpcError::BadFeature),
-            (41, Some("badIssuer"), XRPLRpcError::BadIssuer),
-            (42, Some("badMarket"), XRPLRpcError::BadMarket),
-            (43, Some("badSecret"), XRPLRpcError::BadSecret),
-            (44, Some("badSeed"), XRPLRpcError::BadSeed),
-            (45, Some("channelMalformed"), XRPLRpcError::ChannelMalformed),
-            (
-                46,
-                Some("channelAmtMalformed"),
-                XRPLRpcError::ChannelAmtMalformed,
-            ),
-            (47, Some("commandMissing"), XRPLRpcError::CommandMissing),
-            (48, Some("dstActMalformed"), XRPLRpcError::DstActMalformed),
-            (49, Some("dstActMissing"), XRPLRpcError::DstActMissing),
-            (50, Some("dstActNotFound"), XRPLRpcError::DstActNotFound),
-            (51, Some("dstAmtMalformed"), XRPLRpcError::DstAmtMalformed),
-            (52, Some("dstAmtMissing"), XRPLRpcError::DstAmtMissing),
-            (53, Some("dstIsrMalformed"), XRPLRpcError::DstIsrMalformed),
-            (57, Some("lgrIdxsInvalid"), XRPLRpcError::LgrIdxsInvalid),
-            (58, Some("lgrIdxMalformed"), XRPLRpcError::LgrIdxMalformed),
-            (62, Some("publicMalformed"), XRPLRpcError::PublicMalformed),
-            (63, Some("signingMalformed"), XRPLRpcError::SigningMalformed),
-            (64, Some("sendMaxMalformed"), XRPLRpcError::SendmaxMalformed),
-            (65, Some("srcActMalformed"), XRPLRpcError::SrcActMalformed),
-            (66, Some("srcActMissing"), XRPLRpcError::SrcActMissing),
-            (67, Some("srcActNotFound"), XRPLRpcError::SrcActNotFound),
-            (
-                68,
-                Some("delegateActNotFound"),
-                XRPLRpcError::DelegateActNotFound,
-            ),
-            (69, Some("srcCurMalformed"), XRPLRpcError::SrcCurMalformed),
-            (70, Some("srcIsrMalformed"), XRPLRpcError::SrcIsrMalformed),
-            (71, Some("malformedStream"), XRPLRpcError::StreamMalformed),
-            (72, Some("deprecated"), XRPLRpcError::AtxDeprecated),
-            (73, Some("internal"), XRPLRpcError::Internal),
-            (74, Some("notImpl"), XRPLRpcError::NotImpl),
-            (75, Some("notSupported"), XRPLRpcError::NotSupported),
-            (76, Some("badKeyType"), XRPLRpcError::BadKeyType),
-            (
-                77,
-                Some("dbDeserialization"),
-                XRPLRpcError::DbDeserialization,
-            ),
-            (
-                78,
-                Some("excessiveLgrRange"),
-                XRPLRpcError::ExcessiveLgrRange,
-            ),
-            (79, Some("invalidLgrRange"), XRPLRpcError::InvalidLgrRange),
-            (80, Some("unlBlocked"), XRPLRpcError::ExpiredValidatorList),
-            (91, None, XRPLRpcError::ReportingUnsupported),
-            (92, Some("objectNotFound"), XRPLRpcError::ObjectNotFound),
-            (93, Some("issueMalformed"), XRPLRpcError::IssueMalformed),
-            (94, Some("oracleMalformed"), XRPLRpcError::OracleMalformed),
-            (95, Some("badCredentials"), XRPLRpcError::BadCredentials),
-            (96, Some("transactionSigned"), XRPLRpcError::TxSigned),
-            (97, Some("domainMalformed"), XRPLRpcError::DomainMalformed),
-            (98, Some("entryNotFound"), XRPLRpcError::EntryNotFound),
-            (
-                99,
-                Some("unexpectedLedgerType"),
-                XRPLRpcError::UnexpectedLedgerType,
-            ),
-        ];
-
-        for (code, token, error) in cases {
-            assert_eq!(XRPLRpcError::try_from(code), Ok(error));
-            if let Some(token) = token {
-                assert_eq!(XRPLRpcError::from_token(token), Some(error));
-            }
-        }
+    fn test_rpc_error_from_token() {
         assert_eq!(
-            XRPLRpcError::from_token("ledgerNotFound"),
-            Some(XRPLRpcError::LgrNotFound)
+            XRPLRpcError::from_token("txnNotFound"),
+            Some(XRPLRpcError::TxnNotFound)
         );
-        assert!(XRPLRpcError::try_from(5).is_err());
+        assert_eq!(XRPLRpcError::from_token("noNetwork"), None);
         assert_eq!(XRPLRpcError::from_token("notARealToken"), None);
-    }
-
-    #[test]
-    fn test_rpc_error_server_network_state() {
-        assert!(XRPLRpcError::NoClosed.is_server_network_state());
-        assert!(XRPLRpcError::NoCurrent.is_server_network_state());
-        assert!(XRPLRpcError::NoNetwork.is_server_network_state());
-        assert!(XRPLRpcError::NotSynced.is_server_network_state());
-        assert!(XRPLRpcError::TooBusy.is_server_network_state());
-        assert!(XRPLRpcError::SlowDown.is_server_network_state());
-        assert!(!XRPLRpcError::TxnNotFound.is_server_network_state());
-        assert!(!XRPLRpcError::InvalidParams.is_server_network_state());
     }
 
     #[test]
