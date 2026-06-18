@@ -22,6 +22,8 @@ pub enum AccountObjectType {
     SignerList,
     State,
     Ticket,
+    /// Filter for Vault ledger objects (XLS-65 SingleAssetVault).
+    Vault,
 }
 
 /// This request returns the raw ledger format for all objects

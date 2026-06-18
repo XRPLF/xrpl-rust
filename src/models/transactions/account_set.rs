@@ -73,8 +73,10 @@ pub enum AccountSetFlag {
     AsfDisallowIncomingTrustline = 13,
     /// Disallow incoming NFToken offers from other accounts.
     AsfDisallowIncomingNFTokenOffer = 14,
-    /// Allow other accounts to mint NFTokens with this account set as the issuer.
-    AsfAllowTrustLineClawback = 15,
+    /// Disallow incoming trust lines from new accounts.
+    AsfDisallowIncomingTrustlineV2 = 15,
+    /// Allow the account to claw back tokens it issued via trust lines.
+    AsfAllowTrustLineClawback = 16,
 }
 
 /// An AccountSet transaction modifies the properties of an

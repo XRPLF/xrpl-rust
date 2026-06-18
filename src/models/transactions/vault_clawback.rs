@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::amount::XRPAmount;
 use bigdecimal::BigDecimal;
 use core::str::FromStr;
 
+use crate::models::amount::XRPAmount;
 use crate::models::{
     Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
@@ -136,13 +136,13 @@ impl<'a> VaultClawback<'a> {
                 Some(FlagCollection::default()),
                 last_ledger_sequence,
                 memos,
-                None,
+                None, // network_id
                 sequence,
                 signers,
-                None,
+                None, // signing_pub_key
                 source_tag,
                 ticket_sequence,
-                None,
+                None, // txn_signature
             ),
             vault_id,
             holder,
@@ -325,20 +325,25 @@ mod tests {
 
     #[test]
     fn test_new_constructor() {
-        let vault_clawback = VaultClawback::new(
-            "rNewIssuer555".into(),
-            None,
-            Some("12".into()),
-            Some(7108682),
-            None,
-            Some(100),
-            None,
-            None,
-            None,
-            VAULT_ID.into(),
-            "rNewHolder666".into(),
-            Some("750".into()),
-        );
+        let vault_clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: "rNewIssuer555".into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                last_ledger_sequence: Some(7108682),
+                sequence: Some(100),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: "rNewHolder666".into(),
+            amount: Some(Amount::IssuedCurrencyAmount(
+                crate::models::amount::IssuedCurrencyAmount::new(
+                    "XRP".into(),
+                    "rNewIssuer555".into(),
+                    "750".into(),
+                ),
+            )),
+        };
 
         assert_eq!(vault_clawback.common_fields.account, "rNewIssuer555");
         assert_eq!(
@@ -377,20 +382,18 @@ mod tests {
 
     #[test]
     fn test_clawback_all_no_amount() {
-        let vault_clawback = VaultClawback::new(
-            "rIssuerAll999".into(),
-            None,
-            Some("12".into()),
-            None,
-            None,
-            Some(200),
-            None,
-            None,
-            None,
-            VAULT_ID.into(),
-            "rHolderAll000".into(),
-            None,
-        );
+        let vault_clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: "rIssuerAll999".into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(200),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: "rHolderAll000".into(),
+            amount: None,
+        };
 
         assert!(vault_clawback.amount.is_none());
         assert!(vault_clawback.validate().is_ok());

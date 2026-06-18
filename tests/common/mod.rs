@@ -274,6 +274,10 @@ where
 {
     use xrpl::asynch::transaction::sign_and_submit;
     let client = get_client().await;
+    eprintln!(
+        "[test_transaction] submitting: {:?}",
+        serde_json::to_string(tx).unwrap_or_default()
+    );
     let result = sign_and_submit(tx, client, wallet, true, true)
         .await
         .expect("test_transaction: sign_and_submit failed");

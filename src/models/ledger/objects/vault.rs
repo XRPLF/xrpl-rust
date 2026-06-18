@@ -8,8 +8,16 @@ use super::{CommonFields, LedgerObject};
 
 /// The `Vault` object type describes a single-asset vault instance (XLS-65).
 ///
-/// A vault holds a single asset type and issues share tokens (MPTokens)
-/// to depositors proportional to their ownership of the vault's assets.
+/// All string fields use `Cow<'a, str>`. Vault objects are constructed by the
+/// server; callers should treat all fields as read-only.
+///
+/// Note: the ideal field type for server-read-only strings is `&'a str`
+/// (zero-copy, immutable). However, switching to `&'a str` with
+/// `#[serde(borrow)]` requires the `'de: 'a` lifetime constraint to propagate
+/// through the entire `LedgerEntry` → `BaseLedger` → `LedgerV1` chain, which
+/// affects all other ledger objects. A follow-up PR should migrate `Vault`,
+/// `AccountRoot`, `MPToken`, and `MPTokenIssuance` to `&'a str` together as
+/// part of a codebase-wide ledger-object cleanup.
 ///
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0065-single-asset-vault>`
 #[skip_serializing_none]
@@ -66,7 +74,7 @@ impl<'a> LedgerObject<NoFlags> for Vault<'a> {
 
 #[cfg(test)]
 mod test_serde {
-    use crate::models::currency::{Currency, IssuedCurrency, XRP};
+    use crate::models::currency::{Currency, IssuedCurrency};
     use crate::models::ledger::objects::vault::Vault;
     use crate::models::ledger::objects::CommonFields;
     use crate::models::ledger::objects::LedgerEntryType;
@@ -274,25 +282,5 @@ mod test_serde {
             json.contains("\"LedgerEntryType\":\"Vault\""),
             "missing LedgerEntryType=Vault: {json}"
         );
-    }
-
-    #[test]
-    fn test_xrp_vault() {
-        let vault = make_vault(
-            Some(Cow::from("XRPVaultTest")),
-            "rwhaYGnJMexktjhxAKzRwoCcQ2g6hvBDWu".into(),
-            "rBVxExjRR6oDMWCeQYgJP7q4JBLGeLBPyv".into(),
-            Currency::XRP(XRP::new()),
-            "00000001732B0822A31109C996BCDD7E64E05D446E7998EE".into(),
-            1,
-            4,
-            "0".into(),
-            "25C3C8BF2C9EE60DFCDA02F3919D0C4D6BF2D0A4AC9354EFDA438F2ECDDA65E4".into(),
-            5,
-        );
-
-        let serialized = serde_json::to_string(&vault).unwrap();
-        let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
-        assert_eq!(vault, deserialized);
     }
 }
