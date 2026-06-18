@@ -1,5 +1,5 @@
 use crate::models::ledger::objects::LedgerEntryType;
-use crate::models::{Currency, FlagCollection, Model, NoFlags};
+use crate::models::{Currency, NoFlags};
 use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -22,34 +22,34 @@ pub struct Vault<'a> {
     /// `<https://xrpl.org/ledger-entry-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    /// The account address of the Vault Owner.
+    /// The account address of the Vault Owner. (SoeRequired)
     pub owner: Cow<'a, str>,
-    /// The address of the Vault's pseudo-account.
+    /// The address of the Vault's pseudo-account. (SoeRequired)
     pub account: Cow<'a, str>,
-    /// The asset of the vault (XRP, IOU or MPT).
+    /// The asset of the vault (XRP, IOU or MPT). (SoeRequired)
     pub asset: Currency<'a>,
-    /// The total value of the vault.
+    /// The total value of the vault. (SoeDefault)
     pub assets_total: Option<Cow<'a, str>>,
-    /// The asset amount that is available in the vault.
+    /// The asset amount that is available in the vault. (SoeDefault)
     pub assets_available: Option<Cow<'a, str>>,
-    /// The maximum asset amount that can be held in the vault. Zero means no cap.
+    /// The maximum asset amount that can be held in the vault. Zero means no cap. (SoeOptional)
     pub assets_maximum: Option<Cow<'a, str>>,
-    /// The potential loss amount that is not yet realized, expressed as the vault's asset.
+    /// The potential loss amount that is not yet realized, expressed as the vault's asset. (SoeDefault)
     pub loss_unrealized: Option<Cow<'a, str>>,
-    /// The identifier of the share MPTokenIssuance object.
+    /// The identifier of the share MPTokenIssuance object. (SoeRequired)
     #[serde(rename = "ShareMPTID")]
-    pub share_mpt_id: Option<Cow<'a, str>>,
-    /// Indicates the withdrawal strategy used by the Vault.
-    pub withdrawal_policy: Option<u8>,
+    pub share_mpt_id: Cow<'a, str>,
+    /// Indicates the withdrawal strategy used by the Vault. (SoeRequired)
+    pub withdrawal_policy: u8,
     /// The Scale specifies the power of 10 to multiply an asset's value by
-    /// when converting it into an integer-based number of shares.
+    /// when converting it into an integer-based number of shares. (SoeDefault)
     pub scale: Option<u8>,
-    /// The transaction sequence number that created the vault.
-    pub sequence: Option<u32>,
-    /// Arbitrary metadata about the Vault. Limited to 256 bytes.
+    /// The transaction sequence number that created the vault. (SoeRequired)
+    pub sequence: u32,
+    /// Arbitrary metadata about the Vault. Limited to 256 bytes. (SoeOptional)
     pub data: Option<Cow<'a, str>>,
-    /// A hint indicating which page of the owner's directory links to this object.
-    pub owner_node: Option<Cow<'a, str>>,
+    /// A hint indicating which page of the owner's directory links to this object. (SoeRequired)
+    pub owner_node: Cow<'a, str>,
     /// The identifying hash of the transaction that most recently modified this object.
     #[serde(rename = "PreviousTxnID")]
     pub previous_txn_id: Cow<'a, str>,
@@ -58,58 +58,9 @@ pub struct Vault<'a> {
     pub previous_txn_lgr_seq: u32,
 }
 
-impl<'a> Model for Vault<'a> {}
-
 impl<'a> LedgerObject<NoFlags> for Vault<'a> {
     fn get_ledger_entry_type(&self) -> LedgerEntryType {
         self.common_fields.get_ledger_entry_type()
-    }
-}
-
-impl<'a> Vault<'a> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        index: Option<Cow<'a, str>>,
-        ledger_index: Option<Cow<'a, str>>,
-        owner: Cow<'a, str>,
-        account: Cow<'a, str>,
-        asset: Currency<'a>,
-        assets_total: Option<Cow<'a, str>>,
-        assets_available: Option<Cow<'a, str>>,
-        assets_maximum: Option<Cow<'a, str>>,
-        loss_unrealized: Option<Cow<'a, str>>,
-        share_mpt_id: Option<Cow<'a, str>>,
-        withdrawal_policy: Option<u8>,
-        scale: Option<u8>,
-        sequence: Option<u32>,
-        data: Option<Cow<'a, str>>,
-        owner_node: Option<Cow<'a, str>>,
-        previous_txn_id: Cow<'a, str>,
-        previous_txn_lgr_seq: u32,
-    ) -> Self {
-        Self {
-            common_fields: CommonFields {
-                flags: FlagCollection::default(),
-                ledger_entry_type: LedgerEntryType::Vault,
-                index,
-                ledger_index,
-            },
-            owner,
-            account,
-            asset,
-            assets_total,
-            assets_available,
-            assets_maximum,
-            loss_unrealized,
-            share_mpt_id,
-            withdrawal_policy,
-            scale,
-            sequence,
-            data,
-            owner_node,
-            previous_txn_id,
-            previous_txn_lgr_seq,
-        }
     }
 }
 
@@ -117,29 +68,74 @@ impl<'a> Vault<'a> {
 mod test_serde {
     use crate::models::currency::{Currency, IssuedCurrency, XRP};
     use crate::models::ledger::objects::vault::Vault;
+    use crate::models::ledger::objects::CommonFields;
+    use crate::models::ledger::objects::LedgerEntryType;
+    use crate::models::{FlagCollection, NoFlags};
     use alloc::borrow::Cow;
+
+    fn make_vault<'a>(
+        index: Option<Cow<'a, str>>,
+        owner: Cow<'a, str>,
+        account: Cow<'a, str>,
+        asset: Currency<'a>,
+        share_mpt_id: Cow<'a, str>,
+        withdrawal_policy: u8,
+        sequence: u32,
+        owner_node: Cow<'a, str>,
+        previous_txn_id: Cow<'a, str>,
+        previous_txn_lgr_seq: u32,
+    ) -> Vault<'a> {
+        Vault {
+            common_fields: CommonFields {
+                flags: FlagCollection::<NoFlags>::default(),
+                ledger_entry_type: LedgerEntryType::Vault,
+                index,
+                ledger_index: None,
+            },
+            owner,
+            account,
+            asset,
+            assets_total: None,
+            assets_available: None,
+            assets_maximum: None,
+            loss_unrealized: None,
+            share_mpt_id,
+            withdrawal_policy,
+            scale: None,
+            sequence,
+            data: None,
+            owner_node,
+            previous_txn_id,
+            previous_txn_lgr_seq,
+        }
+    }
 
     #[test]
     fn test_serialize() {
-        let vault = Vault::new(
-            Some(Cow::from("ForTest")),
-            None,
-            Cow::from("rVaultOwner123"),
-            Cow::from("rPseudoAccount456"),
-            Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
-            Some("1000000".into()),
-            Some("800000".into()),
-            Some("5000000".into()),
-            Some("0".into()),
-            Some("00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into()),
-            Some(1),
-            Some(6),
-            Some(5),
-            Some("48656C6C6F".into()),
-            Some("0".into()),
-            Cow::from("ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"),
-            12345678,
-        );
+        let vault = Vault {
+            common_fields: CommonFields {
+                flags: FlagCollection::<NoFlags>::default(),
+                ledger_entry_type: LedgerEntryType::Vault,
+                index: Some(Cow::from("ForTest")),
+                ledger_index: None,
+            },
+            owner: "rVaultOwner123".into(),
+            account: "rPseudoAccount456".into(),
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
+            assets_total: Some("1000000".into()),
+            assets_available: Some("800000".into()),
+            assets_maximum: Some("5000000".into()),
+            loss_unrealized: Some("0".into()),
+            share_mpt_id: "00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into(),
+            withdrawal_policy: 1,
+            scale: Some(6),
+            sequence: 5,
+            data: Some("48656C6C6F".into()),
+            owner_node: "0".into(),
+            previous_txn_id: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
+                .into(),
+            previous_txn_lgr_seq: 12345678,
+        };
 
         let serialized = serde_json::to_string(&vault).unwrap();
         let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
@@ -148,23 +144,16 @@ mod test_serde {
 
     #[test]
     fn test_minimal_vault() {
-        let vault = Vault::new(
+        let vault = make_vault(
             Some(Cow::from("MinimalTest")),
-            None,
-            Cow::from("rMinimalOwner789"),
-            Cow::from("rMinimalPseudo789"),
+            "rMinimalOwner789".into(),
+            "rMinimalPseudo789".into(),
             Currency::IssuedCurrency(IssuedCurrency::new("EUR".into(), "rEURIssuer012".into())),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Cow::from("1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"),
+            "00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into(),
+            1,
+            1,
+            "0".into(),
+            "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF".into(),
             1,
         );
 
@@ -175,25 +164,33 @@ mod test_serde {
 
     #[test]
     fn test_vault_with_all_fields() {
-        let vault = Vault::new(
-            Some(Cow::from("FullVaultTest")),
-            Some(Cow::from("ledger_idx_123")),
-            Cow::from("rFullVaultOwner456"),
-            Cow::from("rFullPseudoAccount"),
-            Currency::IssuedCurrency(IssuedCurrency::new("BTC".into(), "rBTCIssuer789".into())),
-            Some("50000000".into()),
-            Some("45000000".into()),
-            Some("100000000".into()),
-            Some("200000".into()),
-            Some("0000000000000001".into()),
-            Some(1),
-            Some(6),
-            Some(1),
-            Some("44617461".into()),
-            Some("42".into()),
-            Cow::from("FEDCBA0987654321FEDCBA0987654321FEDCBA0987654321FEDCBA0987654321"),
-            99999999,
-        );
+        let vault = Vault {
+            common_fields: CommonFields {
+                flags: FlagCollection::<NoFlags>::default(),
+                ledger_entry_type: LedgerEntryType::Vault,
+                index: Some(Cow::from("FullVaultTest")),
+                ledger_index: Some(Cow::from("ledger_idx_123")),
+            },
+            owner: "rFullVaultOwner456".into(),
+            account: "rFullPseudoAccount".into(),
+            asset: Currency::IssuedCurrency(IssuedCurrency::new(
+                "BTC".into(),
+                "rBTCIssuer789".into(),
+            )),
+            assets_total: Some("50000000".into()),
+            assets_available: Some("45000000".into()),
+            assets_maximum: Some("100000000".into()),
+            loss_unrealized: Some("200000".into()),
+            share_mpt_id: "00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into(),
+            withdrawal_policy: 1,
+            scale: Some(6),
+            sequence: 1,
+            data: Some("44617461".into()),
+            owner_node: "42".into(),
+            previous_txn_id: "FEDCBA0987654321FEDCBA0987654321FEDCBA0987654321FEDCBA0987654321"
+                .into(),
+            previous_txn_lgr_seq: 99999999,
+        };
 
         let serialized = serde_json::to_string(&vault).unwrap();
         let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
@@ -202,28 +199,30 @@ mod test_serde {
 
     #[test]
     fn test_serialized_keys_are_pascal_case() {
-        // Assert the raw wire format uses the exact PascalCase keys that
-        // XRPL expects. Relying only on a struct round-trip would silently
-        // tolerate a rename that breaks compatibility with rippled.
-        let vault = Vault::new(
-            Some(Cow::from("KeysTest")),
-            None,
-            Cow::from("rKeysOwner"),
-            Cow::from("rKeysAccount"),
-            Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuerX".into())),
-            Some("100".into()),
-            Some("90".into()),
-            Some("200".into()),
-            Some("5".into()),
-            Some("00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into()),
-            Some(1),
-            Some(6),
-            Some(1),
-            Some("48656C6C6F".into()),
-            Some("0".into()),
-            Cow::from("ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"),
-            100,
-        );
+        let vault = Vault {
+            common_fields: CommonFields {
+                flags: FlagCollection::<NoFlags>::default(),
+                ledger_entry_type: LedgerEntryType::Vault,
+                index: Some(Cow::from("KeysTest")),
+                ledger_index: None,
+            },
+            owner: "rKeysOwner".into(),
+            account: "rKeysAccount".into(),
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuerX".into())),
+            assets_total: Some("100".into()),
+            assets_available: Some("90".into()),
+            assets_maximum: Some("200".into()),
+            loss_unrealized: Some("5".into()),
+            share_mpt_id: "00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into(),
+            withdrawal_policy: 1,
+            scale: Some(6),
+            sequence: 1,
+            data: Some("48656C6C6F".into()),
+            owner_node: "0".into(),
+            previous_txn_id: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
+                .into(),
+            previous_txn_lgr_seq: 100,
+        };
 
         let json = serde_json::to_string(&vault).unwrap();
         assert!(json.contains("\"Account\""), "missing Account key: {json}");
@@ -279,23 +278,16 @@ mod test_serde {
 
     #[test]
     fn test_xrp_vault() {
-        let vault = Vault::new(
+        let vault = make_vault(
             Some(Cow::from("XRPVaultTest")),
-            None,
-            Cow::from("rwhaYGnJMexktjhxAKzRwoCcQ2g6hvBDWu"),
-            Cow::from("rBVxExjRR6oDMWCeQYgJP7q4JBLGeLBPyv"),
+            "rwhaYGnJMexktjhxAKzRwoCcQ2g6hvBDWu".into(),
+            "rBVxExjRR6oDMWCeQYgJP7q4JBLGeLBPyv".into(),
             Currency::XRP(XRP::new()),
-            Some("0".into()),
-            Some("0".into()),
-            None,
-            Some("0".into()),
-            Some("00000001732B0822A31109C996BCDD7E64E05D446E7998EE".into()),
-            Some(1),
-            Some(0),
-            Some(4),
-            None,
-            Some("0".into()),
-            Cow::from("25C3C8BF2C9EE60DFCDA02F3919D0C4D6BF2D0A4AC9354EFDA438F2ECDDA65E4"),
+            "00000001732B0822A31109C996BCDD7E64E05D446E7998EE".into(),
+            1,
+            4,
+            "0".into(),
+            "25C3C8BF2C9EE60DFCDA02F3919D0C4D6BF2D0A4AC9354EFDA438F2ECDDA65E4".into(),
             5,
         );
 

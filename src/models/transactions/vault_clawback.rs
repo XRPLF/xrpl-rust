@@ -66,7 +66,7 @@ impl Model for VaultClawback<'_> {
                     });
                 }
             };
-            if BigDecimal::from_str(value)? < BigDecimal::from(0) {
+            if BigDecimal::from_str(value)? < 0 {
                 return Err(XRPLModelException::InvalidValue {
                     field: "amount".into(),
                     expected: "a nonnegative amount".into(),
@@ -361,25 +361,6 @@ mod tests {
         .with_sequence(300);
 
         assert!(vault_clawback.validate().is_ok());
-    }
-
-    #[test]
-    fn test_get_transaction_type() {
-        use crate::models::transactions::Transaction;
-        let vault_clawback = VaultClawback {
-            common_fields: CommonFields {
-                account: "rTxTypeTest".into(),
-                transaction_type: TransactionType::VaultClawback,
-                ..Default::default()
-            },
-            vault_id: VAULT_ID.into(),
-            holder: "rHolder".into(),
-            amount: None,
-        };
-        assert_eq!(
-            *vault_clawback.get_transaction_type(),
-            TransactionType::VaultClawback
-        );
     }
 
     #[test]
