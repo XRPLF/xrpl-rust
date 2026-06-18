@@ -62,7 +62,10 @@ async fn test_get_aggregate_price_base() {
             .try_into()
             .expect("failed to parse get_aggregate_price result");
 
-        assert!(!result.entire_set.mean.is_empty(), "mean should be non-empty");
+        assert!(
+            !result.entire_set.mean.is_empty(),
+            "mean should be non-empty"
+        );
         assert_eq!(result.entire_set.size, 1, "one oracle = size 1");
         assert!(!result.median.is_empty(), "median should be non-empty");
         assert!(result.time > 0, "time should be positive");
