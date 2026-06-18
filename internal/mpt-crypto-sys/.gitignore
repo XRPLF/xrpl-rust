@@ -1,0 +1,7 @@
+# Vendored native binaries are not committed — they're large (~40 MB across
+# all platforms), and `build.rs` fetches them from the upstream GitHub
+# release on first build, verified by SHA-256.
+#
+# Developers who want offline builds can run `scripts/fetch_upstream.sh`
+# locally to populate this directory; their local copy is gitignored.
+vendor/lib/

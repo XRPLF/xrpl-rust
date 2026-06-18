@@ -9,6 +9,16 @@ pub mod amm_withdraw;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential_mpt_clawback;
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential_mpt_convert;
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential_mpt_convert_back;
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential_mpt_merge_inbox;
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential_mpt_send;
 pub mod deposit_preauth;
 pub mod escrow_cancel;
 pub mod escrow_create;
@@ -76,6 +86,11 @@ pub enum TransactionType {
     CheckCancel,
     CheckCash,
     CheckCreate,
+    ConfidentialMPTClawback,
+    ConfidentialMPTConvert,
+    ConfidentialMPTConvertBack,
+    ConfidentialMPTMergeInbox,
+    ConfidentialMPTSend,
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,

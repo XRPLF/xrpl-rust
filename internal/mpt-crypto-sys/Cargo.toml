@@ -1,0 +1,27 @@
+[package]
+name = "mpt-crypto-sys"
+version = "0.1.0"
+edition = "2024"
+description = "Low-level FFI bindings to the mpt-crypto C library for XLS-0096 Confidential MPTs."
+license = "ISC"
+repository = "https://github.com/XRPLF/xrpl-rust"
+publish = false
+links = "mpt-crypto"
+
+# If this crate is ever published, the committed binaries would exceed
+# crates.io's size limit. Exclude them — consumers would have to use the
+# build.rs download path or set MPT_CRYPTO_LIB_DIR.
+exclude = ["vendor/lib/**"]
+
+[lib]
+name = "mpt_crypto_sys"
+
+# --- build-time dependencies: HTTP, gzip, tar, checksum ---
+# These compile once per target machine on the first build that has to
+# fetch the upstream bundle. They are not part of the consumer's final
+# binary; they exist only to run build.rs.
+[build-dependencies]
+ureq   = { version = "2.10", default-features = false, features = ["tls"] }
+flate2 = "1.0"
+tar    = "0.4"
+sha2   = "0.10"

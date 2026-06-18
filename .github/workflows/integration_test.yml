@@ -31,7 +31,6 @@ jobs:
         run: |
           docker run \
             --detach \
-            --rm \
             --publish 5005:5005 \
             --publish 6006:6006 \
             --volume "${{ github.workspace }}/.ci-config/":"/etc/xrpld/" \
@@ -59,7 +58,7 @@ jobs:
       - name: Run integration tests under coverage
         run: |
           cargo llvm-cov --no-report --release \
-            --features std,json-rpc,helpers,cli,websocket,integration \
+            --features std,json-rpc,helpers,cli,websocket,integration,confidential-mpt \
             --test integration_test \
             --test cli_integration \
             --test funding \
