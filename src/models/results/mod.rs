@@ -249,7 +249,7 @@ impl_try_from_result!(account_currencies, AccountCurrencies, AccountCurrencies);
 impl_try_from_result!(account_lines, AccountLines, AccountLines);
 // AccountObjects: also accepts Other(Value) as a fallback because serde's
 // ContentDeserializer (used by untagged enums) may fail to match AccountObjects
-// when the rippled response omits ledger_index (standalone/current-ledger mode).
+// when the xrpld response omits ledger_index (standalone/current-ledger mode).
 // In that case the JSON lands in Other(Value) and we re-parse it here.
 impl<'a> TryFrom<XRPLResult<'a>> for account_objects::AccountObjects<'a> {
     type Error = XRPLModelException;
@@ -514,6 +514,25 @@ pub enum ResponseType {
     Response,
     LedgerClosed,
     Transaction,
+}
+
+/// Structured XRPL RPC error codes returned by xrpld/Clio.
+///
+/// Only codes consumed by library logic are defined here. Extend as needed
+/// rather than mirroring the full xrpld error list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum XRPLRpcError {
+    TxnNotFound,
+}
+
+impl XRPLRpcError {
+    pub fn from_token(token: &str) -> Option<Self> {
+        match token {
+            "txnNotFound" => Some(XRPLRpcError::TxnNotFound),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -884,6 +903,11 @@ impl<'a> TryInto<XRPLResult<'a>> for XRPLResponse<'a> {
 }
 
 impl<'a> XRPLResponse<'a> {
+    /// Return the structured RPC error code, if this response carries one.
+    pub fn rpc_error(&self) -> Option<XRPLRpcError> {
+        self.error.as_deref().and_then(XRPLRpcError::from_token)
+    }
+
     pub fn is_success(&self) -> bool {
         if let Some(status) = &self.status {
             return status == &ResponseStatus::Success;
@@ -1061,15 +1085,16 @@ mod tests {
     fn test_response_deserialize_error() {
         let json = r#"{
             "error": "noNetwork",
-            "error_code": 16,
+            "error_code": 17,
             "error_message": "Not synced to the network.",
             "status": "error"
         }"#;
         let response: XRPLResponse = serde_json::from_str(json).unwrap();
         assert!(!response.is_success());
         assert_eq!(response.error.as_deref(), Some("noNetwork"));
-        assert_eq!(response.error_code, Some(16));
+        assert_eq!(response.error_code, Some(17));
         assert_eq!(response.status, Some(ResponseStatus::Error));
+        assert_eq!(response.rpc_error(), None);
 
         // Try-into Result reports the error message.
         let result: Result<XRPLResult, _> = response.try_into();
@@ -1131,6 +1156,16 @@ mod tests {
                 .and_then(|v| v.as_u64()),
             Some(26575101)
         );
+    }
+
+    #[test]
+    fn test_rpc_error_from_token() {
+        assert_eq!(
+            XRPLRpcError::from_token("txnNotFound"),
+            Some(XRPLRpcError::TxnNotFound)
+        );
+        assert_eq!(XRPLRpcError::from_token("noNetwork"), None);
+        assert_eq!(XRPLRpcError::from_token("notARealToken"), None);
     }
 
     #[test]

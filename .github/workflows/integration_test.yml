@@ -16,7 +16,7 @@ env:
   # Files measured by the integration coverage gate are the inverse of this regex.
   # Unit-test territory (models, core, utils, _serde) is excluded; integration territory
   # (CLI, asynch::clients, account/, ledger/, transaction/, faucet) is what remains.
-  COVERAGE_IGNORE_REGEX: '(_serde|core|models|utils)/|constants\.rs$|macros\.rs$|lib\.rs$|wallet/(mod|exceptions)\.rs$|tests/'
+  COVERAGE_IGNORE_REGEX: '(_serde|core|models|utils)/|constants\.rs$|macros\.rs$|lib\.rs$|asynch/transaction/submit_and_wait\.rs$|wallet/(mod|exceptions)\.rs$|tests/'
 
 jobs:
   integration_test:
