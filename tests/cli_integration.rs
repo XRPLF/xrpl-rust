@@ -47,6 +47,7 @@ mod cli_tests {
             "expected value",
             "network",
             "connection",
+            "Connection",
             "timeout",
             "there is no reactor running",
             "must be called from the context of a Tokio",
