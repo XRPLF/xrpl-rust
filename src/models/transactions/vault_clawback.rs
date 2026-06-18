@@ -66,10 +66,17 @@ impl Model for VaultClawback<'_> {
                     });
                 }
             };
-            if BigDecimal::from_str(value)? < 0 {
+            let parsed = BigDecimal::from_str(value).map_err(|_| {
+                XRPLModelException::InvalidValueFormat {
+                    field: "amount".into(),
+                    format: "a valid decimal number".into(),
+                    found: value.into(),
+                }
+            })?;
+            if parsed <= 0 {
                 return Err(XRPLModelException::InvalidValue {
                     field: "amount".into(),
-                    expected: "a nonnegative amount".into(),
+                    expected: "a positive amount".into(),
                     found: value.into(),
                 });
             }
@@ -144,6 +151,8 @@ impl<'a> VaultClawback<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::amount::Amount;
+    use crate::utils::testing::test_constants::*;
 
     const VAULT_ID: &str = "A0000000000000000000000000000000000000000000000000000000DEADBEEF";
 
@@ -382,5 +391,114 @@ mod tests {
 
         assert!(vault_clawback.amount.is_none());
         assert!(vault_clawback.validate().is_ok());
+    }
+
+    #[test]
+    fn test_amount_xrp_rejected() {
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::XRPAmount("500".into())),
+        };
+        assert!(clawback.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_zero_rejected() {
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::IssuedCurrencyAmount(
+                crate::models::amount::IssuedCurrencyAmount::new(
+                    "USD".into(),
+                    ACCOUNT_HOLDER_2.into(),
+                    "0".into(),
+                ),
+            )),
+        };
+        assert!(clawback.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_negative_rejected() {
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::IssuedCurrencyAmount(
+                crate::models::amount::IssuedCurrencyAmount::new(
+                    "USD".into(),
+                    ACCOUNT_HOLDER_2.into(),
+                    "-100".into(),
+                ),
+            )),
+        };
+        assert!(clawback.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_not_a_number_rejected() {
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::IssuedCurrencyAmount(
+                crate::models::amount::IssuedCurrencyAmount::new(
+                    "USD".into(),
+                    ACCOUNT_HOLDER_2.into(),
+                    "not-a-number".into(),
+                ),
+            )),
+        };
+        assert!(clawback.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_valid_ica_accepted() {
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::IssuedCurrencyAmount(
+                crate::models::amount::IssuedCurrencyAmount::new(
+                    "USD".into(),
+                    ACCOUNT_HOLDER_2.into(),
+                    "100".into(),
+                ),
+            )),
+        };
+        assert!(clawback.validate().is_ok());
     }
 }
