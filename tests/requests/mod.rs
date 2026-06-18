@@ -6,6 +6,7 @@ mod account_objects;
 mod account_offers;
 mod account_tx;
 mod amm_info;
+mod get_aggregate_price;
 mod book_offers;
 mod channel_verify;
 mod deposit_authorized;
