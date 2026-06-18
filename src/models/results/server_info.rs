@@ -82,16 +82,29 @@ pub struct Info<'a> {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ValidatorList<'a> {
     pub count: u32,
-    pub expiration: u32,
+    /// Expiration can be a number or "unknown" when the validator list
+    /// status is unknown (e.g. standalone mode).
+    pub expiration: Value,
     pub status: Cow<'a, str>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LastClose {
-    /// Time to reach consensus in seconds
-    pub converge_time_s: u64,
+    /// Time to reach consensus in seconds.
+    /// Can be a fractional value (e.g. 0.1), so we use serde_json::Number
+    /// to handle both integer and float representations.
+    pub converge_time_s: serde_json::Number,
     /// Number of trusted validators considered
     pub proposers: u32,
+}
+
+impl Default for LastClose {
+    fn default() -> Self {
+        Self {
+            converge_time_s: serde_json::Number::from(0),
+            proposers: 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -202,7 +215,10 @@ mod tests {
         assert_eq!(result.info.hostid, Some("LEST".into()));
         assert_eq!(result.info.io_latency_ms, 1);
         assert_eq!(result.info.jq_trans_overflow, Some("0".into()));
-        assert_eq!(result.info.last_close.converge_time_s, 3);
+        assert_eq!(
+            result.info.last_close.converge_time_s,
+            serde_json::Number::from(3)
+        );
         assert_eq!(result.info.last_close.proposers, 35);
         assert_eq!(result.info.load_factor, 1);
         assert_eq!(result.info.network_id, Some(10));

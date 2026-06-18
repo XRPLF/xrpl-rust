@@ -41,3 +41,26 @@ impl<'a> Ping<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::string::ToString;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = Ping::new(Some("ping-1".into()));
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: Ping = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"ping\""));
+    }
+
+    #[test]
+    fn test_get_common_fields() {
+        let mut req = Ping::new(None);
+        assert!(req.get_common_fields().id.is_none());
+        req.get_common_fields_mut().id = Some("x".to_string().into());
+        assert_eq!(req.get_common_fields().id.as_deref(), Some("x"));
+    }
+}

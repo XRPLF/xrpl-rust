@@ -54,3 +54,22 @@ impl<'a> NFTInfo<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = NFTInfo::new(
+            Some("ni-1".into()),
+            "00080000B4F4AFC5FBCBD76873F18006173D2193467D3EE70000099B00000000".into(),
+            None,
+            Some(LedgerIndex::Str("validated".into())),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: NFTInfo = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"nft_info\""));
+    }
+}

@@ -74,3 +74,25 @@ impl<'a> AccountOffers<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serde_round_trip() {
+        let req = AccountOffers::new(
+            Some("aoff-1".into()),
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            None,
+            Some(LedgerIndex::Int(456)),
+            Some(50),
+            Some(true),
+            Some(Marker::Str("abc".into())),
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: AccountOffers = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"command\":\"account_offers\""));
+    }
+}

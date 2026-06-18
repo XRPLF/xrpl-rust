@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/trustSet.test.ts
-//
 // Scenarios:
 //   - base: set a USD trust line to a locally funded issuer
 //

@@ -18,7 +18,7 @@ use crate::{
     },
     models::{
         requests::{self},
-        results::tx::TxVersionMap,
+        results::{tx::TxVersionMap, XRPLRpcError},
         transactions::Transaction,
         Model,
     },
@@ -99,8 +99,8 @@ where
             .request(requests::tx::Tx::new(None, None, None, None, Some(tx_hash.clone())).into())
             .await?;
         if response.is_success() {
-            if let Some(error) = response.error {
-                if error == "txnNotFound" {
+            if let Some(error) = response.error.as_ref() {
+                if response.rpc_error() == Some(XRPLRpcError::TxnNotFound) {
                     continue;
                 } else {
                     return Err(XRPLSubmitAndWaitException::SubmissionFailed(format!(
@@ -196,6 +196,7 @@ mod tests {
         },
     };
 
+    #[cfg(feature = "integration")]
     #[tokio::test]
     async fn test_submit_and_wait() {
         let client = AsyncJsonRpcClient::connect(test_constants::TESTNET_URL.parse().unwrap());
@@ -284,5 +285,87 @@ mod tests {
         assert_eq!(tx1.common_fields.fee, Some("10".into()));
         assert_eq!(tx1.common_fields.sequence, Some(1));
         assert_eq!(tx1.domain, Some(test_constants::EXAMPLE_COM_HEX.into()));
+    }
+
+    #[tokio::test]
+    async fn test_wait_for_final_transaction_result_retries_typed_txn_not_found() {
+        use std::sync::Mutex;
+
+        use crate::{
+            asynch::clients::{exceptions::XRPLClientResult, XRPLClient},
+            models::{requests::XRPLRequest, results::XRPLResponse},
+        };
+        use url::Url;
+
+        struct MockClient {
+            request_count: Mutex<usize>,
+        }
+
+        const HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+
+        impl XRPLClient for MockClient {
+            async fn request_impl<'a: 'b, 'b>(
+                &self,
+                _request: XRPLRequest<'a>,
+            ) -> XRPLClientResult<XRPLResponse<'b>> {
+                let mut request_count = self.request_count.lock().unwrap();
+                *request_count += 1;
+                if *request_count == 1 {
+                    Ok(serde_json::from_str(&alloc::format!(
+                        r#"{{
+                            "status":"success",
+                            "result":{{
+                                "ledger":{{
+                                    "account_hash":"{HASH}",
+                                    "close_flags":0,
+                                    "close_time":0,
+                                    "close_time_resolution":10,
+                                    "closed":true,
+                                    "ledger_hash":"{HASH}",
+                                    "ledger_index":"2",
+                                    "parent_close_time":0,
+                                    "parent_hash":"{HASH}",
+                                    "total_coins":"0",
+                                    "transaction_hash":"{HASH}"
+                                }},
+                                "ledger_hash":"{HASH}",
+                                "ledger_index":2,
+                                "validated":true
+                            }}
+                        }}"#
+                    ))?)
+                } else {
+                    let response: XRPLResponse<'b> = serde_json::from_str(
+                        r#"{
+                            "status":"success",
+                            "error":"txnNotFound",
+                            "error_code":29,
+                            "error_message":"Transaction not found."
+                        }"#,
+                    )?;
+                    assert_eq!(response.rpc_error(), Some(XRPLRpcError::TxnNotFound));
+                    Ok(response)
+                }
+            }
+
+            fn get_host(&self) -> Url {
+                "http://127.0.0.1:5005".parse().unwrap()
+            }
+        }
+
+        let client = MockClient {
+            request_count: Mutex::new(0),
+        };
+
+        let result = wait_for_final_transaction_result(HASH.into(), &client, 1).await;
+        match result {
+            Err(crate::asynch::exceptions::XRPLHelperException::XRPLTransactionHelperError(
+                crate::asynch::transaction::exceptions::XRPLTransactionHelperException::XRPLSubmitAndWaitError(
+                    XRPLSubmitAndWaitException::SubmissionFailed(message),
+                ),
+            )) => assert_eq!(message, "Transaction not included in ledger"),
+            other => panic!("expected typed txnNotFound retry path, got {other:?}"),
+        }
+        assert_eq!(*client.request_count.lock().unwrap(), 2);
     }
 }

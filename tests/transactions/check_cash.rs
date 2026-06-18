@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/checkCash.test.ts
-//
 // Scenarios:
 //   - base: create a Check for 500 drops, then cash it for the exact amount
 
