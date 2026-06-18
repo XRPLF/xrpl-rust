@@ -25,3 +25,4 @@ rustc-ice*
 .local/*
 dev/*
 .playwright-mcp/*
+.worktrees/
