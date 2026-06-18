@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+#[cfg(not(feature = "std"))]
 use alloc::vec;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
