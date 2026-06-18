@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/escrowCancel.test.ts
-//
 // Scenarios:
 //   - base: create a time-locked XRP escrow then cancel it once CancelAfter has passed
 //
@@ -8,7 +6,6 @@
 //   1. Queries account_objects to confirm the escrow exists on-chain
 //   2. Looks up the creating tx to get the validated Sequence (OfferSequence)
 //   3. Waits for close_time >= CancelAfter, then one more ledger_accept
-// This mirrors the xrpl.js pattern exactly (account_objects → tx lookup).
 // An escrow can only be cancelled after CancelAfter passes.
 
 use crate::common::{
@@ -49,13 +46,12 @@ async fn test_escrow_cancel_base() {
         // test_transaction signs, submits, asserts tesSUCCESS, and calls ledger_accept.
         test_transaction(&mut create_tx, &wallet).await;
 
-        // Mirroring xrpl.js: look up the validated Sequence via account_objects → tx query
+        // Look up the validated Sequence via account_objects → tx query
         // instead of reading the autofilled value from the tx struct.  This confirms the
         // escrow actually exists on-chain before we try to cancel it.
         let offer_sequence = get_escrow_offer_sequence(&wallet.classic_address).await;
 
-        // Wait for the validated ledger close_time to reach CancelAfter (mirrors
-        // xrpl.js waitForAndForceProgressLedgerTime(CLOSE_TIME + 3)).
+        // Wait for the validated ledger close_time to reach CancelAfter.
         wait_for_ledger_close_time(cancel_after as u64).await;
         // rippled validates a cancel using the *previous* ledger's close_time,
         // so one more ledger_accept ensures that previous close_time > CancelAfter.

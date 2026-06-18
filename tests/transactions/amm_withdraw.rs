@@ -1,5 +1,3 @@
-// xrpl.js reference: xrpl.js/packages/xrpl/test/integration/transactions/ammWithdraw.test.ts
-//
 // Scenarios:
 //   - single_asset: withdraw 500 XRP drops from an XRP/USD pool (TfSingleAsset flag)
 //

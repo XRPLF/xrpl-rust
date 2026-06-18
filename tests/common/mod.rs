@@ -2,6 +2,7 @@
 
 pub mod amm;
 pub mod constants;
+pub mod payment;
 pub mod xchain;
 
 use anyhow::Result;
@@ -77,7 +78,9 @@ static TEST_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 #[cfg(feature = "std")]
 pub async fn get_client() -> &'static AsyncJsonRpcClient {
     CLIENT
-        .get_or_init(|| async { AsyncJsonRpcClient::connect(Url::parse(STANDALONE_URL).unwrap()) })
+        .get_or_init(|| async {
+            AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap())
+        })
         .await
 }
 
@@ -133,7 +136,7 @@ pub async fn generate_funded_wallet() -> Wallet {
 #[cfg(feature = "std")]
 pub async fn ledger_accept() {
     let _ = reqwest::Client::new()
-        .post(STANDALONE_URL)
+        .post(constants::STANDALONE_URL)
         .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
         .send()
         .await;
@@ -191,9 +194,8 @@ where
 }
 
 /// Look up the OfferSequence for the first escrow owned by `account`.
-/// Mirrors xrpl.js:
-///   const accountObjects = (await client.request({command:'account_objects', account})).result.account_objects
-///   const sequence = (await client.request({command:'tx', transaction: accountObjects[0].PreviousTxnID})).result.tx_json.Sequence
+/// Queries account_objects to find the escrow, then looks up its creating
+/// transaction to extract the validated Sequence number.
 #[cfg(feature = "std")]
 pub async fn get_escrow_offer_sequence(account: &str) -> u32 {
     use xrpl::asynch::clients::XRPLAsyncClient;

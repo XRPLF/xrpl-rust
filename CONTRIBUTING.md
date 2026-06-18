@@ -54,7 +54,7 @@ cargo clippy
 
 ### Running Tests
 
-For integration tests, we use a `rippled` node in standalone mode to test xrpl-rust code against. To set this up, you can either configure and run `rippled` locally, or set up the Docker container `rippleci/rippled` by [following these instructions](#integration-tests). The latter will require you to [install Docker](https://docs.docker.com/get-docker/).
+For integration tests, we use an `xrpld` node in standalone mode to test xrpl-rust code against. To set this up, you can either configure and run `xrpld` locally, or set up the Docker container `rippleci/xrpld` by [following these instructions](#integration-tests). The latter will require you to [install Docker](https://docs.docker.com/get-docker/).
 
 #### Unit Tests
 
@@ -72,29 +72,37 @@ cargo test --release --no-default-features --features embassy-rt,core,utils,wall
 From the `xrpl-rust` folder, run the following commands:
 
 ```bash
-# Sets up the rippled standalone Docker container — skip if you already have it running
-docker run -p 5005:5005 -p 6006:6006 --rm -it --name rippled_standalone \
-  --entrypoint bash rippleci/rippled:develop \
-  -c 'mkdir -p /var/lib/rippled/db/ && rippled -a'
-cargo test --release --features integration,std,json-rpc,helpers
+# Sets up the xrpld standalone Docker container — skip if you already have it running
+docker run -p 5005:5005 -p 6006:6006 --rm -it --name xrpld_standalone \
+  --volume "$PWD/.ci-config/:/etc/xrpld/" \
+  rippleci/xrpld:develop --standalone
+cargo test --release \
+  --features std,json-rpc,helpers,cli,websocket,integration \
+  -- --test-threads=1
 ```
 
 To run a specific group of tests (e.g. escrow):
 
 ```bash
-cargo test --release --features integration,std,json-rpc,helpers escrow
+cargo test --release \
+  --features std,json-rpc,helpers,cli,websocket,integration \
+  escrow -- --test-threads=1
 ```
+
+The feature set matches `.github/workflows/integration_test.yml`; `cli` and
+`websocket` are required for `cli_integration.rs` and the websocket tests in
+`utils.rs` to compile. `--test-threads=1` matches CI and prevents concurrent
+tests from racing on the shared `xrpld` container.
 
 Breaking down the `docker run` command:
 
 - `-p 5005:5005 -p 6006:6006` exposes the HTTP JSON-RPC and WebSocket admin ports.
 - `--rm` closes the container automatically when it exits.
 - `-it` keeps stdin open so you can stop the node with Ctrl-C.
-- `--name rippled_standalone` is an instance name for clarity.
-- `--volume $PWD/.ci-config:/etc/opt/ripple/` mounts `rippled.cfg` so the node binds on `0.0.0.0` and is reachable from the host. It must be an absolute path, so we use `$PWD` instead of `./`.
-- `rippleci/rippled` is an image that is regularly updated with the latest `rippled` releases.
-- `--entrypoint bash rippleci/rippled:develop` manually overrides the entrypoint (for the latest version of rippled on the `develop` branch).
-- `-c 'mkdir -p /var/lib/rippled/db/ && rippled -a'` starts `rippled` in standalone mode, where ledgers only close on demand.
+- `--name xrpld_standalone` is an instance name for clarity.
+- `--volume $PWD/.ci-config/:/etc/xrpld/`: bind-mounts the host directory (left side) into the container (right side). `xrpld.cfg` lives in `$PWD/.ci-config/`, and this command is intended to be run from the root of the `xrpl-rust` project. The `xrpld` binary searches for its configuration file inside `/etc/xrpld/`. An absolute path is required, so we use `$PWD` instead of `./`.
+- `rippleci/xrpld` is an image that is regularly updated with the latest `xrpld` releases (the binary formerly known as `rippled`; see xrpl.js PR #3270).
+- `--standalone` starts `xrpld` in standalone mode, where ledgers only close on demand.
 
 **Notes**
 
@@ -103,24 +111,69 @@ Breaking down the `docker run` command:
 
 ### Coverage
 
-Coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov).
+Coverage is measured with [`cargo-llvm-cov`](https://github.com/taiki-e/cargo-llvm-cov)
+and uploaded to codecov under two separate flags:
 
-Install the tool and run a coverage report locally:
+- **unit** — pure-logic code (models, core, utils, `_serde`, signing). Built
+  with a minimal feature set so network-bound modules are not compiled.
+- **integration** — network-bound code (CLI, async clients, faucet, helpers
+  under `account/`, `ledger/`, `transaction/`). Scoped via
+  `--ignore-filename-regex` so unit-territory files do not dilute the
+  integration metric.
+
+Install the tool once:
 
 ```bash
 cargo install cargo-llvm-cov --locked
-cargo llvm-cov --summary-only
 ```
 
-The CI enforces the following minimum thresholds (current baseline is ~78% lines / ~68% regions / ~75% functions, measured with default features only — integration tests are excluded from coverage):
+#### Unit coverage
 
-| Metric    | Minimum |
-|-----------|---------|
-| Lines     | 75%     |
-| Regions   | 65%     |
-| Functions | 72%     |
+Matches `.github/workflows/unit_test.yml`:
 
-To generate an HTML report and open it in a browser:
+```bash
+cargo llvm-cov \
+  --no-default-features --features std,core,utils,wallet,models \
+  --summary-only \
+  --fail-under-lines 83 \
+  --fail-under-regions 85 \
+  --fail-under-functions 73
+```
+
+The `--fail-under-*` flags mirror the thresholds CI enforces:
+
+| Metric    | Threshold |
+| --------- | --------- |
+| Lines     | 83%       |
+| Regions   | 85%       |
+| Functions | 73%       |
+
+#### Integration coverage
+
+Requires the standalone `xrpld` container running (see [Integration Tests](#integration-tests)).
+Matches `.github/workflows/integration_test.yml`:
+
+```bash
+# Collect coverage from the integration suite (writes raw profile data)
+cargo llvm-cov --no-report --release \
+  --features std,json-rpc,helpers,cli,websocket,integration \
+  --test integration_test --test cli_integration --test funding \
+  --test utils --test test_utils \
+  -- --test-threads=1
+
+# Generate lcov scoped to integration territory
+cargo llvm-cov report --release --lcov --output-path lcov.info \
+  --ignore-filename-regex '(_serde|core|models|utils)/|constants\.rs$|macros\.rs$|lib\.rs$|wallet/(mod|exceptions)\.rs$|tests/'
+```
+
+The codecov integration target is 65%. The `--ignore-filename-regex` value
+mirrors `COVERAGE_IGNORE_REGEX` in the workflow; without it the integration
+metric would be dominated by unit-territory files the integration suite is
+not designed to exercise.
+
+#### HTML report
+
+For local exploration:
 
 ```bash
 cargo llvm-cov --open
