@@ -11,7 +11,7 @@ use crate::models::{
     Currency, FlagCollection, Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 
-use super::vault_common::{validate_hex_blob, validate_nonnegative_integer, validate_vault_id};
+use super::vault_common::{validate_hex_blob, validate_nonnegative_number, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 /// Maximum length, in hex characters, of the VaultCreate `Data` field.
@@ -97,7 +97,7 @@ impl Model for VaultCreate<'_> {
             validate_hex_blob("data", data, MAX_VAULT_DATA_HEX_LEN)?;
         }
         if let Some(maximum) = self.assets_maximum.as_deref() {
-            validate_nonnegative_integer("assets_maximum", maximum)?;
+            validate_nonnegative_number("assets_maximum", maximum)?;
         }
         if let Some(metadata) = self.mptoken_metadata.as_deref() {
             validate_hex_blob(
@@ -729,18 +729,23 @@ mod tests {
     }
 
     #[test]
-    fn test_assets_maximum_fractional_rejected() {
-        let vault_create = VaultCreate {
-            common_fields: CommonFields {
-                account: "rVaultFrac".into(),
-                transaction_type: TransactionType::VaultCreate,
+    fn test_assets_maximum_xrpl_number_accepted() {
+        for assets_maximum in ["100.5", "1e6", "9999999999999999e80"] {
+            let vault_create = VaultCreate {
+                common_fields: CommonFields {
+                    account: "rVaultNumber".into(),
+                    transaction_type: TransactionType::VaultCreate,
+                    ..Default::default()
+                },
+                asset: Currency::XRP(XRP::new()),
+                assets_maximum: Some(assets_maximum.into()),
                 ..Default::default()
-            },
-            asset: Currency::XRP(XRP::new()),
-            assets_maximum: Some("100.5".into()),
-            ..Default::default()
-        };
-        assert!(vault_create.validate().is_err());
+            };
+            assert!(
+                vault_create.validate().is_ok(),
+                "{assets_maximum} should validate"
+            );
+        }
     }
 
     #[test]
