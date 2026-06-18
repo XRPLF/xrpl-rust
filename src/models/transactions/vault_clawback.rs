@@ -74,7 +74,7 @@ impl Model for VaultClawback<'_> {
                     found: value.into(),
                 }
             })?;
-            // rippled VaultClawback::preflight: zero amount is valid (means "all").
+            // xrpld VaultClawback preflight: zero amount is valid (means "all").
             // Only negative values are temBAD_AMOUNT.
             if parsed < 0 {
                 return Err(XRPLModelException::InvalidValue {
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_amount_zero_accepted() {
-        // rippled VaultClawback: zero amount is valid ("claw back all"). Only negative
+        // xrpld VaultClawback: zero amount is valid ("claw back all"). Only negative
         // is temBAD_AMOUNT. Explicit zero is equivalent to omitting the field.
         let clawback = VaultClawback {
             common_fields: CommonFields {

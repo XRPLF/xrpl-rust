@@ -1,6 +1,6 @@
 // XLS-65 SingleAssetVault — VaultCreate integration test stub
 //
-// VaultCreate requires an XLS-65-enabled rippled node. These tests validate
+// VaultCreate requires an XLS-65-enabled xrpld node. These tests validate
 // that the transaction type can be constructed and serialized correctly.
 // Live submission tests will be enabled once XLS-65 is available on devnet.
 

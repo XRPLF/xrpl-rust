@@ -1,6 +1,6 @@
 // XLS-65 SingleAssetVault — VaultDeposit integration test stub
 //
-// VaultDeposit requires an XLS-65-enabled rippled node. These tests validate
+// VaultDeposit requires an XLS-65-enabled xrpld node. These tests validate
 // that the transaction type can be constructed and serialized correctly.
 
 use xrpl::models::transactions::vault_deposit::VaultDeposit;
