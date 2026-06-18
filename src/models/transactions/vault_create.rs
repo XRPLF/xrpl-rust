@@ -11,7 +11,7 @@ use crate::models::{
     Currency, FlagCollection, Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 
-use super::vault_common::{validate_hex_blob, validate_nonnegative_number, validate_vault_id};
+use super::vault_common::{validate_hex_blob, validate_nonnegative_integer, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
 /// Maximum length, in hex characters, of the VaultCreate `Data` field.
@@ -97,7 +97,7 @@ impl Model for VaultCreate<'_> {
             validate_hex_blob("data", data, MAX_VAULT_DATA_HEX_LEN)?;
         }
         if let Some(maximum) = self.assets_maximum.as_deref() {
-            validate_nonnegative_number("assets_maximum", maximum)?;
+            validate_nonnegative_integer("assets_maximum", maximum)?;
         }
         if let Some(metadata) = self.mptoken_metadata.as_deref() {
             validate_hex_blob(
@@ -107,7 +107,8 @@ impl Model for VaultCreate<'_> {
             )?;
         }
         if let Some(domain_id) = self.domain_id.as_deref() {
-            validate_vault_id(domain_id)?;
+            // Check flag constraint before format — user needs to know why the
+            // field is invalid, not just that the hash is malformed.
             if !self.has_flag(&VaultCreateFlag::TfVaultPrivate) {
                 return Err(XRPLModelException::InvalidValue {
                     field: "domain_id".into(),
@@ -115,6 +116,7 @@ impl Model for VaultCreate<'_> {
                     found: domain_id.into(),
                 });
             }
+            validate_vault_id(domain_id)?;
         }
         if let Some(policy) = self.withdrawal_policy {
             if policy != FIRST_COME_FIRST_SERVE_POLICY {
@@ -676,6 +678,105 @@ mod tests {
             mptoken_metadata: Some("ZZZZ".into()),
             ..Default::default()
         };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_domain_id_without_private_flag_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rVaultNoDomain".into(),
+                transaction_type: TransactionType::VaultCreate,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            domain_id: Some(
+                "D0000000000000000000000000000000000000000000000000000000DEADBEEF".into(),
+            ),
+            ..Default::default()
+        };
+        // domain_id present but TfVaultPrivate flag not set — must fail
+        assert!(vault_create.validate().is_err());
+        let err = vault_create.validate().unwrap_err().to_string();
+        // Error should mention the flag constraint, not the hash format
+        assert!(
+            err.contains("domain_id"),
+            "expected domain_id in error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_domain_id_with_private_flag_accepted() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rPrivateVault".into(),
+                transaction_type: TransactionType::VaultCreate,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            domain_id: Some(
+                "D0000000000000000000000000000000000000000000000000000000DEADBEEF".into(),
+            ),
+            ..Default::default()
+        }
+        .with_flag(VaultCreateFlag::TfVaultPrivate)
+        .with_withdrawal_policy(1);
+        assert!(vault_create.validate().is_ok());
+    }
+
+    #[test]
+    fn test_assets_maximum_fractional_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rVaultFrac".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            assets_maximum: Some("100.5".into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_assets_maximum_integer_accepted() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rVaultMax".into(),
+                transaction_type: TransactionType::VaultCreate,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            assets_maximum: Some("1000000000".into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_ok());
+    }
+
+    #[test]
+    fn test_builder_pattern_validates_correctly() {
+        // builder_pattern test sets domain_id without TfVaultPrivate — must fail validate()
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rVaultCreator123".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
+            ..Default::default()
+        }
+        .with_fee("12".into())
+        .with_sequence(100)
+        .with_domain_id("D0000000000000000000000000000000000000000000000000000000DEADBEEF".into())
+        .with_withdrawal_policy(1);
+        // domain_id without TfVaultPrivate must fail
         assert!(vault_create.validate().is_err());
     }
 }

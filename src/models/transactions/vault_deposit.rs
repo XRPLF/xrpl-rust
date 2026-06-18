@@ -320,4 +320,50 @@ mod tests {
 
         assert!(vault_deposit.validate().is_ok());
     }
+
+    #[test]
+    fn test_amount_zero_rejected() {
+        let vault_deposit = VaultDeposit {
+            common_fields: CommonFields {
+                account: "rDepositor".into(),
+                transaction_type: TransactionType::VaultDeposit,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("0")),
+        };
+        assert!(vault_deposit.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_negative_rejected() {
+        let vault_deposit = VaultDeposit {
+            common_fields: CommonFields {
+                account: "rDepositor".into(),
+                transaction_type: TransactionType::VaultDeposit,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::IssuedCurrencyAmount(crate::models::amount::IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rIssuer".into(),
+                "-10".into(),
+            )),
+        };
+        assert!(vault_deposit.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_non_numeric_rejected() {
+        let vault_deposit = VaultDeposit {
+            common_fields: CommonFields {
+                account: "rDepositor".into(),
+                transaction_type: TransactionType::VaultDeposit,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("not-a-number")),
+        };
+        assert!(vault_deposit.validate().is_err());
+    }
 }
