@@ -30,3 +30,5 @@ rustc-ice*
 dev/*
 .playwright-mcp/*
 .worktrees/
+.local/
+.history/

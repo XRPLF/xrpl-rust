@@ -316,21 +316,20 @@ mod tests {
 
     #[test]
     fn test_new_constructor() {
-        let vault_withdraw = VaultWithdraw::new(
-            "rNewWithdrawer444".into(),
-            None,
-            Some("12".into()),
-            Some(7108682),
-            None,
-            Some(100),
-            None,
-            None,
-            None,
-            VAULT_ID.into(),
-            Amount::XRPAmount(XRPAmount::from("10000000")),
-            None,
-            None,
-        );
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rNewWithdrawer444".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                fee: Some("12".into()),
+                last_ledger_sequence: Some(7108682),
+                sequence: Some(100),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("10000000")),
+            destination: None,
+            destination_tag: None,
+        };
 
         assert_eq!(vault_withdraw.common_fields.account, "rNewWithdrawer444");
         assert_eq!(

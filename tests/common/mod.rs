@@ -280,6 +280,7 @@ where
     // detect that a new ledger has been validated after the transaction lands.
     let pre_close = get_ledger_close_time().await;
 
+
     let result = sign_and_submit(tx, client, wallet, true, true)
         .await
         .expect("test_transaction: sign_and_submit failed");

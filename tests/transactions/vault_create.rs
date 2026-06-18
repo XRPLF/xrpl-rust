@@ -1,84 +1,270 @@
-// XLS-65 SingleAssetVault — VaultCreate integration test stub
+// XLS-65 SingleAssetVault — lifecycle integration tests
 //
-// VaultCreate requires an XLS-65-enabled xrpld node. These tests validate
-// that the transaction type can be constructed and serialized correctly.
-// Live submission tests will be enabled once XLS-65 is available on devnet.
+// Tests mirror xrpl.js packages/xrpl/test/integration/transactions/singleAssetVault.test.ts:
+//   - test_vault_lifecycle_iou: full IOU vault lifecycle (create/set/deposit/withdraw/clawback/delete)
+//
+// TODO: implement test_vault_lifecycle_mpt once feat/mpt-binary-codec is merged.
+//       MPTAmount, MPTCurrency, MPTokenIssuanceCreate, and MPTokenAuthorize types are not
+//       available on this branch.
+//
+// Requires an XLS-65-enabled xrpld node (3.2.0+) at localhost:5005.
 
-use xrpl::models::transactions::vault_create::{VaultCreate, VaultCreateFlag};
-use xrpl::models::transactions::{CommonFields, Memo, TransactionType};
-use xrpl::models::{Currency, FlagCollection, IssuedCurrency, Model};
-
-#[test]
-fn test_vault_create_serde_roundtrip() {
-    let vault_create = VaultCreate {
-        common_fields: CommonFields {
-            account: "rVaultCreator123".into(),
-            transaction_type: TransactionType::VaultCreate,
-            signing_pub_key: Some("".into()),
-            ..Default::default()
-        },
-        asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
-        data: None,
-        assets_maximum: None,
-        mptoken_metadata: None,
-        domain_id: None,
-        withdrawal_policy: None,
-        scale: None,
+#[cfg(feature = "integration")]
+mod tests {
+    use crate::common::{
+        generate_funded_wallet, get_client, test_transaction, with_blockchain_lock,
     };
+    use serde_json::Value;
+    use xrpl::asynch::clients::XRPLAsyncClient;
+    use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
+    use xrpl::models::requests::{CommonFields as ReqCommonFields, RequestMethod};
+    use xrpl::models::transactions::account_set::{AccountSet, AccountSetFlag};
+    use xrpl::models::transactions::payment::Payment;
+    use xrpl::models::transactions::trust_set::{TrustSet, TrustSetFlag};
+    use xrpl::models::transactions::vault_clawback::VaultClawback;
+    use xrpl::models::transactions::vault_create::VaultCreate;
+    use xrpl::models::transactions::vault_delete::VaultDelete;
+    use xrpl::models::transactions::vault_deposit::VaultDeposit;
+    use xrpl::models::transactions::vault_set::VaultSet;
+    use xrpl::models::transactions::vault_withdraw::VaultWithdraw;
+    use xrpl::models::transactions::{CommonFields, TransactionType};
+    use xrpl::models::{Amount, Currency, FlagCollection, IssuedCurrency, IssuedCurrencyAmount};
 
-    let json_str = serde_json::to_string(&vault_create).unwrap();
-    let deserialized: VaultCreate = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(vault_create, deserialized);
-}
-
-#[test]
-fn test_vault_create_with_all_optional_fields() {
-    let vault_create = VaultCreate {
-        common_fields: CommonFields {
-            account: "rVaultCreatorFull".into(),
-            transaction_type: TransactionType::VaultCreate,
-            fee: Some("12".into()),
-            sequence: Some(100),
-            flags: FlagCollection::from(vec![VaultCreateFlag::TfVaultPrivate]),
-            ..Default::default()
-        },
-        asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
-        data: Some("48656C6C6F".into()),
-        assets_maximum: Some("1000000000".into()),
-        mptoken_metadata: Some("ABCDEF".into()),
-        domain_id: Some("D0000000000000000000000000000000000000000000000000000000DEADBEEF".into()),
-        withdrawal_policy: Some(1),
-        scale: Some(6),
-    };
-
-    assert!(vault_create.validate().is_ok());
-    let json_str = serde_json::to_string(&vault_create).unwrap();
-    let deserialized: VaultCreate = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(vault_create, deserialized);
-}
-
-#[test]
-fn test_vault_create_builder_pattern() {
-    use xrpl::models::transactions::CommonTransactionBuilder;
-
-    let vault_create = VaultCreate {
-        common_fields: CommonFields {
-            account: "rVaultBuilder".into(),
-            transaction_type: TransactionType::VaultCreate,
-            ..Default::default()
-        },
-        asset: Currency::IssuedCurrency(IssuedCurrency::new("EUR".into(), "rEURIssuer".into())),
-        ..Default::default()
+    fn vault_ao_request(owner: &str) -> AccountObjects<'_> {
+        AccountObjects {
+            common_fields: ReqCommonFields {
+                command: RequestMethod::AccountObjects,
+                id: None,
+            },
+            account: owner.into(),
+            ledger_lookup: None,
+            r#type: Some(AccountObjectType::Vault),
+            deletion_blockers_only: None,
+            limit: None,
+            marker: None,
+        }
     }
-    .with_fee("15".into())
-    .with_sequence(200)
-    .with_memo(Memo {
-        memo_data: Some("vault creation".into()),
-        memo_format: None,
-        memo_type: Some("text".into()),
-    });
 
-    assert_eq!(vault_create.common_fields.fee.as_ref().unwrap().0, "15");
-    assert_eq!(vault_create.common_fields.sequence, Some(200));
-    assert!(vault_create.common_fields.memos.is_some());
+    async fn account_objects_json(owner: &str) -> Value {
+        let client = get_client().await;
+        let resp = client
+            .request(vault_ao_request(owner).into())
+            .await
+            .expect("account_objects request failed");
+        resp.raw_result.unwrap_or(Value::Null)
+    }
+
+    async fn get_vault_id(owner: &str) -> String {
+        let resp = account_objects_json(owner).await;
+        let objects = resp["account_objects"]
+            .as_array()
+            .expect("account_objects array missing");
+        assert!(!objects.is_empty(), "no vault found for {owner}");
+        objects[0]["index"]
+            .as_str()
+            .expect("vault index missing")
+            .to_string()
+    }
+
+    async fn vault_assets_total(owner: &str) -> String {
+        let resp = account_objects_json(owner).await;
+        resp["account_objects"][0]["AssetsTotal"]
+            .as_str()
+            .unwrap_or("0")
+            .to_string()
+    }
+
+    async fn vault_count(owner: &str) -> usize {
+        let resp = account_objects_json(owner).await;
+        resp["account_objects"]
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0)
+    }
+
+    /// Full IOU vault lifecycle:
+    /// AccountSet (DefaultRipple + AllowClawback) → TrustSet → Payment →
+    /// VaultCreate → VaultSet → VaultDeposit → VaultWithdraw → VaultClawback → VaultDelete
+    #[tokio::test]
+    async fn test_vault_lifecycle_iou() {
+        with_blockchain_lock(|| async {
+            let issuer = generate_funded_wallet().await;
+            let vault_owner = generate_funded_wallet().await;
+            let holder = generate_funded_wallet().await;
+            let currency = "USD";
+
+            // 1. Enable DefaultRipple on issuer
+            let mut tx = AccountSet {
+                common_fields: CommonFields {
+                    account: issuer.classic_address.clone().into(),
+                    transaction_type: TransactionType::AccountSet,
+                    ..Default::default()
+                },
+                set_flag: Some(AccountSetFlag::AsfDefaultRipple),
+                ..Default::default()
+            };
+            test_transaction(&mut tx, &issuer).await;
+
+            // 2. Enable clawback on issuer
+            let mut tx = AccountSet {
+                common_fields: CommonFields {
+                    account: issuer.classic_address.clone().into(),
+                    transaction_type: TransactionType::AccountSet,
+                    ..Default::default()
+                },
+                set_flag: Some(AccountSetFlag::AsfAllowTrustLineClawback),
+                ..Default::default()
+            };
+            test_transaction(&mut tx, &issuer).await;
+
+            // 3. Holder establishes trust line
+            let mut trust = TrustSet {
+                common_fields: CommonFields {
+                    account: holder.classic_address.clone().into(),
+                    transaction_type: TransactionType::TrustSet,
+                    ..Default::default()
+                },
+                limit_amount: IssuedCurrencyAmount::new(
+                    currency.into(),
+                    issuer.classic_address.clone().into(),
+                    "100000000".into(),
+                ),
+                ..Default::default()
+            };
+            test_transaction(&mut trust, &holder).await;
+
+            // 4. Issuer sends USD to holder
+            let mut payment = Payment {
+                common_fields: CommonFields {
+                    account: issuer.classic_address.clone().into(),
+                    transaction_type: TransactionType::Payment,
+                    ..Default::default()
+                },
+                destination: holder.classic_address.clone().into(),
+                amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                    currency.into(),
+                    issuer.classic_address.clone().into(),
+                    "1000".into(),
+                )),
+                ..Default::default()
+            };
+            test_transaction(&mut payment, &issuer).await;
+
+            // 5. VaultCreate
+            let mut vault_create = VaultCreate {
+                common_fields: CommonFields {
+                    account: vault_owner.classic_address.clone().into(),
+                    transaction_type: TransactionType::VaultCreate,
+                    ..Default::default()
+                },
+                asset: Currency::IssuedCurrency(IssuedCurrency::new(
+                    currency.into(),
+                    issuer.classic_address.clone().into(),
+                )),
+                withdrawal_policy: Some(1),
+                data: Some(hex::encode("vault metadata").to_uppercase().into()),
+                mptoken_metadata: Some(hex::encode("share metadata").to_uppercase().into()),
+                assets_maximum: Some("9999900000000000000000000".into()),
+                scale: Some(2),
+                ..Default::default()
+            };
+            test_transaction(&mut vault_create, &vault_owner).await;
+
+            let vault_id = get_vault_id(&vault_owner.classic_address).await;
+
+            // 6. VaultSet — update AssetsMaximum and Data
+            let mut vault_set = VaultSet {
+                common_fields: CommonFields {
+                    account: vault_owner.classic_address.clone().into(),
+                    transaction_type: TransactionType::VaultSet,
+                    fee: None,
+                    ..Default::default()
+                },
+                vault_id: vault_id.clone().into(),
+                assets_maximum: Some("1000".into()),
+                data: Some(hex::encode("updated metadata").to_uppercase().into()),
+                domain_id: None,
+            };
+            test_transaction(&mut vault_set, &vault_owner).await;
+
+            // 7. VaultDeposit — deposit 10 USD
+            let mut vault_deposit = VaultDeposit {
+                common_fields: CommonFields {
+                    account: holder.classic_address.clone().into(),
+                    transaction_type: TransactionType::VaultDeposit,
+                    fee: None,
+                    ..Default::default()
+                },
+                vault_id: vault_id.clone().into(),
+                amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                    currency.into(),
+                    issuer.classic_address.clone().into(),
+                    "10".into(),
+                )),
+            };
+            test_transaction(&mut vault_deposit, &holder).await;
+
+            let after_deposit = vault_assets_total(&vault_owner.classic_address).await;
+            assert_eq!(after_deposit, "10", "AssetsTotal after deposit");
+
+            // 8. VaultWithdraw — withdraw 5 USD
+            let mut vault_withdraw = VaultWithdraw {
+                common_fields: CommonFields {
+                    account: holder.classic_address.clone().into(),
+                    transaction_type: TransactionType::VaultWithdraw,
+                    fee: None,
+                    ..Default::default()
+                },
+                vault_id: vault_id.clone().into(),
+                amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                    currency.into(),
+                    issuer.classic_address.clone().into(),
+                    "5".into(),
+                )),
+                destination: Some(holder.classic_address.clone().into()),
+                destination_tag: Some(10),
+            };
+            test_transaction(&mut vault_withdraw, &holder).await;
+
+            let after_withdraw = vault_assets_total(&vault_owner.classic_address).await;
+            assert_eq!(after_withdraw, "5", "AssetsTotal after withdrawal");
+
+            // 9. VaultClawback — claw back 5 USD
+            let mut vault_clawback = VaultClawback {
+                common_fields: CommonFields {
+                    account: issuer.classic_address.clone().into(),
+                    transaction_type: TransactionType::VaultClawback,
+                    fee: None,
+                    ..Default::default()
+                },
+                vault_id: vault_id.clone().into(),
+                holder: holder.classic_address.clone().into(),
+                amount: Some(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                    currency.into(),
+                    issuer.classic_address.clone().into(),
+                    "5".into(),
+                ))),
+            };
+            test_transaction(&mut vault_clawback, &issuer).await;
+
+            // 10. VaultDelete
+            let mut vault_delete = VaultDelete {
+                common_fields: CommonFields {
+                    account: vault_owner.classic_address.clone().into(),
+                    transaction_type: TransactionType::VaultDelete,
+                    fee: None,
+                    ..Default::default()
+                },
+                vault_id: vault_id.into(),
+            };
+            test_transaction(&mut vault_delete, &vault_owner).await;
+
+            assert_eq!(
+                vault_count(&vault_owner.classic_address).await,
+                0,
+                "vault should be deleted"
+            );
+        })
+        .await;
+    }
 }
