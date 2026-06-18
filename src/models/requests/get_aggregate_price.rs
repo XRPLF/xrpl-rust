@@ -41,8 +41,8 @@ pub struct GetAggregatePrice<'a> {
     /// are returned in addition to the full-set statistics.
     pub trim: Option<u8>,
     /// Time range in seconds for filtering out older price data. Default 0
-    /// (no filtering).
-    pub trim_threshold: Option<u32>,
+    /// (no filtering). Maps to rippled's `time_threshold` field.
+    pub time_threshold: Option<u32>,
 }
 
 impl Model for GetAggregatePrice<'_> {}
@@ -64,7 +64,7 @@ impl<'a> GetAggregatePrice<'a> {
         quote_asset: Cow<'a, str>,
         oracles: Vec<OracleDescriptor<'a>>,
         trim: Option<u8>,
-        trim_threshold: Option<u32>,
+        time_threshold: Option<u32>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -75,7 +75,7 @@ impl<'a> GetAggregatePrice<'a> {
             quote_asset,
             oracles,
             trim,
-            trim_threshold,
+            time_threshold,
         }
     }
 }
@@ -125,7 +125,7 @@ mod tests {
         );
         let serialized = serde_json::to_string(&req).unwrap();
         assert!(serialized.contains("\"trim\":20"));
-        assert!(serialized.contains("\"trim_threshold\":60"));
+        assert!(serialized.contains("\"time_threshold\":60"));
         let deserialized: GetAggregatePrice = serde_json::from_str(&serialized).unwrap();
         assert_eq!(req, deserialized);
     }
