@@ -1,14 +1,7 @@
 // xrpl.js reference: n/a (XLS-47 price oracle support)
-//
-// Scenarios:
-//   - base: construct and validate an OracleDelete transaction
-//
-// NOTE: OracleDelete requires a live rippled with amendment support for price
-// oracles (XLS-47). These tests validate type construction and serialization
-// without submitting to a network.
 
 use crate::common::{
-    constants::{ORACLE_ASSET_CLASS, ORACLE_PROVIDER, ORACLE_URI, TEST_ACCOUNT},
+    constants::{ORACLE_ASSET_CLASS, ORACLE_PROVIDER, ORACLE_URI},
     generate_funded_wallet, get_ledger_close_time, submit_tx, test_transaction,
     with_blockchain_lock, SubmitOptions,
 };
@@ -19,26 +12,6 @@ use xrpl::models::results::account_objects::AccountObjects as AccountObjectsResu
 use xrpl::models::transactions::oracle_delete::OracleDelete;
 use xrpl::models::transactions::oracle_set::OracleSet;
 use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
-
-#[test]
-fn test_oracle_delete_construction() {
-    let oracle_delete = OracleDelete {
-        common_fields: CommonFields {
-            account: TEST_ACCOUNT.into(),
-            transaction_type: TransactionType::OracleDelete,
-            fee: Some("12".into()),
-            sequence: Some(391),
-            ..Default::default()
-        },
-        oracle_document_id: 1,
-    };
-
-    assert_eq!(
-        oracle_delete.common_fields.transaction_type,
-        TransactionType::OracleDelete
-    );
-    assert_eq!(oracle_delete.oracle_document_id, 1);
-}
 
 #[tokio::test]
 async fn test_oracle_delete_submit() {

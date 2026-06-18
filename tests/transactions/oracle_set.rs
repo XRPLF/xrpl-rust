@@ -1,14 +1,7 @@
 // xrpl.js reference: n/a (XLS-47 price oracle support)
-//
-// Scenarios:
-//   - base: construct and validate an OracleSet transaction
-//
-// NOTE: OracleSet requires a live rippled with amendment support for price
-// oracles (XLS-47). These tests validate type construction and serialization
-// without submitting to a network.
 
 use crate::common::{
-    constants::{ORACLE_ASSET_CLASS, ORACLE_PROVIDER, ORACLE_URI, TEST_ACCOUNT},
+    constants::{ORACLE_ASSET_CLASS, ORACLE_PROVIDER, ORACLE_URI},
     generate_funded_wallet, get_ledger_close_time, submit_tx, test_transaction,
     with_blockchain_lock, SubmitOptions,
 };
@@ -19,37 +12,6 @@ use xrpl::models::results::account_objects::AccountObjects as AccountObjectsResu
 use xrpl::models::transactions::oracle_set::OracleSet;
 use xrpl::models::transactions::{CommonFields, PriceData, TransactionType};
 use xrpl::models::Model;
-
-#[test]
-fn test_oracle_set_construction() {
-    let oracle_set = OracleSet {
-        common_fields: CommonFields {
-            account: TEST_ACCOUNT.into(),
-            transaction_type: TransactionType::OracleSet,
-            fee: Some("12".into()),
-            sequence: Some(391),
-            ..Default::default()
-        },
-        oracle_document_id: 1,
-        provider: Some(ORACLE_PROVIDER.into()),
-        uri: Some(ORACLE_URI.into()),
-        asset_class: Some(ORACLE_ASSET_CLASS.into()),
-        last_update_time: 743609014,
-        price_data_series: vec![PriceData {
-            base_asset: "EUR".into(),
-            quote_asset: "USD".into(),
-            asset_price: Some("2E4".into()),
-            scale: Some(1),
-        }],
-    };
-
-    assert_eq!(
-        oracle_set.common_fields.transaction_type,
-        TransactionType::OracleSet
-    );
-    assert_eq!(oracle_set.oracle_document_id, 1);
-    assert_eq!(oracle_set.price_data_series.len(), 1);
-}
 
 #[tokio::test]
 async fn test_oracle_set_submit() {
