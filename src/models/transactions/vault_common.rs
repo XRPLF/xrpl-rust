@@ -67,13 +67,8 @@ pub(crate) fn validate_hex_blob(
             found: value.to_string(),
         });
     }
-    if value.len() > max_hex_chars {
-        return Err(XRPLModelException::ValueTooLong {
-            field: field.to_string(),
-            max: max_hex_chars,
-            found: value.len(),
-        });
-    }
+    // Check hex content before length so the diagnostic is "not hex"
+    // rather than "too long" when both conditions apply.
     if !value.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(XRPLModelException::InvalidValueFormat {
             field: field.to_string(),
@@ -81,11 +76,23 @@ pub(crate) fn validate_hex_blob(
             found: value.to_string(),
         });
     }
+    if value.len() > max_hex_chars {
+        return Err(XRPLModelException::ValueTooLong {
+            field: field.to_string(),
+            max: max_hex_chars,
+            found: value.len(),
+        });
+    }
     Ok(())
 }
 
 pub(crate) fn validate_nonnegative_number(field: &'static str, value: &str) -> XRPLModelResult<()> {
-    let parsed = BigDecimal::from_str(value)?;
+    let parsed =
+        BigDecimal::from_str(value).map_err(|_| XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "a valid decimal number".to_string(),
+            found: value.to_string(),
+        })?;
     if parsed < 0 {
         return Err(XRPLModelException::InvalidValue {
             field: field.to_string(),
@@ -105,7 +112,12 @@ pub(crate) fn validate_positive_amount(
         Amount::IssuedCurrencyAmount(amount) => amount.value.as_ref(),
         Amount::XRPAmount(amount) => amount.0.as_ref(),
     };
-    let parsed = BigDecimal::from_str(value)?;
+    let parsed =
+        BigDecimal::from_str(value).map_err(|_| XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "a valid decimal number".to_string(),
+            found: value.to_string(),
+        })?;
     if parsed <= 0 {
         return Err(XRPLModelException::InvalidValue {
             field: field.to_string(),
