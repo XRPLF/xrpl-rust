@@ -60,7 +60,7 @@ pub(crate) fn validate_hex_blob(
     value: &str,
     max_hex_chars: usize,
 ) -> XRPLModelResult<()> {
-    if value.is_empty() || value.len() % 2 != 0 {
+    if value.is_empty() || !value.len().is_multiple_of(2) {
         return Err(XRPLModelException::InvalidValueFormat {
             field: field.to_string(),
             format: "non-empty even-length ASCII hexadecimal".to_string(),
@@ -86,7 +86,7 @@ pub(crate) fn validate_hex_blob(
 
 pub(crate) fn validate_nonnegative_number(field: &'static str, value: &str) -> XRPLModelResult<()> {
     let parsed = BigDecimal::from_str(value)?;
-    if parsed < BigDecimal::from(0) {
+    if parsed < 0 {
         return Err(XRPLModelException::InvalidValue {
             field: field.to_string(),
             expected: "a nonnegative number".to_string(),
@@ -106,7 +106,7 @@ pub(crate) fn validate_positive_amount(
         Amount::XRPAmount(amount) => amount.0.as_ref(),
     };
     let parsed = BigDecimal::from_str(value)?;
-    if parsed <= BigDecimal::from(0) {
+    if parsed <= 0 {
         return Err(XRPLModelException::InvalidValue {
             field: field.to_string(),
             expected: "a positive amount".to_string(),
