@@ -286,7 +286,7 @@ mod cli_tests {
     #[test]
     fn test_get_fee() {
         assert_cli_command(
-            &["server", "fee"],
+            &["server", "fee", "--url", constants::TEST_URL],
             "Current network fee:",
             &["Failed to get network fee"],
         );
