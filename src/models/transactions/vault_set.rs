@@ -7,7 +7,7 @@ use crate::models::amount::XRPAmount;
 use crate::models::{FlagCollection, Model, NoFlags, XRPLModelException, XRPLModelResult};
 
 use super::vault_common::{
-    validate_hash256, validate_hex_blob, validate_nonnegative_number, validate_vault_id,
+    validate_hash256, validate_hex_blob, validate_nonnegative_integer, validate_vault_id,
 };
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
 
@@ -54,7 +54,7 @@ impl Model for VaultSet<'_> {
             validate_hex_blob("data", data, MAX_VAULT_DATA_HEX_LEN)?;
         }
         if let Some(maximum) = self.assets_maximum.as_deref() {
-            validate_nonnegative_number("assets_maximum", maximum)?;
+            validate_nonnegative_integer("assets_maximum", maximum)?;
         }
         if let Some(domain_id) = self.domain_id.as_deref() {
             validate_hash256("domain_id", domain_id)?;
@@ -403,6 +403,38 @@ mod tests {
         assert_eq!(vault_set.data, Some("4E6577446174614F6E6C79".into()));
         assert!(vault_set.assets_maximum.is_none());
         assert!(vault_set.domain_id.is_none());
+        assert!(vault_set.validate().is_ok());
+    }
+
+    #[test]
+    fn test_assets_maximum_fractional_rejected() {
+        let vault_set = VaultSet {
+            common_fields: CommonFields {
+                account: "rVaultFrac".into(),
+                transaction_type: TransactionType::VaultSet,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            assets_maximum: Some("100.5".into()),
+            ..Default::default()
+        };
+        assert!(vault_set.validate().is_err());
+    }
+
+    #[test]
+    fn test_assets_maximum_integer_accepted() {
+        let vault_set = VaultSet {
+            common_fields: CommonFields {
+                account: "rVaultMax".into(),
+                transaction_type: TransactionType::VaultSet,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            assets_maximum: Some("2000000000".into()),
+            ..Default::default()
+        };
         assert!(vault_set.validate().is_ok());
     }
 }

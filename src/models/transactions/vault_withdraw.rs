@@ -399,4 +399,56 @@ mod tests {
 
         assert!(vault_withdraw.validate().is_ok());
     }
+
+    #[test]
+    fn test_amount_zero_rejected() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("0")),
+            destination: None,
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_negative_rejected() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::IssuedCurrencyAmount(crate::models::amount::IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rIssuer".into(),
+                "-5".into(),
+            )),
+            destination: None,
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_non_numeric_rejected() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("bad")),
+            destination: None,
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_err());
+    }
 }

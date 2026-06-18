@@ -86,6 +86,22 @@ pub(crate) fn validate_hex_blob(
     Ok(())
 }
 
+/// Validate a field that must be a non-negative integer string (digits only, no decimal).
+/// Used for AssetsMaximum which is serialized as a UInt64 integer on the wire.
+pub(crate) fn validate_nonnegative_integer(
+    field: &'static str,
+    value: &str,
+) -> XRPLModelResult<()> {
+    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "a non-negative integer string (digits only)".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn validate_nonnegative_number(field: &'static str, value: &str) -> XRPLModelResult<()> {
     let parsed =
         BigDecimal::from_str(value).map_err(|_| XRPLModelException::InvalidValueFormat {
@@ -171,5 +187,26 @@ mod tests {
     fn test_validate_hex_blob_rejects_empty_or_odd_length() {
         assert!(validate_hex_blob("data", "", 512).is_err());
         assert!(validate_hex_blob("data", "ABC", 512).is_err());
+    }
+
+    #[test]
+    fn test_validate_nonnegative_integer_accepts_valid() {
+        assert!(validate_nonnegative_integer("f", "0").is_ok());
+        assert!(validate_nonnegative_integer("f", "1000000000").is_ok());
+        assert!(validate_nonnegative_integer("f", "9999999999999999").is_ok());
+    }
+
+    #[test]
+    fn test_validate_nonnegative_integer_rejects_fractional() {
+        assert!(validate_nonnegative_integer("f", "100.5").is_err());
+        assert!(validate_nonnegative_integer("f", "1e6").is_err());
+        assert!(validate_nonnegative_integer("f", "1.0").is_err());
+    }
+
+    #[test]
+    fn test_validate_nonnegative_integer_rejects_empty_and_nonnumeric() {
+        assert!(validate_nonnegative_integer("f", "").is_err());
+        assert!(validate_nonnegative_integer("f", "abc").is_err());
+        assert!(validate_nonnegative_integer("f", "-5").is_err());
     }
 }
