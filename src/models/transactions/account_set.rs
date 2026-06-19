@@ -65,18 +65,19 @@ pub enum AccountSetFlag {
     /// on this account's behalf. Specify the authorized account in the
     /// NFTokenMinter field of the AccountRoot object.
     AsfAuthorizedNFTokenMinter = 10,
+    AsfDisallowIncomingNFTokenOffer = 12,
     /// Disallow incoming Checks from other accounts.
-    AsfDisallowIncomingCheck = 11,
+    AsfDisallowIncomingCheck = 13,
     /// Disallow incoming Payment Channels from other accounts.
-    AsfDisallowIncomingPayChan = 12,
+    AsfDisallowIncomingPayChan = 14,
     /// Disallow incoming trust lines from other accounts.
-    AsfDisallowIncomingTrustline = 13,
-    /// Disallow incoming NFToken offers from other accounts.
-    AsfDisallowIncomingNFTokenOffer = 14,
-    /// Disallow incoming trust lines from new accounts.
-    AsfDisallowIncomingTrustlineV2 = 15,
-    /// Allow the account to claw back tokens it issued via trust lines.
+    AsfDisallowIncomingTrustline = 15,
+    /// Allow this account to claw back tokens it has issued on trust lines.
+    /// Can only be set if the account has no trust lines, offers, escrows,
+    /// payment channels, checks, or signer lists.
     AsfAllowTrustLineClawback = 16,
+    /// Allow this account to lock tokens it has issued (TokenEscrow).
+    AsfAllowTrustLineLocking = 17,
 }
 
 /// An AccountSet transaction modifies the properties of an
@@ -425,6 +426,7 @@ impl FromStr for AccountSetFlag {
                 Ok(AccountSetFlag::AsfDisallowIncomingNFTokenOffer)
             }
             "asfAllowTrustLineClawback" => Ok(AccountSetFlag::AsfAllowTrustLineClawback),
+            "asfAllowTrustLineLocking" => Ok(AccountSetFlag::AsfAllowTrustLineLocking),
             _ => Err(()),
         }
     }
