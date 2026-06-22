@@ -644,4 +644,110 @@ mod tests {
         let round_trip: MPTokenMetadata = serde_json::from_value(decoded).unwrap();
         assert_eq!(round_trip, metadata);
     }
+
+    /// Hex-encode a JSON value the way the ledger stores it, then validate it.
+    fn validate_json(value: serde_json::Value) -> Vec<String> {
+        let hex = hex::encode_upper(serde_json::to_string(&value).unwrap().as_bytes());
+        validate_mptoken_metadata(&hex)
+    }
+
+    #[test]
+    fn test_validate_rejects_non_hex_input() {
+        assert_eq!(
+            validate_mptoken_metadata("xyz"),
+            vec!["MPTokenMetadata must be in hex format.".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_validate_reports_undecodable_hex() {
+        // Valid hex characters but an odd length -> hex decode fails.
+        let odd = validate_mptoken_metadata("ABC");
+        assert_eq!(odd.len(), 1);
+        assert!(odd[0].starts_with("MPTokenMetadata is not properly formatted as JSON -"));
+
+        // Decodes to 0xFF, which is not valid UTF-8.
+        let bad_utf8 = validate_mptoken_metadata("FF");
+        assert_eq!(bad_utf8.len(), 1);
+        assert!(bad_utf8[0].starts_with("MPTokenMetadata is not properly formatted as JSON -"));
+    }
+
+    #[test]
+    fn test_validate_reports_both_forms_for_every_field() {
+        use serde_json::json;
+
+        let base = || {
+            json!({
+                "ticker": "TBILL",
+                "name": "T-Bill",
+                "icon": "https://example.org/icon.png",
+                "asset_class": "rwa",
+                "asset_subclass": "treasury",
+                "issuer_name": "Issuer"
+            })
+        };
+        assert!(validate_json(base()).is_empty(), "baseline should be valid");
+
+        // Adding a single compact-form key conflicts with its long form.
+        let single_key_cases = [
+            ("n", json!("dup"), "name/n"),
+            ("i", json!("https://dup"), "icon/i"),
+            ("in", json!("dup"), "issuer_name/in"),
+            ("ac", json!("rwa"), "asset_class/ac"),
+            ("as", json!("treasury"), "asset_subclass/as"),
+        ];
+        for (key, value, prefix) in single_key_cases {
+            let mut obj = base();
+            obj[key] = value;
+            assert_eq!(
+                validate_json(obj),
+                vec![format!(
+                    "{prefix}: both long and compact forms present. expected only one."
+                )],
+                "field {prefix}"
+            );
+        }
+
+        // desc / uris / additional_info are optional, so set both forms explicitly.
+        let mut desc = base();
+        desc["desc"] = json!("a");
+        desc["d"] = json!("b");
+        assert_eq!(
+            validate_json(desc),
+            vec!["desc/d: both long and compact forms present. expected only one.".to_string()]
+        );
+
+        let mut uris = base();
+        uris["uris"] = json!([{ "uri": "https://x", "category": "website", "title": "T" }]);
+        uris["us"] = json!([{ "u": "https://x", "c": "website", "t": "T" }]);
+        assert_eq!(
+            validate_json(uris),
+            vec!["uris/us: both long and compact forms present. expected only one.".to_string()]
+        );
+
+        let mut info = base();
+        info["additional_info"] = json!("x");
+        info["ai"] = json!("y");
+        assert_eq!(
+            validate_json(info),
+            vec![
+                "additional_info/ai: both long and compact forms present. expected only one."
+                    .to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_encode_decode_preserves_non_object_uri_elements() {
+        use serde_json::json;
+
+        // Non-object entries in a uris/us array pass through encode/decode unchanged.
+        let value = json!({ "ticker": "TBILL", "uris": [123, "not-an-object"] });
+        let encoded = encode_mptoken_metadata(&value).unwrap();
+        let decoded = decode_mptoken_metadata(&encoded).unwrap();
+        assert_eq!(
+            decoded,
+            json!({ "ticker": "TBILL", "uris": [123, "not-an-object"] })
+        );
+    }
 }
