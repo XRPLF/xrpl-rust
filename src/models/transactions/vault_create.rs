@@ -784,4 +784,127 @@ mod tests {
         // domain_id without TfVaultPrivate must fail
         assert!(vault_create.validate().is_err());
     }
+
+    #[test]
+    fn test_scale_on_mpt_asset_rejected() {
+        use crate::models::currency::MPTCurrency;
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rMPTScaleVault".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::MPTCurrency(MPTCurrency::new(
+                "000000016B4E90A4B36D74F6E16A5BED41EBD7AA37B19B89".into(),
+            )),
+            scale: Some(6),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_scale_on_xrp_asset_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rXRPScaleVault".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            scale: Some(0),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_scale_too_high_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rScaleTooHigh".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            scale: Some(19), // MAX_VAULT_SCALE is 18
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_scale_zero_on_iou_accepted() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rScaleZero".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            scale: Some(0),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_ok());
+    }
+
+    #[test]
+    fn test_scale_max_on_iou_accepted() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rScaleMax".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            scale: Some(18),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_withdrawal_policy_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rBadPolicy".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            withdrawal_policy: Some(2), // Only 1 is valid
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_assets_maximum_negative_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rNegMaxVault".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            assets_maximum: Some("-1000".into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
+
+    #[test]
+    fn test_assets_maximum_non_numeric_rejected() {
+        let vault_create = VaultCreate {
+            common_fields: CommonFields {
+                account: "rBadMaxVault".into(),
+                transaction_type: TransactionType::VaultCreate,
+                ..Default::default()
+            },
+            asset: Currency::XRP(XRP::new()),
+            assets_maximum: Some("not-a-number".into()),
+            ..Default::default()
+        };
+        assert!(vault_create.validate().is_err());
+    }
 }

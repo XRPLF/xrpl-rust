@@ -450,4 +450,64 @@ mod tests {
         };
         assert!(vault_withdraw.validate().is_err());
     }
+
+    #[test]
+    fn test_amount_ica_non_numeric_rejected() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rIssuer".into(),
+                "not-a-number".into(),
+            )),
+            destination: None,
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_err());
+    }
+
+    #[test]
+    fn test_amount_mpt_positive_accepted() {
+        use crate::models::amount::MPTAmount;
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::MPTAmount(MPTAmount {
+                mpt_issuance_id: "000000016B4E90A4B36D74F6E16A5BED41EBD7AA37B19B89".into(),
+                value: "1000".into(),
+            }),
+            destination: None,
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_ok());
+    }
+
+    #[test]
+    fn test_amount_mpt_zero_rejected() {
+        use crate::models::amount::MPTAmount;
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::MPTAmount(MPTAmount {
+                mpt_issuance_id: "000000016B4E90A4B36D74F6E16A5BED41EBD7AA37B19B89".into(),
+                value: "0".into(),
+            }),
+            destination: None,
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_err());
+    }
 }

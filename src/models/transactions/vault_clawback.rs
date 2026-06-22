@@ -7,6 +7,7 @@ use serde_with::skip_serializing_none;
 use bigdecimal::BigDecimal;
 use core::str::FromStr;
 
+use crate::core::addresscodec::is_valid_classic_address;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
@@ -55,6 +56,13 @@ impl Model for VaultClawback<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
         validate_vault_id(&self.vault_id)?;
+        if !is_valid_classic_address(self.holder.as_ref()) {
+            return Err(XRPLModelException::InvalidValue {
+                field: "holder".into(),
+                expected: "a valid classic account address".into(),
+                found: self.holder.as_ref().into(),
+            });
+        }
         if let Some(amount) = &self.amount {
             let value = match amount {
                 Amount::MPTAmount(amount) => amount.value.as_ref(),
@@ -359,16 +367,16 @@ mod tests {
     fn test_validate() {
         let vault_clawback = VaultClawback {
             common_fields: CommonFields {
-                account: "rValidateIssuer777".into(),
+                account: ACCOUNT_ISSUER.into(),
                 transaction_type: TransactionType::VaultClawback,
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
-            holder: "rValidateHolder888".into(),
+            holder: ACCOUNT_HOLDER.into(),
             amount: Some(
                 crate::models::IssuedCurrencyAmount::new(
                     "USD".into(),
-                    "rIssuer".into(),
+                    ACCOUNT_ISSUER.into(),
                     "100".into(),
                 )
                 .into(),
@@ -384,19 +392,34 @@ mod tests {
     fn test_clawback_all_no_amount() {
         let vault_clawback = VaultClawback {
             common_fields: CommonFields {
-                account: "rIssuerAll999".into(),
+                account: ACCOUNT_ISSUER.into(),
                 transaction_type: TransactionType::VaultClawback,
                 fee: Some("12".into()),
                 sequence: Some(200),
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
-            holder: "rHolderAll000".into(),
+            holder: ACCOUNT_HOLDER.into(),
             amount: None,
         };
 
         assert!(vault_clawback.amount.is_none());
         assert!(vault_clawback.validate().is_ok());
+    }
+
+    #[test]
+    fn test_holder_invalid_rejected() {
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: "notanaddress".into(),
+            amount: None,
+        };
+        assert!(clawback.validate().is_err());
     }
 
     #[test]
@@ -508,5 +531,63 @@ mod tests {
             )),
         };
         assert!(clawback.validate().is_ok());
+    }
+
+    #[test]
+    fn test_amount_mpt_positive_accepted() {
+        use crate::models::amount::MPTAmount;
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::MPTAmount(MPTAmount {
+                mpt_issuance_id: "000000016B4E90A4B36D74F6E16A5BED41EBD7AA37B19B89".into(),
+                value: "500".into(),
+            })),
+        };
+        assert!(clawback.validate().is_ok());
+    }
+
+    #[test]
+    fn test_amount_mpt_negative_rejected() {
+        use crate::models::amount::MPTAmount;
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: Some(Amount::MPTAmount(MPTAmount {
+                mpt_issuance_id: "000000016B4E90A4B36D74F6E16A5BED41EBD7AA37B19B89".into(),
+                value: "-1".into(),
+            })),
+        };
+        assert!(clawback.validate().is_err());
+    }
+
+    #[test]
+    fn test_vault_id_invalid_rejected() {
+        // vault_id too short
+        let clawback = VaultClawback {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::VaultClawback,
+                ..Default::default()
+            },
+            vault_id: "TOOSHORT".into(),
+            holder: ACCOUNT_HOLDER.into(),
+            amount: None,
+        };
+        assert!(clawback.validate().is_err());
     }
 }
