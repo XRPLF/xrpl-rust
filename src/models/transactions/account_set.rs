@@ -77,6 +77,7 @@ pub enum AccountSetFlag {
     /// This flag can only be set if the account has no trust lines.
     /// Once set, it cannot be unset.
     AsfAllowTrustLineClawback = 16,
+    AsfAllowTrustLineLocking = 17,
 }
 
 /// An AccountSet transaction modifies the properties of an
@@ -425,6 +426,7 @@ impl FromStr for AccountSetFlag {
                 Ok(AccountSetFlag::AsfDisallowIncomingNFTokenOffer)
             }
             "asfAllowTrustLineClawback" => Ok(AccountSetFlag::AsfAllowTrustLineClawback),
+            "asfAllowTrustLineLocking" => Ok(AccountSetFlag::AsfAllowTrustLineLocking),
             _ => Err(()),
         }
     }
