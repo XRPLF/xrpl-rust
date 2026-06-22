@@ -370,4 +370,96 @@ mod tests {
         assert!(clawback.common_fields.fee.is_none());
         assert!(clawback.common_fields.sequence.is_none());
     }
+
+    #[test]
+    fn test_new_constructor() {
+        let clawback = Clawback::new(
+            "rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S".into(),
+            None,
+            Some("12".into()),
+            Some(7108682),
+            None,
+            Some(123),
+            None,
+            Some(12345),
+            None,
+            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "FOO".into(),
+                "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                "314.159".into(),
+            )),
+            None,
+        );
+
+        assert_eq!(
+            clawback.common_fields.account,
+            "rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S"
+        );
+        assert_eq!(
+            clawback.common_fields.transaction_type,
+            TransactionType::Clawback
+        );
+        assert_eq!(clawback.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(clawback.common_fields.sequence, Some(123));
+        assert_eq!(clawback.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(clawback.common_fields.source_tag, Some(12345));
+        assert!(clawback.holder.is_none());
+        assert!(clawback.validate().is_ok());
+    }
+
+    #[test]
+    fn test_with_holder_builder() {
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: "rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S".into(),
+                transaction_type: TransactionType::Clawback,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "FOO".into(),
+                "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                "314.159".into(),
+            )),
+            ..Default::default()
+        }
+        .with_holder("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into());
+
+        assert_eq!(
+            clawback.holder.as_deref(),
+            Some("rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW")
+        );
+    }
+
+    #[test]
+    fn test_transaction_trait_getters() {
+        let mut clawback = Clawback {
+            common_fields: CommonFields {
+                account: "rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S".into(),
+                transaction_type: TransactionType::Clawback,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "FOO".into(),
+                "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW".into(),
+                "314.159".into(),
+            )),
+            holder: None,
+        };
+
+        // Route explicitly through the `Transaction` trait. `get_mut_common_fields`
+        // is also defined on `CommonTransactionBuilder`, so the fully-qualified
+        // call disambiguates which impl is exercised.
+        assert_eq!(
+            Transaction::get_transaction_type(&clawback),
+            &TransactionType::Clawback
+        );
+        assert_eq!(
+            Transaction::get_common_fields(&clawback).account,
+            "rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S"
+        );
+
+        let common_mut = Transaction::get_mut_common_fields(&mut clawback);
+        common_mut.sequence = Some(42);
+        assert_eq!(clawback.common_fields.sequence, Some(42));
+    }
 }
