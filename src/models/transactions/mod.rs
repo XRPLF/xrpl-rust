@@ -22,6 +22,8 @@ pub mod nftoken_create_offer;
 pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
+pub mod oracle_delete;
+pub mod oracle_set;
 pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
@@ -87,6 +89,8 @@ pub enum TransactionType {
     NFTokenMint,
     OfferCancel,
     OfferCreate,
+    OracleDelete,
+    OracleSet,
     #[default]
     Payment,
     PaymentChannelClaim,
@@ -570,6 +574,99 @@ pub struct Signer {
     pub txn_signature: String,
     pub signing_pub_key: String,
 }
+}
+
+serde_with_tag! {
+/// Represents a single price data entry in an Oracle's PriceDataSeries.
+///
+/// See OracleSet:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/oracleset>`
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct PriceData {
+    pub base_asset: String,
+    pub quote_asset: String,
+    /// The token pair's price. When omitted on an OracleSet update, rippled
+    /// deletes the existing price data entry for this base/quote pair.
+    pub asset_price: Option<String>,
+    pub scale: Option<u8>,
+}
+}
+
+/// Maximum allowed value for the `scale` field of a `PriceData` entry.
+///
+/// Per rippled (`kMaxPriceScale` in `Protocol.h`), `scale` must be in the
+/// inclusive range `0..=20`.
+pub const MAX_PRICE_DATA_SCALE: u8 = 20;
+
+impl crate::models::Model for PriceData {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        if let Some(scale) = self.scale {
+            if scale > MAX_PRICE_DATA_SCALE {
+                return Err(crate::models::XRPLModelException::ValueTooHigh {
+                    field: "scale".into(),
+                    max: MAX_PRICE_DATA_SCALE as u32,
+                    found: scale as u32,
+                });
+            }
+        }
+        if self.asset_price.is_some() != self.scale.is_some() {
+            return Err(crate::models::XRPLModelException::InvalidValue {
+                field: "price_data".into(),
+                expected: "AssetPrice and Scale both present or both omitted".into(),
+                found: alloc::format!(
+                    "asset_price_present={}, scale_present={}",
+                    self.asset_price.is_some(),
+                    self.scale.is_some()
+                ),
+            });
+        }
+        validate_oracle_currency("base_asset", &self.base_asset)?;
+        validate_oracle_currency("quote_asset", &self.quote_asset)?;
+        validate_oracle_asset_price(&self.asset_price)?;
+        Ok(())
+    }
+}
+
+/// Maximum allowed value for `AssetPrice`.
+///
+/// `AssetPrice` is a `UInt64` field; the full unsigned 64-bit range
+/// (`0x0000000000000000..=0xFFFFFFFFFFFFFFFF`) is valid. rippled does not
+/// impose an upper-bound smaller than `u64::MAX` (`kMaxPriceScale` only
+/// governs Scale, not AssetPrice).
+pub const MAX_ORACLE_ASSET_PRICE: u64 = u64::MAX;
+
+/// Validate a currency code used in a `PriceData` entry.
+///
+/// Accepts either a 3-character ISO-style code (uppercase letters and digits,
+/// including `"XRP"`) or a 40-character hex code.
+fn validate_oracle_currency(
+    field: &'static str,
+    value: &str,
+) -> crate::models::XRPLModelResult<()> {
+    if crate::utils::is_iso_code(value) || crate::utils::is_iso_hex(value) {
+        return Ok(());
+    }
+    Err(crate::models::XRPLModelException::InvalidValue {
+        field: field.into(),
+        expected: "a 3-character ISO currency code (including \"XRP\") or 40-character hex code"
+            .into(),
+        found: value.into(),
+    })
+}
+
+fn validate_oracle_asset_price(value: &Option<String>) -> crate::models::XRPLModelResult<()> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    match u64::from_str_radix(value, 16) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(crate::models::XRPLModelException::InvalidValue {
+            field: "asset_price".into(),
+            expected: "a valid UInt64 hexadecimal string (0x0000000000000000..=0xFFFFFFFFFFFFFFFF)"
+                .into(),
+            found: value.clone(),
+        }),
+    }
 }
 
 /// Standard functions for transactions.

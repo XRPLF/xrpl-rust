@@ -47,6 +47,7 @@ async fn test_ledger_entry_base() {
             None,                      // ledger_hash
             None,                      // ledger_index
             None,                      // offer
+            None,                      // oracle
             None,                      // payment_channel
             None,                      // ripple_state
             None,                      // ticket

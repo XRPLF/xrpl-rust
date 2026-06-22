@@ -14,6 +14,7 @@ pub mod deposit_authorize;
 pub mod exceptions;
 pub mod fee;
 pub mod gateway_balances;
+pub mod get_aggregate_price;
 pub mod ledger;
 pub mod ledger_closed;
 pub mod ledger_current;
@@ -125,6 +126,7 @@ pub enum XRPLResult<'a> {
     AccountTx(account_tx::AccountTxVersionMap<'a>),
     AMMInfo(amm_info::AMMInfo<'a>),
     BookOffers(book_offers::BookOffers<'a>),
+    GetAggregatePrice(get_aggregate_price::GetAggregatePrice<'a>),
     ChannelAuthorize(channel_authorize::ChannelAuthorize<'a>),
     ChannelVerify(channel_verify::ChannelVerify<'a>),
     DepositAuthorized(deposit_authorize::DepositAuthorized<'a>),
@@ -177,6 +179,7 @@ impl_from_result!(account_nfts, AccountNfts);
 impl_from_result!(account_offers, AccountOffers);
 impl_from_result!(amm_info, AMMInfo);
 impl_from_result!(book_offers, BookOffers);
+impl_from_result!(get_aggregate_price, GetAggregatePrice);
 impl_from_result!(channel_authorize, ChannelAuthorize);
 impl_from_result!(channel_verify, ChannelVerify);
 impl_from_result!(deposit_authorize, DepositAuthorized);
@@ -271,6 +274,7 @@ impl_try_from_result!(account_nfts, AccountNfts, AccountNfts);
 impl_try_from_result!(account_offers, AccountOffers, AccountOffers);
 impl_try_from_result!(amm_info, AMMInfo, AMMInfo);
 impl_try_from_result!(book_offers, BookOffers, BookOffers);
+impl_try_from_result!(get_aggregate_price, GetAggregatePrice, GetAggregatePrice);
 impl_try_from_result!(channel_authorize, ChannelAuthorize, ChannelAuthorize);
 impl_try_from_result!(channel_verify, ChannelVerify, ChannelVerify);
 impl_try_from_result!(deposit_authorize, DepositAuthorized, DepositAuthorized);
@@ -468,6 +472,7 @@ impl XRPLResult<'_> {
             XRPLResult::AccountTx(_) => "AccountTx".to_string(),
             XRPLResult::AMMInfo(_) => "AMMInfo".to_string(),
             XRPLResult::BookOffers(_) => "BookOffers".to_string(),
+            XRPLResult::GetAggregatePrice(_) => "GetAggregatePrice".to_string(),
             XRPLResult::ChannelAuthorize(_) => "ChannelAuthorize".to_string(),
             XRPLResult::ChannelVerify(_) => "ChannelVerify".to_string(),
             XRPLResult::DepositAuthorized(_) => "DepositAuthorized".to_string(),
@@ -612,6 +617,7 @@ impl_try_from_response!(account_nfts, AccountNfts, AccountNfts);
 impl_try_from_response!(account_offers, AccountOffers, AccountOffers);
 impl_try_from_response!(amm_info, AMMInfo, AMMInfo);
 impl_try_from_response!(book_offers, BookOffers, BookOffers);
+impl_try_from_response!(get_aggregate_price, GetAggregatePrice, GetAggregatePrice);
 impl_try_from_response!(channel_authorize, ChannelAuthorize, ChannelAuthorize);
 impl_try_from_response!(channel_verify, ChannelVerify, ChannelVerify);
 impl_try_from_response!(deposit_authorize, DepositAuthorized, DepositAuthorized);

@@ -38,6 +38,23 @@ jobs:
             --name xrpld-service \
             ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
 
+      - name: Wait for xrpld to be ready
+        run: |
+          echo "Waiting for xrpld RPC on localhost:5005..."
+          for i in $(seq 1 60); do
+            if curl -sf -X POST http://localhost:5005/ \
+                -H 'Content-Type: application/json' \
+                -d '{"method":"server_info","params":[{}]}' \
+                | grep -q '"status":"success"'; then
+              echo "xrpld is ready (attempt $i)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "xrpld did not become ready in time"
+          docker logs xrpld-service || true
+          exit 1
+
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-llvm-cov
