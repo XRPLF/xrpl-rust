@@ -38,6 +38,7 @@ pub mod subscribe;
 pub mod transaction_entry;
 pub mod tx;
 pub mod unsubscribe;
+pub mod vault_info;
 
 use alloc::{borrow::Cow, string::String};
 use derive_new::new;
@@ -116,6 +117,9 @@ pub enum RequestMethod {
     // Utility methods
     Ping,
     Random,
+
+    // Vault methods (XLS-65 SingleAssetVault)
+    VaultInfo,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
@@ -161,6 +165,7 @@ pub enum XRPLRequest<'a> {
     ServerState(server_state::ServerState<'a>),
     Ping(ping::Ping<'a>),
     Random(random::Random<'a>),
+    VaultInfo(vault_info::VaultInfo<'a>),
 }
 
 impl<'a> From<account_channels::AccountChannels<'a>> for XRPLRequest<'a> {
@@ -385,6 +390,12 @@ impl<'a> From<random::Random<'a>> for XRPLRequest<'a> {
     }
 }
 
+impl<'a> From<vault_info::VaultInfo<'a>> for XRPLRequest<'a> {
+    fn from(request: vault_info::VaultInfo<'a>) -> Self {
+        XRPLRequest::VaultInfo(request)
+    }
+}
+
 impl<'a> Request<'a> for XRPLRequest<'a> {
     fn get_common_fields(&self) -> &CommonFields<'a> {
         match self {
@@ -428,6 +439,7 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::ServerState(request) => request.get_common_fields(),
             XRPLRequest::Ping(request) => request.get_common_fields(),
             XRPLRequest::Random(request) => request.get_common_fields(),
+            XRPLRequest::VaultInfo(request) => request.get_common_fields(),
         }
     }
 
@@ -473,6 +485,7 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::ServerState(request) => request.get_common_fields_mut(),
             XRPLRequest::Ping(request) => request.get_common_fields_mut(),
             XRPLRequest::Random(request) => request.get_common_fields_mut(),
+            XRPLRequest::VaultInfo(request) => request.get_common_fields_mut(),
         }
     }
 }
