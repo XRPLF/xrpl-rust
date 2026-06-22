@@ -9,13 +9,14 @@
 //! See <https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0089-multi-purpose-token-metadata-schema>.
 
 use alloc::{
+    borrow::Cow,
     format,
     string::{String, ToString},
     vec,
     vec::Vec,
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::exceptions::{XRPLMPTokenMetadataException, XRPLUtilsResult};
@@ -57,6 +58,59 @@ const MPT_META_ASSET_SUB_CLASSES: [&str; 7] = [
     "treasury",
     "other",
 ];
+
+/// A related URI entry within [`MPTokenMetadata`], per XLS-89.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MPTokenMetadataUri<'a> {
+    /// URI to the related resource (e.g. `https://...` or `ipfs://...`).
+    pub uri: Cow<'a, str>,
+    /// Category of the link: `website`, `social`, `docs`, or `other`.
+    pub category: Cow<'a, str>,
+    /// Human-readable label for the link.
+    pub title: Cow<'a, str>,
+}
+
+/// The freeform `additional_info` field: either UTF-8 text or a JSON object.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum MPTokenMetadataAdditionalInfo<'a> {
+    /// A UTF-8 string.
+    Text(Cow<'a, str>),
+    /// An arbitrary JSON object.
+    Object(Map<String, Value>),
+}
+
+/// `MPTokenMetadata` as described by the XLS-89 standard.
+///
+/// Build this in long form and pass it to [`encode_mptoken_metadata`] to
+/// produce the compact hex blob stored on-ledger;
+/// [`decode_mptoken_metadata`] produces a JSON value that deserializes back
+/// into this type.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MPTokenMetadata<'a> {
+    /// Ticker symbol: uppercase letters (A-Z) and digits (0-9), max 6 chars.
+    pub ticker: Cow<'a, str>,
+    /// Display name of the token.
+    pub name: Cow<'a, str>,
+    /// Short description of the token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub desc: Option<Cow<'a, str>>,
+    /// URI to the token icon.
+    pub icon: Cow<'a, str>,
+    /// Top-level classification: `rwa`, `memes`, `wrapped`, `gaming`, `defi`, or `other`.
+    pub asset_class: Cow<'a, str>,
+    /// Subcategory of the asset class. Required when `asset_class` is `rwa`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_subclass: Option<Cow<'a, str>>,
+    /// Name of the issuer account.
+    pub issuer_name: Cow<'a, str>,
+    /// Related URIs (site, dashboard, social media, documentation, ...).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uris: Option<Vec<MPTokenMetadataUri<'a>>>,
+    /// Freeform field for key token details (interest rate, maturity, ...).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub additional_info: Option<MPTokenMetadataAdditionalInfo<'a>>,
+}
 
 /// Encodes `MPTokenMetadata` into the compact hex blob stored on-ledger.
 ///
@@ -546,5 +600,36 @@ mod tests {
                 XRPLMPTokenMetadataException::InvalidHex
             )
         );
+    }
+
+    #[test]
+    fn test_typed_metadata_round_trip() {
+        let metadata = MPTokenMetadata {
+            ticker: "TBILL".into(),
+            name: "T-Bill Yield Token".into(),
+            desc: Some("A yield-bearing stablecoin backed by U.S. Treasuries.".into()),
+            icon: "https://example.org/tbill-icon.png".into(),
+            asset_class: "rwa".into(),
+            asset_subclass: Some("treasury".into()),
+            issuer_name: "Example Yield Co.".into(),
+            uris: Some(vec![MPTokenMetadataUri {
+                uri: "https://exampleyield.co/tbill".into(),
+                category: "website".into(),
+                title: "Product Page".into(),
+            }]),
+            additional_info: Some(MPTokenMetadataAdditionalInfo::Object(
+                serde_json::json!({ "interest_rate": "5.00%", "maturity_date": "2045-06-30" })
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            )),
+        };
+
+        let encoded = encode_mptoken_metadata(&metadata).unwrap();
+        assert!(validate_mptoken_metadata(&encoded).is_empty());
+
+        let decoded = decode_mptoken_metadata(&encoded).unwrap();
+        let round_trip: MPTokenMetadata = serde_json::from_value(decoded).unwrap();
+        assert_eq!(round_trip, metadata);
     }
 }
