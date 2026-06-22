@@ -51,6 +51,7 @@ async fn test_ledger_entry_base() {
             None,                      // payment_channel
             None,                      // ripple_state
             None,                      // ticket
+            None,                      // vault
         );
 
         let entry_response = client
