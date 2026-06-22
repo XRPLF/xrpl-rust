@@ -8,7 +8,12 @@
 //!
 //! See <https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0089-multi-purpose-token-metadata-schema>.
 
-use alloc::string::String;
+use alloc::{
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -38,6 +43,20 @@ const MPT_META_ALL_FIELDS: [(&str, &str); 9] = [
 
 /// `(long, compact)` field-name pairs for each entry of the `uris` array.
 const MPT_META_URI_FIELDS: [(&str, &str); 3] = [("uri", "u"), ("category", "c"), ("title", "t")];
+
+/// Allowed values for the `asset_class` field.
+const MPT_META_ASSET_CLASSES: [&str; 6] = ["rwa", "memes", "wrapped", "gaming", "defi", "other"];
+
+/// Allowed values for the `asset_subclass` field.
+const MPT_META_ASSET_SUB_CLASSES: [&str; 7] = [
+    "stablecoin",
+    "commodity",
+    "real_estate",
+    "private_credit",
+    "equity",
+    "treasury",
+    "other",
+];
 
 /// Encodes `MPTokenMetadata` into the compact hex blob stored on-ledger.
 ///
@@ -164,6 +183,262 @@ fn is_hex(value: &str) -> bool {
     !value.is_empty() && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// Validates that a hex `MPTokenMetadata` blob adheres to the XLS-89 standard.
+///
+/// Returns a list of human-readable messages describing every way in which the
+/// blob fails to conform. An empty list means the metadata is valid. Both the
+/// long and compact form of each field are accepted, and unknown fields are
+/// allowed (subject to the top-level field-count limit).
+pub fn validate_mptoken_metadata(input: &str) -> Vec<String> {
+    let mut messages = Vec::new();
+
+    if !is_hex(input) {
+        messages.push("MPTokenMetadata must be in hex format.".to_string());
+        return messages;
+    }
+
+    if input.len() / 2 > MAX_MPT_META_BYTE_LENGTH {
+        messages.push(format!(
+            "MPTokenMetadata must be max {MAX_MPT_META_BYTE_LENGTH} bytes."
+        ));
+        return messages;
+    }
+
+    let text = match hex::decode(input)
+        .map_err(|e| e.to_string())
+        .and_then(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()))
+    {
+        Ok(text) => text,
+        Err(err) => {
+            messages.push(format!(
+                "MPTokenMetadata is not properly formatted as JSON - {err}"
+            ));
+            return messages;
+        }
+    };
+
+    let value: Value = match serde_json::from_str(&text) {
+        Ok(value) => value,
+        Err(err) => {
+            messages.push(format!(
+                "MPTokenMetadata is not properly formatted as JSON - {err}"
+            ));
+            return messages;
+        }
+    };
+
+    let obj = match value.as_object() {
+        Some(obj) => obj,
+        None => {
+            messages
+                .push("MPTokenMetadata is not properly formatted JSON object as per XLS-89.".to_string());
+            return messages;
+        }
+    };
+
+    if obj.len() > MPT_META_ALL_FIELDS.len() {
+        messages.push(format!(
+            "MPTokenMetadata must not contain more than {} top-level fields (found {}).",
+            MPT_META_ALL_FIELDS.len(),
+            obj.len()
+        ));
+    }
+
+    // Field order is significant: messages are emitted in this order.
+    messages.extend(validate_ticker(obj));
+    messages.extend(validate_non_empty_string(obj, "name", "n"));
+    messages.extend(validate_non_empty_string(obj, "icon", "i"));
+    messages.extend(validate_asset_class(obj));
+    messages.extend(validate_non_empty_string(obj, "issuer_name", "in"));
+    messages.extend(validate_optional_non_empty_string(obj, "desc", "d"));
+    messages.extend(validate_asset_subclass(obj));
+    messages.extend(validate_uris(obj));
+    messages.extend(validate_additional_info(obj));
+
+    messages
+}
+
+/// JS `obj[key] != null`: the key is present and not JSON null.
+fn present_non_null(obj: &Map<String, Value>, key: &str) -> bool {
+    matches!(obj.get(key), Some(value) if !value.is_null())
+}
+
+/// JS `obj[long] != null && obj[compact] != null`.
+fn has_both_forms(obj: &Map<String, Value>, long: &str, compact: &str) -> bool {
+    present_non_null(obj, long) && present_non_null(obj, compact)
+}
+
+/// JS `obj[long] === undefined && obj[compact] === undefined`.
+fn neither_form_present(obj: &Map<String, Value>, long: &str, compact: &str) -> bool {
+    obj.get(long).is_none() && obj.get(compact).is_none()
+}
+
+/// JS `obj[long] ?? obj[compact]`: prefer the long form unless null/absent.
+fn coalesce<'a>(obj: &'a Map<String, Value>, long: &str, compact: &str) -> Option<&'a Value> {
+    match obj.get(long) {
+        Some(value) if !value.is_null() => Some(value),
+        _ => obj.get(compact),
+    }
+}
+
+fn is_string(value: Option<&Value>) -> bool {
+    matches!(value, Some(Value::String(_)))
+}
+
+fn is_non_empty_string(value: Option<&Value>) -> bool {
+    matches!(value, Some(Value::String(s)) if !s.is_empty())
+}
+
+fn equals_str(value: Option<&Value>, expected: &str) -> bool {
+    matches!(value, Some(Value::String(s)) if s == expected)
+}
+
+fn both_forms_message(long: &str, compact: &str) -> String {
+    format!("{long}/{compact}: both long and compact forms present. expected only one.")
+}
+
+fn validate_ticker(obj: &Map<String, Value>) -> Vec<String> {
+    if has_both_forms(obj, "ticker", "t") {
+        return vec![both_forms_message("ticker", "t")];
+    }
+    let valid = matches!(coalesce(obj, "ticker", "t"), Some(Value::String(s)) if is_valid_ticker(s));
+    if !valid {
+        return vec![
+            "ticker/t: should have uppercase letters (A-Z) and digits (0-9) only. Max 6 characters recommended."
+                .to_string(),
+        ];
+    }
+    Vec::new()
+}
+
+fn is_valid_ticker(value: &str) -> bool {
+    let len = value.chars().count();
+    (1..=6).contains(&len) && value.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+}
+
+fn validate_non_empty_string(obj: &Map<String, Value>, long: &str, compact: &str) -> Vec<String> {
+    if has_both_forms(obj, long, compact) {
+        return vec![both_forms_message(long, compact)];
+    }
+    if !is_non_empty_string(coalesce(obj, long, compact)) {
+        return vec![format!("{long}/{compact}: should be a non-empty string.")];
+    }
+    Vec::new()
+}
+
+fn validate_optional_non_empty_string(
+    obj: &Map<String, Value>,
+    long: &str,
+    compact: &str,
+) -> Vec<String> {
+    if has_both_forms(obj, long, compact) {
+        return vec![both_forms_message(long, compact)];
+    }
+    if neither_form_present(obj, long, compact) {
+        return Vec::new();
+    }
+    if !is_non_empty_string(coalesce(obj, long, compact)) {
+        return vec![format!("{long}/{compact}: should be a non-empty string.")];
+    }
+    Vec::new()
+}
+
+fn validate_asset_class(obj: &Map<String, Value>) -> Vec<String> {
+    if has_both_forms(obj, "asset_class", "ac") {
+        return vec![both_forms_message("asset_class", "ac")];
+    }
+    let value = coalesce(obj, "asset_class", "ac");
+    let valid = matches!(value, Some(Value::String(s)) if MPT_META_ASSET_CLASSES.contains(&s.as_str()));
+    if !valid {
+        return vec![format!(
+            "asset_class/ac: should be one of {}.",
+            MPT_META_ASSET_CLASSES.join(", ")
+        )];
+    }
+    Vec::new()
+}
+
+fn validate_asset_subclass(obj: &Map<String, Value>) -> Vec<String> {
+    if has_both_forms(obj, "asset_subclass", "as") {
+        return vec![both_forms_message("asset_subclass", "as")];
+    }
+    let value = coalesce(obj, "asset_subclass", "as");
+    let is_rwa = equals_str(obj.get("asset_class"), "rwa") || equals_str(obj.get("ac"), "rwa");
+    if is_rwa && value.is_none() {
+        return vec!["asset_subclass/as: required when asset_class is rwa.".to_string()];
+    }
+    if neither_form_present(obj, "asset_subclass", "as") {
+        return Vec::new();
+    }
+    let valid =
+        matches!(value, Some(Value::String(s)) if MPT_META_ASSET_SUB_CLASSES.contains(&s.as_str()));
+    if !valid {
+        return vec![format!(
+            "asset_subclass/as: should be one of {}.",
+            MPT_META_ASSET_SUB_CLASSES.join(", ")
+        )];
+    }
+    Vec::new()
+}
+
+fn validate_uris(obj: &Map<String, Value>) -> Vec<String> {
+    if has_both_forms(obj, "uris", "us") {
+        return vec![both_forms_message("uris", "us")];
+    }
+    if neither_form_present(obj, "uris", "us") {
+        return Vec::new();
+    }
+
+    let arr = match coalesce(obj, "uris", "us") {
+        Some(Value::Array(arr)) if !arr.is_empty() => arr,
+        _ => return vec!["uris/us: should be a non-empty array.".to_string()],
+    };
+
+    let structure_message =
+        "uris/us: should be an array of objects each with uri/u, category/c, and title/t properties.";
+    let mut messages = Vec::new();
+
+    for elem in arr {
+        let uri_obj = match elem.as_object() {
+            Some(uri_obj) if uri_obj.len() == MPT_META_URI_FIELDS.len() => uri_obj,
+            _ => {
+                messages.push(structure_message.to_string());
+                continue;
+            }
+        };
+
+        for &(long, compact) in &MPT_META_URI_FIELDS {
+            if has_both_forms(uri_obj, long, compact) {
+                messages.push(format!("uris/us: should not have both {long} and {compact} fields."));
+                break;
+            }
+        }
+
+        let uri = coalesce(uri_obj, "uri", "u");
+        let category = coalesce(uri_obj, "category", "c");
+        let title = coalesce(uri_obj, "title", "t");
+        if !(is_string(uri) && is_string(category) && is_string(title)) {
+            messages.push(structure_message.to_string());
+        }
+    }
+
+    messages
+}
+
+fn validate_additional_info(obj: &Map<String, Value>) -> Vec<String> {
+    if has_both_forms(obj, "additional_info", "ai") {
+        return vec![both_forms_message("additional_info", "ai")];
+    }
+    if neither_form_present(obj, "additional_info", "ai") {
+        return Vec::new();
+    }
+    let value = coalesce(obj, "additional_info", "ai");
+    if !matches!(value, Some(Value::String(_)) | Some(Value::Object(_))) {
+        return vec!["additional_info/ai: should be a string or JSON object.".to_string()];
+    }
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +471,56 @@ mod tests {
                 "decode mismatch for `{}`",
                 case.test_name
             );
+        }
+    }
+
+    #[derive(Deserialize)]
+    struct ValidationCase {
+        #[serde(rename = "testName")]
+        test_name: String,
+        #[serde(rename = "mptMetadata")]
+        mpt_metadata: Value,
+        #[serde(rename = "validationMessages")]
+        validation_messages: Vec<String>,
+    }
+
+    #[test]
+    fn test_validation_fixtures() {
+        // serde_json's parse-error text differs from V8's, so messages on this
+        // path are matched by prefix only.
+        const JSON_PARSE_PREFIX: &str = "MPTokenMetadata is not properly formatted as JSON -";
+
+        let data = include_str!("./test_data/mptoken_metadata_validation.json");
+        let cases: Vec<ValidationCase> = serde_json::from_str(data).unwrap();
+
+        for case in cases {
+            // The fixture harness uses a raw string value as the blob payload
+            // directly; any other value is serialized to JSON first.
+            let payload = match &case.mpt_metadata {
+                Value::String(s) => s.clone(),
+                other => serde_json::to_string(other).unwrap(),
+            };
+            let hex = hex::encode_upper(payload.as_bytes());
+
+            let actual = validate_mptoken_metadata(&hex);
+            assert_eq!(
+                actual.len(),
+                case.validation_messages.len(),
+                "message count mismatch for `{}`: {actual:?}",
+                case.test_name
+            );
+
+            for (got, want) in actual.iter().zip(case.validation_messages.iter()) {
+                if want.starts_with(JSON_PARSE_PREFIX) {
+                    assert!(
+                        got.starts_with(JSON_PARSE_PREFIX),
+                        "expected JSON-parse message for `{}`, got: {got}",
+                        case.test_name
+                    );
+                } else {
+                    assert_eq!(got, want, "message mismatch for `{}`", case.test_name);
+                }
+            }
         }
     }
 
