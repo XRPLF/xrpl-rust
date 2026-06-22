@@ -100,6 +100,8 @@ pub struct LedgerEntry<'a> {
     pub payment_channel: Option<Cow<'a, str>>,
     pub ripple_state: Option<RippleState<'a>>,
     pub ticket: Option<Ticket<'a>>,
+    /// The ledger object ID of a Vault to retrieve (XLS-65 SingleAssetVault).
+    pub vault: Option<Cow<'a, str>>,
 }
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
@@ -144,6 +146,9 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.ticket.is_some() {
             signing_methods += 1
         }
+        if self.vault.is_some() {
+            signing_methods += 1
+        }
         if signing_methods != 1 {
             Err(XRPLModelException::ExpectedOneOf(&[
                 "index",
@@ -157,6 +162,7 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "payment_channel",
                 "deposit_preauth",
                 "ticket",
+                "vault",
             ]))
         } else {
             Ok(())
@@ -191,6 +197,7 @@ impl<'a> LedgerEntry<'a> {
         payment_channel: Option<Cow<'a, str>>,
         ripple_state: Option<RippleState<'a>>,
         ticket: Option<Ticket<'a>>,
+        vault: Option<Cow<'a, str>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -208,6 +215,7 @@ impl<'a> LedgerEntry<'a> {
             oracle,
             ripple_state,
             ticket,
+            vault,
             binary,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
@@ -250,7 +258,7 @@ mod test_ledger_entry_errors {
             None,
             None,
             None,
-            None,
+            None, // vault
         );
         let _expected = XRPLModelException::ExpectedOneOf(&[
             "index",
@@ -258,16 +266,44 @@ mod test_ledger_entry_errors {
             "check",
             "directory",
             "offer",
+            "oracle",
             "ripple_state",
             "escrow",
             "payment_channel",
             "deposit_preauth",
             "ticket",
+            "vault",
         ]);
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
+            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, ticket, vault"
         );
+    }
+
+    #[test]
+    fn test_vault_selector() {
+        let req = LedgerEntry::new(
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2".into()),
+        );
+        assert!(req.validate().is_ok(), "vault selector should be valid");
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(req, deserialized);
+        assert!(serialized.contains("\"vault\""), "expected vault key in JSON");
     }
 
     #[test]
@@ -290,7 +326,7 @@ mod test_ledger_entry_errors {
             None,
             None,
             None,
-            None,
+            None, // vault
         );
         let serialized = serde_json::to_string(&req).unwrap();
 
