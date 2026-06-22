@@ -24,11 +24,6 @@ use super::exceptions::{XRPLMPTokenMetadataException, XRPLUtilsResult};
 /// Maximum byte length of the on-ledger `MPTokenMetadata` blob.
 pub const MAX_MPT_META_BYTE_LENGTH: usize = 1024;
 
-/// Warning describing metadata that does not conform to the XLS-89 standard.
-pub const MPT_META_WARNING_HEADER: &str = "MPTokenMetadata is not properly formatted as JSON as per the XLS-89 standard. \
-While adherence to this standard is not mandatory, such non-compliant MPToken's might not be discoverable \
-by Explorers and Indexers in the XRPL ecosystem.";
-
 /// `(long, compact)` field-name pairs for the top-level metadata object.
 const MPT_META_ALL_FIELDS: [(&str, &str); 9] = [
     ("ticker", "t"),
@@ -232,9 +227,10 @@ fn transform_uri_array(map: &mut Map<String, Value>, key: &str, direction: Direc
     map.insert(String::from(key), Value::Array(transformed));
 }
 
-/// Returns `true` if `value` is a non-empty string of hexadecimal characters.
+/// Returns `true` if `value` is a non-empty, even-length string of hexadecimal
+/// characters. Hex byte strings always have an even number of characters.
 fn is_hex(value: &str) -> bool {
-    !value.is_empty() && value.bytes().all(|b| b.is_ascii_hexdigit())
+    !value.is_empty() && value.len() % 2 == 0 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Validates that a hex `MPTokenMetadata` blob adheres to the XLS-89 standard.
@@ -258,10 +254,10 @@ pub fn validate_mptoken_metadata(input: &str) -> Vec<String> {
         return messages;
     }
 
-    let text = match hex::decode(input)
-        .map_err(|e| e.to_string())
-        .and_then(|bytes| String::from_utf8(bytes).map_err(|e| e.to_string()))
-    {
+    // `is_hex` guarantees an even-length hex string, so decoding cannot fail; the
+    // decoded bytes may still be invalid UTF-8, which is reported below.
+    let bytes = hex::decode(input).unwrap_or_default();
+    let text = match String::from_utf8(bytes) {
         Ok(text) => text,
         Err(err) => {
             messages.push(format!(
@@ -653,23 +649,19 @@ mod tests {
 
     #[test]
     fn test_validate_rejects_non_hex_input() {
-        assert_eq!(
-            validate_mptoken_metadata("xyz"),
-            vec!["MPTokenMetadata must be in hex format.".to_string()]
-        );
+        let expected = vec!["MPTokenMetadata must be in hex format.".to_string()];
+        // Non-hex characters.
+        assert_eq!(validate_mptoken_metadata("xyz"), expected);
+        // Valid hex characters but an odd length is not a valid hex byte string.
+        assert_eq!(validate_mptoken_metadata("ABC"), expected);
     }
 
     #[test]
-    fn test_validate_reports_undecodable_hex() {
-        // Valid hex characters but an odd length -> hex decode fails.
-        let odd = validate_mptoken_metadata("ABC");
-        assert_eq!(odd.len(), 1);
-        assert!(odd[0].starts_with("MPTokenMetadata is not properly formatted as JSON -"));
-
-        // Decodes to 0xFF, which is not valid UTF-8.
-        let bad_utf8 = validate_mptoken_metadata("FF");
-        assert_eq!(bad_utf8.len(), 1);
-        assert!(bad_utf8[0].starts_with("MPTokenMetadata is not properly formatted as JSON -"));
+    fn test_validate_reports_non_utf8_blob() {
+        // Even-length valid hex that decodes to 0xFF, which is not valid UTF-8.
+        let messages = validate_mptoken_metadata("FF");
+        assert_eq!(messages.len(), 1);
+        assert!(messages[0].starts_with("MPTokenMetadata is not properly formatted as JSON -"));
     }
 
     #[test]
