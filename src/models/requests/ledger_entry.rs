@@ -303,7 +303,10 @@ mod test_ledger_entry_errors {
         let serialized = serde_json::to_string(&req).unwrap();
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
         assert_eq!(req, deserialized);
-        assert!(serialized.contains("\"vault\""), "expected vault key in JSON");
+        assert!(
+            serialized.contains("\"vault\""),
+            "expected vault key in JSON"
+        );
     }
 
     #[test]
