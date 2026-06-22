@@ -178,10 +178,10 @@ mod tests {
 
         let default_json_str = r#"{"Account":"rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S","TransactionType":"Clawback","Fee":"12","Flags":0,"SigningPubKey":"","Amount":{"currency":"FOO","issuer":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","value":"314.159"}}"#;
 
-        let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&default_txn).unwrap();
-        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
-        assert_eq!(serialized_value, default_json_value);
+        let actual: serde_json::Value = serde_json::from_str(&serialized_string).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(default_json_str).unwrap();
+        assert_eq!(actual, expected);
 
         let deserialized: Clawback = serde_json::from_str(default_json_str).unwrap();
         assert_eq!(default_txn, deserialized);
@@ -208,9 +208,9 @@ mod tests {
         let json_str = r#"{"Account":"rp6abvbTbjoce8ZDJkT6snvxTZSYMBCC9S","TransactionType":"Clawback","Fee":"12","Flags":0,"SigningPubKey":"","Amount":{"currency":"FOO","issuer":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW","value":"314.159"},"Holder":"rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW"}"#;
 
         let serialized_string = serde_json::to_string(&txn).unwrap();
-        let serialized_value = serde_json::to_value(&serialized_string).unwrap();
-        let expected_value = serde_json::to_value(json_str).unwrap();
-        assert_eq!(serialized_value, expected_value);
+        let actual: serde_json::Value = serde_json::from_str(&serialized_string).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(json_str).unwrap();
+        assert_eq!(actual, expected);
 
         let deserialized: Clawback = serde_json::from_str(json_str).unwrap();
         assert_eq!(txn, deserialized);
