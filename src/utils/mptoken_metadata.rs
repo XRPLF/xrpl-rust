@@ -235,7 +235,9 @@ fn transform_uri_array(map: &mut Map<String, Value>, key: &str, direction: Direc
 /// Returns `true` if `value` is a non-empty, even-length string of hexadecimal
 /// characters. Hex byte strings always have an even number of characters.
 fn is_hex(value: &str) -> bool {
-    !value.is_empty() && value.len() % 2 == 0 && value.bytes().all(|b| b.is_ascii_hexdigit())
+    !value.is_empty()
+        && value.len().is_multiple_of(2)
+        && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 /// Validates that a hex `MPTokenMetadata` blob adheres to the XLS-89 standard.
