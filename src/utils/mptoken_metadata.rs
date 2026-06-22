@@ -24,6 +24,11 @@ use super::exceptions::{XRPLMPTokenMetadataException, XRPLUtilsResult};
 /// Maximum byte length of the on-ledger `MPTokenMetadata` blob.
 pub const MAX_MPT_META_BYTE_LENGTH: usize = 1024;
 
+/// Warning describing metadata that does not conform to the XLS-89 standard.
+pub const MPT_META_WARNING_HEADER: &str = "MPTokenMetadata is not properly formatted as JSON as per the XLS-89 standard. \
+While adherence to this standard is not mandatory, such non-compliant MPTokens might not be discoverable \
+by Explorers and Indexers in the XRPL ecosystem.";
+
 /// `(long, compact)` field-name pairs for the top-level metadata object.
 const MPT_META_ALL_FIELDS: [(&str, &str); 9] = [
     ("ticker", "t"),
@@ -307,6 +312,28 @@ pub fn validate_mptoken_metadata(input: &str) -> Vec<String> {
     messages.extend(validate_additional_info(obj));
 
     messages
+}
+
+/// Builds the user-facing warning for a non-conformant `MPTokenMetadata` blob.
+///
+/// Returns `None` when `input` conforms to XLS-89, or `Some(message)` — the
+/// [`MPT_META_WARNING_HEADER`] followed by each [`validate_mptoken_metadata`]
+/// message as a bulleted line — when it does not. This mirrors how xrpl.js
+/// surfaces a non-fatal `console.warn` for non-compliant metadata when
+/// validating an `MPTokenIssuanceCreate`: adherence to XLS-89 is not mandatory,
+/// so the metadata is still usable, but callers should warn the user.
+pub fn mptoken_metadata_warning(input: &str) -> Option<String> {
+    let messages = validate_mptoken_metadata(input);
+    if messages.is_empty() {
+        return None;
+    }
+
+    let mut warning = String::from(MPT_META_WARNING_HEADER);
+    for message in &messages {
+        warning.push_str("\n- ");
+        warning.push_str(message);
+    }
+    Some(warning)
 }
 
 /// JS `obj[key] != null`: the key is present and not JSON null.
@@ -662,6 +689,44 @@ mod tests {
         let messages = validate_mptoken_metadata("FF");
         assert_eq!(messages.len(), 1);
         assert!(messages[0].starts_with("MPTokenMetadata is not properly formatted as JSON -"));
+    }
+
+    #[test]
+    fn test_mptoken_metadata_warning() {
+        use serde_json::json;
+
+        let to_hex = |value: &serde_json::Value| {
+            hex::encode_upper(serde_json::to_string(value).unwrap().as_bytes())
+        };
+
+        // Conformant metadata produces no warning.
+        let valid = json!({
+            "ticker": "TBILL",
+            "name": "T-Bill Token",
+            "icon": "https://example.com/icon.png",
+            "asset_class": "rwa",
+            "asset_subclass": "treasury",
+            "issuer_name": "Issuer"
+        });
+        assert_eq!(mptoken_metadata_warning(&to_hex(&valid)), None);
+
+        // Non-conformant metadata (invalid `uris`) warns with the header followed
+        // by the specific validation messages — as xrpl.js does on
+        // MPTokenIssuanceCreate.
+        let invalid = json!({
+            "ticker": "TBILL",
+            "name": "T-Bill Token",
+            "icon": "https://example.com/icon.png",
+            "asset_class": "rwa",
+            "asset_subclass": "treasury",
+            "issuer_name": "Issuer",
+            "uris": ["apple"]
+        });
+        let warning = mptoken_metadata_warning(&to_hex(&invalid)).expect("expected a warning");
+        assert!(warning.starts_with(MPT_META_WARNING_HEADER));
+        assert!(warning.contains(
+            "\n- uris/us: should be an array of objects each with uri/u, category/c, and title/t properties."
+        ));
     }
 
     #[test]
