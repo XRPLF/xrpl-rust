@@ -1,10 +1,23 @@
 use crate::models::ledger::objects::LedgerEntryType;
-use crate::models::{Currency, NoFlags};
+use crate::models::{Currency, FlagCollection, Model};
 use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
+use strum_macros::{AsRefStr, Display, EnumIter};
 
 use super::{CommonFields, LedgerObject};
+
+/// Flags for the `Vault` ledger object (XLS-65 SingleAssetVault).
+#[derive(
+    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
+)]
+#[repr(u32)]
+pub enum VaultFlag {
+    /// The vault was created with the private flag set; only allowlisted
+    /// accounts may deposit into this vault.
+    LsfVaultPrivate = 0x00010000,
+}
 
 /// The `Vault` object type describes a single-asset vault instance (XLS-65).
 ///
@@ -29,7 +42,7 @@ pub struct Vault<'a> {
     /// See Ledger Object Common Fields:
     /// `<https://xrpl.org/ledger-entry-common-fields.html>`
     #[serde(flatten)]
-    pub common_fields: CommonFields<'a, NoFlags>,
+    pub common_fields: CommonFields<'a, VaultFlag>,
     /// The account address of the Vault Owner. (SoeRequired)
     pub owner: Cow<'a, str>,
     /// The address of the Vault's pseudo-account. (SoeRequired)
@@ -66,22 +79,19 @@ pub struct Vault<'a> {
     pub previous_txn_lgr_seq: u32,
 }
 
-impl<'a> LedgerObject<NoFlags> for Vault<'a> {
+impl<'a> Model for Vault<'a> {}
+
+impl<'a> LedgerObject<VaultFlag> for Vault<'a> {
     fn get_ledger_entry_type(&self) -> LedgerEntryType {
         self.common_fields.get_ledger_entry_type()
     }
 }
 
-#[cfg(test)]
-mod test_serde {
-    use crate::models::currency::{Currency, IssuedCurrency};
-    use crate::models::ledger::objects::vault::Vault;
-    use crate::models::ledger::objects::CommonFields;
-    use crate::models::ledger::objects::LedgerEntryType;
-    use crate::models::{FlagCollection, NoFlags};
-    use alloc::borrow::Cow;
-
-    fn make_vault<'a>(
+impl<'a> Vault<'a> {
+    /// Create a new `Vault` with required fields; optional fields default to `None`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        flags: FlagCollection<VaultFlag>,
         index: Option<Cow<'a, str>>,
         owner: Cow<'a, str>,
         account: Cow<'a, str>,
@@ -92,10 +102,10 @@ mod test_serde {
         owner_node: Cow<'a, str>,
         previous_txn_id: Cow<'a, str>,
         previous_txn_lgr_seq: u32,
-    ) -> Vault<'a> {
-        Vault {
+    ) -> Self {
+        Self {
             common_fields: CommonFields {
-                flags: FlagCollection::<NoFlags>::default(),
+                flags,
                 ledger_entry_type: LedgerEntryType::Vault,
                 index,
                 ledger_index: None,
@@ -117,12 +127,50 @@ mod test_serde {
             previous_txn_lgr_seq,
         }
     }
+}
+
+#[cfg(test)]
+mod test_serde {
+    use crate::models::currency::{Currency, IssuedCurrency};
+    use crate::models::ledger::objects::vault::{Vault, VaultFlag};
+    use crate::models::ledger::objects::CommonFields;
+    use crate::models::ledger::objects::LedgerEntryType;
+    use crate::models::FlagCollection;
+    use alloc::borrow::Cow;
+    use alloc::vec;
+
+    fn make_vault<'a>(
+        index: Option<Cow<'a, str>>,
+        owner: Cow<'a, str>,
+        account: Cow<'a, str>,
+        asset: Currency<'a>,
+        share_mpt_id: Cow<'a, str>,
+        withdrawal_policy: u8,
+        sequence: u32,
+        owner_node: Cow<'a, str>,
+        previous_txn_id: Cow<'a, str>,
+        previous_txn_lgr_seq: u32,
+    ) -> Vault<'a> {
+        Vault::new(
+            FlagCollection::<VaultFlag>::default(),
+            index,
+            owner,
+            account,
+            asset,
+            share_mpt_id,
+            withdrawal_policy,
+            sequence,
+            owner_node,
+            previous_txn_id,
+            previous_txn_lgr_seq,
+        )
+    }
 
     #[test]
     fn test_serialize() {
         let vault = Vault {
             common_fields: CommonFields {
-                flags: FlagCollection::<NoFlags>::default(),
+                flags: FlagCollection::<VaultFlag>::default(),
                 ledger_entry_type: LedgerEntryType::Vault,
                 index: Some(Cow::from("ForTest")),
                 ledger_index: None,
@@ -174,7 +222,7 @@ mod test_serde {
     fn test_vault_with_all_fields() {
         let vault = Vault {
             common_fields: CommonFields {
-                flags: FlagCollection::<NoFlags>::default(),
+                flags: FlagCollection::<VaultFlag>::default(),
                 ledger_entry_type: LedgerEntryType::Vault,
                 index: Some(Cow::from("FullVaultTest")),
                 ledger_index: Some(Cow::from("ledger_idx_123")),
@@ -206,10 +254,68 @@ mod test_serde {
     }
 
     #[test]
+    fn test_new_constructor() {
+        let vault = Vault::new(
+            FlagCollection::<VaultFlag>::default(),
+            Some(Cow::from("NewConstructorTest")),
+            "rNewOwner".into(),
+            "rNewAccount".into(),
+            Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            "00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into(),
+            1,
+            42,
+            "0".into(),
+            "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890".into(),
+            100,
+        );
+        let serialized = serde_json::to_string(&vault).unwrap();
+        let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(vault, deserialized);
+        assert!(vault.assets_total.is_none());
+        assert!(vault.data.is_none());
+    }
+
+    #[test]
+    fn test_vault_private_flag_serde() {
+        let vault = Vault {
+            common_fields: CommonFields {
+                flags: vec![VaultFlag::LsfVaultPrivate].into(),
+                ledger_entry_type: LedgerEntryType::Vault,
+                index: Some(Cow::from("PrivateFlagTest")),
+                ledger_index: None,
+            },
+            owner: "rFlagOwner".into(),
+            account: "rFlagAccount".into(),
+            asset: Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer".into())),
+            assets_total: None,
+            assets_available: None,
+            assets_maximum: None,
+            loss_unrealized: None,
+            share_mpt_id: "00000001C752C42A1EBD6BF2403134F7CFD2F1D835AFD26E".into(),
+            withdrawal_policy: 1,
+            scale: None,
+            sequence: 1,
+            data: None,
+            owner_node: "0".into(),
+            previous_txn_id: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
+                .into(),
+            previous_txn_lgr_seq: 1,
+        };
+        let serialized = serde_json::to_string(&vault).unwrap();
+        let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(vault, deserialized);
+        // Flag value 0x00010000 = 65536 should appear in the JSON
+        assert!(
+            serialized.contains("65536"),
+            "expected LsfVaultPrivate flag value 65536 in JSON: {serialized}"
+        );
+    }
+
+    #[test]
     fn test_serialized_keys_are_pascal_case() {
         let vault = Vault {
             common_fields: CommonFields {
-                flags: FlagCollection::<NoFlags>::default(),
+                flags: FlagCollection::<VaultFlag>::default(),
                 ledger_entry_type: LedgerEntryType::Vault,
                 index: Some(Cow::from("KeysTest")),
                 ledger_index: None,
