@@ -36,9 +36,12 @@ pub async fn open_websocket(
     use anyhow::anyhow;
 
     let port = uri.port().unwrap_or(80);
-    let url = format!("{}:{}", uri.host_str().unwrap(), port);
+    let host = uri.host_str().expect("open_websocket: URI has no host");
+    let url = format!("{host}:{port}");
 
-    let tcp = TcpStream::connect(&url).await.unwrap();
+    let tcp = TcpStream::connect(&url)
+        .await
+        .expect("open_websocket: TcpStream::connect failed");
     let stream = FromTokio::new(tcp);
     let rng = OsRng;
     match AsyncWebSocketClient::open(stream, uri, rng, None, None).await {
@@ -121,13 +124,19 @@ pub async fn generate_funded_wallet() -> Wallet {
 }
 
 /// Advance the ledger by one close.
+///
+/// Panics if the HTTP round-trip fails so test failures are surfaced
+/// immediately rather than silently proceeding with a stale ledger.
 #[cfg(feature = "std")]
 pub async fn ledger_accept() {
-    let _ = reqwest::Client::new()
+    reqwest::Client::new()
         .post(constants::STANDALONE_URL)
         .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
         .send()
-        .await;
+        .await
+        .expect("ledger_accept: HTTP request failed")
+        .error_for_status()
+        .expect("ledger_accept: server returned error status");
 }
 
 /// Return the `close_time` of the most-recent validated ledger in Ripple epoch seconds.
@@ -274,4 +283,39 @@ where
         result.engine_result, result.engine_result_message
     );
     ledger_accept().await;
+}
+
+/// Parameters for [`submit_tx`] — use struct literal syntax so each argument
+/// is self-documenting at call sites.
+#[cfg(feature = "std")]
+pub struct SubmitOptions<'w> {
+    pub wallet: &'w Wallet,
+    /// Auto-fill sequence, fee, and other transaction fields before signing.
+    pub autofill: bool,
+    /// Validate that the fee satisfies the network's minimum requirement.
+    pub check_fee: bool,
+}
+
+/// Submit a transaction without asserting success. Returns the raw
+/// `engine_result` string so callers can assert specific `tec`/`tem` codes.
+///
+/// Use [`test_transaction`] instead when you expect `tesSUCCESS`.
+#[cfg(feature = "std")]
+pub async fn submit_tx<'a, T, F>(tx: &mut T, opts: SubmitOptions<'_>) -> String
+where
+    T: xrpl::models::transactions::Transaction<'a, F>
+        + xrpl::models::Model
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Clone
+        + core::fmt::Debug,
+    F: strum::IntoEnumIterator + serde::Serialize + core::fmt::Debug + PartialEq + Clone + 'a,
+{
+    use xrpl::asynch::transaction::sign_and_submit;
+    let client = get_client().await;
+    sign_and_submit(tx, client, opts.wallet, opts.autofill, opts.check_fee)
+        .await
+        .expect("submit_tx: sign_and_submit failed")
+        .engine_result
+        .to_string()
 }

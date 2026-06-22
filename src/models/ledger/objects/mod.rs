@@ -12,6 +12,7 @@ pub mod negative_unl;
 pub mod nftoken_offer;
 pub mod nftoken_page;
 pub mod offer;
+pub mod oracle;
 pub mod pay_channel;
 pub mod ripple_state;
 pub mod signer_list;
@@ -34,6 +35,7 @@ use negative_unl::NegativeUNL;
 use nftoken_offer::NFTokenOffer;
 use nftoken_page::NFTokenPage;
 use offer::Offer;
+use oracle::Oracle;
 use pay_channel::PayChannel;
 use ripple_state::RippleState;
 use signer_list::SignerList;
@@ -66,6 +68,7 @@ pub enum LedgerEntryType {
     NFTokenOffer = 0x0037,
     NFTokenPage = 0x0050,
     Offer = 0x006F,
+    Oracle = 0x0080,
     PayChannel = 0x0078,
     RippleState = 0x0072,
     SignerList = 0x0053,
@@ -90,6 +93,7 @@ pub enum LedgerEntry<'a> {
     NFTokenOffer(NFTokenOffer<'a>),
     NFTokenPage(NFTokenPage<'a>),
     Offer(Offer<'a>),
+    Oracle(Oracle<'a>),
     PayChannel(PayChannel<'a>),
     RippleState(RippleState<'a>),
     SignerList(SignerList<'a>),

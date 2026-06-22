@@ -22,3 +22,6 @@
 **/.DS_Store
 
 rustc-ice*
+.local/*
+dev/*
+.playwright-mcp/*
