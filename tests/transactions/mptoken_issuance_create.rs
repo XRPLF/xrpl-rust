@@ -72,7 +72,11 @@ async fn test_mptoken_issuance_create_metadata_round_trip() {
             "MaximumAmount": "9223372036854775807",
             "MPTokenMetadata": encoded,
         });
-        let submit = rpc("submit", json!({ "tx_json": tx_json, "secret": wallet.seed })).await;
+        let submit = rpc(
+            "submit",
+            json!({ "tx_json": tx_json, "secret": wallet.seed }),
+        )
+        .await;
         assert_eq!(
             submit["engine_result"].as_str(),
             Some("tesSUCCESS"),

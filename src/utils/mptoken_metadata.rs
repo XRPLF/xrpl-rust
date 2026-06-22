@@ -284,8 +284,9 @@ pub fn validate_mptoken_metadata(input: &str) -> Vec<String> {
     let obj = match value.as_object() {
         Some(obj) => obj,
         None => {
-            messages
-                .push("MPTokenMetadata is not properly formatted JSON object as per XLS-89.".to_string());
+            messages.push(
+                "MPTokenMetadata is not properly formatted JSON object as per XLS-89.".to_string(),
+            );
             return messages;
         }
     };
@@ -355,7 +356,8 @@ fn validate_ticker(obj: &Map<String, Value>) -> Vec<String> {
     if has_both_forms(obj, "ticker", "t") {
         return vec![both_forms_message("ticker", "t")];
     }
-    let valid = matches!(coalesce(obj, "ticker", "t"), Some(Value::String(s)) if is_valid_ticker(s));
+    let valid =
+        matches!(coalesce(obj, "ticker", "t"), Some(Value::String(s)) if is_valid_ticker(s));
     if !valid {
         return vec![
             "ticker/t: should have uppercase letters (A-Z) and digits (0-9) only. Max 6 characters recommended."
@@ -367,7 +369,10 @@ fn validate_ticker(obj: &Map<String, Value>) -> Vec<String> {
 
 fn is_valid_ticker(value: &str) -> bool {
     let len = value.chars().count();
-    (1..=6).contains(&len) && value.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+    (1..=6).contains(&len)
+        && value
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
 }
 
 fn validate_non_empty_string(obj: &Map<String, Value>, long: &str, compact: &str) -> Vec<String> {
@@ -402,7 +407,8 @@ fn validate_asset_class(obj: &Map<String, Value>) -> Vec<String> {
         return vec![both_forms_message("asset_class", "ac")];
     }
     let value = coalesce(obj, "asset_class", "ac");
-    let valid = matches!(value, Some(Value::String(s)) if MPT_META_ASSET_CLASSES.contains(&s.as_str()));
+    let valid =
+        matches!(value, Some(Value::String(s)) if MPT_META_ASSET_CLASSES.contains(&s.as_str()));
     if !valid {
         return vec![format!(
             "asset_class/ac: should be one of {}.",
@@ -463,7 +469,9 @@ fn validate_uris(obj: &Map<String, Value>) -> Vec<String> {
 
         for &(long, compact) in &MPT_META_URI_FIELDS {
             if has_both_forms(uri_obj, long, compact) {
-                messages.push(format!("uris/us: should not have both {long} and {compact} fields."));
+                messages.push(format!(
+                    "uris/us: should not have both {long} and {compact} fields."
+                ));
                 break;
             }
         }
@@ -517,7 +525,11 @@ mod tests {
 
         for case in cases {
             let encoded = encode_mptoken_metadata(&case.mpt_metadata).unwrap();
-            assert_eq!(encoded, case.hex, "encode mismatch for `{}`", case.test_name);
+            assert_eq!(
+                encoded, case.hex,
+                "encode mismatch for `{}`",
+                case.test_name
+            );
 
             let decoded = decode_mptoken_metadata(&case.hex).unwrap();
             assert_eq!(

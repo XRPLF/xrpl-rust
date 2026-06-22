@@ -3,9 +3,9 @@
 pub mod exceptions;
 #[cfg(feature = "models")]
 pub mod get_nftoken_id;
-pub mod mptoken_metadata;
 #[cfg(feature = "models")]
 pub mod get_xchain_claim_id;
+pub mod mptoken_metadata;
 #[cfg(feature = "models")]
 pub mod parse_nftoken_id;
 pub mod str_conversion;
