@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::string::ToString;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -203,7 +204,7 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                         return Err(XRPLModelException::InvalidValue {
                             field: "permissioned_domain.seq".into(),
                             expected: "value within u32 range".into(),
-                            found: alloc::format!("{}", obj.seq),
+                            found: obj.seq.to_string(),
                         });
                     }
                 }
@@ -305,6 +306,7 @@ pub trait LedgerEntryError {
 mod test_ledger_entry_errors {
     use super::Offer;
     use crate::models::Model;
+    use alloc::format;
     use alloc::string::ToString;
 
     use super::*;
