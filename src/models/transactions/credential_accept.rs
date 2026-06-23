@@ -205,6 +205,7 @@ mod tests {
         );
     }
 
+    /// Guards the upper length boundary: 128 hex chars (= 64 bytes) must still pass.
     #[test]
     fn test_credential_type_at_max_128_ok() {
         let max_hex: Cow<'_, str> = Cow::from("A".repeat(128));
@@ -220,6 +221,7 @@ mod tests {
         assert!(tx.get_errors().is_ok());
     }
 
+    /// Guards the minimal-valid path: a short, well-formed hex credential_type passes.
     #[test]
     fn test_valid_minimal_accept() {
         let tx = CredentialAccept {
