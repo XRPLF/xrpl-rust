@@ -3,7 +3,11 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{requests::RequestMethod, Model};
+use crate::models::{
+    requests::RequestMethod,
+    transactions::validate_credential_ids,
+    Model, XRPLModelResult,
+};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
@@ -29,7 +33,11 @@ pub struct DepositAuthorized<'a> {
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
 }
 
-impl<'a> Model for DepositAuthorized<'a> {}
+impl<'a> Model for DepositAuthorized<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        validate_credential_ids(&self.credentials)
+    }
+}
 
 impl<'a> Request<'a> for DepositAuthorized<'a> {
     fn get_common_fields(&self) -> &CommonFields<'a> {
@@ -75,6 +83,7 @@ mod tests {
     use alloc::vec;
 
     use super::*;
+    use crate::models::{Model, XRPLModelException};
 
     #[test]
     fn test_serde_round_trip() {
@@ -107,5 +116,109 @@ mod tests {
 
         let serialized = serde_json::to_string(&req).unwrap();
         assert!(serialized.contains("\"credentials\":[\"DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001\"]"));
+    }
+
+    #[test]
+    fn test_credentials_empty_error() {
+        let req = DepositAuthorized::new(
+            None,
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            None,
+        )
+        .with_credentials(vec![]);
+
+        assert_eq!(
+            req.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooShort {
+                field: "credential_ids".into(),
+                min: 1,
+                found: 0,
+            }
+        );
+    }
+
+    #[test]
+    fn test_credentials_nine_entries_error() {
+        let id = "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001";
+        // 9 distinct IDs (vary last nibble to avoid duplicate rejection)
+        let creds: Vec<Cow<'_, str>> = (0u8..9)
+            .map(|i| format!("DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D{:03X}", i).into())
+            .collect();
+        let _ = id;
+        let req = DepositAuthorized::new(
+            None,
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            None,
+        )
+        .with_credentials(creds);
+
+        assert_eq!(
+            req.get_errors().unwrap_err(),
+            XRPLModelException::ValueTooLong {
+                field: "credential_ids".into(),
+                max: 8,
+                found: 9,
+            }
+        );
+    }
+
+    #[test]
+    fn test_credentials_duplicate_error() {
+        let id = "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001";
+        let req = DepositAuthorized::new(
+            None,
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            None,
+        )
+        .with_credentials(vec![id.into(), id.into()]);
+
+        assert_eq!(
+            req.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "credential_ids".into(),
+                field2: "credential_ids (duplicate entry)".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_credentials_case_variant_duplicate_error() {
+        let req = DepositAuthorized::new(
+            None,
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            None,
+        )
+        .with_credentials(vec![
+            "dd40031c6c21164e7673a47c35513d52a6b0f1349a873ee0d188d8994cd4d001".into(),
+            "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+        ]);
+
+        assert_eq!(
+            req.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "credential_ids".into(),
+                field2: "credential_ids (duplicate entry)".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_credentials_none_ok() {
+        let req = DepositAuthorized::new(
+            None,
+            "rDest11111111111111111111111111111".into(),
+            "rSrc111111111111111111111111111111".into(),
+            None,
+            None,
+        );
+        assert!(req.get_errors().is_ok());
     }
 }
