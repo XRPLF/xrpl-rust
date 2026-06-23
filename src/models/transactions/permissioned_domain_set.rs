@@ -369,7 +369,10 @@ mod tests {
         };
 
         assert_eq!(txn.accepted_credentials.len(), 3);
-        assert_eq!(txn.accepted_credentials[0].issuer, "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string());
+        assert_eq!(
+            txn.accepted_credentials[0].issuer,
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string()
+        );
         assert_eq!(
             txn.accepted_credentials[1].credential_type,
             "414D4C".to_string()

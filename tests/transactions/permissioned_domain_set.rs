@@ -142,8 +142,9 @@ async fn test_permissioned_domain_account_objects_filter() {
             .await
             .expect("account_objects request failed");
 
-        let ao: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("account_objects parse failed");
+        let ao: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("account_objects parse failed");
 
         assert_eq!(
             ao.account_objects.len(),
@@ -299,7 +300,9 @@ async fn test_permissioned_domain_ledger_entry_by_account_seq() {
             entry["node"]["LedgerEntryType"]
         );
         assert_eq!(
-            entry["node"]["Sequence"].as_u64().expect("Sequence missing"),
+            entry["node"]["Sequence"]
+                .as_u64()
+                .expect("Sequence missing"),
             seq,
             "Sequence mismatch"
         );
@@ -394,7 +397,8 @@ async fn test_permissioned_domain_update_credentials() {
             .to_uppercase();
 
         assert_eq!(
-            cred_type, "414D4C", // hex("AML")
+            cred_type,
+            "414D4C", // hex("AML")
             "Expected AML credential type after update, got: {}",
             cred_type
         );

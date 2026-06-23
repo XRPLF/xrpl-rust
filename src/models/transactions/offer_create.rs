@@ -440,5 +440,4 @@ mod tests {
         // When using tickets, sequence should be None or 0
         assert!(ticket_offer.common_fields.sequence.is_none());
     }
-
 }

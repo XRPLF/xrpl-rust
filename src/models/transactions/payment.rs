@@ -597,5 +597,4 @@ mod tests {
         assert_eq!(payment.paths.as_ref().unwrap().len(), 2);
         assert!(payment.validate().is_ok());
     }
-
 }
