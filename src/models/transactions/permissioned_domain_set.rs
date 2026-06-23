@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::core::addresscodec::is_valid_classic_address;
 use crate::models::amount::XRPAmount;
 use crate::models::exceptions::XRPLModelException;
 use crate::models::{
@@ -67,10 +68,17 @@ impl<'a> Model for PermissionedDomainSet<'a> {
                 found: self.accepted_credentials.len(),
             });
         }
-        let mut credentials = BTreeSet::new();
+        let mut seen: BTreeSet<(alloc::string::String, alloc::string::String)> = BTreeSet::new();
         for credential in &self.accepted_credentials {
             validate_credential(credential)?;
-            if !credentials.insert((&credential.issuer, &credential.credential_type)) {
+            // Normalise CredentialType to uppercase hex before duplicate check so that
+            // "4b5943" and "4B5943" are treated as the same credential (rippled decodes
+            // the blob bytes and hashes them; casing is irrelevant at the wire level).
+            let key = (
+                credential.issuer.clone(),
+                credential.credential_type.to_uppercase(),
+            );
+            if !seen.insert(key) {
                 return Err(XRPLModelException::InvalidValue {
                     field: "AcceptedCredentials".into(),
                     expected: "unique Issuer/CredentialType pairs".into(),
@@ -107,6 +115,13 @@ pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRP
     if credential.issuer.is_empty() {
         return Err(XRPLModelException::MissingField("Credential.Issuer".into()));
     }
+    if !is_valid_classic_address(&credential.issuer) {
+        return Err(XRPLModelException::InvalidValue {
+            field: "Credential.Issuer".into(),
+            expected: "valid classic XRPL address".into(),
+            found: credential.issuer.clone(),
+        });
+    }
     let ct = &credential.credential_type;
     if ct.is_empty() {
         return Err(XRPLModelException::MissingField(
@@ -120,7 +135,7 @@ pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRP
             found: ct.len(),
         });
     }
-    if ct.len() % 2 != 0 || !ct.chars().all(|c| c.is_ascii_hexdigit()) {
+    if !ct.len().is_multiple_of(2) || !ct.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(XRPLModelException::InvalidValue {
             field: "Credential.CredentialType".into(),
             expected: "even-length hex string (<=128 chars)".into(),
@@ -228,7 +243,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer111111111111111111111".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
@@ -253,7 +268,7 @@ mod tests {
                 "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2".into(),
             ),
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer222222222222222222222".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "414D4C".to_string(), // hex("AML")
             }],
         };
@@ -285,7 +300,7 @@ mod tests {
         .with_last_ledger_sequence(596447)
         .with_source_tag(42)
         .with_credential(Credential {
-            issuer: "rIssuer333333333333333333333".to_string(),
+            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
@@ -339,22 +354,22 @@ mod tests {
             domain_id: None,
             accepted_credentials: vec![
                 Credential {
-                    issuer: "rIssuerA".to_string(),
+                    issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                     credential_type: "4B5943".to_string(), // hex("KYC")
                 },
                 Credential {
-                    issuer: "rIssuerB".to_string(),
+                    issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                     credential_type: "414D4C".to_string(), // hex("AML")
                 },
                 Credential {
-                    issuer: "rIssuerC".to_string(),
+                    issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                     credential_type: "41434352454449544544".to_string(), // hex("ACCREDITED")
                 },
             ],
         };
 
         assert_eq!(txn.accepted_credentials.len(), 3);
-        assert_eq!(txn.accepted_credentials[0].issuer, "rIssuerA".to_string());
+        assert_eq!(txn.accepted_credentials[0].issuer, "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string());
         assert_eq!(
             txn.accepted_credentials[1].credential_type,
             "414D4C".to_string()
@@ -400,7 +415,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer111111111111111111111".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
@@ -424,7 +439,7 @@ mod tests {
             None,
             None,
             vec![Credential {
-                issuer: "rIssuer".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         );
@@ -456,7 +471,7 @@ mod tests {
         }
         .with_domain_id("AABB0011".into())
         .with_accepted_credentials(vec![Credential {
-            issuer: "rIssuer".to_string(),
+            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         }]);
 
@@ -482,7 +497,7 @@ mod tests {
             memo_type: Some("text".into()),
         })
         .with_credential(Credential {
-            issuer: "rIssuer".to_string(),
+            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
@@ -518,7 +533,7 @@ mod tests {
         // XLS-80 caps AcceptedCredentials at 10 entries.
         let credentials: Vec<Credential> = (0..11)
             .map(|_| Credential {
-                issuer: "rIssuer".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "4B5943".to_string(),
             })
             .collect();
@@ -555,7 +570,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "KYC".to_string(), // not hex
             }],
         };
@@ -571,7 +586,7 @@ mod tests {
     fn test_credential_type_64_bytes_accepted() {
         // 64 bytes hex-encoded = 128 chars; this is the rippled maximum.
         let credential = Credential {
-            issuer: "rIssuer".to_string(),
+            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
             credential_type: "A".repeat(128),
         };
 
@@ -589,7 +604,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: too_long,
             }],
         };
@@ -604,7 +619,7 @@ mod tests {
     #[test]
     fn test_duplicate_credentials_rejected() {
         let duplicate = Credential {
-            issuer: "rIssuer".to_string(),
+            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
             credential_type: "4B5943".to_string(),
         };
         let txn = PermissionedDomainSet {
@@ -633,7 +648,7 @@ mod tests {
             },
             domain_id: Some("0".repeat(64).into()),
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "4B5943".to_string(),
             }],
         };
@@ -657,7 +672,7 @@ mod tests {
         .with_ticket_sequence(42)
         .with_fee("10".into())
         .with_credential(Credential {
-            issuer: "rIssuer".to_string(),
+            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
@@ -698,7 +713,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rIssuer".to_string(),
+                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
                 credential_type: "".to_string(),
             }],
         };
