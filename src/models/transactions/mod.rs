@@ -134,6 +134,7 @@ pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XR
             });
         }
         for (i, id) in ids.iter().enumerate() {
+            validate_hex("credential_ids", id)?;
             // Hex credential IDs are compared case-insensitively: rippled normalizes
             // the raw bytes, so "ABCD" and "abcd" refer to the same credential.
             if ids[..i].iter().any(|prev| prev.eq_ignore_ascii_case(id)) {
