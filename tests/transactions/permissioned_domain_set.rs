@@ -8,15 +8,16 @@
 //   - ledger_entry_by_account_seq: query domain by owner account + sequence
 //   - update: replace credentials on existing domain (KYC → AML), verify KYC absent
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{
+    constants::STANDALONE_URL, generate_funded_wallet, get_client, ledger_accept,
+    with_blockchain_lock,
+};
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
 use xrpl::models::transactions::permissioned_domain_set::PermissionedDomainSet;
 use xrpl::models::transactions::{CommonFields, Credential, TransactionType};
-
-const STANDALONE_URL: &str = "http://localhost:5005";
 
 fn kyc_credential(issuer: &str) -> Credential {
     Credential {
