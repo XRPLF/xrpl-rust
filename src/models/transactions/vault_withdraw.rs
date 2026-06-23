@@ -3,8 +3,11 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::core::addresscodec::is_valid_classic_address;
 use crate::models::amount::XRPAmount;
-use crate::models::{Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelResult};
+use crate::models::{
+    Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPLModelException, XRPLModelResult,
+};
 
 use super::vault_common::{validate_positive_amount, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
@@ -50,7 +53,17 @@ impl Model for VaultWithdraw<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
         validate_vault_id(&self.vault_id)?;
-        validate_positive_amount("amount", &self.amount)
+        validate_positive_amount("amount", &self.amount)?;
+        if let Some(dest) = &self.destination {
+            if !is_valid_classic_address(dest) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "destination".into(),
+                    expected: "a valid classic account address".into(),
+                    found: dest.as_ref().into(),
+                });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -358,6 +371,38 @@ mod tests {
 
         assert_eq!(vault_withdraw.destination, Some("rDestAccount789".into()));
         assert_eq!(vault_withdraw.destination_tag, Some(42));
+    }
+
+    #[test]
+    fn test_invalid_destination_rejected() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some("notanaddress".into()),
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_err());
+    }
+
+    #[test]
+    fn test_valid_destination_accepted() {
+        let vault_withdraw = VaultWithdraw {
+            common_fields: CommonFields {
+                account: "rWithdrawer".into(),
+                transaction_type: TransactionType::VaultWithdraw,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
+            destination_tag: None,
+        };
+        assert!(vault_withdraw.validate().is_ok());
     }
 
     #[test]

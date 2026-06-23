@@ -5,6 +5,7 @@ use serde_with::skip_serializing_none;
 
 use crate::core::addresscodec::is_valid_classic_address;
 use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
+use crate::models::transactions::vault_common::validate_vault_id;
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
@@ -43,7 +44,7 @@ impl<'a> Model for VaultInfo<'a> {
         let has_seq = self.seq.is_some();
 
         if has_id && !has_owner && !has_seq {
-            // vault_id lookup: nothing further to validate on the lookup keys.
+            validate_vault_id(self.vault_id.as_deref().unwrap())?;
             Ok(())
         } else if !has_id && has_owner && has_seq {
             // owner + seq lookup: validate both fields match rippled's checks.
@@ -300,5 +301,27 @@ mod tests {
             ledger_lookup: None,
         };
         assert!(req.validate().is_err());
+    }
+
+    // --- vault_id content validation ---
+
+    #[test]
+    fn test_vault_id_wrong_length_rejected() {
+        let req = VaultInfo::new(None, "DEADBEEF".into(), None, None);
+        assert!(req.validate().is_err(), "short vault_id must be rejected");
+    }
+
+    #[test]
+    fn test_vault_id_nonhex_rejected() {
+        let non_hex: alloc::string::String = "Z".repeat(64);
+        let req = VaultInfo::new(None, non_hex.into(), None, None);
+        assert!(req.validate().is_err(), "non-hex vault_id must be rejected");
+    }
+
+    #[test]
+    fn test_vault_id_all_zero_rejected() {
+        let zeros: alloc::string::String = "0".repeat(64);
+        let req = VaultInfo::new(None, zeros.into(), None, None);
+        assert!(req.validate().is_err(), "all-zero vault_id must be rejected");
     }
 }

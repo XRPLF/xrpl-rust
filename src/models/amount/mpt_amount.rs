@@ -8,6 +8,7 @@ use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MPTAmount<'a> {
     pub mpt_issuance_id: Cow<'a, str>,
     pub value: Cow<'a, str>,
