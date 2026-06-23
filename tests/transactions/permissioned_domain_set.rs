@@ -49,45 +49,31 @@ fn new_pd_set(
     }
 }
 
-/// Query ledger_entry via raw RPC (bypasses typed client serde which only handles AccountRoot).
-async fn ledger_entry_by_index(domain_id: &str) -> serde_json::Value {
-    let body = serde_json::json!({
-        "method": "ledger_entry",
-        "params": [{"permissioned_domain": domain_id}]
-    });
+/// Raw `ledger_entry` RPC call — bypasses the typed XRPLClient whose serde only handles
+/// AccountRoot. Returns the `result` object from the response.
+async fn rpc_ledger_entry(params: serde_json::Value) -> serde_json::Value {
+    let body = serde_json::json!({"method": "ledger_entry", "params": [params]});
     let resp = reqwest::Client::new()
         .post(STANDALONE_URL)
         .json(&body)
         .send()
         .await
-        .expect("ledger_entry request failed")
+        .expect("ledger_entry RPC request failed")
         .json::<serde_json::Value>()
         .await
-        .expect("ledger_entry response parse failed");
+        .expect("ledger_entry RPC response parse failed");
     resp["result"].clone()
 }
 
-/// Query ledger_entry by account + sequence via raw RPC.
+async fn ledger_entry_by_index(domain_id: &str) -> serde_json::Value {
+    rpc_ledger_entry(serde_json::json!({"permissioned_domain": domain_id})).await
+}
+
 async fn ledger_entry_by_account_seq(account: &str, seq: u64) -> serde_json::Value {
-    let body = serde_json::json!({
-        "method": "ledger_entry",
-        "params": [{
-            "permissioned_domain": {
-                "account": account,
-                "seq": seq
-            }
-        }]
-    });
-    let resp = reqwest::Client::new()
-        .post(STANDALONE_URL)
-        .json(&body)
-        .send()
-        .await
-        .expect("ledger_entry request failed")
-        .json::<serde_json::Value>()
-        .await
-        .expect("ledger_entry response parse failed");
-    resp["result"].clone()
+    rpc_ledger_entry(serde_json::json!({
+        "permissioned_domain": {"account": account, "seq": seq}
+    }))
+    .await
 }
 
 #[tokio::test]
