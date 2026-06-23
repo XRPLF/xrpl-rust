@@ -78,7 +78,7 @@ impl<'a> DepositAuthorized<'a> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
+    use alloc::{format, vec};
 
     use super::*;
     use crate::models::{Model, XRPLModelException};
