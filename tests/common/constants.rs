@@ -11,15 +11,3 @@ pub const GENESIS_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
 
 /// HTTP JSON-RPC endpoint for local Docker standalone rippled.
 pub const STANDALONE_URL: &str = "http://localhost:5005";
-
-/// "chainlink" ASCII hex-encoded (Provider Blob field).
-pub const ORACLE_PROVIDER: &str = "636861696E6C696E6B";
-
-/// "currency" ASCII hex-encoded (AssetClass Blob field).
-pub const ORACLE_ASSET_CLASS: &str = "63757272656E6379";
-
-/// Short opaque URI hex-encoded ("did_example").
-pub const ORACLE_URI: &str = "6469645F6578616D706C65";
-
-/// "https://example.com" ASCII hex-encoded (used in construction-only tests).
-pub const ORACLE_URI_HTTPS: &str = "68747470733A2F2F6578616D706C652E636F6D";

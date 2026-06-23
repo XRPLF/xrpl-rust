@@ -30,6 +30,7 @@ async fn test_mptoken_issuance_set_lock() {
             },
             mptoken_issuance_id: issuance_id.into(),
             holder: None, // lock the entire issuance
+            ..Default::default()
         };
 
         test_transaction(&mut tx, &issuer).await;

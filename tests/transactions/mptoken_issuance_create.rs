@@ -46,6 +46,7 @@ async fn test_mptoken_issuance_create_with_metadata() {
             maximum_amount: Some("1000000".into()),
             transfer_fee: Some(314),
             mptoken_metadata: Some("CAFEBABE".into()),
+            ..Default::default()
         };
 
         test_transaction(&mut tx, &wallet).await;
