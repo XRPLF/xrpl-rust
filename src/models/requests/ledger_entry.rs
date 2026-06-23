@@ -187,7 +187,7 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                         return Err(XRPLModelException::InvalidValue {
                             field: "permissioned_domain.index".into(),
                             expected: "64-character hex string".into(),
-                            found: id.to_string(),
+                            found: id.as_ref().into(),
                         });
                     }
                 }
@@ -196,14 +196,14 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                         return Err(XRPLModelException::InvalidValue {
                             field: "permissioned_domain.account".into(),
                             expected: "valid classic XRPL address".into(),
-                            found: obj.account.to_string(),
+                            found: obj.account.as_ref().into(),
                         });
                     }
                     if obj.seq > u32::MAX as u64 {
                         return Err(XRPLModelException::InvalidValue {
                             field: "permissioned_domain.seq".into(),
                             expected: "value within u32 range".into(),
-                            found: obj.seq.to_string(),
+                            found: alloc::format!("{}", obj.seq),
                         });
                     }
                 }
