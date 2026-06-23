@@ -23,6 +23,14 @@ pub const SPECIAL_CASE_TRANFER_RATE: u32 = 0;
 pub const MAX_TRANSFER_FEE: u32 = 50000;
 pub const MAX_URI_LENGTH: usize = 512;
 
+/// Maximum length of the `URI` field in a CredentialCreate transaction, in hex characters.
+///
+/// rippled enforces `kMaxCredentialUriLength = 256` bytes on the decoded blob, which
+/// equals 256 hex chars since the URI is stored as a hex-encoded string on the ledger.
+/// xrpl.js also caps at 256 hex chars (`MAX_URI_LENGTH = 256` in credentialCreate.ts).
+/// This is distinct from NFToken URI which uses the global `MAX_URI_LENGTH = 512`.
+pub const MAX_CREDENTIAL_URI_LENGTH: usize = 256;
+
 pub const MAX_DOMAIN_LENGTH: usize = 256;
 
 /// Represents the supported cryptography algorithms.
