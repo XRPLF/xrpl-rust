@@ -4,9 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    requests::RequestMethod,
-    transactions::validate_credential_ids,
-    Model, XRPLModelResult,
+    requests::RequestMethod, transactions::validate_credential_ids, Model, XRPLModelResult,
 };
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
@@ -144,7 +142,13 @@ mod tests {
         let id = "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001";
         // 9 distinct IDs (vary last nibble to avoid duplicate rejection)
         let creds: Vec<Cow<'_, str>> = (0u8..9)
-            .map(|i| format!("DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D{:03X}", i).into())
+            .map(|i| {
+                format!(
+                    "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D{:03X}",
+                    i
+                )
+                .into()
+            })
             .collect();
         let _ = id;
         let req = DepositAuthorized::new(

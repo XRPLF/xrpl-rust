@@ -5,9 +5,7 @@ use crate::common::with_blockchain_lock;
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
     requests::{
-        ledger_data::LedgerData as LedgerDataRequest,
-        ledger_entry::LedgerEntry,
-        LedgerIndex,
+        ledger_data::LedgerData as LedgerDataRequest, ledger_entry::LedgerEntry, LedgerIndex,
     },
     results::ledger_data::LedgerData as LedgerDataResult,
 };
