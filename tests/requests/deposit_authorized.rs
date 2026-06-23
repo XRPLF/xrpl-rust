@@ -67,8 +67,7 @@ async fn test_deposit_authorized_with_credentials_echoed_in_response() {
 
         // In a full test: provision a credential for wallet1, then pass its
         // hash in credentials. For now this test documents the expected shape.
-        let credential_id =
-            "A182EFBD154C9E80195082F86C1C8952FC0760A654B886F61BB0A59803B4387B";
+        let credential_id = "A182EFBD154C9E80195082F86C1C8952FC0760A654B886F61BB0A59803B4387B";
 
         let request = DepositAuthorized::new(
             None,
@@ -89,7 +88,9 @@ async fn test_deposit_authorized_with_credentials_echoed_in_response() {
             .expect("failed to parse deposit_authorized result");
 
         // The rippled response must echo the credentials field (Protocol.h verified).
-        let echoed = result.credentials.expect("credentials should be echoed in response");
+        let echoed = result
+            .credentials
+            .expect("credentials should be echoed in response");
         assert_eq!(echoed.len(), 1);
         assert_eq!(echoed[0].as_ref(), credential_id);
     })

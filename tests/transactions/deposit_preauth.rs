@@ -11,8 +11,8 @@
 
 use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
 use xrpl::models::{
-    credential_authorization::{CredentialAuthorization, CredentialAuthorizationFields},
-    transactions::deposit_preauth::DepositPreauth,
+    transactions::{deposit_preauth::DepositPreauth, CommonFields, TransactionType},
+    CredentialAuthorization, CredentialAuthorizationFields,
 };
 
 // ── 1. Base: account-based preauthorization ───────────────────────────────
@@ -23,14 +23,15 @@ async fn test_deposit_preauth_base() {
         let wallet = generate_funded_wallet().await;
         let authorized = generate_funded_wallet().await;
 
-        let mut tx = DepositPreauth::new(
-            wallet.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
-            Some(authorized.classic_address.clone().into()), // authorize
-            None,
-            None, // unauthorize
-            None,
-        );
+        let mut tx = DepositPreauth {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: Some(authorized.classic_address.clone().into()),
+            ..Default::default()
+        };
 
         test_transaction(&mut tx, &wallet).await;
     })
@@ -50,19 +51,22 @@ async fn test_deposit_preauth_authorize_credentials() {
         let wallet = generate_funded_wallet().await;
         let issuer = generate_funded_wallet().await;
 
-        let creds = vec![CredentialAuthorization::new(CredentialAuthorizationFields::new(
-            issuer.classic_address.clone().into(),
-            "4B5943".into(), // hex "KYC"
-        ))];
+        let creds = vec![CredentialAuthorization::new(
+            CredentialAuthorizationFields::new(
+                issuer.classic_address.clone().into(),
+                "4B5943".into(), // hex "KYC"
+            ),
+        )];
 
-        let mut tx = DepositPreauth::new(
-            wallet.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
-            None,            // authorize (account-based) — None
-            Some(creds),     // authorize_credentials
-            None,
-            None,
-        );
+        let mut tx = DepositPreauth {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize_credentials: Some(creds),
+            ..Default::default()
+        };
 
         test_transaction(&mut tx, &wallet).await;
     })
@@ -82,32 +86,36 @@ async fn test_deposit_preauth_unauthorize_credentials() {
 
         let cred_type = "4B5943"; // hex "KYC"
         let make_creds = || {
-            vec![CredentialAuthorization::new(CredentialAuthorizationFields::new(
-                issuer.classic_address.clone().into(),
-                cred_type.into(),
-            ))]
+            vec![CredentialAuthorization::new(
+                CredentialAuthorizationFields::new(
+                    issuer.classic_address.clone().into(),
+                    cred_type.into(),
+                ),
+            )]
         };
 
         // First: authorize credentials.
-        let mut authorize = DepositPreauth::new(
-            wallet.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
-            None,
-            Some(make_creds()),
-            None,
-            None,
-        );
+        let mut authorize = DepositPreauth {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize_credentials: Some(make_creds()),
+            ..Default::default()
+        };
         test_transaction(&mut authorize, &wallet).await;
 
         // Then: revoke the same credential authorization.
-        let mut unauthorize = DepositPreauth::new(
-            wallet.classic_address.clone().into(),
-            None, None, None, None, None, None, None, None,
-            None,
-            None,
-            None,
-            Some(make_creds()), // unauthorize_credentials
-        );
+        let mut unauthorize = DepositPreauth {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            unauthorize_credentials: Some(make_creds()),
+            ..Default::default()
+        };
         test_transaction(&mut unauthorize, &wallet).await;
     })
     .await;
