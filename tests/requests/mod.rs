@@ -26,3 +26,4 @@ mod server_state;
 mod submit;
 mod submit_multisigned;
 mod tx;
+mod vault_info;
