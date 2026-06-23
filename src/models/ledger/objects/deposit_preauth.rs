@@ -151,7 +151,13 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
             }
             for (i, cred) in creds.iter().enumerate() {
                 validate_credential_type(&cred.credential.credential_type)?;
-                if creds[..i].contains(cred) {
+                if creds[..i].iter().any(|prev| {
+                    prev.credential.issuer == cred.credential.issuer
+                        && prev
+                            .credential
+                            .credential_type
+                            .eq_ignore_ascii_case(&cred.credential.credential_type)
+                }) {
                     return Err(XRPLModelException::ValueEqualsValue {
                         field1: "authorize_credentials".into(),
                         field2: "authorize_credentials (duplicate entry)".into(),
