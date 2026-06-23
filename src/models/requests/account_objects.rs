@@ -19,6 +19,7 @@ pub enum AccountObjectType {
     Offer,
     Oracle,
     PaymentChannel,
+    PermissionedDomain,
     SignerList,
     State,
     Ticket,
