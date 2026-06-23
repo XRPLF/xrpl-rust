@@ -32,3 +32,13 @@ dev/*
 .worktrees/
 .local/
 .history/
+
+# Local agent working docs (never push)
+CLAUDE.md
+CLAUDE.local.md
+xls-*.md
+mr-*.md
+pr-*.md
+docs/
+rippled/
+xrpl.js/
