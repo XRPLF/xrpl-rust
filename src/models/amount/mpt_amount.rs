@@ -16,7 +16,14 @@ pub struct MPTAmount<'a> {
 impl Model for MPTAmount<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         validate_mpt_issuance_id(&self.mpt_issuance_id)?;
-        self.value.parse::<i64>()?;
+        let v = self.value.parse::<i64>()?;
+        if v < 0 {
+            return Err(XRPLModelException::InvalidValue {
+                field: "value".to_string(),
+                expected: "a non-negative MPT amount".to_string(),
+                found: self.value.as_ref().to_string(),
+            });
+        }
         Ok(())
     }
 }

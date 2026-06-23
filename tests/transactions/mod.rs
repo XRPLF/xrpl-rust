@@ -35,7 +35,6 @@ pub mod ticket_create;
 pub mod trust_set;
 mod vault_clawback;
 mod vault_create;
-mod vault_delete;
 mod vault_deposit;
 mod vault_set;
 mod vault_withdraw;
