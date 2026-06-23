@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::core::addresscodec::is_valid_classic_address;
-use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 use crate::models::transactions::vault_common::validate_vault_id;
+use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
@@ -322,6 +322,9 @@ mod tests {
     fn test_vault_id_all_zero_rejected() {
         let zeros: alloc::string::String = "0".repeat(64);
         let req = VaultInfo::new(None, zeros.into(), None, None);
-        assert!(req.validate().is_err(), "all-zero vault_id must be rejected");
+        assert!(
+            req.validate().is_err(),
+            "all-zero vault_id must be rejected"
+        );
     }
 }

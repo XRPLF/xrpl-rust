@@ -2,6 +2,7 @@ use crate::models::{
     currency::validate_mpt_issuance_id, Model, XRPLModelException, XRPLModelResult,
 };
 use alloc::borrow::Cow;
+use alloc::string::ToString;
 use bigdecimal::BigDecimal;
 use core::convert::TryInto;
 use core::str::FromStr;
