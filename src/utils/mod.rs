@@ -5,7 +5,6 @@ pub mod exceptions;
 pub mod get_nftoken_id;
 #[cfg(feature = "models")]
 pub mod get_xchain_claim_id;
-pub mod mptoken_metadata;
 #[cfg(feature = "models")]
 pub mod parse_nftoken_id;
 pub mod str_conversion;
@@ -18,7 +17,6 @@ pub(crate) mod transactions;
 pub mod txn_parser;
 pub mod xrpl_conversion;
 
-pub use self::mptoken_metadata::*;
 pub use self::time_conversion::*;
 pub use self::xrpl_conversion::*;
 

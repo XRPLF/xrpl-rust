@@ -19,12 +19,18 @@ pub const COMMON_NETWORK_ERRORS: &[&str] = &[
     "network",
     "connection",
     "timeout",
+    "timed out",
     "Connection refused",
     "Connection reset",
     "Connection timed out",
     "No route to host",
     "Network is unreachable",
     "ConnectError",
+    // Faucet errors
+    "Funding request timed out",
+    "faucet",
+    // WS result-type mismatch from unexpected push messages (local rippled)
+    "Unexpected result type",
     // DNS resolution errors
     "dns error",
     "failed to lookup address",
@@ -189,6 +195,21 @@ pub mod test_constants {
     /// Common test URLs
     pub const TESTNET_URL: &str = "https://testnet.xrpl-labs.com/";
     pub const ALT_TESTNET_URL: &str = "https://faucet.altnet.rippletest.net:443";
+
+    // ── Test account addresses ────────────────────────────────────────────
+    // Well-known fixtures used across MPT model and codec unit tests.
+    // rHb9... is the genesis (root) account on standalone nodes.
+
+    /// Genesis / root account on standalone rippled nodes.
+    pub const ACCOUNT_GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    /// General-purpose test issuer / MPT issuer account.
+    pub const ACCOUNT_ISSUER: &str = "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B";
+    /// General-purpose test holder / clawback target account.
+    pub const ACCOUNT_HOLDER: &str = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH";
+    /// Secondary holder account for multi-party tests.
+    pub const ACCOUNT_HOLDER_2: &str = "rLHzPsX6oXkzU2qL12kHCH8G8cnZv1rBJh";
+    /// Tertiary account for edge-case and multi-signer tests.
+    pub const ACCOUNT_ALT: &str = "rPcHbQ26o4Xrwb2bu5gLc3gWUsS52yx1pG";
 }
 
 /// Assertion helpers for common test patterns

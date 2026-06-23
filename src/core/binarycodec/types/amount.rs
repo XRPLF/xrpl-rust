@@ -445,18 +445,9 @@ impl TryFrom<serde_json::Value> for Amount {
             let obj = value
                 .as_object()
                 .ok_or(XRPLTypeException::InvalidNoneValue)?;
-            if obj.contains_key("mpt_issuance_id") {
-                // MPT amount: must have mpt_issuance_id + value, no currency/issuer
-                if obj.contains_key("currency") {
-                    return Err(XRPLCoreException::XRPLUtilsError(
-                        "Currency not valid for MPT".to_string(),
-                    ));
-                }
-                if obj.contains_key("issuer") {
-                    return Err(XRPLCoreException::XRPLUtilsError(
-                        "Issuer not valid for MPT".to_string(),
-                    ));
-                }
+            if obj.len() == 2 && obj.contains_key("mpt_issuance_id") && obj.contains_key("value") {
+                // MPT amount: exactly the keys {"mpt_issuance_id", "value"} — matches
+                // xrpl.js isAmountObjectMPT which requires sorted keys === ["mpt_issuance_id","value"].
                 let mpt_id = obj["mpt_issuance_id"]
                     .as_str()
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
@@ -465,8 +456,21 @@ impl TryFrom<serde_json::Value> for Amount {
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
                 let serialized = _serialize_mpt_amount(val, mpt_id)?;
                 Ok(Amount::new(Some(&serialized))?)
-            } else {
+            } else if obj.len() == 3
+                && obj.contains_key("currency")
+                && obj.contains_key("issuer")
+                && obj.contains_key("value")
+            {
+                // ICA: exactly the keys {"currency", "issuer", "value"}.
                 Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
+            } else {
+                Err(XRPLCoreException::SerdeJsonError(
+                    XRPLSerdeJsonError::UnexpectedValueType {
+                        expected: r#"{"mpt_issuance_id","value"} or {"currency","issuer","value"}"#
+                            .into(),
+                        found: value,
+                    },
+                ))
             }
         } else {
             Err(XRPLCoreException::SerdeJsonError(

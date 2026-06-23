@@ -13,8 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [[Unreleased]]
 
 ### Added
-- Support for `XLS-39` Clawback amendment (Amendment ID: 56B241D7A43D40354D02A9DC4C8DF5C7A1F930D92A9035C4E12291B3CA3E1C2B)
 
+- **XLS-33 Multi-Purpose Tokens (MPT):** full support for the [XLS-0033 MPTokensV1 amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0033-multi-purpose-tokens).
+  - **Binary codec:** `Hash192` type for `MPTokenIssuanceID`; MPT amount encode/decode (UInt64 as base-10 string); `AssetScale` (UInt8) and `MPTAmount`/`MaximumAmount`/`OutstandingAmount` field support.
+  - **Amount/Currency:** `MPTAmount` and `MPTCurrency` variants in `Amount`/`Currency` enums; digit-only value validation; `i64::MAX` upper-bound enforcement; `is_mpt()` helper.
+  - **Transaction models:** `MPTokenIssuanceCreate`, `MPTokenIssuanceDestroy`, `MPTokenIssuanceSet`, `MPTokenAuthorize`; `Clawback` extended with `MPTAmount` support and optional `Holder` field.
+  - **Ledger objects:** `MPToken` and `MPTokenIssuance` with `LockedAmount`, `MPTokenIssuanceMutableFlag` bitmask, and non-null index validation.
+  - **Requests:** `AccountObjectType::MptIssuance` and `Mptoken` variants.
+  - **Integration tests:** full MPT lifecycle end-to-end (create issuance, holder opt-in, lock/unlock, clawback).
 - New `xrpl::signing` module containing the pure-crypto signing helpers (`sign`, `multisign`, `prepare_transaction`) extracted from `asynch::transaction` and `transaction`. Available with just `core + models + wallet` features (no `helpers`/runtime/client dependency). The legacy paths `asynch::transaction::sign` and `transaction::multisign` are preserved as re-exports for backward compatibility.
 - Expanded unit-test coverage and raised CI thresholds: lines `73 → 83`, regions `75 → 85`, functions `67 → 73`.
 - Codecov integration with per-PR project (≥83%) and patch (≥80% on new/modified lines) gates.
@@ -22,12 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `Amount::is_issued_currency()` now returns `false` for `MPTAmount`. Previously it returned `!is_xrp()`, so any non-XRP amount yielded `true`. With the introduction of the `MPTAmount` variant, callers that used `is_issued_currency()` as a proxy for "not XRP" must be updated to also check `is_mpt()`. Use the new `is_mpt()` helper for MPT-specific branches.
 - Unit-test and integration-test coverage are now scoped via Cargo feature flags rather than path regex. The unit-test workflow builds with `--no-default-features --features std,core,utils,wallet,models`, so integration-territory code (CLI, async clients, sync wrappers, faucet) simply isn't compiled and doesn't appear in the unit coverage report.
 - Network-dependent inline tests in `src/asynch/transaction/` and `src/asynch/wallet/` (`test_autofill_txn`, `test_autofill_and_sign`, `test_submit_and_wait`, `test_generate_faucet_wallet`) are now gated behind `feature = "integration"` so `cargo test --release` is hermetic by default.
 - Codecov **patch** coverage is now gated per flag (separate `unit` and `integration` sections) rather than a single combined gate.
 
 ### Fixed
 
+- Non-cryptographic RNG (`Hc128Rng`) was being used for wallet seed generation; replaced with `OsRng` so all key material is sourced from the OS entropy pool (closes #286).
 - `RipplePathFind::destination_amount` changed from `Currency<'a>` to `Amount<'a>` to match the XRPL wire format.
 - `NoRippleCheckRole` no longer serializes with the `#[serde(tag = "role")]` discriminator; now emits a plain `snake_case` string matching the XRPL wire format.
 - `is_success()` now reports success correctly for responses deserialized into typed `XRPLResult` variants (e.g. `ServerInfo`); it consults the preserved raw result JSON instead of the re-serialized typed value.

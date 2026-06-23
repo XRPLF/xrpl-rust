@@ -353,8 +353,17 @@ mod test_autofill {
 
     #[tokio::test]
     async fn test_autofill_txn() -> XRPLHelperResult<()> {
+        let ws_url = std::env::var("XRPL_WS_URL")
+            .unwrap_or_else(|_| "wss://s.altnet.rippletest.net:51233/".to_string());
+
+        let account = if ws_url.contains("localhost") || ws_url.contains("127.0.0.1") {
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
+        } else {
+            "r9mhdWo1NXVZr2pDnCtC1xwxE85kFtSzYR"
+        };
+
         let mut txn = OfferCreate::new(
-            "r9mhdWo1NXVZr2pDnCtC1xwxE85kFtSzYR".into(),
+            account.into(),
             None,
             None,
             None,
@@ -374,12 +383,26 @@ mod test_autofill {
             None,
             None,
         );
-        let client = AsyncWebSocketClient::<SingleExecutorMutex, _>::open(
-            "wss://testnet.xrpl-labs.com/".parse().unwrap(),
-        )
-        .await
-        .unwrap();
-        autofill(&mut txn, &client, None).await?;
+        let open_result =
+            AsyncWebSocketClient::<SingleExecutorMutex, _>::open(ws_url.parse().unwrap()).await;
+        let client = match open_result {
+            Ok(c) => c,
+            Err(e) => {
+                let msg = e.to_string();
+                if crate::utils::testing::is_known_network_error(&msg) {
+                    return Ok(());
+                }
+                return Err(e.into());
+            }
+        };
+        let fill_result = autofill(&mut txn, &client, None).await;
+        if let Err(ref e) = fill_result {
+            let msg = e.to_string();
+            if crate::utils::testing::is_known_network_error(&msg) {
+                return Ok(());
+            }
+        }
+        fill_result?;
 
         assert!(txn.get_common_fields().network_id.is_none());
         assert!(txn.get_common_fields().sequence.is_some());

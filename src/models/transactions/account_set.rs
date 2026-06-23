@@ -73,10 +73,11 @@ pub enum AccountSetFlag {
     AsfDisallowIncomingPayChan = 14,
     /// Disallow incoming trust lines from other accounts.
     AsfDisallowIncomingTrustline = 15,
-    /// Allow clawback of tokens issued by this account.
-    /// This flag can only be set if the account has no trust lines.
-    /// Once set, it cannot be unset.
+    /// Allow this account to claw back tokens it has issued on trust lines.
+    /// Can only be set if the account has no trust lines, offers, escrows,
+    /// payment channels, checks, or signer lists.
     AsfAllowTrustLineClawback = 16,
+    /// Allow this account to lock tokens it has issued (TokenEscrow).
     AsfAllowTrustLineLocking = 17,
 }
 

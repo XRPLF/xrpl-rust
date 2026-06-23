@@ -13,7 +13,6 @@ pub mod channel_verify;
 pub mod deposit_authorize;
 pub mod fee;
 pub mod gateway_balances;
-pub mod get_aggregate_price;
 pub mod ledger;
 pub mod ledger_closed;
 pub mod ledger_current;
@@ -63,8 +62,6 @@ pub enum RequestMethod {
     #[serde(rename = "amm_info")]
     AMMInfo,
     GatewayBalances,
-    #[serde(rename = "get_aggregate_price")]
-    GetAggregatePrice,
     #[serde(rename = "noripple_check")]
     NoRippleCheck,
 
@@ -131,7 +128,6 @@ pub enum XRPLRequest<'a> {
     AccountTx(account_tx::AccountTx<'a>),
     AMMInfo(amm_info::AMMInfo<'a>),
     GatewayBalances(gateway_balances::GatewayBalances<'a>),
-    GetAggregatePrice(get_aggregate_price::GetAggregatePrice<'a>),
     NoRippleCheck(no_ripple_check::NoRippleCheck<'a>),
     Submit(submit::Submit<'a>),
     SubmitMultisigned(submit_multisigned::SubmitMultisigned<'a>),
@@ -220,12 +216,6 @@ impl<'a> From<amm_info::AMMInfo<'a>> for XRPLRequest<'a> {
 impl<'a> From<gateway_balances::GatewayBalances<'a>> for XRPLRequest<'a> {
     fn from(request: gateway_balances::GatewayBalances<'a>) -> Self {
         XRPLRequest::GatewayBalances(request)
-    }
-}
-
-impl<'a> From<get_aggregate_price::GetAggregatePrice<'a>> for XRPLRequest<'a> {
-    fn from(request: get_aggregate_price::GetAggregatePrice<'a>) -> Self {
-        XRPLRequest::GetAggregatePrice(request)
     }
 }
 
@@ -398,7 +388,6 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::AccountTx(request) => request.get_common_fields(),
             XRPLRequest::AMMInfo(request) => request.get_common_fields(),
             XRPLRequest::GatewayBalances(request) => request.get_common_fields(),
-            XRPLRequest::GetAggregatePrice(request) => request.get_common_fields(),
             XRPLRequest::NoRippleCheck(request) => request.get_common_fields(),
             XRPLRequest::Submit(request) => request.get_common_fields(),
             XRPLRequest::SubmitMultisigned(request) => request.get_common_fields(),
@@ -443,7 +432,6 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::AccountTx(request) => request.get_common_fields_mut(),
             XRPLRequest::AMMInfo(request) => request.get_common_fields_mut(),
             XRPLRequest::GatewayBalances(request) => request.get_common_fields_mut(),
-            XRPLRequest::GetAggregatePrice(request) => request.get_common_fields_mut(),
             XRPLRequest::NoRippleCheck(request) => request.get_common_fields_mut(),
             XRPLRequest::Submit(request) => request.get_common_fields_mut(),
             XRPLRequest::SubmitMultisigned(request) => request.get_common_fields_mut(),

@@ -56,16 +56,6 @@ pub struct RippleState<'a> {
     pub currency: Cow<'a, str>,
 }
 
-/// Required fields for requesting an Oracle ledger entry by account + document ID.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
-pub struct OracleIdentifier<'a> {
-    /// The XRPL account that controls the Oracle object.
-    pub account: Cow<'a, str>,
-    /// The unique identifier of the price oracle for the account.
-    #[serde(rename = "oracle_document_id")]
-    pub oracle_document_id: u32,
-}
-
 /// The ledger_entry method returns a single ledger object
 /// from the XRP Ledger in its raw format. See ledger formats
 /// for information on the different types of objects you can
@@ -96,7 +86,6 @@ pub struct LedgerEntry<'a> {
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     pub offer: Option<Offer<'a>>,
-    pub oracle: Option<OracleIdentifier<'a>>,
     pub payment_channel: Option<Cow<'a, str>>,
     pub ripple_state: Option<RippleState<'a>>,
     pub ticket: Option<Ticket<'a>>,
@@ -126,9 +115,6 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.offer.is_some() {
             signing_methods += 1
         }
-        if self.oracle.is_some() {
-            signing_methods += 1
-        }
         if self.ripple_state.is_some() {
             signing_methods += 1
         }
@@ -151,7 +137,6 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "check",
                 "directory",
                 "offer",
-                "oracle",
                 "ripple_state",
                 "escrow",
                 "payment_channel",
@@ -187,7 +172,6 @@ impl<'a> LedgerEntry<'a> {
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
         offer: Option<Offer<'a>>,
-        oracle: Option<OracleIdentifier<'a>>,
         payment_channel: Option<Cow<'a, str>>,
         ripple_state: Option<RippleState<'a>>,
         ticket: Option<Ticket<'a>>,
@@ -205,7 +189,6 @@ impl<'a> LedgerEntry<'a> {
             directory,
             escrow,
             offer,
-            oracle,
             ripple_state,
             ticket,
             binary,
@@ -250,7 +233,6 @@ mod test_ledger_entry_errors {
             None,
             None,
             None,
-            None,
         );
         let _expected = XRPLModelException::ExpectedOneOf(&[
             "index",
@@ -266,7 +248,7 @@ mod test_ledger_entry_errors {
         ]);
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
+            "Expected one of: index, account_root, check, directory, offer, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
         );
     }
 
@@ -287,7 +269,6 @@ mod test_ledger_entry_errors {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
-            None,
             None,
             None,
             None,
