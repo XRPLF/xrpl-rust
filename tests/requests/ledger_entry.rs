@@ -4,7 +4,11 @@
 use crate::common::with_blockchain_lock;
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
-    requests::{ledger_data::LedgerData as LedgerDataRequest, LedgerIndex},
+    requests::{
+        ledger_data::LedgerData as LedgerDataRequest,
+        ledger_entry::LedgerEntry,
+        LedgerIndex,
+    },
     results::ledger_data::LedgerData as LedgerDataResult,
 };
 
@@ -35,24 +39,10 @@ async fn test_ledger_entry_base() {
         let entry_index = data_result.state[0].index.clone();
 
         // Now query ledger_entry with that index
-        let entry_request = xrpl::models::requests::ledger_entry::LedgerEntry::new(
-            None,                      // id
-            None,                      // account_root
-            None,                      // binary
-            None,                      // check
-            None,                      // credential
-            None,                      // deposit_preauth
-            None,                      // directory
-            None,                      // escrow
-            Some(entry_index.clone()), // index
-            None,                      // ledger_hash
-            None,                      // ledger_index
-            None,                      // offer
-            None,                      // oracle
-            None,                      // payment_channel
-            None,                      // ripple_state
-            None,                      // ticket
-        );
+        let entry_request = LedgerEntry {
+            index: Some(entry_index.clone()),
+            ..Default::default()
+        };
 
         let entry_response = client
             .request(entry_request.into())
