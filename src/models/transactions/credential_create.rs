@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::constants::MAX_URI_LENGTH;
+use crate::constants::MAX_CREDENTIAL_URI_LENGTH;
 use crate::models::amount::XRPAmount;
 use crate::models::transactions::CommonFields;
 use crate::models::{
@@ -133,10 +133,10 @@ impl<'a> CredentialCreateError for CredentialCreate<'a> {
                     found: 0,
                 });
             }
-            if uri.len() > MAX_URI_LENGTH {
+            if uri.len() > MAX_CREDENTIAL_URI_LENGTH {
                 return Err(XRPLModelException::ValueTooLong {
                     field: "uri".into(),
-                    max: MAX_URI_LENGTH,
+                    max: MAX_CREDENTIAL_URI_LENGTH,
                     found: uri.len(),
                 });
             }
@@ -275,9 +275,9 @@ mod tests {
     }
 
     #[test]
-    fn test_uri_at_max_length_ok() {
-        // MAX_URI_LENGTH is 512 chars
-        let max_uri: Cow<'_, str> = Cow::from("A".repeat(MAX_URI_LENGTH));
+    fn test_uri_at_max_256_hex_chars_ok() {
+        // 256 hex chars = 128 decoded bytes; both rippled and xrpl.js cap at 256 hex chars
+        let max_uri: Cow<'_, str> = Cow::from("A".repeat(MAX_CREDENTIAL_URI_LENGTH));
         let tx = CredentialCreate {
             common_fields: CommonFields {
                 account: "rIssuer111111111111111111111111111".into(),
@@ -293,8 +293,8 @@ mod tests {
     }
 
     #[test]
-    fn test_uri_exceeds_max_length_error() {
-        let too_long: Cow<'_, str> = Cow::from("A".repeat(MAX_URI_LENGTH + 1));
+    fn test_uri_exceeds_256_hex_chars_error() {
+        let too_long: Cow<'_, str> = Cow::from("A".repeat(MAX_CREDENTIAL_URI_LENGTH + 1));
         let tx = CredentialCreate {
             common_fields: CommonFields {
                 account: "rIssuer111111111111111111111111111".into(),
@@ -310,8 +310,8 @@ mod tests {
             tx.get_errors().unwrap_err(),
             XRPLModelException::ValueTooLong {
                 field: "uri".into(),
-                max: MAX_URI_LENGTH,
-                found: MAX_URI_LENGTH + 1,
+                max: MAX_CREDENTIAL_URI_LENGTH,
+                found: MAX_CREDENTIAL_URI_LENGTH + 1,
             }
         );
     }
