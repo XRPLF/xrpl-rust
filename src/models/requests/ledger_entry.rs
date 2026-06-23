@@ -277,6 +277,7 @@ impl<'a> Default for LedgerEntry<'a> {
                 ledger_index: None,
             }),
             offer: None,
+            oracle: None,
             payment_channel: None,
             ripple_state: None,
             ticket: None,
