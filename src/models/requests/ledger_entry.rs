@@ -50,7 +50,9 @@ impl Model for DepositPreauth<'_> {
                     validate_credential_type(&credential.credential_type)?;
                     if credentials[..idx].iter().any(|previous| {
                         previous.issuer == credential.issuer
-                            && previous.credential_type == credential.credential_type
+                            && previous
+                                .credential_type
+                                .eq_ignore_ascii_case(&credential.credential_type)
                     }) {
                         return Err(XRPLModelException::InvalidValue {
                             field: "authorized_credentials".into(),
@@ -410,6 +412,30 @@ mod test_ledger_entry_errors {
                     AuthorizedCredential {
                         issuer: "rIssuer".into(),
                         credential_type: "4B5943".into(),
+                    },
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4B5943".into(),
+                    },
+                ]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_case_variant_duplicate_credentials() {
+        // "4b5943" and "4B5943" decode to the same bytes — must be treated as duplicates.
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: Some(vec![
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4b5943".into(),
                     },
                     AuthorizedCredential {
                         issuer: "rIssuer".into(),
