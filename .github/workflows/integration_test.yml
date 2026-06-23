@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "Waiting for xrpld RPC on localhost:5005..."
           for i in $(seq 1 60); do
-            if curl -sf -X POST http://localhost:5005/ \
+            if curl -sf --max-time 5 -X POST http://localhost:5005/ \
                 -H 'Content-Type: application/json' \
                 -d '{"method":"server_info","params":[{}]}' \
                 | grep -q '"status":"success"'; then
@@ -52,7 +52,7 @@ jobs:
             sleep 2
           done
           echo "xrpld did not become ready in time"
-          docker logs xrpld-service || true
+          docker logs xrpld-service 2>&1 || true
           exit 1
 
       - uses: dtolnay/rust-toolchain@stable
