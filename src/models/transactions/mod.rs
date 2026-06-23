@@ -684,7 +684,7 @@ pub struct Credential {
     pub issuer: String,
     pub credential_type: String,
 }
-} 3e1b32a (feat: add Credential type and PermissionedDomain transaction types for XLS-80)
+}
 /// Standard functions for transactions.
 pub trait Transaction<'a, T>
 where
