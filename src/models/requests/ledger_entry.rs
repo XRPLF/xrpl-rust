@@ -328,6 +328,7 @@ mod test_ledger_entry_errors {
     use super::Offer;
     use crate::models::Model;
     use alloc::string::ToString;
+    use alloc::vec;
 
     use super::*;
 

@@ -72,6 +72,8 @@ impl<'a> DepositAuthorized<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
 
     #[test]
