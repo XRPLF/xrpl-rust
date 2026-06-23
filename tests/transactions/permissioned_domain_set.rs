@@ -6,7 +6,7 @@
 //   - account_objects_filter: filter by type=permissioned_domain; verify exactly 1 object
 //   - ledger_entry_by_index: query domain by its ledger hash
 //   - ledger_entry_by_account_seq: query domain by owner account + sequence
-//   - update: update credentials on existing domain, verify via ledger_entry
+//   - update: replace credentials on existing domain (KYC → AML), verify KYC absent
 
 use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
 use xrpl::asynch::clients::XRPLAsyncClient;
@@ -222,10 +222,16 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
         let ao: results::account_objects::AccountObjects<'_> =
             ao_response.try_into().expect("account_objects parse");
 
+        assert_eq!(
+            ao.account_objects.len(),
+            1,
+            "Expected 1 PermissionedDomain, got {}",
+            ao.account_objects.len()
+        );
         let domain_id = ao.account_objects[0]["index"]
             .as_str()
             .or_else(|| ao.account_objects[0]["LedgerIndex"].as_str())
-            .expect("index field missing")
+            .expect("index/LedgerIndex field missing on account_objects[0]")
             .to_string();
 
         // Query ledger_entry by index hash (raw RPC — typed client only handles AccountRoot)
@@ -287,6 +293,12 @@ async fn test_permissioned_domain_ledger_entry_by_account_seq() {
         let ao: results::account_objects::AccountObjects<'_> =
             ao_response.try_into().expect("account_objects parse");
 
+        assert_eq!(
+            ao.account_objects.len(),
+            1,
+            "Expected 1 PermissionedDomain, got {}",
+            ao.account_objects.len()
+        );
         let seq = ao.account_objects[0]["Sequence"]
             .as_u64()
             .expect("Sequence field missing on PermissionedDomain");
@@ -351,10 +363,16 @@ async fn test_permissioned_domain_update_credentials() {
         let ao: results::account_objects::AccountObjects<'_> =
             ao_response.try_into().expect("account_objects parse");
 
+        assert_eq!(
+            ao.account_objects.len(),
+            1,
+            "Expected 1 PermissionedDomain, got {}",
+            ao.account_objects.len()
+        );
         let domain_id = ao.account_objects[0]["index"]
             .as_str()
             .or_else(|| ao.account_objects[0]["LedgerIndex"].as_str())
-            .expect("index field missing")
+            .expect("index/LedgerIndex field missing on account_objects[0]")
             .to_string();
 
         // Step 2: update with AML credential (replacing KYC)
@@ -374,24 +392,33 @@ async fn test_permissioned_domain_update_credentials() {
         );
         ledger_accept().await;
 
-        // Step 3: verify credential was updated (raw RPC)
+        // Step 3: verify AML present and KYC absent (raw RPC)
         let entry = ledger_entry_by_index(&domain_id).await;
 
         let creds = entry["node"]["AcceptedCredentials"]
             .as_array()
             .expect("AcceptedCredentials must be an array");
 
-        assert_eq!(creds.len(), 1, "Expected 1 credential after update");
+        assert_eq!(creds.len(), 1, "Expected exactly 1 credential after update");
 
         let cred_type = creds[0]["Credential"]["CredentialType"]
             .as_str()
-            .unwrap_or("")
+            .expect("CredentialType field missing in AcceptedCredentials[0].Credential")
             .to_uppercase();
 
         assert_eq!(
             cred_type, "414D4C", // hex("AML")
             "Expected AML credential type after update, got: {}",
             cred_type
+        );
+        assert!(
+            !creds.iter().any(|c| {
+                c["Credential"]["CredentialType"]
+                    .as_str()
+                    .unwrap_or("")
+                    .eq_ignore_ascii_case("4B5943")
+            }),
+            "KYC credential should be absent after update to AML"
         );
     })
     .await;
