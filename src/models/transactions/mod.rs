@@ -76,7 +76,12 @@ fn is_hex(value: &str) -> bool {
     value.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// Validate that a `CredentialType` field is a non-empty hex string up to 64 bytes.
+/// Validate that a `CredentialType` field is a non-empty hex string up to 64 bytes (128 hex chars).
+///
+/// Note: rippled accepts any arbitrary blob up to 64 bytes for `CredentialType` and does not
+/// enforce hex encoding at the protocol level (`kMaxCredentialTypeLength` in `Protocol.h`).
+/// This SDK enforces hex intentionally to match xrpl.js (`validateCredentialType` in `common.ts`),
+/// providing an extra client-side guard before a transaction reaches the network.
 pub(crate) fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
     let len = credential_type.len();
     if len == 0 {
