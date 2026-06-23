@@ -299,7 +299,8 @@ mod tests {
             ..Default::default()
         };
         let serialized = serde_json::to_string(&account_delete).unwrap();
-        assert!(serialized.contains("\"CredentialIDs\""));
+        assert!(serialized
+            .contains("\"CredentialIDs\":[\"DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001\"]"));
         let deserialized: AccountDelete = serde_json::from_str(&serialized).unwrap();
         assert_eq!(account_delete, deserialized);
     }
