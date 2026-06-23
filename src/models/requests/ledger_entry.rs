@@ -255,6 +255,7 @@ mod test_ledger_entry_errors {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
+            None, // oracle
             None,
             None,
             None,
@@ -294,6 +295,7 @@ mod test_ledger_entry_errors {
             None,
             None,
             None,
+            None, // oracle
             None,
             None,
             None,
@@ -326,6 +328,7 @@ mod test_ledger_entry_errors {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
+            None, // oracle
             None,
             None,
             None,
