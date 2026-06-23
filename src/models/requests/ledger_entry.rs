@@ -165,7 +165,7 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
             signing_methods += 1
         }
         if signing_methods != 1 {
-            Err(XRPLModelException::ExpectedOneOf(&[
+            return Err(XRPLModelException::ExpectedOneOf(&[
                 "index",
                 "account_root",
                 "check",
@@ -178,10 +178,38 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "deposit_preauth",
                 "permissioned_domain",
                 "ticket",
-            ]))
-        } else {
-            Ok(())
+            ]));
         }
+        if let Some(pd) = &self.permissioned_domain {
+            match pd {
+                PermissionedDomain::Index(id) => {
+                    if id.len() != 64 || !id.chars().all(|c| c.is_ascii_hexdigit()) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "permissioned_domain.index".into(),
+                            expected: "64-character hex string".into(),
+                            found: id.to_string(),
+                        });
+                    }
+                }
+                PermissionedDomain::Object(obj) => {
+                    if !crate::core::addresscodec::is_valid_classic_address(&obj.account) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "permissioned_domain.account".into(),
+                            expected: "valid classic XRPL address".into(),
+                            found: obj.account.to_string(),
+                        });
+                    }
+                    if obj.seq > u32::MAX as u64 {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "permissioned_domain.seq".into(),
+                            expected: "value within u32 range".into(),
+                            found: obj.seq.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -357,7 +385,7 @@ mod test_ledger_entry_errors {
             None,
             None,
             PermissionedDomain::Object(PermissionedDomainObject {
-                account: "rDomainOwner".into(),
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
                 seq: 7,
             }),
             None,
@@ -367,7 +395,7 @@ mod test_ledger_entry_errors {
         assert!(req.validate().is_ok());
         let serialized = serde_json::to_string(&req).unwrap();
         assert!(serialized.contains("\"permissioned_domain\""));
-        assert!(serialized.contains("\"account\":\"rDomainOwner\""));
+        assert!(serialized.contains("\"account\":\"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh\""));
         assert!(serialized.contains("\"seq\":7"));
     }
 
