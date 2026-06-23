@@ -175,8 +175,7 @@ mod tests {
     #[tokio::test]
     async fn test_vault_clawback_partial() {
         with_blockchain_lock(|| async {
-            let (issuer, vault_owner, holder, vault_id) =
-                setup_iou_vault_with_deposit("10").await;
+            let (issuer, vault_owner, holder, vault_id) = setup_iou_vault_with_deposit("10").await;
 
             let mut clawback = VaultClawback {
                 common_fields: CommonFields {
@@ -208,8 +207,7 @@ mod tests {
     #[tokio::test]
     async fn test_vault_clawback_all() {
         with_blockchain_lock(|| async {
-            let (issuer, vault_owner, holder, vault_id) =
-                setup_iou_vault_with_deposit("10").await;
+            let (issuer, vault_owner, holder, vault_id) = setup_iou_vault_with_deposit("10").await;
 
             let mut clawback = VaultClawback {
                 common_fields: CommonFields {
@@ -237,8 +235,7 @@ mod tests {
     #[tokio::test]
     async fn test_vault_clawback_non_issuer_rejected() {
         with_blockchain_lock(|| async {
-            let (issuer, _vault_owner, holder, vault_id) =
-                setup_iou_vault_with_deposit("10").await;
+            let (issuer, _vault_owner, holder, vault_id) = setup_iou_vault_with_deposit("10").await;
 
             let non_issuer = generate_funded_wallet().await;
 

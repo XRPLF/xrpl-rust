@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::core::addresscodec::is_valid_classic_address;
-use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 use crate::models::transactions::vault_common::validate_vault_id;
+use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
@@ -356,7 +356,10 @@ mod test_ledger_entry_errors {
         let serialized = serde_json::to_string(&req).unwrap();
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
         assert!(deserialized.validate().is_ok());
-        assert!(serialized.contains("\"vault\""), "expected vault key in JSON");
+        assert!(
+            serialized.contains("\"vault\""),
+            "expected vault key in JSON"
+        );
         assert!(serialized.contains(id), "expected vault id in JSON");
     }
 
@@ -369,7 +372,10 @@ mod test_ledger_entry_errors {
             }),
             ..Default::default()
         };
-        assert!(req.validate().is_ok(), "vault owner+seq selector should be valid");
+        assert!(
+            req.validate().is_ok(),
+            "vault owner+seq selector should be valid"
+        );
         let serialized = serde_json::to_string(&req).unwrap();
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
         assert!(deserialized.validate().is_ok());
@@ -403,7 +409,10 @@ mod test_ledger_entry_errors {
             vault: Some(VaultIdentifier::Id(zeros.into())),
             ..Default::default()
         };
-        assert!(req.validate().is_err(), "all-zero vault_id must be rejected");
+        assert!(
+            req.validate().is_err(),
+            "all-zero vault_id must be rejected"
+        );
     }
 
     #[test]
