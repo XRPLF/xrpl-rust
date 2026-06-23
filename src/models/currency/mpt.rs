@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub const MPT_ISSUANCE_ID_HEX_LEN: usize = 48;
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MPTCurrency<'a> {
     pub mpt_issuance_id: Cow<'a, str>,
 }
