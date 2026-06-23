@@ -80,6 +80,12 @@ pub struct Credential<'a> {
     pub credential_type: Cow<'a, str>,
 }
 
+impl<'a> Model for Credential<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        validate_credential_type(&self.credential_type)
+    }
+}
+
 /// Required fields for requesting a DirectoryNode if not
 /// querying by object ID.
 #[skip_serializing_none]
@@ -173,6 +179,9 @@ impl<'a: 'static> Model for LedgerEntry<'a> {
         self._get_field_error()?;
         if let Some(deposit_preauth) = &self.deposit_preauth {
             deposit_preauth.get_errors()?;
+        }
+        if let Some(credential) = &self.credential {
+            credential.get_errors()?;
         }
         Ok(())
     }
@@ -463,6 +472,45 @@ mod test_ledger_entry_errors {
             ..Default::default()
         };
 
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_credential_selector_valid() {
+        let req = LedgerEntry {
+            credential: Some(Credential {
+                subject: "rSubject".into(),
+                issuer: "rIssuer".into(),
+                credential_type: "4B5943".into(),
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_credential_selector_invalid_credential_type_error() {
+        let req = LedgerEntry {
+            credential: Some(Credential {
+                subject: "rSubject".into(),
+                issuer: "rIssuer".into(),
+                credential_type: "NOT_HEX".into(),
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_credential_selector_empty_credential_type_error() {
+        let req = LedgerEntry {
+            credential: Some(Credential {
+                subject: "rSubject".into(),
+                issuer: "rIssuer".into(),
+                credential_type: "".into(),
+            }),
+            ..Default::default()
+        };
         assert!(req.validate().is_err());
     }
 }
