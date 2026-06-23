@@ -229,9 +229,7 @@ pub enum XRPLClawbackException {
     IssuerMustNotEqualAccount,
     #[error("The `holder` field is required for MPT clawback")]
     HolderRequiredForMPT,
-    #[error(
-        "The `holder` field must not equal the transaction `Account` (no self-clawback)"
-    )]
+    #[error("The `holder` field must not equal the transaction `Account` (no self-clawback)")]
     HolderMustNotEqualAccount,
 }
 

@@ -233,7 +233,11 @@ mod tests {
 
         let mptoken: MPToken = serde_json::from_str(json).unwrap();
         assert!(
-            mptoken.common_fields.flags.0.contains(&MPTokenFlag::LsfMPTAMM),
+            mptoken
+                .common_fields
+                .flags
+                .0
+                .contains(&MPTokenFlag::LsfMPTAMM),
             "expected LsfMPTAMM in flags, got {:?}",
             mptoken.common_fields.flags
         );
