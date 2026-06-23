@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 
 /// Response format for the deposit_authorized method, which indicates whether
@@ -10,7 +11,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct DepositAuthorized<'a> {
     /// The credentials specified in the request, if any.
-    pub credentials: Option<Cow<'a, [Cow<'a, str>]>>,
+    pub credentials: Option<Vec<Cow<'a, str>>>,
     /// Whether the specified source account is authorized to send payments
     /// directly to the destination account. If true, either the destination
     /// account does not require deposit authorization or the source account
@@ -35,6 +36,8 @@ pub struct DepositAuthorized<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
 
     #[test]
@@ -80,13 +83,10 @@ mod tests {
     #[test]
     fn test_deposit_authorized_serialize() {
         let auth = DepositAuthorized {
-            credentials: Some(
-                alloc::vec![
-                    "A182EFBD154C9E80195082F86C1C8952FC0760A654B886F61BB0A59803B4387B".into(),
-                    "383D269D6C7417D0A8716B09F5DB329FB17B45A5EFDBAFB82FF04BC420DCF7D5".into(),
-                ]
-                .into(),
-            ),
+            credentials: Some(alloc::vec![
+                "A182EFBD154C9E80195082F86C1C8952FC0760A654B886F61BB0A59803B4387B".into(),
+                "383D269D6C7417D0A8716B09F5DB329FB17B45A5EFDBAFB82FF04BC420DCF7D5".into(),
+            ]),
             deposit_authorized: true,
             destination_account: "rsUiUMpnrgxQp24dJYZDhmV4bE3aBtQyt8".into(),
             ledger_hash: Some(
