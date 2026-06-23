@@ -134,6 +134,7 @@ impl<'a> AccountDelete<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::XRPLModelException;
 
     #[test]
     fn test_serialize() {
@@ -379,5 +380,31 @@ mod tests {
             ..Default::default()
         };
         assert!(account_delete.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_credential_ids_case_variant_duplicate_error() {
+        // rippled normalizes hex to raw bytes before hashing; "abcd" and "ABCD" identify
+        // the same credential and must be rejected as duplicates.
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rDeleteAccount789".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rExchange123".into(),
+            credential_ids: Some(alloc::vec![
+                "dd40031c6c21164e7673a47c35513d52a6b0f1349a873ee0d188d8994cd4d001".into(),
+                "DD40031C6C21164E7673A47C35513D52A6B0F1349A873EE0D188D8994CD4D001".into(),
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(
+            account_delete.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "credential_ids".into(),
+                field2: "credential_ids (duplicate entry)".into(),
+            }
+        );
     }
 }

@@ -173,7 +173,13 @@ impl<'a> DepositPreauthError for DepositPreauth<'a> {
             }
             for (i, cred) in credentials.iter().enumerate() {
                 super::validate_credential_type(&cred.credential.credential_type)?;
-                if credentials[..i].contains(cred) {
+                if credentials[..i].iter().any(|prev| {
+                    prev.credential.issuer == cred.credential.issuer
+                        && prev
+                            .credential
+                            .credential_type
+                            .eq_ignore_ascii_case(&cred.credential.credential_type)
+                }) {
                     return Err(XRPLModelException::ValueEqualsValue {
                         field1: field.into(),
                         field2: alloc::format!("{field} (duplicate entry)"),
@@ -819,5 +825,37 @@ mod tests {
             unauthorize_credentials: None,
         };
         assert!(deposit_preauth.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_authorize_credentials_case_variant_duplicate_error() {
+        // "4b5943" and "4B5943" decode to the same bytes and must be rejected as duplicates.
+        let deposit_preauth = DepositPreauth {
+            common_fields: CommonFields {
+                account: "rOwner1111111111111111111111111111".into(),
+                transaction_type: TransactionType::DepositPreauth,
+                ..Default::default()
+            },
+            authorize: None,
+            unauthorize: None,
+            authorize_credentials: Some(vec![
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4b5943".into(),
+                )),
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    "rIssuer111111111111111111111111111".into(),
+                    "4B5943".into(),
+                )),
+            ]),
+            unauthorize_credentials: None,
+        };
+        assert_eq!(
+            deposit_preauth.get_errors().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "authorize_credentials".into(),
+                field2: "authorize_credentials (duplicate entry)".into(),
+            }
+        );
     }
 }
