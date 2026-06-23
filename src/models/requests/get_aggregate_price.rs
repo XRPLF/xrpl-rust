@@ -80,6 +80,8 @@ impl<'a> GetAggregatePrice<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
 
     #[test]
