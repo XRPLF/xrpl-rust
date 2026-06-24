@@ -466,8 +466,10 @@ mod tests {
                 credential_type: Cow::Owned(ct),
             };
             prop_assert!(tx.get_errors().is_ok());
-            let json = serde_json::to_string(&tx).unwrap();
-            let rt: CredentialDelete = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(&tx)
+                .map_err(|e| TestCaseError::fail(format!("serialize: {e}")))?;
+            let rt: CredentialDelete = serde_json::from_str(&json)
+                .map_err(|e| TestCaseError::fail(format!("deserialize: {e}")))?;
             prop_assert_eq!(&tx, &rt);
         }
     }
