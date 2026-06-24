@@ -8,14 +8,10 @@
 
 #[cfg(feature = "integration")]
 mod tests {
+    use crate::common::vault::{get_vault_id, vault_assets_total};
     use crate::common::{
-        generate_funded_wallet, get_client, submit_tx, test_transaction, with_blockchain_lock,
-        SubmitOptions,
+        generate_funded_wallet, submit_tx, test_transaction, with_blockchain_lock, SubmitOptions,
     };
-    use serde_json::Value;
-    use xrpl::asynch::clients::XRPLAsyncClient;
-    use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
-    use xrpl::models::requests::{CommonFields as ReqCommonFields, RequestMethod};
     use xrpl::models::transactions::account_set::{AccountSet, AccountSetFlag};
     use xrpl::models::transactions::payment::Payment;
     use xrpl::models::transactions::trust_set::TrustSet;
@@ -25,47 +21,6 @@ mod tests {
     use xrpl::models::transactions::{CommonFields, TransactionType};
     use xrpl::models::{Amount, Currency, IssuedCurrency, IssuedCurrencyAmount};
     use xrpl::wallet::Wallet;
-
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    async fn vault_ao_json(owner: &str) -> Value {
-        let client = get_client().await;
-        let resp = client
-            .request(
-                AccountObjects {
-                    common_fields: ReqCommonFields {
-                        command: RequestMethod::AccountObjects,
-                        id: None,
-                    },
-                    account: owner.into(),
-                    ledger_lookup: None,
-                    r#type: Some(AccountObjectType::Vault),
-                    deletion_blockers_only: None,
-                    limit: None,
-                    marker: None,
-                }
-                .into(),
-            )
-            .await
-            .expect("account_objects request failed");
-        resp.raw_result.unwrap_or(Value::Null)
-    }
-
-    async fn get_vault_id(owner: &str) -> String {
-        let raw = vault_ao_json(owner).await;
-        raw["account_objects"][0]["index"]
-            .as_str()
-            .expect("vault index missing")
-            .to_string()
-    }
-
-    async fn vault_assets_total(owner: &str) -> String {
-        let raw = vault_ao_json(owner).await;
-        raw["account_objects"][0]["AssetsTotal"]
-            .as_str()
-            .unwrap_or("0")
-            .to_string()
-    }
 
     /// Create issuer + vault_owner + holder, fund trust line, deposit `deposit_amount` USD.
     /// Returns (issuer, vault_owner, holder, vault_id).

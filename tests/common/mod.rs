@@ -3,6 +3,7 @@
 pub mod amm;
 pub mod constants;
 pub mod payment;
+pub mod vault;
 pub mod xchain;
 
 use anyhow::Result;

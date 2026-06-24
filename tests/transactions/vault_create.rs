@@ -11,16 +11,11 @@
 
 #[cfg(feature = "integration")]
 mod tests {
-    use crate::common::{
-        generate_funded_wallet, get_client, test_transaction, with_blockchain_lock,
-    };
-    use serde_json::Value;
-    use xrpl::asynch::clients::XRPLAsyncClient;
-    use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
-    use xrpl::models::requests::{CommonFields as ReqCommonFields, RequestMethod};
+    use crate::common::vault::{get_vault_id, vault_assets_total, vault_count};
+    use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock};
     use xrpl::models::transactions::account_set::{AccountSet, AccountSetFlag};
     use xrpl::models::transactions::payment::Payment;
-    use xrpl::models::transactions::trust_set::{TrustSet, TrustSetFlag};
+    use xrpl::models::transactions::trust_set::TrustSet;
     use xrpl::models::transactions::vault_clawback::VaultClawback;
     use xrpl::models::transactions::vault_create::VaultCreate;
     use xrpl::models::transactions::vault_delete::VaultDelete;
@@ -28,59 +23,7 @@ mod tests {
     use xrpl::models::transactions::vault_set::VaultSet;
     use xrpl::models::transactions::vault_withdraw::VaultWithdraw;
     use xrpl::models::transactions::{CommonFields, TransactionType};
-    use xrpl::models::{Amount, Currency, FlagCollection, IssuedCurrency, IssuedCurrencyAmount};
-
-    fn vault_ao_request(owner: &str) -> AccountObjects<'_> {
-        AccountObjects {
-            common_fields: ReqCommonFields {
-                command: RequestMethod::AccountObjects,
-                id: None,
-            },
-            account: owner.into(),
-            ledger_lookup: None,
-            r#type: Some(AccountObjectType::Vault),
-            deletion_blockers_only: None,
-            limit: None,
-            marker: None,
-        }
-    }
-
-    async fn account_objects_json(owner: &str) -> Value {
-        let client = get_client().await;
-        let resp = client
-            .request(vault_ao_request(owner).into())
-            .await
-            .expect("account_objects request failed");
-        resp.raw_result.unwrap_or(Value::Null)
-    }
-
-    async fn get_vault_id(owner: &str) -> String {
-        let resp = account_objects_json(owner).await;
-        let objects = resp["account_objects"]
-            .as_array()
-            .expect("account_objects array missing");
-        assert!(!objects.is_empty(), "no vault found for {owner}");
-        objects[0]["index"]
-            .as_str()
-            .expect("vault index missing")
-            .to_string()
-    }
-
-    async fn vault_assets_total(owner: &str) -> String {
-        let resp = account_objects_json(owner).await;
-        resp["account_objects"][0]["AssetsTotal"]
-            .as_str()
-            .unwrap_or("0")
-            .to_string()
-    }
-
-    async fn vault_count(owner: &str) -> usize {
-        let resp = account_objects_json(owner).await;
-        resp["account_objects"]
-            .as_array()
-            .map(|a| a.len())
-            .unwrap_or(0)
-    }
+    use xrpl::models::{Amount, Currency, IssuedCurrency, IssuedCurrencyAmount};
 
     /// Full IOU vault lifecycle:
     /// AccountSet (DefaultRipple + AllowClawback) → TrustSet → Payment →
