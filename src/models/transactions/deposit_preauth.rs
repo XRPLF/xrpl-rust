@@ -247,6 +247,7 @@ mod tests {
     use crate::models::CredentialAuthorizationFields;
     use crate::models::{Model, XRPLModelException};
     use alloc::vec;
+    use proptest::prelude::*;
 
     #[test]
     fn test_authorize_and_unauthorize_error() {
@@ -857,5 +858,62 @@ mod tests {
                 field2: "authorize_credentials (duplicate entry)".into(),
             }
         );
+    }
+
+    fn make_cred_auth(n: usize) -> alloc::vec::Vec<CredentialAuthorization<'static>> {
+        (0..n)
+            .map(|i| {
+                CredentialAuthorization::new(CredentialAuthorizationFields::new(
+                    alloc::format!("rIssuer{i:025}").into(),
+                    "4B5943".into(),
+                ))
+            })
+            .collect()
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(200))]
+
+        #[test]
+        fn prop_exactly_one_field_valid(which in 0_u8..4) {
+            let tx = DepositPreauth {
+                common_fields: CommonFields {
+                    account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                    transaction_type: TransactionType::DepositPreauth,
+                    ..Default::default()
+                },
+                authorize:               if which == 0 { Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()) } else { None },
+                unauthorize:             if which == 1 { Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()) } else { None },
+                authorize_credentials:   if which == 2 { Some(make_cred_auth(1)) } else { None },
+                unauthorize_credentials: if which == 3 { Some(make_cred_auth(1)) } else { None },
+            };
+            prop_assert!(
+                tx.get_errors().is_ok(),
+                "field {} should be valid when it is the only one set",
+                which
+            );
+        }
+
+        #[test]
+        fn prop_multiple_fields_invalid(bits in 3_u8..=15) {
+            prop_assume!(bits.count_ones() >= 2);
+            let tx = DepositPreauth {
+                common_fields: CommonFields {
+                    account: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+                    transaction_type: TransactionType::DepositPreauth,
+                    ..Default::default()
+                },
+                authorize:               if bits & 1 != 0 { Some("rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de".into()) } else { None },
+                unauthorize:             if bits & 2 != 0 { Some("rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH".into()) } else { None },
+                authorize_credentials:   if bits & 4 != 0 { Some(make_cred_auth(1)) } else { None },
+                unauthorize_credentials: if bits & 8 != 0 { Some(make_cred_auth(1)) } else { None },
+            };
+            prop_assert!(
+                tx.get_errors().is_err(),
+                "bits={:04b} ({} fields set) should be invalid",
+                bits,
+                bits.count_ones()
+            );
+        }
     }
 }
