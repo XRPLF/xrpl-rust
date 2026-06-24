@@ -113,6 +113,7 @@ mod tests {
     use super::*;
     use crate::models::{Model, XRPLModelException};
     use alloc::borrow::Cow;
+    use proptest::prelude::*;
 
     #[test]
     fn test_serde() {
@@ -234,5 +235,59 @@ mod tests {
             credential_type: "4B5943".into(),
         };
         assert!(tx.get_errors().is_ok());
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(200))]
+
+        #[test]
+        fn prop_credential_type_valid_length(len in 1_usize..=128) {
+            let ct = "B".repeat(len);
+            let tx = CredentialAccept {
+                common_fields: CommonFields {
+                    account: "rSubject11111111111111111111111111".into(),
+                    transaction_type: TransactionType::CredentialAccept,
+                    ..Default::default()
+                },
+                issuer: "rIssuer111111111111111111111111111".into(),
+                credential_type: Cow::Owned(ct),
+            };
+            prop_assert!(tx.get_errors().is_ok(), "len {} should be valid", len);
+        }
+
+        #[test]
+        fn prop_credential_type_too_long(extra in 1_usize..=200) {
+            let len = 128 + extra;
+            let ct = "B".repeat(len);
+            let tx = CredentialAccept {
+                common_fields: CommonFields {
+                    account: "rSubject11111111111111111111111111".into(),
+                    transaction_type: TransactionType::CredentialAccept,
+                    ..Default::default()
+                },
+                issuer: "rIssuer111111111111111111111111111".into(),
+                credential_type: Cow::Owned(ct),
+            };
+            prop_assert!(tx.get_errors().is_err(), "len {} should be rejected", len);
+        }
+
+        #[test]
+        fn prop_serde_roundtrip(ct in "[0-9A-F]{2,128}") {
+            let tx = CredentialAccept {
+                common_fields: CommonFields {
+                    account: "rSubject11111111111111111111111111".into(),
+                    transaction_type: TransactionType::CredentialAccept,
+                    fee: Some("10".into()),
+                    sequence: Some(1),
+                    signing_pub_key: Some(Cow::Borrowed("")),
+                    ..Default::default()
+                },
+                issuer: "rIssuer111111111111111111111111111".into(),
+                credential_type: Cow::Owned(ct),
+            };
+            let json = serde_json::to_string(&tx).unwrap();
+            let rt: CredentialAccept = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(&tx, &rt);
+        }
     }
 }

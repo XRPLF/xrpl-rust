@@ -156,6 +156,7 @@ mod tests {
     use super::*;
     use crate::models::{Model, XRPLModelException};
     use alloc::borrow::Cow;
+    use proptest::prelude::*;
 
     #[test]
     fn test_serde() {
@@ -410,5 +411,71 @@ mod tests {
             uri: None,
         };
         assert!(tx.get_errors().is_ok());
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(200))]
+
+        #[test]
+        fn prop_credential_type_valid_length(len in 1_usize..=128) {
+            let ct = "A".repeat(len);
+            let tx = CredentialCreate {
+                common_fields: CommonFields {
+                    account: "rIssuer111111111111111111111111111".into(),
+                    transaction_type: TransactionType::CredentialCreate,
+                    ..Default::default()
+                },
+                subject: "rSubject11111111111111111111111111".into(),
+                credential_type: Cow::Owned(ct),
+                expiration: None,
+                uri: None,
+            };
+            prop_assert!(tx.get_errors().is_ok(), "len {} should be valid", len);
+        }
+
+        #[test]
+        fn prop_credential_type_too_long(extra in 1_usize..=200) {
+            let len = 128 + extra;
+            let ct = "A".repeat(len);
+            let tx = CredentialCreate {
+                common_fields: CommonFields {
+                    account: "rIssuer111111111111111111111111111".into(),
+                    transaction_type: TransactionType::CredentialCreate,
+                    ..Default::default()
+                },
+                subject: "rSubject11111111111111111111111111".into(),
+                credential_type: Cow::Owned(ct),
+                expiration: None,
+                uri: None,
+            };
+            prop_assert!(tx.get_errors().is_err(), "len {} should be rejected", len);
+        }
+
+        #[test]
+        fn prop_serde_roundtrip(
+            ct in "[0-9A-F]{2,128}",
+            has_expiration in proptest::bool::ANY,
+            expiration_val in proptest::num::u32::ANY,
+            has_uri in proptest::bool::ANY,
+            uri_hex in "[0-9A-F]{2,200}",
+        ) {
+            let tx = CredentialCreate {
+                common_fields: CommonFields {
+                    account: "rIssuer111111111111111111111111111".into(),
+                    transaction_type: TransactionType::CredentialCreate,
+                    fee: Some("12".into()),
+                    sequence: Some(42),
+                    signing_pub_key: Some(Cow::Borrowed("")),
+                    ..Default::default()
+                },
+                subject: "rSubject11111111111111111111111111".into(),
+                credential_type: Cow::Owned(ct),
+                expiration: if has_expiration { Some(expiration_val) } else { None },
+                uri: if has_uri { Some(Cow::Owned(uri_hex)) } else { None },
+            };
+            let json = serde_json::to_string(&tx).unwrap();
+            let rt: CredentialCreate = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(&tx, &rt);
+        }
     }
 }

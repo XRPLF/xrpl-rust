@@ -135,6 +135,7 @@ impl<'a> AccountDelete<'a> {
 mod tests {
     use super::*;
     use crate::models::XRPLModelException;
+    use proptest::prelude::*;
 
     #[test]
     fn test_serialize() {
@@ -406,5 +407,46 @@ mod tests {
                 field2: "credential_ids (duplicate entry)".into(),
             }
         );
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(100))]
+
+        #[test]
+        fn prop_credential_ids_valid_length(count in 1_usize..=8) {
+            let ids: alloc::vec::Vec<alloc::borrow::Cow<'_, str>> = (0..count)
+                .map(|i| alloc::borrow::Cow::Owned(alloc::format!("{:064X}", i)))
+                .collect();
+            let tx = AccountDelete {
+                common_fields: CommonFields {
+                    account: "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
+                    transaction_type: TransactionType::AccountDelete,
+                    ..Default::default()
+                },
+                destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
+                destination_tag: None,
+                credential_ids: Some(ids),
+            };
+            prop_assert!(tx.get_errors().is_ok(), "count {} should be valid", count);
+        }
+
+        #[test]
+        fn prop_credential_ids_too_many(extra in 1_usize..=20) {
+            let count = 8 + extra;
+            let ids: alloc::vec::Vec<alloc::borrow::Cow<'_, str>> = (0..count)
+                .map(|i| alloc::borrow::Cow::Owned(alloc::format!("{:064X}", i)))
+                .collect();
+            let tx = AccountDelete {
+                common_fields: CommonFields {
+                    account: "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
+                    transaction_type: TransactionType::AccountDelete,
+                    ..Default::default()
+                },
+                destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
+                destination_tag: None,
+                credential_ids: Some(ids),
+            };
+            prop_assert!(tx.get_errors().is_err(), "count {} should be rejected", count);
+        }
     }
 }

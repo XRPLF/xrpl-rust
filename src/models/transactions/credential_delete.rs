@@ -134,6 +134,7 @@ mod tests {
     use super::*;
     use crate::models::{Model, XRPLModelException};
     use alloc::borrow::Cow;
+    use proptest::prelude::*;
 
     #[test]
     fn test_requires_subject_or_issuer() {
@@ -386,5 +387,88 @@ mod tests {
             credential_type: "4B5943".into(),
         };
         assert!(tx.get_errors().is_ok());
+    }
+
+    const ACCOUNTS: [&str; 3] = [
+        "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb",
+        "rEhxGqkqPPSxQ3P25J66ft5TwpzV14k2de",
+        "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH",
+    ];
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(200))]
+
+        #[test]
+        fn prop_subject_only_any_submitter_valid(acct_idx in 0_usize..3) {
+            let tx = CredentialDelete {
+                common_fields: CommonFields {
+                    account: ACCOUNTS[acct_idx].into(),
+                    transaction_type: TransactionType::CredentialDelete,
+                    ..Default::default()
+                },
+                subject: Some(ACCOUNTS[1].into()),
+                issuer: None,
+                credential_type: "4B5943".into(),
+            };
+            prop_assert!(tx.get_errors().is_ok());
+        }
+
+        #[test]
+        fn prop_issuer_only_any_submitter_valid(acct_idx in 0_usize..3) {
+            let tx = CredentialDelete {
+                common_fields: CommonFields {
+                    account: ACCOUNTS[acct_idx].into(),
+                    transaction_type: TransactionType::CredentialDelete,
+                    ..Default::default()
+                },
+                subject: None,
+                issuer: Some(ACCOUNTS[0].into()),
+                credential_type: "4B5943".into(),
+            };
+            prop_assert!(tx.get_errors().is_ok());
+        }
+
+        #[test]
+        fn prop_both_any_submitter_valid(acct_idx in 0_usize..3) {
+            let tx = CredentialDelete {
+                common_fields: CommonFields {
+                    account: ACCOUNTS[acct_idx].into(),
+                    transaction_type: TransactionType::CredentialDelete,
+                    ..Default::default()
+                },
+                subject: Some(ACCOUNTS[0].into()),
+                issuer: Some(ACCOUNTS[1].into()),
+                credential_type: "4B5943".into(),
+            };
+            prop_assert!(tx.get_errors().is_ok());
+        }
+
+        #[test]
+        fn prop_serde_roundtrip(
+            ct in "[0-9A-F]{2,64}",
+            has_subject in proptest::bool::ANY,
+            has_issuer in proptest::bool::ANY,
+        ) {
+            let subject = if has_subject || !has_issuer { Some(Cow::Borrowed(ACCOUNTS[0])) } else { None };
+            let issuer = if has_issuer { Some(Cow::Borrowed(ACCOUNTS[1])) } else { None };
+            let acct = if subject.is_some() { ACCOUNTS[0] } else { ACCOUNTS[1] };
+            let tx = CredentialDelete {
+                common_fields: CommonFields {
+                    account: acct.into(),
+                    transaction_type: TransactionType::CredentialDelete,
+                    fee: Some("10".into()),
+                    sequence: Some(7),
+                    signing_pub_key: Some(Cow::Borrowed("")),
+                    ..Default::default()
+                },
+                subject,
+                issuer,
+                credential_type: Cow::Owned(ct),
+            };
+            prop_assert!(tx.get_errors().is_ok());
+            let json = serde_json::to_string(&tx).unwrap();
+            let rt: CredentialDelete = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(&tx, &rt);
+        }
     }
 }
