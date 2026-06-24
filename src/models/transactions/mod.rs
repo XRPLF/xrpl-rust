@@ -183,6 +183,7 @@ where
     /// The network ID of the chain this transaction is intended for.
     /// MUST BE OMITTED for Mainnet and some test networks.
     /// REQUIRED on chains whose network ID is 1025 or higher.
+    #[serde(rename = "NetworkID")]
     pub network_id: Option<u32>,
     /// The sequence number of the account sending the transaction.
     /// A transaction is only valid if the Sequence number is exactly

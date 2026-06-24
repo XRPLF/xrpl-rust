@@ -60,6 +60,8 @@ pub struct State<'a> {
     pub validation_quorum: Option<u32>,
     /// List of ports where the server is listening for API commands
     pub ports: Option<Cow<'a, [PortDescriptor<'a>]>>,
+    /// The network ID of the chain. Present on networks with ID >= 1025.
+    pub network_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
