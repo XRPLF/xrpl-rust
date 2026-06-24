@@ -143,11 +143,7 @@ async fn test_payment_channel_claim_with_credential_ids() {
             None,
         );
 
-        sign_and_submit(&mut create_tx, client, &subject, true, true)
-            .await
-            .expect("Failed to submit PaymentChannelCreate");
-
-        ledger_accept().await;
+        test_transaction(&mut create_tx, &subject).await;
 
         // Step 2: read channel ID from account_objects.
         let ao_response = client
