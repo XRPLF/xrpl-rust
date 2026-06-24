@@ -285,8 +285,10 @@ mod tests {
                 issuer: "rIssuer111111111111111111111111111".into(),
                 credential_type: Cow::Owned(ct),
             };
-            let json = serde_json::to_string(&tx).unwrap();
-            let rt: CredentialAccept = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(&tx)
+                .map_err(|e| TestCaseError::fail(format!("serialize: {e}")))?;
+            let rt: CredentialAccept = serde_json::from_str(&json)
+                .map_err(|e| TestCaseError::fail(format!("deserialize: {e}")))?;
             prop_assert_eq!(&tx, &rt);
         }
     }

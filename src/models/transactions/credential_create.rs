@@ -473,8 +473,10 @@ mod tests {
                 expiration: if has_expiration { Some(expiration_val) } else { None },
                 uri: if has_uri { Some(Cow::Owned(uri_hex)) } else { None },
             };
-            let json = serde_json::to_string(&tx).unwrap();
-            let rt: CredentialCreate = serde_json::from_str(&json).unwrap();
+            let json = serde_json::to_string(&tx)
+                .map_err(|e| TestCaseError::fail(format!("serialize: {e}")))?;
+            let rt: CredentialCreate = serde_json::from_str(&json)
+                .map_err(|e| TestCaseError::fail(format!("deserialize: {e}")))?;
             prop_assert_eq!(&tx, &rt);
         }
     }
