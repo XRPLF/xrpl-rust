@@ -15,7 +15,11 @@ use super::{exceptions::XRPLTypeException, SerializedType, TryFromParser, XRPLTy
 /// Width of an MPT Issue in bytes: issuer(20) + NO_ACCOUNT(20) + sequence(4) = 44
 const MPT_WIDTH: usize = 44;
 
-/// Sentinel account ID used to distinguish MPT issues from IOU issues.
+/// Sentinel used in the wire format to distinguish MPT issues from IOU issues.
+///
+/// This equals the XRPL address `rrrrrrrrrrrrrrrrrrrrBZbvji`. The XRPL ledger
+/// prevents any account from holding this address, so it is safe to use as an
+/// unambiguous MPT type tag in the binary codec.
 const NO_ACCOUNT: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 #[derive(Debug, Clone)]
@@ -50,7 +54,11 @@ impl TryFromParser for Issue {
             // Read next 20 bytes (issuer for IOU, or NO_ACCOUNT sentinel for MPT)
             let next_20 = parser.read(20)?;
             if next_20 == NO_ACCOUNT {
-                // MPT: read 4 more bytes for sequence
+                // NO_ACCOUNT is the XRPL protocol's wire-level type tag for MPT issues.
+                // The XRPL ledger itself prevents any account from being assigned the
+                // address rrrrrrrrrrrrrrrrrrrrBZbvji (the bytes of NO_ACCOUNT), so a
+                // legitimate IOU with that issuer cannot appear in a well-formed stream.
+                // We treat NO_ACCOUNT as unambiguously MPT and read the 4-byte sequence.
                 let sequence = parser.read(4)?;
                 bytes.extend_from_slice(&next_20);
                 bytes.extend_from_slice(&sequence);
@@ -89,7 +97,9 @@ impl TryFrom<Value> for Issue {
                 let sequence_be = &mpt_bytes[0..4];
                 let issuer_account = &mpt_bytes[4..24];
 
-                // Convert sequence to little-endian
+                // The sequence field inside the MPT Issue binary encoding is stored
+                // little-endian. Convert from the big-endian representation in
+                // mpt_issuance_id before writing it into the wire buffer.
                 let sequence = u32::from_be_bytes(sequence_be.try_into().map_err(|_| {
                     XRPLCoreException::XRPLUtilsError("Invalid sequence bytes".to_string())
                 })?);
@@ -135,15 +145,14 @@ impl Serialize for Issue {
         if bytes.len() == MPT_WIDTH {
             let issuer_account = &bytes[0..20];
             // bytes[20..40] = NO_ACCOUNT (skip)
-            let sequence_le = &bytes[40..44];
-            let sequence = u32::from_le_bytes(
-                sequence_le
-                    .try_into()
-                    .map_err(|e: core::array::TryFromSliceError| serde::ser::Error::custom(e))?,
-            );
+            // Sequence is stored little-endian in the wire buffer; convert back to
+            // big-endian for the mpt_issuance_id output.
+            let sequence_le: [u8; 4] = bytes[40..44]
+                .try_into()
+                .map_err(|e: core::array::TryFromSliceError| serde::ser::Error::custom(e))?;
+            let sequence_be = u32::from_le_bytes(sequence_le).to_be_bytes();
 
             // Reconstruct mpt_issuance_id: sequence(BE, 4) + issuer(20) = 24 bytes
-            let sequence_be = sequence.to_be_bytes();
             let mut mpt_id = Vec::with_capacity(24);
             mpt_id.extend_from_slice(&sequence_be);
             mpt_id.extend_from_slice(issuer_account);
