@@ -8,8 +8,7 @@
 //   5. verify lsfAccepted flag set on Credential ledger object after accept
 
 use crate::common::{
-    generate_funded_wallet, get_client, test_transaction, with_blockchain_lock,
-    CREDENTIAL_TYPE_KYC,
+    generate_funded_wallet, get_client, test_transaction, with_blockchain_lock, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
@@ -307,4 +306,3 @@ async fn test_credential_lsf_accepted_set_after_accept() {
     })
     .await;
 }
-
