@@ -10,7 +10,7 @@
 use crate::common::{
     generate_funded_wallet, get_escrow_offer_sequence, get_ledger_close_time, ledger_accept,
     provision_credential_for_destination, submit_tx, test_transaction, wait_for_ledger_close_time,
-    with_blockchain_lock, SubmitOptions,
+    with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::models::transactions::escrow_create::EscrowCreate;
 use xrpl::models::transactions::escrow_finish::EscrowFinish;
@@ -79,7 +79,7 @@ async fn test_escrow_finish_base() {
 
 // ── with_credential_ids: credential-gated escrow finish ───────────────────────
 
-const CREDENTIAL_TYPE: &str = "4B5943"; // hex "KYC"
+const CREDENTIAL_TYPE: &str = CREDENTIAL_TYPE_KYC;
 
 #[tokio::test]
 async fn test_escrow_finish_with_credential_ids() {

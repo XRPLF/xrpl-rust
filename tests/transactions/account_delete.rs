@@ -12,7 +12,7 @@
 
 use crate::common::{
     generate_funded_wallet, get_client, ledger_accept, provision_credential_for_destination,
-    submit_tx, test_transaction, with_blockchain_lock, SubmitOptions,
+    submit_tx, test_transaction, with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::transactions::account_delete::AccountDelete;
@@ -59,7 +59,7 @@ async fn test_account_delete_base() {
 
 // ── with_credential_ids: full 256-ledger advance, assert tesSUCCESS ──────────
 
-const CREDENTIAL_TYPE: &str = "4B5943"; // hex "KYC"
+const CREDENTIAL_TYPE: &str = CREDENTIAL_TYPE_KYC;
 
 #[tokio::test]
 async fn test_account_delete_with_credential_ids() {

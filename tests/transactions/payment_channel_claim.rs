@@ -14,7 +14,7 @@
 
 use crate::common::{
     generate_funded_wallet, get_client, ledger_accept, provision_credential_for_destination,
-    submit_tx, test_transaction, with_blockchain_lock, SubmitOptions,
+    submit_tx, test_transaction, with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit};
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
@@ -110,7 +110,7 @@ async fn test_payment_channel_claim_base() {
 
 // ── with_credential_ids: credential-gated claim ───────────────────────────────
 
-const CREDENTIAL_TYPE: &str = "4B5943"; // hex "KYC"
+const CREDENTIAL_TYPE: &str = CREDENTIAL_TYPE_KYC;
 
 #[tokio::test]
 async fn test_payment_channel_claim_with_credential_ids() {
