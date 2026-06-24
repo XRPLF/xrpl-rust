@@ -1,5 +1,7 @@
 // Scenarios:
 //   - base: create a channel, then submit a claim for 100 drops (channel source claims to destination)
+//   - with_credential_ids: provision credential + DepositPreauth on destination,
+//     create channel, claim with credential_ids set
 //
 // NOTE: PaymentChannelClaim has `flags` at parameter position 4 (after `fee`), the same
 // anomaly as NFTokenMint and PaymentChannelClaim. Pass None for no flags.
@@ -11,7 +13,8 @@
 // hashPaymentChannel utility.
 
 use crate::common::{
-    generate_funded_wallet, get_client, ledger_accept, test_transaction, with_blockchain_lock,
+    generate_funded_wallet, get_client, ledger_accept, provision_credential_for_destination,
+    submit_tx, test_transaction, with_blockchain_lock, SubmitOptions,
 };
 use xrpl::asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit};
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
@@ -101,6 +104,129 @@ async fn test_payment_channel_claim_base() {
         );
 
         test_transaction(&mut claim_tx, &wallet).await;
+    })
+    .await;
+}
+
+// ── with_credential_ids: credential-gated claim ───────────────────────────────
+
+const CREDENTIAL_TYPE: &str = "4B5943"; // hex "KYC"
+
+#[tokio::test]
+async fn test_payment_channel_claim_with_credential_ids() {
+    with_blockchain_lock(|| async {
+        let client = get_client().await;
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+        let destination = generate_funded_wallet().await;
+
+        let credential_hash =
+            provision_credential_for_destination(&issuer, &subject, &destination, CREDENTIAL_TYPE)
+                .await;
+
+        // Step 1: subject opens a payment channel to destination.
+        let mut create_tx = PaymentChannelCreate::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            XRPAmount::from("100"),
+            destination.classic_address.clone().into(),
+            subject.public_key.clone().into(),
+            86400,
+            None,
+            None,
+        );
+
+        sign_and_submit(&mut create_tx, client, &subject, true, true)
+            .await
+            .expect("Failed to submit PaymentChannelCreate");
+
+        ledger_accept().await;
+
+        // Step 2: read channel ID from account_objects.
+        let ao_response = client
+            .request(
+                AccountObjects::new(
+                    None,
+                    subject.classic_address.clone().into(),
+                    None,
+                    None,
+                    Some(AccountObjectType::PaymentChannel),
+                    None,
+                    None,
+                    None,
+                )
+                .into(),
+            )
+            .await
+            .expect("Failed to query account_objects");
+        let ao_result: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("Failed to parse account_objects");
+
+        assert_eq!(ao_result.account_objects.len(), 1, "Expected one channel");
+
+        let channel_id = ao_result.account_objects[0]["index"]
+            .as_str()
+            .expect("Expected index field on channel object")
+            .to_string();
+
+        // Step 3a: verify gate is enforced — claim WITHOUT credentials must be rejected.
+        let mut neg_claim = PaymentChannelClaim::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            channel_id.clone().into(),
+            Some("100".into()),
+            None,
+            None,
+            None,
+        );
+        let neg_result = submit_tx(
+            &mut neg_claim,
+            SubmitOptions { wallet: &subject, autofill: true, check_fee: true },
+        )
+        .await;
+        ledger_accept().await;
+        assert_eq!(
+            neg_result, "tecNO_PERMISSION",
+            "claim without credential_ids should be rejected when destination has DepositAuth"
+        );
+
+        // Step 3b: claim WITH credential_ids — must succeed.
+        let mut claim_tx = PaymentChannelClaim::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            channel_id.into(),
+            Some("100".into()),
+            None,
+            None,
+            None,
+        );
+        claim_tx.credential_ids = Some(vec![credential_hash.into()]);
+
+        test_transaction(&mut claim_tx, &subject).await;
     })
     .await;
 }

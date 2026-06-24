@@ -1,5 +1,6 @@
 // Scenarios:
 //   - base: create a time-locked XRP escrow then finish it once FinishAfter has passed
+//   - with_credential_ids: provision credential + DepositPreauth, finish with credential_ids
 //
 // NOTE: After EscrowCreate is submitted the test:
 //   1. Queries account_objects to confirm the escrow exists on-chain
@@ -8,7 +9,8 @@
 
 use crate::common::{
     generate_funded_wallet, get_escrow_offer_sequence, get_ledger_close_time, ledger_accept,
-    test_transaction, wait_for_ledger_close_time, with_blockchain_lock,
+    provision_credential_for_destination, submit_tx, test_transaction, wait_for_ledger_close_time,
+    with_blockchain_lock, SubmitOptions,
 };
 use xrpl::models::transactions::escrow_create::EscrowCreate;
 use xrpl::models::transactions::escrow_finish::EscrowFinish;
@@ -71,6 +73,99 @@ async fn test_escrow_finish_base() {
         );
 
         test_transaction(&mut finish_tx, &wallet).await;
+    })
+    .await;
+}
+
+// ── with_credential_ids: credential-gated escrow finish ───────────────────────
+
+const CREDENTIAL_TYPE: &str = "4B5943"; // hex "KYC"
+
+#[tokio::test]
+async fn test_escrow_finish_with_credential_ids() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+        let destination = generate_funded_wallet().await;
+
+        let credential_hash =
+            provision_credential_for_destination(&issuer, &subject, &destination, CREDENTIAL_TYPE)
+                .await;
+
+        let close_time = get_ledger_close_time().await;
+        let finish_after = (close_time + 2) as u32;
+
+        let mut create_tx = EscrowCreate::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "10000".into(),
+            destination.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            Some(finish_after),
+        );
+
+        test_transaction(&mut create_tx, &subject).await;
+
+        let offer_sequence = get_escrow_offer_sequence(&subject.classic_address).await;
+
+        wait_for_ledger_close_time(finish_after as u64).await;
+        ledger_accept().await;
+
+        // Step 3a: verify gate is enforced — finish WITHOUT credentials must be rejected.
+        let mut neg_finish = EscrowFinish::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            subject.classic_address.clone().into(),
+            offer_sequence,
+            None,
+            None,
+        );
+        let neg_result = submit_tx(
+            &mut neg_finish,
+            SubmitOptions { wallet: &subject, autofill: true, check_fee: true },
+        )
+        .await;
+        ledger_accept().await;
+        assert_eq!(
+            neg_result, "tecNO_PERMISSION",
+            "escrow finish without credential_ids should be rejected when destination has DepositAuth"
+        );
+
+        // Step 3b: finish WITH credential_ids — must succeed.
+        let mut finish_tx = EscrowFinish::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            subject.classic_address.clone().into(),
+            offer_sequence,
+            None,
+            None,
+        );
+        finish_tx.credential_ids = Some(vec![credential_hash.into()]);
+
+        test_transaction(&mut finish_tx, &subject).await;
     })
     .await;
 }

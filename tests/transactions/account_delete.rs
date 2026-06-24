@@ -1,5 +1,6 @@
 // Scenarios:
 //   - base: submit AccountDelete and expect tecTOO_SOON
+//   - with_credential_ids: advance 256 ledgers, credential + DepositPreauth, assert tesSUCCESS
 //
 // NOTE: AccountDelete requires the account's sequence number to be at least 256 lower than the
 // current ledger index. A freshly funded account never satisfies this condition on testnet, so
@@ -9,7 +10,10 @@
 // On Docker standalone mode, call ledger_accept() 256 times before submitting to satisfy the
 // condition and assert tesSUCCESS instead.
 
-use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_blockchain_lock};
+use crate::common::{
+    generate_funded_wallet, get_client, ledger_accept, provision_credential_for_destination,
+    submit_tx, test_transaction, with_blockchain_lock, SubmitOptions,
+};
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::transactions::account_delete::AccountDelete;
 
@@ -49,6 +53,72 @@ async fn test_account_delete_base() {
         );
 
         ledger_accept().await;
+    })
+    .await;
+}
+
+// ── with_credential_ids: full 256-ledger advance, assert tesSUCCESS ──────────
+
+const CREDENTIAL_TYPE: &str = "4B5943"; // hex "KYC"
+
+#[tokio::test]
+async fn test_account_delete_with_credential_ids() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+        let destination = generate_funded_wallet().await;
+
+        let credential_hash =
+            provision_credential_for_destination(&issuer, &subject, &destination, CREDENTIAL_TYPE)
+                .await;
+
+        // Advance 256 ledgers so subject's sequence is far enough below the ledger index.
+        for _ in 0..256 {
+            ledger_accept().await;
+        }
+
+        // Step 2a: verify gate is enforced — delete WITHOUT credentials must be rejected.
+        let mut neg_tx = AccountDelete::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            destination.classic_address.clone().into(),
+            None,
+        );
+        let neg_result = submit_tx(
+            &mut neg_tx,
+            SubmitOptions { wallet: &subject, autofill: true, check_fee: true },
+        )
+        .await;
+        ledger_accept().await;
+        assert_eq!(
+            neg_result, "tecNO_PERMISSION",
+            "account delete without credential_ids should be rejected when destination has DepositAuth"
+        );
+
+        // Step 2b: delete WITH credential_ids — must succeed.
+        let mut tx = AccountDelete::new(
+            subject.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            destination.classic_address.clone().into(),
+            None,
+        );
+        tx.credential_ids = Some(vec![credential_hash.into()]);
+
+        test_transaction(&mut tx, &subject).await;
     })
     .await;
 }
