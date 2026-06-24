@@ -32,3 +32,10 @@ pub const ORACLE_URI: &str = "6469645F6578616D706C65";
 
 /// "https://example.com" ASCII hex-encoded (used in construction-only tests).
 pub const ORACLE_URI_HTTPS: &str = "68747470733A2F2F6578616D706C652E636F6D";
+
+// ---------------------------------------------------------------------------
+// Credentials / XLS-70 test fixtures
+// ---------------------------------------------------------------------------
+
+/// "KYC" ASCII hex-encoded. Used as credential_type in all credential integration tests.
+pub const CREDENTIAL_TYPE_KYC: &str = "4B5943";

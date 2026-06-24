@@ -7,7 +7,10 @@
 //   4. delete by issuer before accept
 //   5. verify lsfAccepted flag set on Credential ledger object after accept
 
-use crate::common::{generate_funded_wallet, get_client, test_transaction, with_blockchain_lock};
+use crate::common::{
+    generate_funded_wallet, get_client, test_transaction, with_blockchain_lock,
+    CREDENTIAL_TYPE_KYC,
+};
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
     requests::account_objects::{AccountObjectType, AccountObjects},
@@ -18,7 +21,7 @@ use xrpl::models::{
     },
 };
 
-const CREDENTIAL_TYPE: &str = "4B5943"; // hex for "KYC"
+const CREDENTIAL_TYPE: &str = CREDENTIAL_TYPE_KYC;
 const LSF_ACCEPTED: u64 = 0x00010000;
 
 // ── 1. Full lifecycle: create → accept → delete by issuer ────────────────────
@@ -305,33 +308,3 @@ async fn test_credential_lsf_accepted_set_after_accept() {
     .await;
 }
 
-// ── Helper: provision a credential (create + accept) for use in other tests ─
-
-pub async fn provision_credential(
-    issuer: &xrpl::wallet::Wallet,
-    subject: &xrpl::wallet::Wallet,
-    credential_type: &str,
-) {
-    let mut create = CredentialCreate {
-        common_fields: CommonFields {
-            account: issuer.classic_address.clone().into(),
-            transaction_type: TransactionType::CredentialCreate,
-            ..Default::default()
-        },
-        subject: subject.classic_address.clone().into(),
-        credential_type: credential_type.into(),
-        ..Default::default()
-    };
-    test_transaction(&mut create, issuer).await;
-
-    let mut accept = CredentialAccept {
-        common_fields: CommonFields {
-            account: subject.classic_address.clone().into(),
-            transaction_type: TransactionType::CredentialAccept,
-            ..Default::default()
-        },
-        issuer: issuer.classic_address.clone().into(),
-        credential_type: credential_type.into(),
-    };
-    test_transaction(&mut accept, subject).await;
-}

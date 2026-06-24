@@ -5,6 +5,8 @@ pub mod constants;
 pub mod payment;
 pub mod xchain;
 
+pub use constants::CREDENTIAL_TYPE_KYC;
+
 use anyhow::Result;
 #[cfg(feature = "std")]
 use once_cell::sync::Lazy;
