@@ -2,7 +2,10 @@
 //   - base: get an entry index from ledger_data, then query ledger_entry with that index
 //   - credential: provision a Credential object, fetch it via ledger_entry credential selector
 
-use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock, CREDENTIAL_TYPE_KYC};
+use crate::common::{
+    generate_funded_wallet, provision_credential, test_transaction, with_blockchain_lock,
+    CREDENTIAL_TYPE_KYC,
+};
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
     requests::{
@@ -11,10 +14,6 @@ use xrpl::models::{
         LedgerIndex,
     },
     results::ledger_data::LedgerData as LedgerDataResult,
-    transactions::{
-        credential_accept::CredentialAccept, credential_create::CredentialCreate, CommonFields,
-        TransactionType,
-    },
 };
 
 #[tokio::test]
@@ -68,7 +67,6 @@ async fn test_ledger_entry_base() {
 
 // ── credential: provision a Credential then fetch it via ledger_entry selector ─
 
-const CREDENTIAL_TYPE: &str = CREDENTIAL_TYPE_KYC;
 const LSF_ACCEPTED: u64 = 0x00010000;
 
 #[tokio::test]
@@ -78,37 +76,14 @@ async fn test_ledger_entry_credential() {
         let issuer = generate_funded_wallet().await;
         let subject = generate_funded_wallet().await;
 
-        // Step 1: create credential (issuer → subject).
-        let mut create = CredentialCreate {
-            common_fields: CommonFields {
-                account: issuer.classic_address.clone().into(),
-                transaction_type: TransactionType::CredentialCreate,
-                ..Default::default()
-            },
-            subject: subject.classic_address.clone().into(),
-            credential_type: CREDENTIAL_TYPE.into(),
-            ..Default::default()
-        };
-        test_transaction(&mut create, &issuer).await;
+        provision_credential(&issuer, &subject, CREDENTIAL_TYPE_KYC).await;
 
-        // Step 2: subject accepts — sets lsfAccepted flag.
-        let mut accept = CredentialAccept {
-            common_fields: CommonFields {
-                account: subject.classic_address.clone().into(),
-                transaction_type: TransactionType::CredentialAccept,
-                ..Default::default()
-            },
-            issuer: issuer.classic_address.clone().into(),
-            credential_type: CREDENTIAL_TYPE.into(),
-        };
-        test_transaction(&mut accept, &subject).await;
-
-        // Step 3: fetch via ledger_entry credential selector.
+        // Fetch via ledger_entry credential selector.
         let entry_request = LedgerEntry {
             credential: Some(CredentialSelector {
                 subject: subject.classic_address.clone().into(),
                 issuer: issuer.classic_address.clone().into(),
-                credential_type: CREDENTIAL_TYPE.into(),
+                credential_type: CREDENTIAL_TYPE_KYC.into(),
             }),
             ..Default::default()
         };
@@ -122,10 +97,8 @@ async fn test_ledger_entry_credential() {
             .try_into()
             .expect("failed to parse ledger_entry result");
 
-        assert!(entry_result.node.is_some(), "node should be present");
-
         // Verify lsfAccepted is set.
-        let node = entry_result.node.unwrap();
+        let node = entry_result.node.expect("node should be present after CredentialAccept");
         let flags = node["Flags"].as_u64().expect("Flags field missing");
         assert!(
             flags & LSF_ACCEPTED != 0,
