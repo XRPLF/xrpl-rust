@@ -98,7 +98,9 @@ async fn test_ledger_entry_credential() {
             .expect("failed to parse ledger_entry result");
 
         // Verify lsfAccepted is set.
-        let node = entry_result.node.expect("node should be present after CredentialAccept");
+        let node = entry_result
+            .node
+            .expect("node should be present after CredentialAccept");
         let flags = node["Flags"].as_u64().expect("Flags field missing");
         assert!(
             flags & LSF_ACCEPTED != 0,

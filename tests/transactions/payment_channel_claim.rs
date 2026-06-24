@@ -193,7 +193,11 @@ async fn test_payment_channel_claim_with_credential_ids() {
         );
         let neg_result = submit_tx(
             &mut neg_claim,
-            SubmitOptions { wallet: &subject, autofill: true, check_fee: true },
+            SubmitOptions {
+                wallet: &subject,
+                autofill: true,
+                check_fee: true,
+            },
         )
         .await;
         ledger_accept().await;

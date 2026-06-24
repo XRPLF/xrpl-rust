@@ -5,7 +5,9 @@
 //   2. AuthorizeCredentials: credential-based authorization
 //   3. UnauthorizeCredentials: revoke credential-based authorization
 
-use crate::common::{generate_funded_wallet, test_transaction, with_blockchain_lock, CREDENTIAL_TYPE_KYC};
+use crate::common::{
+    generate_funded_wallet, test_transaction, with_blockchain_lock, CREDENTIAL_TYPE_KYC,
+};
 use xrpl::models::{
     transactions::{deposit_preauth::DepositPreauth, CommonFields, TransactionType},
     CredentialAuthorization, CredentialAuthorizationFields,

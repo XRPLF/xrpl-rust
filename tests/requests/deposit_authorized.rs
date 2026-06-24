@@ -62,8 +62,7 @@ async fn test_deposit_authorized_with_credentials_echoed_in_response() {
         let subject = generate_funded_wallet().await;
         let destination = generate_funded_wallet().await;
 
-        let credential_hash =
-            provision_credential(&issuer, &subject, CREDENTIAL_TYPE_KYC).await;
+        let credential_hash = provision_credential(&issuer, &subject, CREDENTIAL_TYPE_KYC).await;
 
         let request = DepositAuthorized::new(
             None,
