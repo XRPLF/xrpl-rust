@@ -1,5 +1,4 @@
 use alloc::borrow::Cow;
-use alloc::string::ToString;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -47,7 +46,7 @@ pub struct Offer<'a> {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
 pub struct PermissionedDomainObject<'a> {
     pub account: Cow<'a, str>,
-    pub seq: u64,
+    pub seq: u32,
 }
 
 /// Required fields for requesting a PermissionedDomain by object selector.
@@ -184,10 +183,13 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if let Some(pd) = &self.permissioned_domain {
             match pd {
                 PermissionedDomain::Index(id) => {
-                    if id.len() != 64 || !id.chars().all(|c| c.is_ascii_hexdigit()) {
+                    if id.len() != 64
+                        || !id.chars().all(|c| c.is_ascii_hexdigit())
+                        || id.chars().all(|c| c == '0')
+                    {
                         return Err(XRPLModelException::InvalidValue {
                             field: "permissioned_domain.index".into(),
-                            expected: "64-character hex string".into(),
+                            expected: "non-zero 64-character hex string".into(),
                             found: id.as_ref().into(),
                         });
                     }
@@ -198,13 +200,6 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                             field: "permissioned_domain.account".into(),
                             expected: "valid classic XRPL address".into(),
                             found: obj.account.as_ref().into(),
-                        });
-                    }
-                    if obj.seq > u32::MAX as u64 {
-                        return Err(XRPLModelException::InvalidValue {
-                            field: "permissioned_domain.seq".into(),
-                            expected: "value within u32 range".into(),
-                            found: obj.seq.to_string(),
                         });
                     }
                 }
@@ -275,24 +270,27 @@ impl<'a> LedgerEntry<'a> {
         ledger_index: Option<LedgerIndex<'a>>,
     ) -> Self {
         Self {
-            permissioned_domain: Some(permissioned_domain),
-            ..Self::new(
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
                 id,
-                None,
-                binary,
-                None,
-                None,
-                None,
-                None,
-                None,
+            },
+            index: None,
+            account_root: None,
+            check: None,
+            payment_channel: None,
+            permissioned_domain: Some(permissioned_domain),
+            deposit_preauth: None,
+            directory: None,
+            escrow: None,
+            offer: None,
+            oracle: None,
+            ripple_state: None,
+            ticket: None,
+            binary,
+            ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
+            }),
         }
     }
 }
@@ -307,7 +305,6 @@ mod test_ledger_entry_errors {
     use super::Offer;
     use crate::models::Model;
     use alloc::format;
-    use alloc::string::ToString;
 
     use super::*;
 
@@ -333,12 +330,13 @@ mod test_ledger_entry_errors {
             None,
             None,
         );
-        let _expected = XRPLModelException::ExpectedOneOf(&[
+        let expected = XRPLModelException::ExpectedOneOf(&[
             "index",
             "account_root",
             "check",
             "directory",
             "offer",
+            "oracle",
             "ripple_state",
             "escrow",
             "payment_channel",
@@ -346,10 +344,7 @@ mod test_ledger_entry_errors {
             "permissioned_domain",
             "ticket",
         ]);
-        assert_eq!(
-            ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, permissioned_domain, ticket"
-        );
+        assert_eq!(ledger_entry.validate().unwrap_err(), expected);
     }
 
     #[test]

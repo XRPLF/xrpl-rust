@@ -8,6 +8,7 @@ use crate::common::{generate_funded_wallet, get_client, ledger_accept, with_bloc
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
+use xrpl::models::requests::{CommonFields as RequestCommonFields, RequestMethod};
 use xrpl::models::results;
 use xrpl::models::transactions::permissioned_domain_delete::PermissionedDomainDelete;
 use xrpl::models::transactions::permissioned_domain_set::PermissionedDomainSet;
@@ -37,6 +38,7 @@ async fn test_permissioned_domain_delete_base() {
             .expect("PermissionedDomainSet submission should not fail");
 
         if set_result.engine_result == "temDISABLED" {
+            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
             ledger_accept().await;
             return;
         }
@@ -50,16 +52,18 @@ async fn test_permissioned_domain_delete_base() {
 
         let ao_response = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    None,
-                    Some(AccountObjectType::PermissionedDomain),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await
@@ -105,16 +109,18 @@ async fn test_permissioned_domain_delete_base() {
         // Verify domain is gone
         let ao_after = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    None,
-                    Some(AccountObjectType::PermissionedDomain),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await

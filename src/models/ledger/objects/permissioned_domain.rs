@@ -50,6 +50,38 @@ impl<'a> LedgerObject<NoFlags> for PermissionedDomain<'a> {
     }
 }
 
+impl<'a> crate::models::Model for PermissionedDomain<'a> {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        use crate::core::addresscodec::is_valid_classic_address;
+        use crate::models::exceptions::XRPLModelException;
+        use crate::models::transactions::permissioned_domain_set::validate_credential;
+
+        if !is_valid_classic_address(&self.owner) {
+            return Err(XRPLModelException::InvalidValue {
+                field: "owner".into(),
+                expected: "valid classic XRPL address".into(),
+                found: self.owner.clone().into_owned(),
+            });
+        }
+        if self.accepted_credentials.is_empty() {
+            return Err(XRPLModelException::MissingField(
+                "AcceptedCredentials".into(),
+            ));
+        }
+        if self.accepted_credentials.len() > 10 {
+            return Err(XRPLModelException::ValueTooLong {
+                field: "AcceptedCredentials".into(),
+                max: 10,
+                found: self.accepted_credentials.len(),
+            });
+        }
+        for credential in &self.accepted_credentials {
+            validate_credential(credential)?;
+        }
+        Ok(())
+    }
+}
+
 impl<'a> PermissionedDomain<'a> {
     pub fn new(
         index: Option<Cow<'a, str>>,
@@ -87,11 +119,15 @@ mod test_serde {
 
     #[test]
     fn test_serialize() {
-        let domain = PermissionedDomain::new(
-            Some(Cow::from("ForTest")),
-            None,
-            Cow::from("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"),
-            vec![
+        let domain = PermissionedDomain {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::PermissionedDomain,
+                index: Some(Cow::from("ForTest")),
+                ledger_index: None,
+            },
+            owner: Cow::from("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"),
+            accepted_credentials: vec![
                 Credential {
                     issuer: "rIssuerA".to_string(),
                     credential_type: "4B5943".to_string(), // hex("KYC")
@@ -101,11 +137,13 @@ mod test_serde {
                     credential_type: "414D4C".to_string(), // hex("AML")
                 },
             ],
-            1,
-            Cow::from("0"),
-            Cow::from("A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2"),
-            1000,
-        );
+            sequence: 1,
+            owner_node: Cow::from("0"),
+            previous_txn_id: Cow::from(
+                "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",
+            ),
+            previous_txn_lgr_seq: 1000,
+        };
 
         let serialized = serde_json::to_string(&domain).unwrap();
 
@@ -124,19 +162,25 @@ mod test_serde {
 
     #[test]
     fn test_ledger_entry_type() {
-        let domain = PermissionedDomain::new(
-            None,
-            None,
-            Cow::from("rOwner"),
-            vec![Credential {
+        let domain = PermissionedDomain {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::PermissionedDomain,
+                index: None,
+                ledger_index: None,
+            },
+            owner: Cow::from("rOwner"),
+            accepted_credentials: vec![Credential {
                 issuer: "rIssuer".to_string(),
                 credential_type: "4B5943".to_string(),
             }],
-            1,
-            Cow::from("0"),
-            Cow::from("0000000000000000000000000000000000000000000000000000000000000000"),
-            1,
-        );
+            sequence: 1,
+            owner_node: Cow::from("0"),
+            previous_txn_id: Cow::from(
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            ),
+            previous_txn_lgr_seq: 1,
+        };
 
         assert_eq!(
             domain.get_ledger_entry_type(),
@@ -146,19 +190,25 @@ mod test_serde {
 
     #[test]
     fn test_fields() {
-        let domain = PermissionedDomain::new(
-            Some(Cow::from("TestIndex")),
-            Some(Cow::from("TestLedgerIndex")),
-            Cow::from("rOwnerXYZ"),
-            vec![Credential {
+        let domain = PermissionedDomain {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::PermissionedDomain,
+                index: Some(Cow::from("TestIndex")),
+                ledger_index: Some(Cow::from("TestLedgerIndex")),
+            },
+            owner: Cow::from("rOwnerXYZ"),
+            accepted_credentials: vec![Credential {
                 issuer: "rIssuerXYZ".to_string(),
                 credential_type: "41434352454449544544".to_string(), // hex("ACCREDITED")
             }],
-            42,
-            Cow::from("7"),
-            Cow::from("1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF"),
-            999,
-        );
+            sequence: 42,
+            owner_node: Cow::from("7"),
+            previous_txn_id: Cow::from(
+                "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF",
+            ),
+            previous_txn_lgr_seq: 999,
+        };
 
         assert_eq!(domain.owner, "rOwnerXYZ");
         assert_eq!(domain.sequence, 42);

@@ -15,6 +15,7 @@ use crate::common::{
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
+use xrpl::models::requests::{CommonFields as RequestCommonFields, RequestMethod};
 use xrpl::models::results;
 use xrpl::models::transactions::permissioned_domain_set::PermissionedDomainSet;
 use xrpl::models::transactions::{CommonFields, Credential, TransactionType};
@@ -119,6 +120,7 @@ async fn test_permissioned_domain_account_objects_filter() {
             .expect("sign_and_submit failed");
 
         if result.engine_result == "temDISABLED" {
+            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
             ledger_accept().await;
             return;
         }
@@ -127,16 +129,18 @@ async fn test_permissioned_domain_account_objects_filter() {
 
         let ao_response = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    None,
-                    Some(AccountObjectType::PermissionedDomain),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await
@@ -184,6 +188,7 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
             .expect("sign_and_submit failed");
 
         if result.engine_result == "temDISABLED" {
+            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
             ledger_accept().await;
             return;
         }
@@ -193,16 +198,18 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
         // Get domain_id from account_objects
         let ao_response = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    None,
-                    Some(AccountObjectType::PermissionedDomain),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await
@@ -255,6 +262,7 @@ async fn test_permissioned_domain_ledger_entry_by_account_seq() {
             .expect("sign_and_submit failed");
 
         if result.engine_result == "temDISABLED" {
+            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
             ledger_accept().await;
             return;
         }
@@ -264,16 +272,18 @@ async fn test_permissioned_domain_ledger_entry_by_account_seq() {
         // Get sequence from account_objects
         let ao_response = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    None,
-                    Some(AccountObjectType::PermissionedDomain),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await
@@ -327,6 +337,7 @@ async fn test_permissioned_domain_update_credentials() {
             .expect("create PDSet failed");
 
         if result.engine_result == "temDISABLED" {
+            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
             ledger_accept().await;
             return;
         }
@@ -336,16 +347,18 @@ async fn test_permissioned_domain_update_credentials() {
         // Get domain_id
         let ao_response = client
             .request(
-                AccountObjects::new(
-                    None,
-                    wallet.classic_address.clone().into(),
-                    None,
-                    None,
-                    Some(AccountObjectType::PermissionedDomain),
-                    None,
-                    None,
-                    None,
-                )
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
                 .into(),
             )
             .await

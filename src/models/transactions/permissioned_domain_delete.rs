@@ -99,22 +99,20 @@ impl<'a> PermissionedDomainDelete<'a> {
         domain_id: Cow<'a, str>,
     ) -> Self {
         Self {
-            common_fields: CommonFields::new(
+            common_fields: CommonFields {
                 account,
-                TransactionType::PermissionedDomainDelete,
+                transaction_type: TransactionType::PermissionedDomainDelete,
                 account_txn_id,
                 fee,
-                Some(FlagCollection::default()),
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
-                None,
                 sequence,
                 signers,
-                None,
                 source_tag,
                 ticket_sequence,
-                None,
-            ),
+                ..Default::default()
+            },
             domain_id,
         }
     }
@@ -159,10 +157,10 @@ mod tests {
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
-            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB001122334455AA".into(),
+            domain_id: "AABB00112233445566778899AABB00112233445566778899AABB001122334455".into(),
         };
 
-        let default_json_str = r#"{"Account":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","TransactionType":"PermissionedDomainDelete","Fee":"12","Flags":0,"Sequence":5,"SigningPubKey":"","DomainID":"AABB00112233445566778899AABB00112233445566778899AABB001122334455AA"}"#;
+        let default_json_str = r#"{"Account":"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh","TransactionType":"PermissionedDomainDelete","Fee":"12","Flags":0,"Sequence":5,"SigningPubKey":"","DomainID":"AABB00112233445566778899AABB00112233445566778899AABB001122334455"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_string = serde_json::to_string(&txn).unwrap();

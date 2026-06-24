@@ -82,7 +82,7 @@ impl<'a> Model for PermissionedDomainSet<'a> {
                 return Err(XRPLModelException::InvalidValue {
                     field: "AcceptedCredentials".into(),
                     expected: "unique Issuer/CredentialType pairs".into(),
-                    found: credential.credential_type.clone(),
+                    found: alloc::format!("{}/{}", credential.issuer, credential.credential_type),
                 });
             }
         }
@@ -93,10 +93,8 @@ impl<'a> Model for PermissionedDomainSet<'a> {
     }
 }
 
-/// Validate a `Credential` entry per XLS-80 / rippled `LedgerFormats.cpp`:
-/// `Issuer` must be non-empty and `CredentialType` is an `sfBlob` (hex),
-/// so it must be non-empty, even-length, hex-only, and at most 128 hex
-/// chars (64 bytes, rippled's `MaxCredentialTypeLength`).
+/// Validates a DomainID per XLS-80: must be a non-zero 64-character hex string
+/// (the 32-byte hash of the PermissionedDomain ledger entry, serialized as uppercase hex).
 pub(crate) fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelResult<()> {
     if domain_id.len() != 64
         || !domain_id.chars().all(|c| c.is_ascii_hexdigit())
@@ -111,6 +109,10 @@ pub(crate) fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelRes
     Ok(())
 }
 
+/// Validates a `Credential` entry per XLS-80 / rippled `LedgerFormats.cpp`:
+/// `Issuer` must be a valid classic XRPL address and `CredentialType` is an `sfBlob` (hex),
+/// so it must be non-empty, even-length, hex-only, and at most 128 hex chars
+/// (64 bytes, rippled's `MaxCredentialTypeLength`).
 pub(crate) fn validate_credential(credential: &Credential) -> crate::models::XRPLModelResult<()> {
     if credential.issuer.is_empty() {
         return Err(XRPLModelException::MissingField("Credential.Issuer".into()));
@@ -184,22 +186,20 @@ impl<'a> PermissionedDomainSet<'a> {
         accepted_credentials: Vec<Credential>,
     ) -> Self {
         Self {
-            common_fields: CommonFields::new(
+            common_fields: CommonFields {
                 account,
-                TransactionType::PermissionedDomainSet,
+                transaction_type: TransactionType::PermissionedDomainSet,
                 account_txn_id,
                 fee,
-                Some(FlagCollection::default()),
+                flags: FlagCollection::default(),
                 last_ledger_sequence,
                 memos,
-                None,
                 sequence,
                 signers,
-                None,
                 source_tag,
                 ticket_sequence,
-                None,
-            ),
+                ..Default::default()
+            },
             domain_id,
             accepted_credentials,
         }
@@ -219,6 +219,10 @@ impl<'a> PermissionedDomainSet<'a> {
 
     /// Add a single credential to the accepted credentials list.
     pub fn with_credential(mut self, credential: Credential) -> Self {
+        assert!(
+            self.accepted_credentials.len() < 10,
+            "AcceptedCredentials exceeds XLS-80 maximum of 10 entries"
+        );
         self.accepted_credentials.push(credential);
         self
     }
@@ -339,6 +343,8 @@ mod tests {
         assert!(txn.accepted_credentials.is_empty());
         assert!(txn.common_fields.fee.is_none());
         assert!(txn.common_fields.sequence.is_none());
+        // Empty accepted_credentials violates XLS-80 mandated 1..=10 entries.
+        assert!(txn.get_errors().is_err());
     }
 
     #[test]
