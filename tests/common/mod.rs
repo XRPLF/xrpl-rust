@@ -116,8 +116,7 @@ pub async fn generate_funded_wallet() -> Wallet {
     // Using the static CLIENT here causes DispatchGone errors when sync
     // wrapper tests create and drop their own Runtime instances — the static
     // client's hyper dispatch task is tied to whichever runtime initialised it.
-    let local_client =
-        AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap());
+    let local_client = AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap());
     sign_and_submit(&mut payment, &local_client, &genesis, true, true)
         .await
         .expect("generate_funded_wallet: funding payment failed");
