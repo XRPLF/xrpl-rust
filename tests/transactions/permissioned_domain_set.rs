@@ -93,12 +93,7 @@ async fn test_permissioned_domain_set_base() {
             .await
             .expect("sign_and_submit failed");
 
-        let allowed = ["tesSUCCESS", "temDISABLED"];
-        assert!(
-            allowed.contains(&&*result.engine_result),
-            "unexpected engine_result: {}",
-            result.engine_result
-        );
+        assert_eq!(result.engine_result, "tesSUCCESS");
         ledger_accept().await;
     })
     .await;
@@ -119,11 +114,6 @@ async fn test_permissioned_domain_account_objects_filter() {
             .await
             .expect("sign_and_submit failed");
 
-        if result.engine_result == "temDISABLED" {
-            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
-            ledger_accept().await;
-            return;
-        }
         assert_eq!(result.engine_result, "tesSUCCESS");
         ledger_accept().await;
 
@@ -187,11 +177,6 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
             .await
             .expect("sign_and_submit failed");
 
-        if result.engine_result == "temDISABLED" {
-            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
-            ledger_accept().await;
-            return;
-        }
         assert_eq!(result.engine_result, "tesSUCCESS");
         ledger_accept().await;
 
@@ -261,11 +246,6 @@ async fn test_permissioned_domain_ledger_entry_by_account_seq() {
             .await
             .expect("sign_and_submit failed");
 
-        if result.engine_result == "temDISABLED" {
-            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
-            ledger_accept().await;
-            return;
-        }
         assert_eq!(result.engine_result, "tesSUCCESS");
         ledger_accept().await;
 
@@ -336,11 +316,6 @@ async fn test_permissioned_domain_update_credentials() {
             .await
             .expect("create PDSet failed");
 
-        if result.engine_result == "temDISABLED" {
-            eprintln!("[SKIP] PermissionedDomains amendment disabled — test vacuous");
-            ledger_accept().await;
-            return;
-        }
         assert_eq!(result.engine_result, "tesSUCCESS");
         ledger_accept().await;
 
