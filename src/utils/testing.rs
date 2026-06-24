@@ -193,7 +193,7 @@ pub mod test_constants {
     pub const EXAMPLE_COM_HEX: &str = "6578616d706c652e636f6d";
 
     /// Common test URLs
-    pub const TESTNET_URL: &str = "https://testnet.xrpl-labs.com/";
+    pub const TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234/";
     pub const ALT_TESTNET_URL: &str = "https://faucet.altnet.rippletest.net:443";
 
     // ── Test account addresses ────────────────────────────────────────────
