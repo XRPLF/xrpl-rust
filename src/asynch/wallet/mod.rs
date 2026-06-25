@@ -143,7 +143,7 @@ mod test_faucet_wallet_generation {
         // Test URL parsing
         let url1 = test_constants::TESTNET_URL.parse::<Url>().unwrap();
         assert_eq!(url1.scheme(), "https");
-        assert_eq!(url1.host_str(), Some("testnet.xrpl-labs.com"));
+        assert_eq!(url1.host_str(), Some("s.altnet.rippletest.net"));
 
         let url2 = test_constants::ALT_TESTNET_URL.parse::<Url>().unwrap();
         assert_eq!(url2.scheme(), "https");
