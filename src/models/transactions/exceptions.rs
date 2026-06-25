@@ -28,6 +28,8 @@ pub enum XRPLTransactionException {
     #[error("{0}")]
     XRPLAMMCreateError(#[from] XRPLAMMCreateException),
     #[error("{0}")]
+    XRPLClawbackError(#[from] XRPLClawbackException),
+    #[error("{0}")]
     XRPLCoreError(#[from] XRPLCoreException),
     #[error("The transaction must be signed")]
     TxMustBeSigned,
@@ -214,3 +216,15 @@ pub enum XRPLAMMCreateException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLAMMCreateException {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[non_exhaustive]
+pub enum XRPLClawbackException {
+    #[error("Clawback amount must not be XRP — only issued currencies can be clawed back")]
+    AmountMustNotBeXRP,
+    #[error("The `holder` field must not be present for standard issued-currency (IOU) clawback")]
+    HolderMustNotBePresentForIOU,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLClawbackException {}

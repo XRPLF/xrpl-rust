@@ -40,6 +40,8 @@ pub struct State<'a> {
     pub peer_disconnects: Option<Cow<'a, str>>,
     /// Count of resource-related peer disconnections
     pub peer_disconnects_resources: Option<Cow<'a, str>>,
+    /// The network ID of the server's network
+    pub network_id: Option<u32>,
     /// Number of other rippled servers currently connected
     pub peers: Option<u32>,
     /// Public key used for peer-to-peer communications
