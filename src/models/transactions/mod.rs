@@ -768,15 +768,14 @@ fn validate_oracle_currency(
     field: &'static str,
     value: &str,
 ) -> crate::models::XRPLModelResult<()> {
-    if crate::utils::is_iso_code(value) || crate::utils::is_iso_hex(value) {
-        return Ok(());
+    if value.is_empty() {
+        return Err(crate::models::XRPLModelException::InvalidValue {
+            field: field.into(),
+            expected: "a non-empty currency code".into(),
+            found: "(empty string)".into(),
+        });
     }
-    Err(crate::models::XRPLModelException::InvalidValue {
-        field: field.into(),
-        expected: "a 3-character ISO currency code (including \"XRP\") or 40-character hex code"
-            .into(),
-        found: value.into(),
-    })
+    Ok(())
 }
 
 fn validate_oracle_asset_price(value: &Option<String>) -> crate::models::XRPLModelResult<()> {
