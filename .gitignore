@@ -31,3 +31,4 @@ rustc-ice*
 dev/*
 .playwright-mcp/*
 .worktrees/
+xls-70-pr-154.md
