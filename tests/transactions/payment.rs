@@ -3,8 +3,8 @@
 //   - with_credential_ids: Payment to DepositAuth-gated destination via credential authorization
 
 use crate::common::{
-    generate_funded_wallet, provision_credential_for_destination, submit_tx, test_transaction,
-    with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
+    generate_funded_wallet, ledger_accept, provision_credential_for_destination, submit_tx,
+    test_transaction, with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::{
     models::{transactions::payment::Payment, Amount, XRPAmount},
@@ -60,25 +60,16 @@ async fn test_payment_with_credential_ids() {
         .await;
 
         // Step 1: payment WITHOUT credentials — must be rejected by DepositAuth gate.
-        let mut neg_tx = Payment::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("1000000")),
-            destination.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        let mut neg_tx = Payment {
+            common_fields: xrpl::models::transactions::CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: xrpl::models::transactions::TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: destination.classic_address.clone().into(),
+            ..Default::default()
+        };
         let neg_result = submit_tx(
             &mut neg_tx,
             SubmitOptions {
@@ -88,32 +79,24 @@ async fn test_payment_with_credential_ids() {
             },
         )
         .await;
+        ledger_accept().await;
         assert_eq!(
             neg_result, "tecNO_PERMISSION",
             "payment without credential_ids should be rejected when destination has DepositAuth"
         );
 
         // Step 2: payment WITH credential_ids — must succeed.
-        let mut tx = Payment::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Amount::XRPAmount(XRPAmount::from("1000000")),
-            destination.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
-        tx.credential_ids = Some(vec![credential_hash.into()]);
+        let mut tx = Payment {
+            common_fields: xrpl::models::transactions::CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: xrpl::models::transactions::TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: destination.classic_address.clone().into(),
+            credential_ids: Some(vec![credential_hash.into()]),
+            ..Default::default()
+        };
 
         test_transaction(&mut tx, &subject).await;
     })
