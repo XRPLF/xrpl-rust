@@ -29,6 +29,7 @@ mod tests {
             withdrawal_policy: Some(1),
             assets_maximum: Some(assets_maximum.into()),
             data: Some(hex::encode("initial metadata").to_uppercase().into()),
+            mptoken_metadata: Some(hex::encode("share metadata").to_uppercase().into()),
             ..Default::default()
         };
         test_transaction(&mut vault_create, owner).await;
@@ -42,8 +43,7 @@ mod tests {
     async fn test_vault_set_updates_assets_maximum() {
         with_blockchain_lock(|| async {
             let owner = generate_funded_wallet().await;
-            let vault_id =
-                create_xrp_vault_with_max(&owner, "9999900000000000000000000").await;
+            let vault_id = create_xrp_vault_with_max(&owner, "1000000000").await;
 
             let mut vault_set = VaultSet {
                 common_fields: CommonFields {
@@ -75,8 +75,7 @@ mod tests {
     async fn test_vault_set_updates_data() {
         with_blockchain_lock(|| async {
             let owner = generate_funded_wallet().await;
-            let vault_id =
-                create_xrp_vault_with_max(&owner, "9999900000000000000000000").await;
+            let vault_id = create_xrp_vault_with_max(&owner, "1000000000").await;
 
             let new_data = hex::encode("updated metadata").to_uppercase();
             let mut vault_set = VaultSet {
