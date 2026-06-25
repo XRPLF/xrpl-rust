@@ -193,13 +193,13 @@ impl<'a> From<f64> for Amount<'a> {
         let drops_bd = BigDecimal::from(XRP_DROPS);
         let result = value_bd * drops_bd;
 
-        Self::XRPAmount(result.to_string().into())
+        Self::XRPAmount(result.normalized().to_string().into())
     }
 }
 
 impl<'a> From<BigDecimal> for Amount<'a> {
     fn from(value: BigDecimal) -> Self {
-        Self::XRPAmount((value * XRP_DROPS).to_string().into())
+        Self::XRPAmount((value * XRP_DROPS).normalized().to_string().into())
     }
 }
 
