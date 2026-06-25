@@ -9,7 +9,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
     transactions::{Transaction, TransactionType},
-    Model, XRPLModelResult,
+    Model, XRPLModelException, XRPLModelResult,
 };
 
 use super::mptoken_issuance_set::{validate_holder_address, validate_mptoken_issuance_id};
@@ -77,6 +77,13 @@ impl<'a> Model for MPTokenAuthorize<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
         if let Some(holder) = self.holder.as_deref() {
+            if holder == self.common_fields.account.as_ref() {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "holder".into(),
+                    expected: "an account other than the transaction Account".into(),
+                    found: holder.into(),
+                });
+            }
             validate_holder_address(holder)?;
         }
         Ok(())
