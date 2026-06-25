@@ -1,12 +1,14 @@
-// xrpl.js reference: N/A (no dedicated PD integration test in xrpl.js yet)
+// xrpl.js reference: packages/xrpl/test/integration/transactions/permissionedDomain.test.ts
 // rippled reference: src/test/app/PermissionedDomains_test.cpp
 //
 // Scenarios:
 //   - base: create a new PermissionedDomain, verify tesSUCCESS
-//   - account_objects_filter: filter by type=permissioned_domain; verify exactly 1 object
-//   - ledger_entry_by_index: query domain by its ledger hash
+//   - account_objects_filter: filter by type=permissioned_domain; verify 1 object, Flags=0,
+//     non-empty AcceptedCredentials
+//   - ledger_entry_by_index: query domain by ledger hash; deep-equal vs account_objects node
 //   - ledger_entry_by_account_seq: query domain by owner account + sequence
 //   - update: replace credentials on existing domain (KYC → AML), verify KYC absent
+//   - delete: full lifecycle (Set → account_objects → Delete → verify gone)
 
 use crate::common::{
     constants::STANDALONE_URL, generate_funded_wallet, get_client, ledger_accept,
@@ -17,8 +19,13 @@ use xrpl::asynch::transaction::sign_and_submit;
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::requests::{CommonFields as RequestCommonFields, RequestMethod};
 use xrpl::models::results;
+use xrpl::models::transactions::permissioned_domain_delete::PermissionedDomainDelete;
 use xrpl::models::transactions::permissioned_domain_set::PermissionedDomainSet;
 use xrpl::models::transactions::{CommonFields, Credential, TransactionType};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ──────────────────────────────────────────────────────────────────────────────
 
 fn kyc_credential(issuer: &str) -> Credential {
     Credential {
@@ -77,6 +84,10 @@ async fn ledger_entry_by_account_seq(account: &str, seq: u64) -> serde_json::Val
     .await
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Tests
+// ──────────────────────────────────────────────────────────────────────────────
+
 #[tokio::test]
 async fn test_permissioned_domain_set_base() {
     with_blockchain_lock(|| async {
@@ -99,6 +110,7 @@ async fn test_permissioned_domain_set_base() {
     .await;
 }
 
+/// Mirrors xrpl.js step-2: account_objects filter, Flags=0, AcceptedCredentials non-empty.
 #[tokio::test]
 async fn test_permissioned_domain_account_objects_filter() {
     with_blockchain_lock(|| async {
@@ -151,6 +163,13 @@ async fn test_permissioned_domain_account_objects_filter() {
         assert_eq!(obj["LedgerEntryType"], "PermissionedDomain");
         assert_eq!(obj["Owner"], wallet.classic_address.as_str());
 
+        // xrpl.js parity: newly-created PD has Flags = 0
+        assert_eq!(
+            obj["Flags"].as_u64().unwrap_or(u64::MAX),
+            0,
+            "PermissionedDomain Flags should be 0"
+        );
+
         let creds = obj["AcceptedCredentials"]
             .as_array()
             .expect("AcceptedCredentials must be an array");
@@ -162,6 +181,7 @@ async fn test_permissioned_domain_account_objects_filter() {
     .await;
 }
 
+/// Mirrors xrpl.js step-3: ledger_entry by index deep-equals the account_objects node.
 #[tokio::test]
 async fn test_permissioned_domain_ledger_entry_by_index() {
     with_blockchain_lock(|| async {
@@ -180,7 +200,7 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
         assert_eq!(result.engine_result, "tesSUCCESS");
         ledger_accept().await;
 
-        // Get domain_id from account_objects
+        // Fetch domain via account_objects
         let ao_response = client
             .request(
                 AccountObjects {
@@ -208,13 +228,14 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
             "Expected 1 PermissionedDomain, got {}",
             ao.account_objects.len()
         );
-        let domain_id = ao.account_objects[0]["index"]
+        let pd_obj = &ao.account_objects[0];
+        let domain_id = pd_obj["index"]
             .as_str()
-            .or_else(|| ao.account_objects[0]["LedgerIndex"].as_str())
+            .or_else(|| pd_obj["LedgerIndex"].as_str())
             .expect("index/LedgerIndex field missing on account_objects[0]")
             .to_string();
 
-        // Query ledger_entry by index hash (raw RPC — typed client only handles AccountRoot)
+        // Fetch same domain via ledger_entry by index
         let entry = ledger_entry_by_index(&domain_id).await;
 
         assert_eq!(
@@ -226,6 +247,12 @@ async fn test_permissioned_domain_ledger_entry_by_index() {
             entry["node"]["Owner"],
             wallet.classic_address.as_str(),
             "Owner mismatch"
+        );
+
+        // xrpl.js parity: ledger_entry node must deep-equal the account_objects entry
+        assert_eq!(
+            &entry["node"], pd_obj,
+            "ledger_entry node must match account_objects[0]"
         );
     })
     .await;
@@ -398,6 +425,117 @@ async fn test_permissioned_domain_update_credentials() {
                     .eq_ignore_ascii_case("4B5943")
             }),
             "KYC credential should be absent after update to AML"
+        );
+    })
+    .await;
+}
+
+/// Full lifecycle: PDSet → account_objects (verify 1) → PDDelete → account_objects (verify 0).
+/// Mirrors xrpl.js step-3 (delete) in permissionedDomain.test.ts.
+#[tokio::test]
+async fn test_permissioned_domain_delete_base() {
+    with_blockchain_lock(|| async {
+        let client = get_client().await;
+        let wallet = generate_funded_wallet().await;
+
+        // Create the domain first
+        let mut set_tx = new_pd_set(
+            &wallet.classic_address,
+            None,
+            vec![kyc_credential(&wallet.classic_address)],
+        );
+        let set_result = sign_and_submit(&mut set_tx, client, &wallet, true, true)
+            .await
+            .expect("PermissionedDomainSet submission should not fail");
+
+        assert_eq!(
+            set_result.engine_result, "tesSUCCESS",
+            "PermissionedDomainSet must succeed before delete test: {}",
+            set_result.engine_result
+        );
+        ledger_accept().await;
+
+        let ao_response = client
+            .request(
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
+                .into(),
+            )
+            .await
+            .expect("account_objects request should succeed");
+        let account_objects: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("account_objects response should deserialize");
+
+        assert_eq!(
+            account_objects.account_objects.len(),
+            1,
+            "Expected 1 PermissionedDomain before delete"
+        );
+
+        let domain_id = account_objects.account_objects[0]["index"]
+            .as_str()
+            .or_else(|| account_objects.account_objects[0]["LedgerIndex"].as_str())
+            .expect("PermissionedDomain object should have an index field")
+            .to_string();
+
+        let mut delete_tx = PermissionedDomainDelete {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::PermissionedDomainDelete,
+                ..Default::default()
+            },
+            domain_id: domain_id.into(),
+        };
+
+        let delete_result = sign_and_submit(&mut delete_tx, client, &wallet, true, true)
+            .await
+            .expect("PermissionedDomainDelete submission should not fail");
+
+        assert_eq!(
+            delete_result.engine_result, "tesSUCCESS",
+            "PermissionedDomainDelete should succeed: {}",
+            delete_result.engine_result
+        );
+        ledger_accept().await;
+
+        // Verify domain is gone
+        let ao_after = client
+            .request(
+                AccountObjects {
+                    common_fields: RequestCommonFields {
+                        command: RequestMethod::AccountObjects,
+                        id: None,
+                    },
+                    account: wallet.classic_address.clone().into(),
+                    ledger_lookup: None,
+                    r#type: Some(AccountObjectType::PermissionedDomain),
+                    deletion_blockers_only: None,
+                    limit: None,
+                    marker: None,
+                }
+                .into(),
+            )
+            .await
+            .expect("account_objects after delete should succeed");
+        let ao_result: results::account_objects::AccountObjects<'_> = ao_after
+            .try_into()
+            .expect("account_objects after delete should deserialize");
+
+        assert_eq!(
+            ao_result.account_objects.len(),
+            0,
+            "PermissionedDomain should be absent after deletion"
         );
     })
     .await;
