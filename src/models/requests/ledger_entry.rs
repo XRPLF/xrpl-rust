@@ -180,31 +180,6 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "ticket",
             ]));
         }
-        if let Some(pd) = &self.permissioned_domain {
-            match pd {
-                PermissionedDomain::Index(id) => {
-                    if id.len() != 64
-                        || !id.chars().all(|c| c.is_ascii_hexdigit())
-                        || id.chars().all(|c| c == '0')
-                    {
-                        return Err(XRPLModelException::InvalidValue {
-                            field: "permissioned_domain.index".into(),
-                            expected: "non-zero 64-character hex string".into(),
-                            found: id.as_ref().into(),
-                        });
-                    }
-                }
-                PermissionedDomain::Object(obj) => {
-                    if !crate::core::addresscodec::is_valid_classic_address(&obj.account) {
-                        return Err(XRPLModelException::InvalidValue {
-                            field: "permissioned_domain.account".into(),
-                            expected: "valid classic XRPL address".into(),
-                            found: obj.account.as_ref().into(),
-                        });
-                    }
-                }
-            }
-        }
         Ok(())
     }
 }
