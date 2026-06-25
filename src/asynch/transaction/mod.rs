@@ -375,7 +375,7 @@ mod test_autofill {
             None,
         );
         let client = AsyncWebSocketClient::<SingleExecutorMutex, _>::open(
-            "wss://testnet.xrpl-labs.com/".parse().unwrap(),
+            "wss://s.altnet.rippletest.net:51233".parse().unwrap(),
         )
         .await
         .unwrap();
