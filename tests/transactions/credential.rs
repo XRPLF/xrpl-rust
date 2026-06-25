@@ -12,8 +12,8 @@
 //   9. expired credential → tecEXPIRED on create; CredentialAccept after expiry → tecEXPIRED
 
 use crate::common::{
-    generate_funded_wallet, get_client, get_ledger_close_time, submit_tx, test_transaction,
-    with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
+    generate_funded_wallet, get_client, get_ledger_close_time, provision_credential, submit_tx,
+    test_transaction, with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
@@ -368,28 +368,7 @@ async fn test_credential_accept_duplicate() {
         let issuer = generate_funded_wallet().await;
         let subject = generate_funded_wallet().await;
 
-        let mut create = CredentialCreate {
-            common_fields: CommonFields {
-                account: issuer.classic_address.clone().into(),
-                transaction_type: TransactionType::CredentialCreate,
-                ..Default::default()
-            },
-            subject: subject.classic_address.clone().into(),
-            credential_type: CREDENTIAL_TYPE.into(),
-            ..Default::default()
-        };
-        test_transaction(&mut create, &issuer).await;
-
-        let mut accept = CredentialAccept {
-            common_fields: CommonFields {
-                account: subject.classic_address.clone().into(),
-                transaction_type: TransactionType::CredentialAccept,
-                ..Default::default()
-            },
-            issuer: issuer.classic_address.clone().into(),
-            credential_type: CREDENTIAL_TYPE.into(),
-        };
-        test_transaction(&mut accept, &subject).await;
+        provision_credential(&issuer, &subject, CREDENTIAL_TYPE).await;
 
         // Second accept on an already-accepted credential must fail.
         let mut dup_accept = CredentialAccept {
@@ -444,8 +423,6 @@ async fn test_credential_create_with_uri() {
         test_transaction(&mut create, &issuer).await;
 
         // Verify URI is stored on the ledger object.
-        use xrpl::asynch::clients::XRPLAsyncClient;
-        use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
         let ao_resp = client
             .request(
                 AccountObjects::new(
@@ -490,7 +467,7 @@ async fn test_credential_expired_create_and_accept() {
 
         let close_time = get_ledger_close_time().await;
         // Expiration 2 seconds in the past (Ripple epoch seconds).
-        let past_expiration = (close_time - 2) as u32;
+        let past_expiration = close_time.saturating_sub(2) as u32;
 
         // CredentialCreate with past expiration → tecEXPIRED.
         let mut expired_create = CredentialCreate {

@@ -417,8 +417,8 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(200))]
 
         #[test]
-        fn prop_credential_type_valid_length(len in 1_usize..=128) {
-            let ct = "A".repeat(len);
+        fn prop_credential_type_valid_length(len in 1_usize..=64) {
+            let ct = "AB".repeat(len); // even-length hex pairs — valid encodable bytes
             let tx = CredentialCreate {
                 common_fields: CommonFields {
                     account: "rIssuer111111111111111111111111111".into(),
@@ -434,9 +434,9 @@ mod tests {
         }
 
         #[test]
-        fn prop_credential_type_too_long(extra in 1_usize..=200) {
-            let len = 128 + extra;
-            let ct = "A".repeat(len);
+        fn prop_credential_type_too_long(extra in 1_usize..=100) {
+            let len = 64 + extra; // "AB".repeat(64) = 128 chars (max); exceed that
+            let ct = "AB".repeat(len);
             let tx = CredentialCreate {
                 common_fields: CommonFields {
                     account: "rIssuer111111111111111111111111111".into(),
