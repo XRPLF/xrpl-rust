@@ -385,8 +385,12 @@ pub async fn create_transferable_mptoken_issuance(wallet: &Wallet) -> String {
     hex::encode_upper(&id_bytes)
 }
 
-/// Parameters for [`submit_tx`] — use struct literal syntax so each argument
-/// is self-documenting at call sites.
+/// Parameters for [`submit_tx`].
+///
+/// Use when asserting a specific non-success `engine_result` (tec/tem codes).
+/// For `tesSUCCESS` paths use [`test_transaction`] instead.
+///
+/// Use struct literal syntax so each argument is self-documenting at call sites.
 #[cfg(feature = "std")]
 pub struct SubmitOptions<'w> {
     pub wallet: &'w Wallet,

@@ -295,7 +295,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("740".to_string()), // hex: 1856 decimal,
                 scale: Some(1),
             }],
         };
@@ -370,13 +370,13 @@ mod tests {
             PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("740".to_string()), // hex: 1856 decimal,
                 scale: Some(1),
             },
             PriceData {
                 base_asset: "BTC".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("2600000".to_string()),
+                asset_price: Some("2600000".to_string()), // hex: 39845888 decimal,
                 scale: Some(2),
             },
         ];
@@ -443,7 +443,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("2E4".to_string()),
+                asset_price: Some("2E4".to_string()), // hex: 740 decimal,
                 scale: Some(1),
             }],
         };
@@ -556,7 +556,7 @@ mod tests {
             .map(|i| PriceData {
                 base_asset: alloc::format!("A{i:02}"),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             })
             .collect();
@@ -580,7 +580,7 @@ mod tests {
             .map(|i| PriceData {
                 base_asset: alloc::format!("A{i:02}"),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             })
             .collect();
@@ -620,7 +620,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(21),
         }]);
 
@@ -649,7 +649,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(20),
         }]);
 
@@ -670,7 +670,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(15),
         }]);
 
@@ -690,7 +690,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: None,
         }]);
 
@@ -714,7 +714,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EURO".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(1),
         }]);
 
@@ -739,7 +739,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(1),
         }]);
 
@@ -760,7 +760,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "0000000000000000000000005553440000000000".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(0),
         }]);
 
@@ -779,7 +779,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             }],
             ..Default::default()
@@ -804,7 +804,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             }],
             ..Default::default()
@@ -883,7 +883,7 @@ mod tests {
                     price_data_series: vec![PriceData {
                         base_asset: "XRP".to_string(),
                         quote_asset: "USD".to_string(),
-                        asset_price: Some("100".to_string()),
+                        asset_price: Some("100".to_string()), // hex: 256 decimal,
                         scale: Some(1),
                     }],
                     ..Default::default()
@@ -901,7 +901,7 @@ mod tests {
                     price_data_series: vec![PriceData {
                         base_asset: "XRP".to_string(),
                         quote_asset: "USD".to_string(),
-                        asset_price: Some("100".to_string()),
+                        asset_price: Some("100".to_string()), // hex: 256 decimal,
                         scale: Some(1),
                     }],
                     ..Default::default()
@@ -919,7 +919,7 @@ mod tests {
                     price_data_series: vec![PriceData {
                         base_asset: "XRP".to_string(),
                         quote_asset: "USD".to_string(),
-                        asset_price: Some("100".to_string()),
+                        asset_price: Some("100".to_string()), // hex: 256 decimal,
                         scale: Some(1),
                     }],
                     ..Default::default()
@@ -950,7 +950,7 @@ mod tests {
             PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             },
             PriceData {
@@ -980,7 +980,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "XRP".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(1),
         }]);
 

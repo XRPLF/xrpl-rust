@@ -599,6 +599,8 @@ pub struct PriceData {
     /// The token pair's price. When omitted on an OracleSet update, rippled
     /// deletes the existing price data entry for this base/quote pair.
     pub asset_price: Option<String>,
+    /// Decimal scale factor. Actual price = asset_price × 10^(−scale). Range 0–20.
+    /// Must be present when asset_price is present, and absent when asset_price is absent.
     pub scale: Option<u8>,
 }
 }

@@ -553,3 +553,38 @@ async fn test_oracle_set_uri_max_byte_boundary() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn test_oracle_set_rejects_scale_above_20() {
+    with_blockchain_lock(|| async {
+        let wallet = generate_funded_wallet().await;
+        let last_update_time = u32::try_from(get_ledger_close_time().await + 946_684_800)
+            .expect("LastUpdateTime overflows u32");
+
+        // scale = 21 exceeds the MAX_PRICE_DATA_SCALE = 20 limit.
+        // The model-level validator must reject this before it reaches rippled.
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: wallet.classic_address.clone().into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            oracle_document_id: 1,
+            provider: Some(ORACLE_PROVIDER.into()),
+            asset_class: Some(ORACLE_ASSET_CLASS.into()),
+            last_update_time,
+            price_data_series: vec![PriceData {
+                base_asset: "XRP".into(),
+                quote_asset: "USD".into(),
+                asset_price: Some("100".into()), // hex: 256 decimal
+                scale: Some(21),                 // over MAX_PRICE_DATA_SCALE (20)
+            }],
+            uri: None,
+        };
+        assert!(
+            oracle_set.get_errors().is_err(),
+            "expected model validation to reject scale = 21"
+        );
+    })
+    .await;
+}

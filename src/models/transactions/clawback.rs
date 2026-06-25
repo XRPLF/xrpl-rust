@@ -606,4 +606,30 @@ mod tests {
         };
         assert!(clawback.get_errors().is_err());
     }
+
+    #[test]
+    fn test_clawback_mpt_rejects_malformed_issuance_id() {
+        // mpt_issuance_id must be 48 hex chars (192-bit Hash192). This is only
+        // 8 chars — MPTAmount::get_errors() must reject it via _get_amount_error().
+        let account = ACCOUNT_HOLDER_2;
+        let holder = ACCOUNT_HOLDER;
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount: Amount::MPTAmount(crate::models::amount::MPTAmount::new(
+                "100".into(),
+                "DEADBEEF".into(), // too short — not a valid Hash192
+            )),
+            holder: Some(holder.into()),
+        };
+        assert!(
+            clawback.get_errors().is_err(),
+            "expected get_errors() to fail for malformed mpt_issuance_id"
+        );
+    }
 }
