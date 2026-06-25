@@ -267,10 +267,11 @@ impl Amount {
         self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
-    /// Returns true if 2nd bit in 1st byte is set to 1
-    /// (positive amount).
+    /// Returns true if bit 6 of the first byte is set (positive amount).
+    /// Applies to XRP, IOU, and MPT amounts — the positive flag is always
+    /// encoded in byte[0] bit 6 (0x40) of the serialized amount.
     pub fn is_positive(&self) -> bool {
-        self.0[1] & 0x40 > 0
+        self.0[0] & 0x40 > 0
     }
 }
 
