@@ -457,12 +457,12 @@ impl TryFrom<serde_json::Value> for Amount {
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
                 let serialized = _serialize_mpt_amount(val, mpt_id)?;
                 Ok(Amount::new(Some(&serialized))?)
-            } else if obj.len() == 3
-                && obj.contains_key("currency")
+            } else if obj.contains_key("currency")
                 && obj.contains_key("issuer")
                 && obj.contains_key("value")
             {
-                // ICA: exactly the keys {"currency", "issuer", "value"}.
+                // ICA: must have {"currency", "issuer", "value"}; extra keys (e.g.
+                // "counterparty") are allowed and ignored per the XRPL amount spec.
                 Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
             } else {
                 Err(XRPLCoreException::SerdeJsonError(
