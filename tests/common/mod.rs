@@ -384,3 +384,38 @@ pub async fn create_transferable_mptoken_issuance(wallet: &Wallet) -> String {
     id_bytes.extend_from_slice(&account_id);
     hex::encode_upper(&id_bytes)
 }
+
+/// Parameters for [`submit_tx`] — use struct literal syntax so each argument
+/// is self-documenting at call sites.
+#[cfg(feature = "std")]
+pub struct SubmitOptions<'w> {
+    pub wallet: &'w Wallet,
+    /// Auto-fill sequence, fee, and other transaction fields before signing.
+    pub autofill: bool,
+    /// Validate that the fee satisfies the network's minimum requirement.
+    pub check_fee: bool,
+}
+
+/// Submit a transaction without asserting success. Returns the raw
+/// `engine_result` string so callers can assert specific `tec`/`tem` codes.
+///
+/// Use [`test_transaction`] instead when you expect `tesSUCCESS`.
+#[cfg(feature = "std")]
+pub async fn submit_tx<'a, T, F>(tx: &mut T, opts: SubmitOptions<'_>) -> String
+where
+    T: xrpl::models::transactions::Transaction<'a, F>
+        + xrpl::models::Model
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Clone
+        + core::fmt::Debug,
+    F: strum::IntoEnumIterator + serde::Serialize + core::fmt::Debug + PartialEq + Clone + 'a,
+{
+    use xrpl::asynch::transaction::sign_and_submit;
+    let client = get_client().await;
+    sign_and_submit(tx, client, opts.wallet, opts.autofill, opts.check_fee)
+        .await
+        .expect("submit_tx: sign_and_submit failed")
+        .engine_result
+        .to_string()
+}

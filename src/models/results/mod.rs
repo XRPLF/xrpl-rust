@@ -14,6 +14,7 @@ pub mod deposit_authorize;
 pub mod exceptions;
 pub mod fee;
 pub mod gateway_balances;
+pub mod get_aggregate_price;
 pub mod ledger;
 pub mod ledger_closed;
 pub mod ledger_current;
@@ -130,6 +131,7 @@ pub enum XRPLResult<'a> {
     DepositAuthorized(deposit_authorize::DepositAuthorized<'a>),
     Fee(fee::Fee<'a>),
     GatewayBalances(gateway_balances::GatewayBalances<'a>),
+    GetAggregatePrice(get_aggregate_price::GetAggregatePrice<'a>),
     Ledger(ledger::Ledger<'a>),
     LedgerClosed(ledger_closed::LedgerClosed<'a>),
     LedgerCurrent(ledger_current::LedgerCurrent<'a>),
@@ -182,6 +184,7 @@ impl_from_result!(channel_verify, ChannelVerify);
 impl_from_result!(deposit_authorize, DepositAuthorized);
 impl_from_result!(fee, Fee);
 impl_from_result!(gateway_balances, GatewayBalances);
+impl_from_result!(get_aggregate_price, GetAggregatePrice);
 impl_from_result!(ledger, Ledger);
 impl_from_result!(ledger_closed, LedgerClosed);
 impl_from_result!(ledger_current, LedgerCurrent);
@@ -276,6 +279,7 @@ impl_try_from_result!(channel_verify, ChannelVerify, ChannelVerify);
 impl_try_from_result!(deposit_authorize, DepositAuthorized, DepositAuthorized);
 impl_try_from_result!(fee, Fee, Fee);
 impl_try_from_result!(gateway_balances, GatewayBalances, GatewayBalances);
+impl_try_from_result!(get_aggregate_price, GetAggregatePrice, GetAggregatePrice);
 impl_try_from_result!(ledger, Ledger, Ledger);
 impl_try_from_result!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_result!(ledger_current, LedgerCurrent, LedgerCurrent);
@@ -473,6 +477,7 @@ impl XRPLResult<'_> {
             XRPLResult::DepositAuthorized(_) => "DepositAuthorized".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
             XRPLResult::GatewayBalances(_) => "GatewayBalances".to_string(),
+            XRPLResult::GetAggregatePrice(_) => "GetAggregatePrice".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
             XRPLResult::LedgerClosed(_) => "LedgerClosed".to_string(),
             XRPLResult::LedgerCurrent(_) => "LedgerCurrent".to_string(),
@@ -617,6 +622,7 @@ impl_try_from_response!(channel_verify, ChannelVerify, ChannelVerify);
 impl_try_from_response!(deposit_authorize, DepositAuthorized, DepositAuthorized);
 impl_try_from_response!(fee, Fee, Fee);
 impl_try_from_response!(gateway_balances, GatewayBalances, GatewayBalances);
+impl_try_from_response!(get_aggregate_price, GetAggregatePrice, GetAggregatePrice);
 impl_try_from_response!(ledger, Ledger, Ledger);
 impl_try_from_response!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_response!(ledger_current, LedgerCurrent, LedgerCurrent);

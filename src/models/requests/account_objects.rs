@@ -17,6 +17,7 @@ pub enum AccountObjectType {
     DepositPreauth,
     Escrow,
     Offer,
+    Oracle,
     PaymentChannel,
     SignerList,
     State,
