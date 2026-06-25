@@ -6,9 +6,14 @@
 //   3. delete by subject before accept
 //   4. delete by issuer before accept
 //   5. verify lsfAccepted flag set on Credential ledger object after accept
+//   6. duplicate CredentialCreate → tecDUPLICATE
+//   7. double CredentialAccept → tecDUPLICATE
+//   8. CredentialCreate with uri field — uri stored on ledger object
+//   9. expired credential → tecEXPIRED on create; CredentialAccept after expiry → tecEXPIRED
 
 use crate::common::{
-    generate_funded_wallet, get_client, test_transaction, with_blockchain_lock, CREDENTIAL_TYPE_KYC,
+    generate_funded_wallet, get_client, get_ledger_close_time, submit_tx, test_transaction,
+    with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
@@ -303,6 +308,258 @@ async fn test_credential_lsf_accepted_set_after_accept() {
             credential_type: CREDENTIAL_TYPE.into(),
         };
         test_transaction(&mut delete, &issuer).await;
+    })
+    .await;
+}
+
+// ── 6. Duplicate CredentialCreate → tecDUPLICATE ────────────────────────────
+
+#[tokio::test]
+async fn test_credential_create_duplicate() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+
+        let mut create = CredentialCreate {
+            common_fields: CommonFields {
+                account: issuer.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: subject.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+            ..Default::default()
+        };
+        test_transaction(&mut create, &issuer).await;
+
+        // Second create with same issuer/subject/type must be rejected.
+        let mut dup = CredentialCreate {
+            common_fields: CommonFields {
+                account: issuer.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: subject.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+            ..Default::default()
+        };
+        let result = submit_tx(
+            &mut dup,
+            SubmitOptions {
+                wallet: &issuer,
+                autofill: true,
+                check_fee: true,
+            },
+        )
+        .await;
+        assert_eq!(
+            result, "tecDUPLICATE",
+            "duplicate CredentialCreate should return tecDUPLICATE"
+        );
+    })
+    .await;
+}
+
+// ── 7. Double CredentialAccept → tecDUPLICATE ───────────────────────────────
+
+#[tokio::test]
+async fn test_credential_accept_duplicate() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+
+        let mut create = CredentialCreate {
+            common_fields: CommonFields {
+                account: issuer.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: subject.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+            ..Default::default()
+        };
+        test_transaction(&mut create, &issuer).await;
+
+        let mut accept = CredentialAccept {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: issuer.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+        };
+        test_transaction(&mut accept, &subject).await;
+
+        // Second accept on an already-accepted credential must fail.
+        let mut dup_accept = CredentialAccept {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: issuer.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+        };
+        let result = submit_tx(
+            &mut dup_accept,
+            SubmitOptions {
+                wallet: &subject,
+                autofill: true,
+                check_fee: true,
+            },
+        )
+        .await;
+        assert_eq!(
+            result, "tecDUPLICATE",
+            "second CredentialAccept should return tecDUPLICATE"
+        );
+    })
+    .await;
+}
+
+// ── 8. CredentialCreate with uri field ──────────────────────────────────────
+
+#[tokio::test]
+async fn test_credential_create_with_uri() {
+    with_blockchain_lock(|| async {
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+        let client = get_client().await;
+
+        // "https://example.com/credential" hex-encoded
+        let uri_hex = "68747470733a2f2f6578616d706c652e636f6d2f63726564656e7469616c";
+
+        let mut create = CredentialCreate {
+            common_fields: CommonFields {
+                account: issuer.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: subject.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+            uri: Some(uri_hex.into()),
+            ..Default::default()
+        };
+        test_transaction(&mut create, &issuer).await;
+
+        // Verify URI is stored on the ledger object.
+        use xrpl::asynch::clients::XRPLAsyncClient;
+        use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
+        let ao_resp = client
+            .request(
+                AccountObjects::new(
+                    None,
+                    subject.classic_address.clone().into(),
+                    None,
+                    None,
+                    Some(AccountObjectType::Credential),
+                    None,
+                    None,
+                    None,
+                )
+                .into(),
+            )
+            .await
+            .expect("account_objects request failed");
+        let ao_result: results::account_objects::AccountObjects<'_> =
+            ao_resp.try_into().expect("parse account_objects");
+
+        assert!(!ao_result.account_objects.is_empty());
+        let stored_uri = ao_result.account_objects[0]["URI"]
+            .as_str()
+            .expect("URI field missing on credential object");
+        assert_eq!(
+            stored_uri.to_uppercase(),
+            uri_hex.to_uppercase(),
+            "URI on ledger object should match what was provided at create"
+        );
+    })
+    .await;
+}
+
+// ── 9. Expired credential edge cases ────────────────────────────────────────
+
+#[tokio::test]
+async fn test_credential_expired_create_and_accept() {
+    with_blockchain_lock(|| async {
+        use crate::common::{ledger_accept, wait_for_ledger_close_time};
+
+        let issuer = generate_funded_wallet().await;
+        let subject = generate_funded_wallet().await;
+
+        let close_time = get_ledger_close_time().await;
+        // Expiration 2 seconds in the past (Ripple epoch seconds).
+        let past_expiration = (close_time - 2) as u32;
+
+        // CredentialCreate with past expiration → tecEXPIRED.
+        let mut expired_create = CredentialCreate {
+            common_fields: CommonFields {
+                account: issuer.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: subject.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+            expiration: Some(past_expiration),
+            ..Default::default()
+        };
+        let result = submit_tx(
+            &mut expired_create,
+            SubmitOptions {
+                wallet: &issuer,
+                autofill: true,
+                check_fee: true,
+            },
+        )
+        .await;
+        assert_eq!(
+            result, "tecEXPIRED",
+            "CredentialCreate with past expiration should return tecEXPIRED"
+        );
+
+        // Create a valid (future-expiring) credential, let it expire, then try to accept.
+        let future_expiration = (close_time + 2) as u32;
+        let mut valid_create = CredentialCreate {
+            common_fields: CommonFields {
+                account: issuer.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: subject.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+            expiration: Some(future_expiration),
+            ..Default::default()
+        };
+        test_transaction(&mut valid_create, &issuer).await;
+
+        // Advance time past expiration.
+        wait_for_ledger_close_time(future_expiration as u64 + 1).await;
+        ledger_accept().await;
+
+        // CredentialAccept after expiry → tecEXPIRED.
+        let mut expired_accept = CredentialAccept {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::CredentialAccept,
+                ..Default::default()
+            },
+            issuer: issuer.classic_address.clone().into(),
+            credential_type: CREDENTIAL_TYPE.into(),
+        };
+        let accept_result = submit_tx(
+            &mut expired_accept,
+            SubmitOptions {
+                wallet: &subject,
+                autofill: true,
+                check_fee: true,
+            },
+        )
+        .await;
+        assert_eq!(
+            accept_result, "tecEXPIRED",
+            "CredentialAccept after expiry should return tecEXPIRED"
+        );
     })
     .await;
 }
