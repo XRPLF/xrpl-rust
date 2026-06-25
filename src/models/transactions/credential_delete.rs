@@ -322,14 +322,14 @@ mod tests {
             },
             subject: Some("rSubject11111111111111111111111111".into()),
             issuer: None,
-            credential_type: "NOT_HEX".into(),
+            credential_type: "NOTHEX".into(),
         };
         assert_eq!(
             tx.get_errors().unwrap_err(),
             XRPLModelException::InvalidValueFormat {
                 field: "credential_type".into(),
                 format: "hexadecimal".into(),
-                found: "NOT_HEX".into(),
+                found: "NOTHEX".into(),
             }
         );
     }
@@ -445,7 +445,7 @@ mod tests {
 
         #[test]
         fn prop_serde_roundtrip(
-            ct in "[0-9A-F]{2,64}",
+            ct in "([0-9A-F]{2}){1,64}", // even-length only: 2, 4, ..., 128 hex chars
             has_subject in proptest::bool::ANY,
             has_issuer in proptest::bool::ANY,
         ) {
