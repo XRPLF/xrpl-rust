@@ -40,8 +40,6 @@ pub struct State<'a> {
     pub peer_disconnects: Option<Cow<'a, str>>,
     /// Count of resource-related peer disconnections
     pub peer_disconnects_resources: Option<Cow<'a, str>>,
-    /// The network ID of the server's network
-    pub network_id: Option<u32>,
     /// Number of other rippled servers currently connected
     pub peers: Option<u32>,
     /// Public key used for peer-to-peer communications
@@ -62,6 +60,8 @@ pub struct State<'a> {
     pub validation_quorum: Option<u32>,
     /// List of ports where the server is listening for API commands
     pub ports: Option<Cow<'a, [PortDescriptor<'a>]>>,
+    /// The network ID of the chain. Present on networks with ID >= 1025.
+    pub network_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

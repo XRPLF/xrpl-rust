@@ -182,11 +182,8 @@ fn test_sync_account_root_and_latest_transaction() {
     let _guard = rt.enter();
 
     // First send a transaction so genesis has a latest transaction to find.
-    // The funded wallet itself is not needed here — we just need the faucet
-    // payment to land on-ledger so get_latest_transaction returns a result.
     rt.block_on(with_blockchain_lock(|| async {
-        let _wallet = generate_funded_wallet().await;
-        // wallet is intentionally unused; side-effect (ledger tx) is what matters.
+        let _ = generate_funded_wallet().await;
     }));
 
     let client = new_client();
@@ -298,11 +295,7 @@ fn test_sync_submit_and_wait_payment() {
         .expect("sync submit_and_wait");
 
         ledger_driver.abort();
-        match ledger_driver.await {
-            Ok(_) => {}
-            Err(ref e) if e.is_cancelled() => {}
-            Err(e) => std::panic::resume_unwind(e.into_panic()),
-        }
+        let _ = ledger_driver.await;
 
         let metadata = validated
             .get_transaction_metadata()

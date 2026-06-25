@@ -12,16 +12,7 @@ pub const GENESIS_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
 /// HTTP JSON-RPC endpoint for local Docker standalone rippled.
 pub const STANDALONE_URL: &str = "http://localhost:5005";
 
-// ---------------------------------------------------------------------------
-// Oracle / XLS-47 test fixtures
-// ---------------------------------------------------------------------------
-
-/// Reusable test account (funded via faucet in integration tests).
-pub const TEST_ACCOUNT: &str = "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW";
-
-/// "chainlink" ASCII hex-encoded.
-/// Provider and similar Blob fields must be hex; plain ASCII is rejected by
-/// the binary codec with `TryFromStrError`.
+/// "chainlink" ASCII hex-encoded (Provider Blob field).
 pub const ORACLE_PROVIDER: &str = "636861696E6C696E6B";
 
 /// "currency" ASCII hex-encoded (AssetClass Blob field).

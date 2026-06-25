@@ -17,8 +17,7 @@ use crate::core::keypairs::utils::*;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
-use rand::Rng;
-use rand::SeedableRng;
+use rand::{rngs::OsRng, Rng};
 
 use super::exceptions::XRPLCoreResult;
 
@@ -105,7 +104,7 @@ pub fn generate_seed(
     if let Some(value) = entropy {
         random_bytes = value;
     } else {
-        let mut rng = rand_hc::Hc128Rng::from_entropy();
+        let mut rng = OsRng;
         rng.fill(&mut random_bytes);
     }
 

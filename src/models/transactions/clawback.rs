@@ -14,13 +14,14 @@ use crate::models::{
 use crate::models::{FlagCollection, NoFlags};
 
 use super::exceptions::XRPLClawbackException;
+use super::mptoken_issuance_set::validate_holder_address;
 use super::{CommonTransactionBuilder, Memo, Signer};
 
-/// Claw back tokens from a token holder.
+/// Claws back issued currency amount or MPT issued by the sender.
 ///
-/// The issuer can only claw back issued tokens if the issuer has set
-/// the `asfAllowTrustLineClawback` flag on their account using an
-/// AccountSet transaction.
+/// For IssuedCurrencyAmount: `amount.issuer` must be the token holder's address
+/// and `Holder` must be absent.
+/// For MPTAmount: `Holder` must be present and must not equal `Account`.
 ///
 /// See Clawback:
 /// `<https://xrpl.org/docs/references/protocol/transactions/types/clawback>`
@@ -43,13 +44,12 @@ pub struct Clawback<'a> {
     /// `<https://xrpl.org/transaction-common-fields.html>`
     #[serde(flatten)]
     pub common_fields: CommonFields<'a, NoFlags>,
-    /// The amount of currency to claw back. For fungible tokens, the `issuer`
-    /// field of the Amount object is the token holder's address (the account
-    /// from which tokens are being clawed back).
+    /// The amount to claw back. Must be IssuedCurrencyAmount or MPTAmount (not XRP).
+    /// For ICA: `amount.issuer` must be the holder's address.
+    /// For MPT: supply the `holder` field instead.
     pub amount: Amount<'a>,
-    /// For MPT (Multi-Purpose Token) clawback only. The address of the token
-    /// holder from which tokens should be clawed back. Must not be present
-    /// for standard issued-currency clawback.
+    /// (MPT only) The account to claw back from. Required when `amount` is
+    /// MPTAmount; must not equal the transaction `account`.
     pub holder: Option<Cow<'a, str>>,
 }
 
@@ -59,23 +59,33 @@ pub trait ClawbackError {
 }
 
 impl<'a> ClawbackError for Clawback<'a> {
-    /// Validate that the Amount is not XRP.
     fn _get_amount_error(&self) -> crate::models::XRPLModelResult<()> {
         if self.amount.is_xrp() {
-            Err(XRPLClawbackException::AmountMustNotBeXRP.into())
-        } else {
-            Ok(())
+            return Err(XRPLClawbackException::AmountMustNotBeXRP.into());
         }
+        self.amount.get_errors()
     }
 
-    /// Validate that the Holder field is not present for standard IOU clawback.
     fn _get_holder_error(&self) -> crate::models::XRPLModelResult<()> {
-        if let Amount::IssuedCurrencyAmount(_) = &self.amount {
-            if self.holder.is_some() {
-                return Err(XRPLClawbackException::HolderMustNotBePresentForIOU.into());
+        match &self.amount {
+            Amount::IssuedCurrencyAmount(ica) => {
+                if self.common_fields.account == ica.issuer {
+                    return Err(XRPLClawbackException::IssuerMustNotEqualAccount.into());
+                }
+                if self.holder.is_some() {
+                    return Err(XRPLClawbackException::HolderMustNotBePresentForIOU.into());
+                }
+                Ok(())
             }
+            Amount::MPTAmount(_) => match &self.holder {
+                None => Err(XRPLClawbackException::HolderRequiredForMPT.into()),
+                Some(holder) if holder.as_ref() == self.common_fields.account.as_ref() => {
+                    Err(XRPLClawbackException::HolderMustNotEqualAccount.into())
+                }
+                Some(holder) => validate_holder_address(holder.as_ref()),
+            },
+            Amount::XRPAmount(_) => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -157,6 +167,7 @@ impl<'a> Clawback<'a> {
 mod tests {
     use super::*;
     use crate::models::amount::IssuedCurrencyAmount;
+    use crate::utils::testing::test_constants::*;
 
     #[test]
     fn test_serde() {
@@ -446,9 +457,6 @@ mod tests {
             holder: None,
         };
 
-        // Route explicitly through the `Transaction` trait. `get_mut_common_fields`
-        // is also defined on `CommonTransactionBuilder`, so the fully-qualified
-        // call disambiguates which impl is exercised.
         assert_eq!(
             Transaction::get_transaction_type(&clawback),
             &TransactionType::Clawback
@@ -461,5 +469,167 @@ mod tests {
         let common_mut = Transaction::get_mut_common_fields(&mut clawback);
         common_mut.sequence = Some(42);
         assert_eq!(clawback.common_fields.sequence, Some(42));
+    }
+
+    #[test]
+    fn test_clawback_ica_valid_holder_differs_from_account() {
+        let account = ACCOUNT_HOLDER;
+        let holder = ACCOUNT_HOLDER_2;
+        let amount =
+            Amount::IssuedCurrencyAmount(crate::models::amount::IssuedCurrencyAmount::new(
+                "USD".into(),
+                holder.into(),
+                "100".into(),
+            ));
+
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount,
+            holder: None,
+        };
+
+        assert!(clawback.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_clawback_ica_rejects_self_clawback() {
+        let account = ACCOUNT_HOLDER;
+        let amount =
+            Amount::IssuedCurrencyAmount(crate::models::amount::IssuedCurrencyAmount::new(
+                "USD".into(),
+                account.into(),
+                "100".into(),
+            ));
+
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount,
+            holder: None,
+        };
+
+        assert!(clawback.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_clawback_mpt_valid() {
+        let account = ACCOUNT_HOLDER;
+        let holder = ACCOUNT_HOLDER_2;
+        let amount = Amount::MPTAmount(crate::models::amount::MPTAmount::new(
+            "100".into(),
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+        ));
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount,
+            holder: Some(holder.into()),
+        };
+        assert!(clawback.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_clawback_mpt_missing_holder() {
+        let account = ACCOUNT_HOLDER;
+        let amount = Amount::MPTAmount(crate::models::amount::MPTAmount::new(
+            "100".into(),
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+        ));
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount,
+            holder: None,
+        };
+        assert!(clawback.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_clawback_mpt_holder_equals_account() {
+        let account = ACCOUNT_HOLDER;
+        let amount = Amount::MPTAmount(crate::models::amount::MPTAmount::new(
+            "100".into(),
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+        ));
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount,
+            holder: Some(account.into()),
+        };
+        assert!(clawback.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_clawback_mpt_invalid_holder_address() {
+        let account = ACCOUNT_HOLDER;
+        let amount = Amount::MPTAmount(crate::models::amount::MPTAmount::new(
+            "100".into(),
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+        ));
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount,
+            holder: Some("not-a-valid-xrpl-address".into()),
+        };
+        assert!(clawback.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_clawback_mpt_rejects_malformed_issuance_id() {
+        // mpt_issuance_id must be 48 hex chars (192-bit Hash192). This is only
+        // 8 chars — MPTAmount::get_errors() must reject it via _get_amount_error().
+        let account = ACCOUNT_HOLDER_2;
+        let holder = ACCOUNT_HOLDER;
+        let clawback = Clawback {
+            common_fields: CommonFields {
+                account: account.into(),
+                transaction_type: TransactionType::Clawback,
+                fee: Some("12".into()),
+                sequence: Some(1),
+                ..Default::default()
+            },
+            amount: Amount::MPTAmount(crate::models::amount::MPTAmount::new(
+                "100".into(),
+                "DEADBEEF".into(), // too short — not a valid Hash192
+            )),
+            holder: Some(holder.into()),
+        };
+        assert!(
+            clawback.get_errors().is_err(),
+            "expected get_errors() to fail for malformed mpt_issuance_id"
+        );
     }
 }

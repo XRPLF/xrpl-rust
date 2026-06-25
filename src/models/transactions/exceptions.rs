@@ -10,6 +10,8 @@ pub enum XRPLTransactionException {
     #[error("{0}")]
     XRPLAccountSetError(#[from] XRPLAccountSetException),
     #[error("{0}")]
+    XRPLClawbackError(#[from] XRPLClawbackException),
+    #[error("{0}")]
     XRPLNFTokenCancelOfferError(#[from] XRPLNFTokenCancelOfferException),
     #[error("{0}")]
     XRPLNFTokenCreateOfferError(#[from] XRPLNFTokenCreateOfferException),
@@ -27,8 +29,6 @@ pub enum XRPLTransactionException {
     XRPLXChainModifyBridgeError(#[from] XRPLXChainModifyBridgeException),
     #[error("{0}")]
     XRPLAMMCreateError(#[from] XRPLAMMCreateException),
-    #[error("{0}")]
-    XRPLClawbackError(#[from] XRPLClawbackException),
     #[error("{0}")]
     XRPLCoreError(#[from] XRPLCoreException),
     #[error("The transaction must be signed")]
@@ -218,12 +218,19 @@ pub enum XRPLAMMCreateException {
 impl alloc::error::Error for XRPLAMMCreateException {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-#[non_exhaustive]
 pub enum XRPLClawbackException {
     #[error("Clawback amount must not be XRP — only issued currencies can be clawed back")]
     AmountMustNotBeXRP,
     #[error("The `holder` field must not be present for standard issued-currency (IOU) clawback")]
     HolderMustNotBePresentForIOU,
+    #[error(
+        "For IOU clawback, `amount.issuer` must be the holder's address and must differ from `Account`"
+    )]
+    IssuerMustNotEqualAccount,
+    #[error("The `holder` field is required for MPT clawback")]
+    HolderRequiredForMPT,
+    #[error("The `holder` field must not equal the transaction `Account` (no self-clawback)")]
+    HolderMustNotEqualAccount,
 }
 
 #[cfg(feature = "std")]

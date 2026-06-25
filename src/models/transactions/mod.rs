@@ -16,6 +16,10 @@ pub mod escrow_create;
 pub mod escrow_finish;
 pub mod exceptions;
 pub mod metadata;
+pub mod mptoken_authorize;
+pub mod mptoken_issuance_create;
+pub mod mptoken_issuance_destroy;
+pub mod mptoken_issuance_set;
 pub mod nftoken_accept_offer;
 pub mod nftoken_burn;
 pub mod nftoken_cancel_offer;
@@ -84,6 +88,10 @@ pub enum TransactionType {
     EscrowCancel,
     EscrowCreate,
     EscrowFinish,
+    MPTokenAuthorize,
+    MPTokenIssuanceCreate,
+    MPTokenIssuanceDestroy,
+    MPTokenIssuanceSet,
     NFTokenAcceptOffer,
     NFTokenBurn,
     NFTokenCancelOffer,
@@ -591,14 +599,13 @@ pub struct PriceData {
     /// The token pair's price. When omitted on an OracleSet update, rippled
     /// deletes the existing price data entry for this base/quote pair.
     pub asset_price: Option<String>,
+    /// Decimal scale factor. Actual price = asset_price × 10^(−scale). Range 0–20.
+    /// Must be present when asset_price is present, and absent when asset_price is absent.
     pub scale: Option<u8>,
 }
 }
 
 /// Maximum allowed value for the `scale` field of a `PriceData` entry.
-///
-/// Per rippled (`kMaxPriceScale` in `Protocol.h`), `scale` must be in the
-/// inclusive range `0..=20`.
 pub const MAX_PRICE_DATA_SCALE: u8 = 20;
 
 impl crate::models::Model for PriceData {
@@ -631,17 +638,8 @@ impl crate::models::Model for PriceData {
 }
 
 /// Maximum allowed value for `AssetPrice`.
-///
-/// `AssetPrice` is a `UInt64` field; the full unsigned 64-bit range
-/// (`0x0000000000000000..=0xFFFFFFFFFFFFFFFF`) is valid. rippled does not
-/// impose an upper-bound smaller than `u64::MAX` (`kMaxPriceScale` only
-/// governs Scale, not AssetPrice).
 pub const MAX_ORACLE_ASSET_PRICE: u64 = u64::MAX;
 
-/// Validate a currency code used in a `PriceData` entry.
-///
-/// Accepts either a 3-character ISO-style code (uppercase letters and digits,
-/// including `"XRP"`) or a 40-character hex code.
 fn validate_oracle_currency(
     field: &'static str,
     value: &str,

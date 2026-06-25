@@ -10,7 +10,7 @@ use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::generate_seed;
 use alloc::string::String;
-use core::fmt::Display;
+use core::fmt::{Debug, Display};
 use exceptions::XRPLWalletResult;
 use zeroize::Zeroize;
 
@@ -19,7 +19,6 @@ use zeroize::Zeroize;
 ///
 /// See Cryptographic Keys:
 /// `<https://xrpl.org/cryptographic-keys.html>`
-#[derive(Debug)]
 pub struct Wallet {
     /// The seed from which the public and private keys
     /// are derived.
@@ -40,6 +39,12 @@ pub struct Wallet {
     /// user. Increments on the ledger with every successful
     /// transaction submission, and stays the same with every
     /// failed transaction submission.
+    ///
+    /// **Note:** This field duplicates the `Sequence` field of the account's
+    /// `AccountRoot` ledger object and must be kept in sync manually. It is
+    /// retained for backwards compatibility and is slated for removal in a
+    /// future major version. Prefer querying the ledger directly for the
+    /// authoritative sequence number.
     pub sequence: u64,
 }
 
@@ -51,6 +56,19 @@ impl Drop for Wallet {
         self.private_key.zeroize();
         self.classic_address.zeroize();
         self.sequence.zeroize();
+    }
+}
+
+impl Debug for Wallet {
+    /// Custom Debug implementation that hides sensitive key material.
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Wallet")
+            .field("seed", &"***REDACTED***")
+            .field("public_key", &self.public_key)
+            .field("private_key", &"***REDACTED***")
+            .field("classic_address", &self.classic_address)
+            .field("sequence", &self.sequence)
+            .finish()
     }
 }
 
@@ -85,6 +103,41 @@ impl Wallet {
             tag,
             is_test_network,
         )?)
+    }
+}
+
+#[cfg(all(test, feature = "wallet"))]
+mod tests {
+    use super::*;
+
+    /// Seed for the well-known genesis account used throughout XRPL tests.
+    const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
+
+    #[test]
+    fn test_debug_redacts_secrets_and_shows_public_key() {
+        let wallet = Wallet::new(GENESIS_SEED, 0).expect("genesis wallet");
+        let debug_output = alloc::format!("{:?}", wallet);
+
+        // public_key must be visible in Debug (not secret)
+        assert!(
+            debug_output.contains(&wallet.public_key),
+            "public_key should appear in Debug output"
+        );
+        // classic_address must be visible
+        assert!(
+            debug_output.contains(&wallet.classic_address),
+            "classic_address should appear in Debug output"
+        );
+        // seed must NOT be visible
+        assert!(
+            !debug_output.contains(&wallet.seed),
+            "seed must not appear in Debug output"
+        );
+        // private_key must NOT be visible
+        assert!(
+            !debug_output.contains(&wallet.private_key),
+            "private_key must not appear in Debug output"
+        );
     }
 }
 
