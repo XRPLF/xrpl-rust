@@ -295,7 +295,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("740".to_string()), // hex: 1856 decimal,
                 scale: Some(1),
             }],
         };
@@ -370,13 +370,13 @@ mod tests {
             PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("740".to_string()),
+                asset_price: Some("740".to_string()), // hex: 1856 decimal,
                 scale: Some(1),
             },
             PriceData {
                 base_asset: "BTC".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("2600000".to_string()),
+                asset_price: Some("2600000".to_string()), // hex: 39845888 decimal,
                 scale: Some(2),
             },
         ];
@@ -443,7 +443,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "EUR".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("2E4".to_string()),
+                asset_price: Some("2E4".to_string()), // hex: 740 decimal,
                 scale: Some(1),
             }],
         };
@@ -556,7 +556,7 @@ mod tests {
             .map(|i| PriceData {
                 base_asset: alloc::format!("A{i:02}"),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             })
             .collect();
@@ -580,7 +580,7 @@ mod tests {
             .map(|i| PriceData {
                 base_asset: alloc::format!("A{i:02}"),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             })
             .collect();
@@ -620,7 +620,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(21),
         }]);
 
@@ -649,7 +649,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(20),
         }]);
 
@@ -670,7 +670,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "EUR".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(15),
         }]);
 
@@ -690,7 +690,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: None,
         }]);
 
@@ -701,8 +701,34 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_base_asset_rejected() {
-        // A 4-character code is neither a valid ISO code nor a 40-char hex.
+    fn test_arbitrary_non_empty_base_asset_accepted() {
+        // rippled imposes no ISO/hex restriction on BaseAsset/QuoteAsset —
+        // any non-empty string is valid (e.g. EURO, BTC, DOGE, AAPL).
+        for code in &["EURO", "BTC", "DOGE", "AAPL", "X", "LONGTICKER"] {
+            let oracle_set = OracleSet {
+                common_fields: CommonFields {
+                    account: TEST_ACCOUNT.into(),
+                    transaction_type: TransactionType::OracleSet,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .with_price_data_series(vec![PriceData {
+                base_asset: code.to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            }]);
+
+            assert!(
+                oracle_set.get_errors().is_ok(),
+                "non-empty base_asset {code:?} should be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn test_empty_base_asset_rejected() {
         let oracle_set = OracleSet {
             common_fields: CommonFields {
                 account: TEST_ACCOUNT.into(),
@@ -712,7 +738,7 @@ mod tests {
             ..Default::default()
         }
         .with_price_data_series(vec![PriceData {
-            base_asset: "EURO".to_string(),
+            base_asset: "".to_string(),
             quote_asset: "USD".to_string(),
             asset_price: Some("100".to_string()),
             scale: Some(1),
@@ -722,6 +748,30 @@ mod tests {
         assert!(matches!(
             err,
             XRPLModelException::InvalidValue { ref field, .. } if field == "base_asset"
+        ));
+    }
+
+    #[test]
+    fn test_empty_quote_asset_rejected() {
+        let oracle_set = OracleSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::OracleSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_price_data_series(vec![PriceData {
+            base_asset: "XRP".to_string(),
+            quote_asset: "".to_string(),
+            asset_price: Some("100".to_string()),
+            scale: Some(1),
+        }]);
+
+        let err = oracle_set.get_errors().unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLModelException::InvalidValue { ref field, .. } if field == "quote_asset"
         ));
     }
 
@@ -739,7 +789,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(1),
         }]);
 
@@ -760,7 +810,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "0000000000000000000000005553440000000000".to_string(),
             quote_asset: "USD".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(0),
         }]);
 
@@ -779,7 +829,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             }],
             ..Default::default()
@@ -804,7 +854,7 @@ mod tests {
             price_data_series: vec![PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             }],
             ..Default::default()
@@ -883,7 +933,7 @@ mod tests {
                     price_data_series: vec![PriceData {
                         base_asset: "XRP".to_string(),
                         quote_asset: "USD".to_string(),
-                        asset_price: Some("100".to_string()),
+                        asset_price: Some("100".to_string()), // hex: 256 decimal,
                         scale: Some(1),
                     }],
                     ..Default::default()
@@ -901,7 +951,7 @@ mod tests {
                     price_data_series: vec![PriceData {
                         base_asset: "XRP".to_string(),
                         quote_asset: "USD".to_string(),
-                        asset_price: Some("100".to_string()),
+                        asset_price: Some("100".to_string()), // hex: 256 decimal,
                         scale: Some(1),
                     }],
                     ..Default::default()
@@ -919,7 +969,7 @@ mod tests {
                     price_data_series: vec![PriceData {
                         base_asset: "XRP".to_string(),
                         quote_asset: "USD".to_string(),
-                        asset_price: Some("100".to_string()),
+                        asset_price: Some("100".to_string()), // hex: 256 decimal,
                         scale: Some(1),
                     }],
                     ..Default::default()
@@ -950,7 +1000,7 @@ mod tests {
             PriceData {
                 base_asset: "XRP".to_string(),
                 quote_asset: "USD".to_string(),
-                asset_price: Some("100".to_string()),
+                asset_price: Some("100".to_string()), // hex: 256 decimal,
                 scale: Some(1),
             },
             PriceData {
@@ -980,7 +1030,7 @@ mod tests {
         .with_price_data_series(vec![PriceData {
             base_asset: "XRP".to_string(),
             quote_asset: "XRP".to_string(),
-            asset_price: Some("100".to_string()),
+            asset_price: Some("100".to_string()), // hex: 256 decimal,
             scale: Some(1),
         }]);
 
