@@ -218,7 +218,7 @@ mod tests {
                 ..Default::default()
             },
             subject: "rSubject11111111111111111111111111".into(),
-            credential_type: "NOT_HEX".into(),
+            credential_type: "NOTHEX".into(), // even-length, but 'N','O','T' are non-hex
             expiration: None,
             uri: None,
         };
@@ -227,7 +227,30 @@ mod tests {
             XRPLModelException::InvalidValueFormat {
                 field: "credential_type".into(),
                 format: "hexadecimal".into(),
-                found: "NOT_HEX".into(),
+                found: "NOTHEX".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_credential_type_odd_length_error() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "ABC".into(), // 3 chars — odd-length, valid hex chars
+            expiration: None,
+            uri: None,
+        };
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "credential_type".into(),
+                format: "even-length hexadecimal (whole bytes)".into(),
+                found: "ABC".into(),
             }
         );
     }

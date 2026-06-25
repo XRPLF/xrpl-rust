@@ -194,14 +194,14 @@ mod tests {
                 ..Default::default()
             },
             issuer: "rIssuer111111111111111111111111111".into(),
-            credential_type: "NOT_HEX".into(),
+            credential_type: "NOTHEX".into(),
         };
         assert_eq!(
             tx.get_errors().unwrap_err(),
             XRPLModelException::InvalidValueFormat {
                 field: "credential_type".into(),
                 format: "hexadecimal".into(),
-                found: "NOT_HEX".into(),
+                found: "NOTHEX".into(),
             }
         );
     }

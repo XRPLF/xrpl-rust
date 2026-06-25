@@ -96,6 +96,14 @@ pub(crate) fn validate_credential_type(credential_type: &str) -> XRPLModelResult
             max: 128,
             found: len,
         })
+    } else if !len.is_multiple_of(2) {
+        // Odd-length hex strings cannot represent whole bytes; rippled's binary
+        // codec would reject them at serialization time.
+        Err(XRPLModelException::InvalidValueFormat {
+            field: "credential_type".into(),
+            format: "even-length hexadecimal (whole bytes)".into(),
+            found: credential_type.into(),
+        })
     } else if !is_hex(credential_type) {
         Err(XRPLModelException::InvalidValueFormat {
             field: "credential_type".into(),
@@ -140,6 +148,14 @@ pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XR
         }
         for (i, id) in ids.iter().enumerate() {
             validate_hex("credential_ids", id)?;
+            // Credential IDs are SHA-512Half ledger-object hashes: 256 bits = 32 bytes = 64 hex chars.
+            if id.len() != 64 {
+                return Err(XRPLModelException::InvalidValueFormat {
+                    field: "credential_ids".into(),
+                    format: "64-character hexadecimal ledger-object hash".into(),
+                    found: id.as_ref().into(),
+                });
+            }
             // Hex credential IDs are compared case-insensitively: rippled normalizes
             // the raw bytes, so "ABCD" and "abcd" refer to the same credential.
             if ids[..i].iter().any(|prev| prev.eq_ignore_ascii_case(id)) {

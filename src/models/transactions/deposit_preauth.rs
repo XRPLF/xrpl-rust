@@ -616,7 +616,7 @@ mod tests {
             authorize_credentials: Some(vec![CredentialAuthorization::new(
                 crate::models::CredentialAuthorizationFields::new(
                     "rIssuer111111111111111111111111111".into(),
-                    "NOT_HEX".into(),
+                    "NOTHEX".into(),
                 ),
             )]),
             unauthorize: None,
@@ -627,7 +627,7 @@ mod tests {
             XRPLModelException::InvalidValueFormat {
                 field: "credential_type".into(),
                 format: "hexadecimal".into(),
-                found: "NOT_HEX".into(),
+                found: "NOTHEX".into(),
             }
         );
     }

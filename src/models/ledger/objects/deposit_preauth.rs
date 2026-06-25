@@ -391,7 +391,7 @@ mod tests {
             authorize_credentials: Some(vec![CredentialAuthorization::new(
                 CredentialAuthorizationFields::new(
                     Cow::from("rIssuer111111111111111111111111111"),
-                    Cow::from("NOT_HEX"),
+                    Cow::from("NOTHEX"),
                 ),
             )]),
             owner_node: Cow::from("0000000000000001"),
@@ -405,7 +405,7 @@ mod tests {
             XRPLModelException::InvalidValueFormat {
                 field: "credential_type".into(),
                 format: "hexadecimal".into(),
-                found: "NOT_HEX".into(),
+                found: "NOTHEX".into(),
             }
         );
     }

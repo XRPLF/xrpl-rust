@@ -495,7 +495,7 @@ mod test_ledger_entry_errors {
             credential: Some(Credential {
                 subject: "rSubject".into(),
                 issuer: "rIssuer".into(),
-                credential_type: "NOT_HEX".into(),
+                credential_type: "NOTHEX".into(),
             }),
             ..Default::default()
         };
