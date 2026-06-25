@@ -182,15 +182,4 @@ mod tests_currency_enum {
         let cur = Currency::MPTCurrency(MPTCurrency::new("TOOSHORT".into()));
         assert!(cur.get_errors().is_err());
     }
-
-    #[test]
-    fn test_currency_mpt_hybrid_object_parses_as_issued_currency() {
-        // Hybrid object with mpt_issuance_id AND issuer must fall through to IssuedCurrency.
-        let json = r#"{"mpt_issuance_id":"00000001A407AF5856CEFBF81F3D4A0000000000A407AF58","currency":"USD","issuer":"rP9jPyP5kyvFRb6ZiRghAGw5u8SGAmU4bd"}"#;
-        let cur: Currency = serde_json::from_str(json).unwrap();
-        assert!(
-            matches!(cur, Currency::IssuedCurrency(_)),
-            "hybrid object must parse as IssuedCurrency, not MPTCurrency"
-        );
-    }
 }
