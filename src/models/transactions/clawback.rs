@@ -61,10 +61,9 @@ pub trait ClawbackError {
 impl<'a> ClawbackError for Clawback<'a> {
     fn _get_amount_error(&self) -> crate::models::XRPLModelResult<()> {
         if self.amount.is_xrp() {
-            Err(XRPLClawbackException::AmountMustNotBeXRP.into())
-        } else {
-            Ok(())
+            return Err(XRPLClawbackException::AmountMustNotBeXRP.into());
         }
+        self.amount.get_errors()
     }
 
     fn _get_holder_error(&self) -> crate::models::XRPLModelResult<()> {
