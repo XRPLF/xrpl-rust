@@ -10,7 +10,7 @@ use crate::core::keypairs::derive_classic_address;
 use crate::core::keypairs::derive_keypair;
 use crate::core::keypairs::generate_seed;
 use alloc::string::String;
-use core::fmt::Display;
+use core::fmt::{Debug, Display};
 use exceptions::XRPLWalletResult;
 use zeroize::Zeroize;
 
@@ -19,7 +19,10 @@ use zeroize::Zeroize;
 ///
 /// See Cryptographic Keys:
 /// `<https://xrpl.org/cryptographic-keys.html>`
-#[derive(Debug)]
+///
+/// Both `Debug` and `Display` redact the `seed` and `private_key` fields so that
+/// `dbg!(wallet)`, `format!("{wallet:?}")`, and `tracing::debug!(?wallet)` cannot leak
+/// secrets into logs or terminal scrollback (issue #287).
 pub struct Wallet {
     /// The seed from which the public and private keys
     /// are derived.
@@ -96,5 +99,64 @@ impl Display for Wallet {
             "Wallet {{ public_key: {}, private_key: -HIDDEN-, classic_address: {} }}",
             self.public_key, self.classic_address
         )
+    }
+}
+
+// `Debug` delegates to `Display` so `{:?}`, `{:#?}`, `dbg!(...)`, and
+// `tracing::debug!(?wallet)` all redact the `seed` and `private_key` fields the same
+// way the human-readable formatter does. The default derive would print the raw
+// secrets — see issue #287 (CLI faucet path printed `{:#?}` on the generated wallet).
+impl Debug for Wallet {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        Display::fmt(self, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::format;
+
+    const TEST_SEED: &str = "sEdSkooMk31MeTjbHVE7vLvgCpEMAdB";
+
+    #[test]
+    fn debug_does_not_leak_private_key_or_seed() {
+        // Regression for #287. With the default `#[derive(Debug)]`, this output would
+        // include the raw `seed` and `private_key`. The custom impl mirrors `Display`,
+        // which redacts both.
+        let wallet = Wallet::new(TEST_SEED, 0).unwrap();
+        let dbg_output = format!("{wallet:?}");
+        assert!(
+            !dbg_output.contains(wallet.private_key.as_str()),
+            "Debug output must not contain the raw private_key. Got: {dbg_output}",
+        );
+        assert!(
+            !dbg_output.contains(wallet.seed.as_str()),
+            "Debug output must not contain the raw seed. Got: {dbg_output}",
+        );
+        // Sanity: redacted marker must be present and public fields must still appear.
+        assert!(dbg_output.contains("-HIDDEN-"));
+        assert!(dbg_output.contains(wallet.public_key.as_str()));
+        assert!(dbg_output.contains(wallet.classic_address.as_str()));
+    }
+
+    #[test]
+    fn pretty_debug_also_redacts() {
+        // The CLI faucet path uses `{:#?}` (alternate Debug). It must redact too.
+        let wallet = Wallet::new(TEST_SEED, 0).unwrap();
+        let dbg_output = format!("{wallet:#?}");
+        assert!(!dbg_output.contains(wallet.private_key.as_str()));
+        assert!(!dbg_output.contains(wallet.seed.as_str()));
+    }
+
+    #[test]
+    fn display_redacts_private_key_and_seed() {
+        // Pin the pre-existing Display behaviour so a future change to it can't silently
+        // reintroduce the leak via the `Debug -> Display` delegation above.
+        let wallet = Wallet::new(TEST_SEED, 0).unwrap();
+        let display_output = format!("{wallet}");
+        assert!(!display_output.contains(wallet.private_key.as_str()));
+        assert!(!display_output.contains(wallet.seed.as_str()));
+        assert!(display_output.contains("-HIDDEN-"));
     }
 }
