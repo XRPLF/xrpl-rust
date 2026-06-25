@@ -282,6 +282,14 @@ impl IssuedCurrency {
         let mut value: BigDecimal;
         let bytes = parser.read(8)?;
 
+        // IOU wire format requires the "not XRP" bit (0x80) to be set in the first byte.
+        // Without this check a malformed buffer that reaches the IOU branch but lacks 0x80
+        // would still proceed, potentially producing a silently sign-inverted result because
+        // the sign bit (0x40) could be misread against an unexpected bit pattern.
+        if bytes[0] & _NOT_XRP_BIT_MASK == 0 {
+            return Err(XRPLBinaryCodecException::InvalidReadFromBytesValue.into());
+        }
+
         // Some wizardry by Amie Corso
         let exp = ((bytes[0] as i32 & 0x3F) << 2) + ((bytes[1] as i32 & 0xFF) >> 6) - 97;
 
@@ -603,5 +611,103 @@ mod test {
                 assert!(amount.is_err());
             }
         }
+    }
+
+    // --- IOU "not XRP" bit guard tests ---
+
+    /// A valid positive IOU: byte 0 = 0xC0 (0x80 "not XRP" | 0x40 positive),
+    /// followed by encoding of 1.0 IOU, then 20-byte currency + 20-byte issuer
+    /// (all zeroes here; currency/issuer parsing is tested separately).
+    /// The point is that serialization must NOT return an error.
+    #[test]
+    fn test_iou_positive_sign_round_trips() {
+        // Construct a minimal valid IOU bytes buffer: 8-byte amount + 20-byte currency + 20-byte issuer.
+        // Use the known wire encoding for "1" IOU value:
+        //   0xD4838D7EA4C68000  (from the XRPL spec: positive, exp=0, mantissa=1000000000000000)
+        let amount_bytes = 0xD4838D7EA4C68000_u64.to_be_bytes();
+        let mut buf = [0u8; 48];
+        buf[..8].copy_from_slice(&amount_bytes);
+        // currency and issuer bytes remain zero
+
+        let amount = Amount::new(Some(&buf)).unwrap();
+        // Must route to IOU branch (0x80 set in byte 0, 0x20 clear)
+        assert!(!amount.is_native());
+        assert!(!amount.is_mpt());
+
+        // Serialization must succeed (no error from the 0x80 guard)
+        let result = serde_json::to_string(&amount);
+        assert!(
+            result.is_ok(),
+            "valid positive IOU serialization failed: {:?}",
+            result.err()
+        );
+        let json_str = result.unwrap();
+        // Value must be positive
+        assert!(
+            !json_str.contains("\"-"),
+            "expected positive value, got: {}",
+            json_str
+        );
+    }
+
+    /// A valid negative IOU: byte 0 = 0x80 (0x80 "not XRP", 0x40 sign bit clear = negative),
+    /// rest is a non-zero mantissa. Serialization must succeed and the value must be negative.
+    #[test]
+    fn test_iou_negative_sign_round_trips() {
+        // Same encoding as above but with the positive sign bit (0x40) cleared in byte 0.
+        // 0xD4838D7EA4C68000 has byte 0 = 0xD4. Clear 0x40 -> 0x94 to make it negative.
+        let mut amount_bytes = 0xD4838D7EA4C68000_u64.to_be_bytes();
+        amount_bytes[0] &= !0x40; // clear positive-sign bit -> negative
+        let mut buf = [0u8; 48];
+        buf[..8].copy_from_slice(&amount_bytes);
+
+        let amount = Amount::new(Some(&buf)).unwrap();
+        assert!(!amount.is_native());
+        assert!(!amount.is_mpt());
+
+        let result = serde_json::to_string(&amount);
+        assert!(
+            result.is_ok(),
+            "valid negative IOU serialization failed: {:?}",
+            result.err()
+        );
+        let json_str = result.unwrap();
+        // The "value" field must be negative
+        assert!(
+            json_str.contains("\"-"),
+            "expected negative value, got: {}",
+            json_str
+        );
+    }
+
+    /// Directly exercise the 0x80 guard via `IssuedCurrency::from_parser` on a raw
+    /// bytes slice that has byte 0 = 0x40 (sign bit set, but 0x80 "not XRP" bit missing).
+    /// This is the malformed case described in issue #260: the bytes would reach the IOU
+    /// deserialization path in a hypothetical scenario where routing logic changes, and
+    /// without the guard would silently produce a sign-inverted result.
+    #[test]
+    fn test_iou_missing_not_xrp_bit_returns_error() {
+        // byte 0 = 0x40: positive-sign bit set, but 0x80 "not XRP" bit NOT set.
+        // The remaining 7 bytes complete a plausible-looking IOU amount field.
+        let malformed: [u8; 8] = [0x40, 0x83, 0x8D, 0x7E, 0xA4, 0xC6, 0x80, 0x00];
+        let mut parser = BinaryParser::from(&malformed[..]);
+        let result = IssuedCurrency::_deserialize_issued_currency_amount(&mut parser);
+        assert!(
+            result.is_err(),
+            "expected error for IOU bytes missing 0x80 bit, but got Ok"
+        );
+    }
+
+    /// Zero IOU bytes (all-zero 8 bytes) also lack 0x80 and must be rejected
+    /// by `_deserialize_issued_currency_amount`.
+    #[test]
+    fn test_iou_all_zero_bytes_returns_error() {
+        let zero_bytes = [0u8; 8];
+        let mut parser = BinaryParser::from(&zero_bytes[..]);
+        let result = IssuedCurrency::_deserialize_issued_currency_amount(&mut parser);
+        assert!(
+            result.is_err(),
+            "expected error for all-zero IOU bytes (no 0x80), but got Ok"
+        );
     }
 }
