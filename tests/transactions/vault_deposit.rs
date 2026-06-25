@@ -63,9 +63,9 @@ mod tests {
             )
             .await;
 
-            assert_ne!(
-                result, "tesSUCCESS",
-                "deposit into private vault by non-allowlisted account should be rejected, got: {result}"
+            assert_eq!(
+                result, "tecNO_AUTH",
+                "deposit into private vault by non-allowlisted account must return tecNO_AUTH, got: {result}"
             );
         })
         .await;

@@ -58,7 +58,14 @@ mod tests {
             test_transaction(&mut vault_set, &owner).await;
 
             let resp = account_objects_json(owner.classic_address.as_str()).await;
-            let vault = &resp["account_objects"][0];
+            let objects = resp["account_objects"]
+                .as_array()
+                .expect("account_objects array missing");
+            assert!(
+                !objects.is_empty(),
+                "no vault found for owner after VaultSet"
+            );
+            let vault = &objects[0];
             assert_eq!(
                 vault["AssetsMaximum"].as_str(),
                 Some("5000"),
@@ -91,7 +98,14 @@ mod tests {
             test_transaction(&mut vault_set, &owner).await;
 
             let resp = account_objects_json(owner.classic_address.as_str()).await;
-            let vault = &resp["account_objects"][0];
+            let objects = resp["account_objects"]
+                .as_array()
+                .expect("account_objects array missing");
+            assert!(
+                !objects.is_empty(),
+                "no vault found for owner after VaultSet"
+            );
+            let vault = &objects[0];
             assert_eq!(
                 vault["Data"].as_str(),
                 Some(new_data.as_str()),

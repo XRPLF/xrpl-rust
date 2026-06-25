@@ -19,11 +19,9 @@ mod tests {
     use xrpl::models::requests::vault_info::VaultInfo;
     use xrpl::models::results::vault_info::VaultInfo as VaultInfoResult;
     use xrpl::models::transactions::account_set::{AccountSet, AccountSetFlag};
-    use xrpl::models::transactions::payment::Payment;
-    use xrpl::models::transactions::trust_set::TrustSet;
     use xrpl::models::transactions::vault_create::VaultCreate;
     use xrpl::models::transactions::{CommonFields, TransactionType};
-    use xrpl::models::{Amount, Currency, IssuedCurrency, IssuedCurrencyAmount};
+    use xrpl::models::{Currency, IssuedCurrency};
 
     /// Create an XRP vault and return `(vault_id, vault_sequence)`.
     ///
@@ -188,7 +186,7 @@ mod tests {
             const CURRENCY: &str = "USD";
             const SCALE: u8 = 6;
 
-            // Enable DefaultRipple on issuer so IOU payments ripple.
+            // DefaultRipple is required on the issuer for IOU vault creation.
             let mut tx = AccountSet {
                 common_fields: CommonFields {
                     account: issuer.classic_address.clone().into(),
@@ -199,39 +197,6 @@ mod tests {
                 ..Default::default()
             };
             test_transaction(&mut tx, &issuer).await;
-
-            // vault_owner establishes a trust line so the vault can hold IOU.
-            let mut trust = TrustSet {
-                common_fields: CommonFields {
-                    account: vault_owner.classic_address.clone().into(),
-                    transaction_type: TransactionType::TrustSet,
-                    ..Default::default()
-                },
-                limit_amount: IssuedCurrencyAmount::new(
-                    CURRENCY.into(),
-                    issuer.classic_address.clone().into(),
-                    "100000000".into(),
-                ),
-                ..Default::default()
-            };
-            test_transaction(&mut trust, &vault_owner).await;
-
-            // Fund vault_owner with some IOU.
-            let mut payment = Payment {
-                common_fields: CommonFields {
-                    account: issuer.classic_address.clone().into(),
-                    transaction_type: TransactionType::Payment,
-                    ..Default::default()
-                },
-                destination: vault_owner.classic_address.clone().into(),
-                amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
-                    CURRENCY.into(),
-                    issuer.classic_address.clone().into(),
-                    "1000".into(),
-                )),
-                ..Default::default()
-            };
-            test_transaction(&mut payment, &issuer).await;
 
             // Create IOU vault with explicit scale=6.
             let mut vault_create = VaultCreate {
