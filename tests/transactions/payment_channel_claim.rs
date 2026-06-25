@@ -97,8 +97,8 @@ async fn test_payment_channel_claim_base() {
             None,               // source_tag
             None,               // ticket_sequence
             channel_id.into(),  // channel
-            Some("100".into()), // amount: 100 drops (Cow<str>, not XRPAmount)
-            None,               // balance
+            None,               // amount (signature-based; not used here)
+            Some("100".into()), // balance: deliver 100 drops to destination
             None,               // public_key
             None,               // signature
         );
@@ -174,6 +174,8 @@ async fn test_payment_channel_claim_with_credential_ids() {
             .to_string();
 
         // Step 3a: verify gate is enforced — claim WITHOUT credentials must be rejected.
+        // Use `balance` (not `amount`) to deliver XRP from source directly. `amount` alone
+        // without `signature` does not trigger fund delivery and therefore DepositAuth.
         let mut neg_claim = PaymentChannelClaim::new(
             subject.classic_address.clone().into(),
             None,
@@ -186,8 +188,8 @@ async fn test_payment_channel_claim_with_credential_ids() {
             None,
             None,
             channel_id.clone().into(),
-            Some("100".into()),
             None,
+            Some("100".into()),
             None,
             None,
         );
@@ -219,8 +221,8 @@ async fn test_payment_channel_claim_with_credential_ids() {
             None,
             None,
             channel_id.into(),
-            Some("100".into()),
             None,
+            Some("100".into()),
             None,
             None,
         );
