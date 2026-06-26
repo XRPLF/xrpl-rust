@@ -55,42 +55,53 @@ pub struct PermissionedDomainSet<'a> {
 
 impl<'a> Model for PermissionedDomainSet<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
-        // XLS-80 mandates AcceptedCredentials contain between 1 and 10 entries.
-        if self.accepted_credentials.is_empty() {
-            return Err(XRPLModelException::MissingField(
-                "AcceptedCredentials".into(),
-            ));
-        }
-        if self.accepted_credentials.len() > 10 {
-            return Err(XRPLModelException::ValueTooLong {
-                field: "AcceptedCredentials".into(),
-                max: 10,
-                found: self.accepted_credentials.len(),
-            });
-        }
-        let mut seen: BTreeSet<(alloc::string::String, alloc::string::String)> = BTreeSet::new();
-        for credential in &self.accepted_credentials {
-            validate_credential(credential)?;
-            // Normalise CredentialType to uppercase hex before duplicate check so that
-            // "4b5943" and "4B5943" are treated as the same credential (rippled decodes
-            // the blob bytes and hashes them; casing is irrelevant at the wire level).
-            let key = (
-                credential.issuer.clone(),
-                credential.credential_type.to_uppercase(),
-            );
-            if !seen.insert(key) {
-                return Err(XRPLModelException::InvalidValue {
-                    field: "AcceptedCredentials".into(),
-                    expected: "unique Issuer/CredentialType pairs".into(),
-                    found: alloc::format!("{}/{}", credential.issuer, credential.credential_type),
-                });
-            }
-        }
+        validate_accepted_credentials(&self.accepted_credentials)?;
         if let Some(domain_id) = &self.domain_id {
             validate_domain_id(domain_id.as_ref())?;
         }
         self.validate_currencies()
     }
+}
+
+/// Validates an `AcceptedCredentials` list per XLS-80: it must contain between 1 and 10
+/// entries, each a valid [`Credential`], with no duplicate `(Issuer, CredentialType)` pairs.
+/// `CredentialType` is compared case-insensitively because rippled decodes the blob bytes and
+/// hashes them, so hex casing is irrelevant at the wire level; `Issuer` is a base58 classic
+/// address (validated by [`validate_credential`]) and is compared verbatim.
+///
+/// Shared by both [`PermissionedDomainSet`] (outbound transaction) and the
+/// `PermissionedDomain` ledger object so the two validate under identical rules.
+pub(crate) fn validate_accepted_credentials(
+    credentials: &[Credential],
+) -> crate::models::XRPLModelResult<()> {
+    if credentials.is_empty() {
+        return Err(XRPLModelException::MissingField(
+            "AcceptedCredentials".into(),
+        ));
+    }
+    if credentials.len() > 10 {
+        return Err(XRPLModelException::ValueTooLong {
+            field: "AcceptedCredentials".into(),
+            max: 10,
+            found: credentials.len(),
+        });
+    }
+    let mut seen: BTreeSet<(alloc::string::String, alloc::string::String)> = BTreeSet::new();
+    for credential in credentials {
+        validate_credential(credential)?;
+        let key = (
+            credential.issuer.clone(),
+            credential.credential_type.to_uppercase(),
+        );
+        if !seen.insert(key) {
+            return Err(XRPLModelException::InvalidValue {
+                field: "AcceptedCredentials".into(),
+                expected: "unique Issuer/CredentialType pairs".into(),
+                found: alloc::format!("{}/{}", credential.issuer, credential.credential_type),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Validates a DomainID per XLS-80: must be a non-zero 64-character hex string
@@ -218,11 +229,11 @@ impl<'a> PermissionedDomainSet<'a> {
     }
 
     /// Add a single credential to the accepted credentials list.
+    ///
+    /// The 1..=10 bound is enforced by [`Model::get_errors`], not here — the builder
+    /// accumulates freely and validation surfaces an over-limit list as a recoverable
+    /// `XRPLModelException::ValueTooLong` rather than panicking.
     pub fn with_credential(mut self, credential: Credential) -> Self {
-        assert!(
-            self.accepted_credentials.len() < 10,
-            "AcceptedCredentials exceeds XLS-80 maximum of 10 entries"
-        );
         self.accepted_credentials.push(credential);
         self
     }
@@ -234,11 +245,14 @@ mod tests {
     use alloc::string::ToString;
     use alloc::vec;
 
+    /// Shared test account / credential issuer (a valid classic address).
+    const TEST_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+
     #[test]
     fn test_serde() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 fee: Some("10".into()),
                 sequence: Some(1),
@@ -247,7 +261,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
@@ -261,7 +275,7 @@ mod tests {
     fn test_serde_with_domain_id() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 fee: Some("10".into()),
                 sequence: Some(2),
@@ -272,7 +286,7 @@ mod tests {
                 "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2".into(),
             ),
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "414D4C".to_string(), // hex("AML")
             }],
         };
@@ -293,7 +307,7 @@ mod tests {
     fn test_builder_pattern() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -304,14 +318,11 @@ mod tests {
         .with_last_ledger_sequence(596447)
         .with_source_tag(42)
         .with_credential(Credential {
-            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+            issuer: TEST_ACCOUNT.to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
-        assert_eq!(
-            txn.common_fields.account,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
-        );
+        assert_eq!(txn.common_fields.account, TEST_ACCOUNT);
         assert_eq!(txn.common_fields.fee.as_ref().unwrap().0, "12");
         assert_eq!(txn.common_fields.sequence, Some(100));
         assert_eq!(txn.common_fields.last_ledger_sequence, Some(596447));
@@ -324,17 +335,14 @@ mod tests {
     fn test_default() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
             ..Default::default()
         };
 
-        assert_eq!(
-            txn.common_fields.account,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
-        );
+        assert_eq!(txn.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             txn.common_fields.transaction_type,
             TransactionType::PermissionedDomainSet
@@ -351,7 +359,7 @@ mod tests {
     fn test_with_credentials() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 fee: Some("10".into()),
                 sequence: Some(5),
@@ -360,25 +368,22 @@ mod tests {
             domain_id: None,
             accepted_credentials: vec![
                 Credential {
-                    issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                    issuer: TEST_ACCOUNT.to_string(),
                     credential_type: "4B5943".to_string(), // hex("KYC")
                 },
                 Credential {
-                    issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                    issuer: TEST_ACCOUNT.to_string(),
                     credential_type: "414D4C".to_string(), // hex("AML")
                 },
                 Credential {
-                    issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                    issuer: TEST_ACCOUNT.to_string(),
                     credential_type: "41434352454449544544".to_string(), // hex("ACCREDITED")
                 },
             ],
         };
 
         assert_eq!(txn.accepted_credentials.len(), 3);
-        assert_eq!(
-            txn.accepted_credentials[0].issuer,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string()
-        );
+        assert_eq!(txn.accepted_credentials[0].issuer, TEST_ACCOUNT.to_string());
         assert_eq!(
             txn.accepted_credentials[1].credential_type,
             "414D4C".to_string()
@@ -395,7 +400,7 @@ mod tests {
             "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2".to_string();
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 fee: Some("10".into()),
                 sequence: Some(10),
@@ -416,7 +421,7 @@ mod tests {
     fn test_create_domain() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 fee: Some("10".into()),
                 sequence: Some(1),
@@ -424,7 +429,7 @@ mod tests {
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         };
@@ -437,7 +442,7 @@ mod tests {
     #[test]
     fn test_new_constructor() {
         let txn = PermissionedDomainSet::new(
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            TEST_ACCOUNT.into(),
             None,
             Some("12".into()),
             Some(596447),
@@ -448,15 +453,12 @@ mod tests {
             None,
             None,
             vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "4B5943".to_string(), // hex("KYC")
             }],
         );
 
-        assert_eq!(
-            txn.common_fields.account,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
-        );
+        assert_eq!(txn.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             txn.common_fields.transaction_type,
             TransactionType::PermissionedDomainSet
@@ -472,7 +474,7 @@ mod tests {
     fn test_with_domain_id_builder() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -480,7 +482,7 @@ mod tests {
         }
         .with_domain_id("AABB0011".into())
         .with_accepted_credentials(vec![Credential {
-            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+            issuer: TEST_ACCOUNT.to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         }]);
 
@@ -492,7 +494,7 @@ mod tests {
     fn test_with_memo() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -506,7 +508,7 @@ mod tests {
             memo_type: Some("text".into()),
         })
         .with_credential(Credential {
-            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+            issuer: TEST_ACCOUNT.to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
@@ -519,7 +521,7 @@ mod tests {
         // XLS-80 mandates AcceptedCredentials has 1..=10 entries; empty must fail validation.
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 fee: Some("10".into()),
                 sequence: Some(1),
@@ -542,13 +544,13 @@ mod tests {
         // XLS-80 caps AcceptedCredentials at 10 entries.
         let credentials: Vec<Credential> = (0..11)
             .map(|_| Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "4B5943".to_string(),
             })
             .collect();
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -573,13 +575,13 @@ mod tests {
         // CredentialType is an sfBlob; non-hex values must fail validation.
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "KYC".to_string(), // not hex
             }],
         };
@@ -595,7 +597,7 @@ mod tests {
     fn test_credential_type_64_bytes_accepted() {
         // 64 bytes hex-encoded = 128 chars; this is the rippled maximum.
         let credential = Credential {
-            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+            issuer: TEST_ACCOUNT.to_string(),
             credential_type: "A".repeat(128),
         };
 
@@ -607,13 +609,13 @@ mod tests {
         let too_long = "A".repeat(130);
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: too_long,
             }],
         };
@@ -628,12 +630,12 @@ mod tests {
     #[test]
     fn test_duplicate_credentials_rejected() {
         let duplicate = Credential {
-            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+            issuer: TEST_ACCOUNT.to_string(),
             credential_type: "4B5943".to_string(),
         };
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -651,13 +653,84 @@ mod tests {
     fn test_set_all_zero_domain_id_rejected() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
             domain_id: Some("0".repeat(64).into()),
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
+                credential_type: "4B5943".to_string(),
+            }],
+        };
+
+        assert!(matches!(
+            txn.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_duplicate_credentials_case_insensitive_rejected() {
+        // "4b5943" and "4B5943" are the same credential on the wire — dedup must
+        // collapse them via the to_uppercase() normalization in validate_accepted_credentials.
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: None,
+            accepted_credentials: vec![
+                Credential {
+                    issuer: TEST_ACCOUNT.to_string(),
+                    credential_type: "4b5943".to_string(),
+                },
+                Credential {
+                    issuer: TEST_ACCOUNT.to_string(),
+                    credential_type: "4B5943".to_string(),
+                },
+            ],
+        };
+
+        assert!(matches!(
+            txn.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_set_wrong_length_domain_id_rejected() {
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: Some("ABCD".into()), // 4 chars, not 64
+            accepted_credentials: vec![Credential {
+                issuer: TEST_ACCOUNT.to_string(),
+                credential_type: "4B5943".to_string(),
+            }],
+        };
+
+        assert!(matches!(
+            txn.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_set_non_hex_domain_id_rejected() {
+        let txn = PermissionedDomainSet {
+            common_fields: CommonFields {
+                account: TEST_ACCOUNT.into(),
+                transaction_type: TransactionType::PermissionedDomainSet,
+                ..Default::default()
+            },
+            domain_id: Some("G".repeat(64).into()), // 64 chars but 'G' is not hex
+            accepted_credentials: vec![Credential {
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "4B5943".to_string(),
             }],
         };
@@ -672,7 +745,7 @@ mod tests {
     fn test_ticket_sequence() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -681,7 +754,7 @@ mod tests {
         .with_ticket_sequence(42)
         .with_fee("10".into())
         .with_credential(Credential {
-            issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+            issuer: TEST_ACCOUNT.to_string(),
             credential_type: "4B5943".to_string(), // hex("KYC")
         });
 
@@ -693,7 +766,7 @@ mod tests {
     fn test_credential_empty_issuer_rejected() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
@@ -716,13 +789,13 @@ mod tests {
     fn test_credential_empty_credential_type_rejected() {
         let txn = PermissionedDomainSet {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainSet,
                 ..Default::default()
             },
             domain_id: None,
             accepted_credentials: vec![Credential {
-                issuer: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".to_string(),
+                issuer: TEST_ACCOUNT.to_string(),
                 credential_type: "".to_string(),
             }],
         };

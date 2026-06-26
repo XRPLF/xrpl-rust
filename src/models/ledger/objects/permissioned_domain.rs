@@ -54,7 +54,7 @@ impl<'a> crate::models::Model for PermissionedDomain<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         use crate::core::addresscodec::is_valid_classic_address;
         use crate::models::exceptions::XRPLModelException;
-        use crate::models::transactions::permissioned_domain_set::validate_credential;
+        use crate::models::transactions::permissioned_domain_set::validate_accepted_credentials;
 
         if !is_valid_classic_address(&self.owner) {
             return Err(XRPLModelException::InvalidValue {
@@ -63,22 +63,9 @@ impl<'a> crate::models::Model for PermissionedDomain<'a> {
                 found: self.owner.clone().into_owned(),
             });
         }
-        if self.accepted_credentials.is_empty() {
-            return Err(XRPLModelException::MissingField(
-                "AcceptedCredentials".into(),
-            ));
-        }
-        if self.accepted_credentials.len() > 10 {
-            return Err(XRPLModelException::ValueTooLong {
-                field: "AcceptedCredentials".into(),
-                max: 10,
-                found: self.accepted_credentials.len(),
-            });
-        }
-        for credential in &self.accepted_credentials {
-            validate_credential(credential)?;
-        }
-        Ok(())
+        // Same credential-list rules as PermissionedDomainSet (1..=10, valid, no dupes)
+        // so the ledger object and its originating transaction validate identically.
+        validate_accepted_credentials(&self.accepted_credentials)
     }
 }
 
@@ -117,6 +104,9 @@ mod test_serde {
     use alloc::string::ToString;
     use alloc::vec;
 
+    /// Shared test owner / credential issuer (a valid classic address).
+    const TEST_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+
     #[test]
     fn test_serialize() {
         let domain = PermissionedDomain {
@@ -126,7 +116,7 @@ mod test_serde {
                 index: Some(Cow::from("ForTest")),
                 ledger_index: None,
             },
-            owner: Cow::from("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"),
+            owner: Cow::from(TEST_ACCOUNT),
             accepted_credentials: vec![
                 Credential {
                     issuer: "rIssuerA".to_string(),
@@ -224,5 +214,85 @@ mod test_serde {
             domain.common_fields.ledger_index,
             Some(Cow::from("TestLedgerIndex"))
         );
+    }
+
+    use crate::models::exceptions::XRPLModelException;
+    use crate::models::Model;
+
+    /// A valid PermissionedDomain ledger object (real classic addresses) for validation tests.
+    fn valid_domain(credentials: Vec<Credential>) -> PermissionedDomain<'static> {
+        PermissionedDomain {
+            common_fields: CommonFields {
+                flags: FlagCollection::default(),
+                ledger_entry_type: LedgerEntryType::PermissionedDomain,
+                index: None,
+                ledger_index: None,
+            },
+            owner: Cow::from(TEST_ACCOUNT),
+            accepted_credentials: credentials,
+            sequence: 1,
+            owner_node: Cow::from("0"),
+            previous_txn_id: Cow::from(
+                "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2",
+            ),
+            previous_txn_lgr_seq: 1000,
+        }
+    }
+
+    fn kyc() -> Credential {
+        Credential {
+            issuer: TEST_ACCOUNT.to_string(),
+            credential_type: "4B5943".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_get_errors_valid() {
+        assert!(valid_domain(vec![kyc()]).get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_get_errors_invalid_owner_rejected() {
+        let mut domain = valid_domain(vec![kyc()]);
+        domain.owner = Cow::from("not-an-address");
+        assert!(matches!(
+            domain.get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_get_errors_empty_credentials_rejected() {
+        assert!(matches!(
+            valid_domain(vec![]).get_errors(),
+            Err(XRPLModelException::MissingField(_))
+        ));
+    }
+
+    #[test]
+    fn test_get_errors_duplicate_credentials_rejected() {
+        // Shares the transaction's dedup rule (case-insensitive CredentialType).
+        let dup_lower = Credential {
+            issuer: TEST_ACCOUNT.to_string(),
+            credential_type: "4b5943".to_string(),
+        };
+        assert!(matches!(
+            valid_domain(vec![kyc(), dup_lower]).get_errors(),
+            Err(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_get_errors_too_many_credentials_rejected() {
+        let creds: Vec<Credential> = (0..11)
+            .map(|i| Credential {
+                issuer: TEST_ACCOUNT.to_string(),
+                credential_type: alloc::format!("{:06X}", i),
+            })
+            .collect();
+        assert!(matches!(
+            valid_domain(creds).get_errors(),
+            Err(XRPLModelException::ValueTooLong { .. })
+        ));
     }
 }

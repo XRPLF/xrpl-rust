@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::amount::XRPAmount;
-use crate::models::exceptions::XRPLModelException;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
     Model, ValidateCurrencies,
@@ -45,18 +44,11 @@ pub struct PermissionedDomainDelete<'a> {
 impl<'a> Model for PermissionedDomainDelete<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         // DomainID is the 32-byte hash of the PermissionedDomain ledger entry,
-        // serialized as 64 uppercase hex chars.
-        let domain_id = self.domain_id.as_ref();
-        if domain_id.len() != 64
-            || !domain_id.chars().all(|c| c.is_ascii_hexdigit())
-            || domain_id.chars().all(|c| c == '0')
-        {
-            return Err(XRPLModelException::InvalidValue {
-                field: "DomainID".into(),
-                expected: "non-zero 64-character hex string".into(),
-                found: domain_id.into(),
-            });
-        }
+        // serialized as 64 uppercase hex chars. Reuse the shared validator so the
+        // rule stays in lockstep with PermissionedDomainSet.
+        crate::models::transactions::permissioned_domain_set::validate_domain_id(
+            self.domain_id.as_ref(),
+        )?;
         self.validate_currencies()
     }
 }
@@ -121,12 +113,16 @@ impl<'a> PermissionedDomainDelete<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::exceptions::XRPLModelException;
+
+    /// Shared test account (a valid classic address).
+    const TEST_ACCOUNT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
 
     #[test]
     fn test_serde() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 fee: Some("10".into()),
                 sequence: Some(1),
@@ -150,7 +146,7 @@ mod tests {
     fn test_serde_json_format() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 fee: Some("12".into()),
                 sequence: Some(5),
@@ -176,7 +172,7 @@ mod tests {
     fn test_builder_pattern() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
@@ -192,10 +188,7 @@ mod tests {
             memo_type: Some("text".into()),
         });
 
-        assert_eq!(
-            txn.common_fields.account,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
-        );
+        assert_eq!(txn.common_fields.account, TEST_ACCOUNT);
         assert_eq!(txn.common_fields.fee.as_ref().unwrap().0, "12");
         assert_eq!(txn.common_fields.sequence, Some(100));
         assert_eq!(txn.common_fields.last_ledger_sequence, Some(596447));
@@ -211,17 +204,14 @@ mod tests {
     fn test_default() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
             domain_id: "AABB00112233445566778899AABB00112233445566778899AABB00112233445A".into(),
         };
 
-        assert_eq!(
-            txn.common_fields.account,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
-        );
+        assert_eq!(txn.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             txn.common_fields.transaction_type,
             TransactionType::PermissionedDomainDelete
@@ -237,7 +227,7 @@ mod tests {
     #[test]
     fn test_new_constructor() {
         let txn = PermissionedDomainDelete::new(
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            TEST_ACCOUNT.into(),
             None,
             Some("12".into()),
             Some(596447),
@@ -249,10 +239,7 @@ mod tests {
             "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2".into(),
         );
 
-        assert_eq!(
-            txn.common_fields.account,
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
-        );
+        assert_eq!(txn.common_fields.account, TEST_ACCOUNT);
         assert_eq!(
             txn.common_fields.transaction_type,
             TransactionType::PermissionedDomainDelete
@@ -270,7 +257,7 @@ mod tests {
     fn test_ticket_sequence() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
@@ -287,7 +274,7 @@ mod tests {
     fn test_account_txn_id() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
@@ -308,7 +295,7 @@ mod tests {
         // DomainID must be exactly 64 hex chars (32-byte hash).
         let too_short = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
@@ -322,7 +309,7 @@ mod tests {
         // Correct length but non-hex chars.
         let non_hex = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
@@ -338,7 +325,7 @@ mod tests {
     fn test_delete_all_zero_domain_id_rejected() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
@@ -355,7 +342,7 @@ mod tests {
     fn test_valid_domain_id_accepted() {
         let txn = PermissionedDomainDelete {
             common_fields: CommonFields {
-                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                account: TEST_ACCOUNT.into(),
                 transaction_type: TransactionType::PermissionedDomainDelete,
                 ..Default::default()
             },
