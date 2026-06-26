@@ -41,6 +41,22 @@ pub struct Offer<'a> {
     pub seq: u64,
 }
 
+/// Required fields for requesting a PermissionedDomain if not
+/// querying by object ID.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct PermissionedDomainObject<'a> {
+    pub account: Cow<'a, str>,
+    pub seq: u32,
+}
+
+/// Required fields for requesting a PermissionedDomain by object selector.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum PermissionedDomain<'a> {
+    Index(Cow<'a, str>),
+    Object(PermissionedDomainObject<'a>),
+}
+
 /// Required fields for requesting a Ticket, if not
 /// querying by object ID.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
@@ -98,6 +114,7 @@ pub struct LedgerEntry<'a> {
     pub offer: Option<Offer<'a>>,
     pub oracle: Option<OracleIdentifier<'a>>,
     pub payment_channel: Option<Cow<'a, str>>,
+    pub permissioned_domain: Option<PermissionedDomain<'a>>,
     pub ripple_state: Option<RippleState<'a>>,
     pub ticket: Option<Ticket<'a>>,
 }
@@ -141,11 +158,14 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.deposit_preauth.is_some() {
             signing_methods += 1
         }
+        if self.permissioned_domain.is_some() {
+            signing_methods += 1
+        }
         if self.ticket.is_some() {
             signing_methods += 1
         }
         if signing_methods != 1 {
-            Err(XRPLModelException::ExpectedOneOf(&[
+            return Err(XRPLModelException::ExpectedOneOf(&[
                 "index",
                 "account_root",
                 "check",
@@ -156,11 +176,11 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "escrow",
                 "payment_channel",
                 "deposit_preauth",
+                "permissioned_domain",
                 "ticket",
-            ]))
-        } else {
-            Ok(())
+            ]));
         }
+        Ok(())
     }
 }
 
@@ -201,6 +221,7 @@ impl<'a> LedgerEntry<'a> {
             account_root,
             check,
             payment_channel,
+            permissioned_domain: None,
             deposit_preauth,
             directory,
             escrow,
@@ -208,6 +229,38 @@ impl<'a> LedgerEntry<'a> {
             oracle,
             ripple_state,
             ticket,
+            binary,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
+        }
+    }
+
+    pub fn new_with_permissioned_domain(
+        id: Option<Cow<'a, str>>,
+        binary: Option<bool>,
+        permissioned_domain: PermissionedDomain<'a>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
+    ) -> Self {
+        Self {
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
+                id,
+            },
+            index: None,
+            account_root: None,
+            check: None,
+            payment_channel: None,
+            permissioned_domain: Some(permissioned_domain),
+            deposit_preauth: None,
+            directory: None,
+            escrow: None,
+            offer: None,
+            oracle: None,
+            ripple_state: None,
+            ticket: None,
             binary,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
@@ -226,7 +279,7 @@ pub trait LedgerEntryError {
 mod test_ledger_entry_errors {
     use super::Offer;
     use crate::models::Model;
-    use alloc::string::ToString;
+    use alloc::format;
 
     use super::*;
 
@@ -252,22 +305,21 @@ mod test_ledger_entry_errors {
             None,
             None,
         );
-        let _expected = XRPLModelException::ExpectedOneOf(&[
+        let expected = XRPLModelException::ExpectedOneOf(&[
             "index",
             "account_root",
             "check",
             "directory",
             "offer",
+            "oracle",
             "ripple_state",
             "escrow",
             "payment_channel",
             "deposit_preauth",
+            "permissioned_domain",
             "ticket",
         ]);
-        assert_eq!(
-            ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
-        );
+        assert_eq!(ledger_entry.validate().unwrap_err(), expected);
     }
 
     #[test]
@@ -297,5 +349,40 @@ mod test_ledger_entry_errors {
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(req, deserialized);
+    }
+
+    #[test]
+    fn test_permissioned_domain_object_serde() {
+        let req = LedgerEntry::new_with_permissioned_domain(
+            None,
+            None,
+            PermissionedDomain::Object(PermissionedDomainObject {
+                account: "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+                seq: 7,
+            }),
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_ok());
+        let serialized = serde_json::to_string(&req).unwrap();
+        assert!(serialized.contains("\"permissioned_domain\""));
+        assert!(serialized.contains("\"account\":\"rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh\""));
+        assert!(serialized.contains("\"seq\":7"));
+    }
+
+    #[test]
+    fn test_permissioned_domain_index_serde() {
+        let req = LedgerEntry::new_with_permissioned_domain(
+            None,
+            None,
+            PermissionedDomain::Index("A".repeat(64).into()),
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_ok());
+        let serialized = serde_json::to_string(&req).unwrap();
+        assert!(serialized.contains(&format!("\"permissioned_domain\":\"{}\"", "A".repeat(64))));
     }
 }
