@@ -14,7 +14,7 @@ use crate::models::{
 use crate::models::{FlagCollection, NoFlags};
 
 use super::exceptions::XRPLClawbackException;
-use super::mptoken_issuance_set::validate_holder_address;
+use super::mpt_common::validate_holder_address;
 use super::{CommonTransactionBuilder, Memo, Signer};
 
 /// Claws back issued currency amount or MPT issued by the sender.
