@@ -15,7 +15,7 @@ use crate::common::{
     submit_tx, test_transaction, with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
 use xrpl::asynch::transaction::sign_and_submit;
-use xrpl::models::transactions::account_delete::AccountDelete;
+use xrpl::models::transactions::{account_delete::AccountDelete, CommonFields, TransactionType};
 
 #[tokio::test]
 async fn test_account_delete_base() {
@@ -78,19 +78,15 @@ async fn test_account_delete_with_credential_ids() {
         }
 
         // Step 2a: verify gate is enforced — delete WITHOUT credentials must be rejected.
-        let mut neg_tx = AccountDelete::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            destination.classic_address.clone().into(),
-            None,
-        );
+        let mut neg_tx = AccountDelete {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: destination.classic_address.clone().into(),
+            ..Default::default()
+        };
         let neg_result = submit_tx(
             &mut neg_tx,
             SubmitOptions { wallet: &subject, autofill: true, check_fee: true },
@@ -103,19 +99,15 @@ async fn test_account_delete_with_credential_ids() {
         );
 
         // Step 2b: delete WITH credential_ids — must succeed.
-        let mut tx = AccountDelete::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            destination.classic_address.clone().into(),
-            None,
-        );
+        let mut tx = AccountDelete {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: destination.classic_address.clone().into(),
+            ..Default::default()
+        };
         tx.credential_ids = Some(vec![credential_hash.into()]);
 
         test_transaction(&mut tx, &subject).await;

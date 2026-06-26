@@ -12,8 +12,9 @@ use crate::common::{
     provision_credential_for_destination, submit_tx, test_transaction, wait_for_ledger_close_time,
     with_blockchain_lock, SubmitOptions, CREDENTIAL_TYPE_KYC,
 };
-use xrpl::models::transactions::escrow_create::EscrowCreate;
-use xrpl::models::transactions::escrow_finish::EscrowFinish;
+use xrpl::models::transactions::{
+    escrow_create::EscrowCreate, escrow_finish::EscrowFinish, CommonFields, TransactionType,
+};
 
 #[tokio::test]
 async fn test_escrow_finish_base() {
@@ -95,23 +96,17 @@ async fn test_escrow_finish_with_credential_ids() {
         let close_time = get_ledger_close_time().await;
         let finish_after = (close_time + 2) as u32;
 
-        let mut create_tx = EscrowCreate::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            "10000".into(),
-            destination.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            Some(finish_after),
-        );
+        let mut create_tx = EscrowCreate {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::EscrowCreate,
+                ..Default::default()
+            },
+            amount: "10000".into(),
+            destination: destination.classic_address.clone().into(),
+            finish_after: Some(finish_after),
+            ..Default::default()
+        };
 
         test_transaction(&mut create_tx, &subject).await;
 
@@ -121,21 +116,16 @@ async fn test_escrow_finish_with_credential_ids() {
         ledger_accept().await;
 
         // Step 3a: verify gate is enforced — finish WITHOUT credentials must be rejected.
-        let mut neg_finish = EscrowFinish::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            subject.classic_address.clone().into(),
+        let mut neg_finish = EscrowFinish {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::EscrowFinish,
+                ..Default::default()
+            },
+            owner: subject.classic_address.clone().into(),
             offer_sequence,
-            None,
-            None,
-        );
+            ..Default::default()
+        };
         let neg_result = submit_tx(
             &mut neg_finish,
             SubmitOptions { wallet: &subject, autofill: true, check_fee: true },
@@ -148,21 +138,16 @@ async fn test_escrow_finish_with_credential_ids() {
         );
 
         // Step 3b: finish WITH credential_ids — must succeed.
-        let mut finish_tx = EscrowFinish::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            subject.classic_address.clone().into(),
+        let mut finish_tx = EscrowFinish {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::EscrowFinish,
+                ..Default::default()
+            },
+            owner: subject.classic_address.clone().into(),
             offer_sequence,
-            None,
-            None,
-        );
+            ..Default::default()
+        };
         finish_tx.credential_ids = Some(vec![credential_hash.into()]);
 
         test_transaction(&mut finish_tx, &subject).await;

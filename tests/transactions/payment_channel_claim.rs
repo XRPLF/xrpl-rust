@@ -19,8 +19,10 @@ use crate::common::{
 use xrpl::asynch::{clients::XRPLAsyncClient, transaction::sign_and_submit};
 use xrpl::models::requests::account_objects::{AccountObjectType, AccountObjects};
 use xrpl::models::results;
-use xrpl::models::transactions::payment_channel_claim::PaymentChannelClaim;
-use xrpl::models::transactions::payment_channel_create::PaymentChannelCreate;
+use xrpl::models::transactions::{
+    payment_channel_claim::PaymentChannelClaim, payment_channel_create::PaymentChannelCreate,
+    CommonFields, TransactionType,
+};
 use xrpl::models::XRPAmount;
 
 #[tokio::test]
@@ -125,23 +127,18 @@ async fn test_payment_channel_claim_with_credential_ids() {
                 .await;
 
         // Step 1: subject opens a payment channel to destination.
-        let mut create_tx = PaymentChannelCreate::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            XRPAmount::from("100"),
-            destination.classic_address.clone().into(),
-            subject.public_key.clone().into(),
-            86400,
-            None,
-            None,
-        );
+        let mut create_tx = PaymentChannelCreate {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::PaymentChannelCreate,
+                ..Default::default()
+            },
+            amount: XRPAmount::from("100"),
+            destination: destination.classic_address.clone().into(),
+            public_key: subject.public_key.clone().into(),
+            settle_delay: 86400,
+            ..Default::default()
+        };
 
         test_transaction(&mut create_tx, &subject).await;
 
@@ -176,23 +173,16 @@ async fn test_payment_channel_claim_with_credential_ids() {
         // Step 3a: verify gate is enforced — claim WITHOUT credentials must be rejected.
         // Use `balance` (not `amount`) to deliver XRP from source directly. `amount` alone
         // without `signature` does not trigger fund delivery and therefore DepositAuth.
-        let mut neg_claim = PaymentChannelClaim::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            channel_id.clone().into(),
-            None,
-            Some("100".into()),
-            None,
-            None,
-        );
+        let mut neg_claim = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: channel_id.clone().into(),
+            balance: Some("100".into()),
+            ..Default::default()
+        };
         let neg_result = submit_tx(
             &mut neg_claim,
             SubmitOptions {
@@ -209,23 +199,16 @@ async fn test_payment_channel_claim_with_credential_ids() {
         );
 
         // Step 3b: claim WITH credential_ids — must succeed.
-        let mut claim_tx = PaymentChannelClaim::new(
-            subject.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            channel_id.into(),
-            None,
-            Some("100".into()),
-            None,
-            None,
-        );
+        let mut claim_tx = PaymentChannelClaim {
+            common_fields: CommonFields {
+                account: subject.classic_address.clone().into(),
+                transaction_type: TransactionType::PaymentChannelClaim,
+                ..Default::default()
+            },
+            channel: channel_id.into(),
+            balance: Some("100".into()),
+            ..Default::default()
+        };
         claim_tx.credential_ids = Some(vec![credential_hash.into()]);
 
         test_transaction(&mut claim_tx, &subject).await;
