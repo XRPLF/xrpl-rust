@@ -134,6 +134,7 @@ mod tests {
     use super::*;
     use crate::models::{Model, XRPLModelException};
     use alloc::borrow::Cow;
+    use alloc::format;
     use proptest::prelude::*;
 
     #[test]
