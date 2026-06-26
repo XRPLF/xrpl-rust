@@ -309,22 +309,23 @@ where
     wait_for_ledger_close_time(pre_close + 1).await;
 }
 
-/// Create an MPToken issuance and return the MPTokenIssuanceID.
-///
-/// The ID is `{sequence as 4-byte BE hex}{account_id as 20-byte hex}`.
+/// Create an MPToken issuance with the given creation flag and return its
+/// MPTokenIssuanceID (`{sequence as 4-byte BE hex}{account_id as 20-byte hex}`).
 #[cfg(feature = "std")]
-pub async fn create_mptoken_issuance(wallet: &Wallet) -> String {
+async fn create_mptoken_issuance_with_flag(
+    wallet: &Wallet,
+    flag: xrpl::models::transactions::mptoken_issuance_create::MPTokenIssuanceCreateFlag,
+) -> String {
     use xrpl::asynch::transaction::sign_and_submit;
     use xrpl::models::transactions::{
-        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
-        CommonFields, TransactionType,
+        mptoken_issuance_create::MPTokenIssuanceCreate, CommonFields, TransactionType,
     };
 
     let mut tx = MPTokenIssuanceCreate {
         common_fields: CommonFields {
             account: wallet.classic_address.clone().into(),
             transaction_type: TransactionType::MPTokenIssuanceCreate,
-            flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanLock].into(),
+            flags: vec![flag].into(),
             ..Default::default()
         },
         ..Default::default()
@@ -355,48 +356,19 @@ pub async fn create_mptoken_issuance(wallet: &Wallet) -> String {
     hex::encode_upper(&id_bytes)
 }
 
+/// Create an MPToken issuance (TfMPTCanLock) and return the MPTokenIssuanceID.
+#[cfg(feature = "std")]
+pub async fn create_mptoken_issuance(wallet: &Wallet) -> String {
+    use xrpl::models::transactions::mptoken_issuance_create::MPTokenIssuanceCreateFlag;
+    create_mptoken_issuance_with_flag(wallet, MPTokenIssuanceCreateFlag::TfMPTCanLock).await
+}
+
 /// Create an MPToken issuance with TfMPTCanTransfer enabled and return its ID.
 /// Used by tests that need to send MPT via Payment transactions.
 #[cfg(feature = "std")]
 pub async fn create_transferable_mptoken_issuance(wallet: &Wallet) -> String {
-    use xrpl::asynch::transaction::sign_and_submit;
-    use xrpl::models::transactions::{
-        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
-        CommonFields, TransactionType,
-    };
-
-    let mut tx = MPTokenIssuanceCreate {
-        common_fields: CommonFields {
-            account: wallet.classic_address.clone().into(),
-            transaction_type: TransactionType::MPTokenIssuanceCreate,
-            flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanTransfer].into(),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let client = get_client().await;
-    let result = sign_and_submit(&mut tx, client, wallet, true, true)
-        .await
-        .expect("create_transferable_mptoken_issuance: sign_and_submit failed");
-    assert_eq!(
-        result.engine_result, "tesSUCCESS",
-        "create_transferable_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
-        result.engine_result, result.engine_result_message
-    );
-    let pre_close = get_ledger_close_time().await;
-    ledger_accept().await;
-    wait_for_ledger_close_time(pre_close + 1).await;
-
-    let sequence = result.tx_json["Sequence"]
-        .as_u64()
-        .expect("Sequence missing from tx_json") as u32;
-    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
-        .expect("failed to decode classic address");
-    let mut id_bytes = Vec::with_capacity(24);
-    id_bytes.extend_from_slice(&sequence.to_be_bytes());
-    id_bytes.extend_from_slice(&account_id);
-    hex::encode_upper(&id_bytes)
+    use xrpl::models::transactions::mptoken_issuance_create::MPTokenIssuanceCreateFlag;
+    create_mptoken_issuance_with_flag(wallet, MPTokenIssuanceCreateFlag::TfMPTCanTransfer).await
 }
 
 /// Parameters for [`submit_tx`].
