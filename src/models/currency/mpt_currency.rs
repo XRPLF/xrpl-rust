@@ -1,4 +1,4 @@
-use crate::models::transactions::mptoken_issuance_set::validate_mptoken_issuance_id;
+use crate::models::transactions::mpt_common::validate_mptoken_issuance_id;
 use crate::models::{Model, XRPLModelResult};
 use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};

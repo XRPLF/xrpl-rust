@@ -8,7 +8,7 @@ use crate::models::{
     Model, NoFlags, ValidateCurrencies, XRPLModelResult,
 };
 
-use super::mptoken_issuance_set::validate_mptoken_issuance_id;
+use super::mpt_common::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// Destroys an existing MPToken issuance. Only the issuer can destroy an
