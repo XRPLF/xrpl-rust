@@ -140,6 +140,13 @@ impl<'a> CredentialCreateError for CredentialCreate<'a> {
                     found: uri.len(),
                 });
             }
+            if !uri.len().is_multiple_of(2) {
+                return Err(XRPLModelException::InvalidValueFormat {
+                    field: "uri".into(),
+                    format: "even-length hexadecimal (whole bytes)".into(),
+                    found: uri.as_ref().into(),
+                });
+            }
             super::validate_hex("uri", uri)?;
         }
         Ok(())
@@ -365,6 +372,29 @@ mod tests {
     }
 
     #[test]
+    fn test_uri_odd_length_error() {
+        let tx = CredentialCreate {
+            common_fields: CommonFields {
+                account: "rIssuer111111111111111111111111111".into(),
+                transaction_type: TransactionType::CredentialCreate,
+                ..Default::default()
+            },
+            subject: "rSubject11111111111111111111111111".into(),
+            credential_type: "4B5943".into(),
+            expiration: None,
+            uri: Some(Cow::from("ABC")), // 3 chars — odd-length valid hex
+        };
+        assert_eq!(
+            tx.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValueFormat {
+                field: "uri".into(),
+                format: "even-length hexadecimal (whole bytes)".into(),
+                found: "ABC".into(),
+            }
+        );
+    }
+
+    #[test]
     fn test_uri_non_hex_error() {
         let tx = CredentialCreate {
             common_fields: CommonFields {
@@ -375,14 +405,14 @@ mod tests {
             subject: "rSubject11111111111111111111111111".into(),
             credential_type: "4B5943".into(),
             expiration: None,
-            uri: Some(Cow::from("NOT_HEX")),
+            uri: Some(Cow::from("NOTHEX")), // 6 chars, even-length, non-hex
         };
         assert_eq!(
             tx.get_errors().unwrap_err(),
             XRPLModelException::InvalidValueFormat {
                 field: "uri".into(),
                 format: "hexadecimal".into(),
-                found: "NOT_HEX".into(),
+                found: "NOTHEX".into(),
             }
         );
     }
