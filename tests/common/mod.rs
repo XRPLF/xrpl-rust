@@ -36,9 +36,15 @@ pub async fn open_websocket(
     use anyhow::anyhow;
 
     let port = uri.port().unwrap_or(80);
-    let url = format!("{}:{}", uri.host_str().unwrap(), port);
+    let url = format!(
+        "{}:{}",
+        uri.host_str().expect("open_websocket: URI has no host"),
+        port
+    );
 
-    let tcp = TcpStream::connect(&url).await.unwrap();
+    let tcp = TcpStream::connect(&url)
+        .await
+        .expect("open_websocket: TcpStream::connect failed");
     let stream = FromTokio::new(tcp);
     let rng = OsRng;
     match AsyncWebSocketClient::open(stream, uri, rng, None, None).await {
@@ -121,13 +127,21 @@ pub async fn generate_funded_wallet() -> Wallet {
 }
 
 /// Advance the ledger by one close.
+///
+/// Panics on a transport failure or non-success HTTP status so that a broken
+/// standalone node surfaces as a clear test failure rather than a silently
+/// dropped request that later manifests as a confusing stale-ledger error.
 #[cfg(feature = "std")]
 pub async fn ledger_accept() {
-    let _ = reqwest::Client::new()
+    let response = reqwest::Client::new()
         .post(constants::STANDALONE_URL)
         .json(&serde_json::json!({"method": "ledger_accept", "params": [{}]}))
         .send()
-        .await;
+        .await
+        .expect("ledger_accept: HTTP request failed");
+    response
+        .error_for_status()
+        .expect("ledger_accept: node returned an error status");
 }
 
 /// Return the `close_time` of the most-recent validated ledger in Ripple epoch seconds.
