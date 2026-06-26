@@ -37,6 +37,13 @@ const _MAX_MANTISSA: u128 = u128::pow(10, 16) - 1;
 const _NOT_XRP_BIT_MASK: u8 = 0x80;
 const _POS_SIGN_BIT_MASK: i64 = 0x4000000000000000;
 const _ZERO_CURRENCY_AMOUNT_HEX: u64 = 0x8000000000000000;
+
+/// Leading-byte flag (bit 7): set for IOU amounts, clear for XRP and MPT.
+const LEADING_IOU_FLAG: u8 = 0x80;
+/// Leading-byte flag (bit 5): set for MPT amounts.
+const LEADING_MPT_FLAG: u8 = 0x20;
+/// Leading-byte flag (bit 6): set when the amount is positive.
+const LEADING_POS_FLAG: u8 = 0x40;
 const _NATIVE_AMOUNT_BYTE_LENGTH: u8 = 8;
 const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
 const _MPT_AMOUNT_BYTE_LENGTH: u8 = 33;
@@ -237,8 +244,8 @@ fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[
     })?;
 
     let mut result = [0u8; 33];
-    // Leading byte: 0x60 = MPT flag (0x20) + positive flag (0x40)
-    result[0] = 0x60;
+    // Leading byte: MPT flag (0x20) + positive flag (0x40) = 0x60.
+    result[0] = LEADING_MPT_FLAG | LEADING_POS_FLAG;
     // Amount as big-endian u64
     let amount_bytes = amount.to_be_bytes();
     result[1..9].copy_from_slice(&amount_bytes);
@@ -259,19 +266,19 @@ impl Amount {
 
     /// Returns True if this amount is a native XRP amount.
     pub fn is_native(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
+        self.0[0] & LEADING_IOU_FLAG == 0 && self.0[0] & LEADING_MPT_FLAG == 0
     }
 
     /// Returns True if this amount is an MPT amount.
     pub fn is_mpt(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
+        self.0[0] & LEADING_IOU_FLAG == 0 && self.0[0] & LEADING_MPT_FLAG != 0
     }
 
     /// Returns true if bit 6 of the first byte is set (positive amount).
     /// Applies to XRP, IOU, and MPT amounts — the positive flag is always
     /// encoded in byte[0] bit 6 (0x40) of the serialized amount.
     pub fn is_positive(&self) -> bool {
-        self.0[0] & 0x40 > 0
+        self.0[0] & LEADING_POS_FLAG > 0
     }
 }
 
@@ -300,7 +307,7 @@ impl IssuedCurrency {
             value = BigDecimal::new(int_mantissa.into(), scale);
 
             // Handle the sign
-            if bytes[0] & 0x40 > 0 {
+            if bytes[0] & LEADING_POS_FLAG > 0 {
                 // Set the value to positive (BigDecimal assumes positive by default)
                 value = value.abs();
             } else {
@@ -343,9 +350,9 @@ impl TryFromParser for Amount {
         // 0x80 set => IOU (48 bytes)
         // 0x80 clear, 0x20 set => MPT (33 bytes)
         // 0x80 clear, 0x20 clear => Native XRP (8 bytes)
-        let num_bytes = if first_byte[0] & 0x80 != 0 {
+        let num_bytes = if first_byte[0] & LEADING_IOU_FLAG != 0 {
             _CURRENCY_AMOUNT_BYTE_LENGTH
-        } else if first_byte[0] & 0x20 != 0 {
+        } else if first_byte[0] & LEADING_MPT_FLAG != 0 {
             _MPT_AMOUNT_BYTE_LENGTH
         } else {
             _NATIVE_AMOUNT_BYTE_LENGTH
@@ -387,7 +394,7 @@ impl Serialize for Amount {
             // always sets the positive bit (0x40) for MPT. A cleared sign bit is
             // malformed wire data — reject it rather than synthesizing a negative
             // value string that would fail re-validation on the model layer.
-            if leading & 0x40 == 0 {
+            if leading & LEADING_POS_FLAG == 0 {
                 return Err(S::Error::custom(
                     "MPT amount has cleared sign bit (negative MPT amounts are invalid)",
                 ));
