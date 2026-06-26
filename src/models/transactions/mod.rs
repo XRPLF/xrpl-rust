@@ -16,6 +16,7 @@ pub mod escrow_create;
 pub mod escrow_finish;
 pub mod exceptions;
 pub mod metadata;
+pub mod mpt_common;
 pub mod mptoken_authorize;
 pub mod mptoken_issuance_create;
 pub mod mptoken_issuance_destroy;

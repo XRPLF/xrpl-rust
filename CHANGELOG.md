@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking:** `Amount::is_issued_currency()` now returns `false` for `MPTAmount`. Previously it returned `!is_xrp()`, so any non-XRP amount yielded `true`. With the introduction of the `MPTAmount` variant, callers that used `is_issued_currency()` as a proxy for "not XRP" must be updated to also check `is_mpt()`. Use the new `is_mpt()` helper for MPT-specific branches.
+- **Behavior change:** the transaction-metadata balance parser no longer labels non-IOU amounts as `XRP` via a catch-all arm. MPT amounts now return `None` (no trustline currency) instead of being mislabeled `XRP`. Consumers that relied on the previous wildcard behavior for non-ICA amounts will observe the corrected classification.
 - Unit-test and integration-test coverage are now scoped via Cargo feature flags rather than path regex. The unit-test workflow builds with `--no-default-features --features std,core,utils,wallet,models`, so integration-territory code (CLI, async clients, sync wrappers, faucet) simply isn't compiled and doesn't appear in the unit coverage report.
 - Network-dependent inline tests in `src/asynch/transaction/` and `src/asynch/wallet/` (`test_autofill_txn`, `test_autofill_and_sign`, `test_submit_and_wait`, `test_generate_faucet_wallet`) are now gated behind `feature = "integration"` so `cargo test --release` is hermetic by default.
 - Codecov **patch** coverage is now gated per flag (separate `unit` and `integration` sections) rather than a single combined gate.
@@ -36,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Non-cryptographic RNG (`Hc128Rng`) was being used for wallet seed generation; replaced with `OsRng` so all key material is sourced from the OS entropy pool (closes #286).
+- MPT amount decode now rejects a cleared sign bit (`0x40`) as malformed wire data instead of synthesizing a negative value string. Per XLS-33, MPT amounts are strictly unsigned.
 - `RipplePathFind::destination_amount` changed from `Currency<'a>` to `Amount<'a>` to match the XRPL wire format.
 - `NoRippleCheckRole` no longer serializes with the `#[serde(tag = "role")]` discriminator; now emits a plain `snake_case` string matching the XRPL wire format.
 - `is_success()` now reports success correctly for responses deserialized into typed `XRPLResult` variants (e.g. `ServerInfo`); it consults the preserved raw result JSON instead of the re-serialized typed value.

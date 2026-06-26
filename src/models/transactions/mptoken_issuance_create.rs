@@ -14,12 +14,10 @@ use crate::models::{
     FlagCollection, Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
 
-use super::{mptoken_issuance_set::validate_domain_id, CommonFields, CommonTransactionBuilder};
-
-/// Maximum transfer fee value (50000 = 50.000%).
-const MAX_MPT_TRANSFER_FEE: u16 = 50000;
-/// Maximum MPT metadata byte length per XLS-89.
-const MAX_MPT_METADATA_BYTES: usize = 1024;
+use super::{
+    mpt_common::{validate_domain_id, validate_mpt_metadata, validate_transfer_fee},
+    CommonFields, CommonTransactionBuilder,
+};
 
 /// Transactions of the MPTokenIssuanceCreate type support additional values
 /// in the Flags field.
@@ -217,13 +215,7 @@ impl<'a> MPTokenIssuanceCreate<'a> {
 
     fn _get_transfer_fee_error(&self) -> XRPLModelResult<()> {
         if let Some(transfer_fee) = self.transfer_fee {
-            if transfer_fee > MAX_MPT_TRANSFER_FEE {
-                return Err(XRPLModelException::ValueTooHigh {
-                    field: "transfer_fee".into(),
-                    max: MAX_MPT_TRANSFER_FEE as u32,
-                    found: transfer_fee as u32,
-                });
-            }
+            validate_transfer_fee(transfer_fee)?;
         }
         Ok(())
     }
@@ -288,24 +280,7 @@ impl<'a> MPTokenIssuanceCreate<'a> {
 
     fn _get_metadata_error(&self) -> XRPLModelResult<()> {
         if let Some(metadata) = &self.mptoken_metadata {
-            if metadata.is_empty()
-                || metadata.len() % 2 != 0
-                || !metadata.bytes().all(|b| b.is_ascii_hexdigit())
-            {
-                return Err(XRPLModelException::InvalidValueFormat {
-                    field: "mptoken_metadata".into(),
-                    format: "non-empty even-length ASCII hex string".into(),
-                    found: metadata.as_ref().into(),
-                });
-            }
-            let byte_len = metadata.len() / 2;
-            if byte_len > MAX_MPT_METADATA_BYTES {
-                return Err(XRPLModelException::ValueTooLong {
-                    field: "mptoken_metadata".into(),
-                    max: MAX_MPT_METADATA_BYTES,
-                    found: byte_len,
-                });
-            }
+            validate_mpt_metadata(metadata.as_ref())?;
         }
         Ok(())
     }
@@ -317,6 +292,7 @@ mod tests {
 
     use crate::models::Model;
 
+    use super::super::mpt_common::MAX_MPT_TRANSFER_FEE;
     use super::*;
     use crate::utils::testing::test_constants::*;
 

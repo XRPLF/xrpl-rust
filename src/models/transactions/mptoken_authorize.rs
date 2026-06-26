@@ -12,7 +12,7 @@ use crate::models::{
     Model, XRPLModelException, XRPLModelResult,
 };
 
-use super::mptoken_issuance_set::{validate_holder_address, validate_mptoken_issuance_id};
+use super::mpt_common::{validate_holder_address, validate_mptoken_issuance_id};
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// Transactions of the MPTokenAuthorize type support additional values
