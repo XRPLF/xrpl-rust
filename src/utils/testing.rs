@@ -193,16 +193,13 @@ pub mod test_constants {
     pub const EXAMPLE_COM_HEX: &str = "6578616d706c652e636f6d";
 
     /// Common test URLs
-    pub const TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234";
+    pub const TESTNET_URL: &str = "https://s.altnet.rippletest.net:51234/";
     pub const ALT_TESTNET_URL: &str = "https://faucet.altnet.rippletest.net:443";
 
     // ── Test account addresses ────────────────────────────────────────────
-    // Well-known fixtures used across MPT model and codec unit tests.
-    // rHb9... is the genesis (root) account on standalone nodes.
-
     /// Genesis / root account on standalone rippled nodes.
     pub const ACCOUNT_GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
-    /// General-purpose test issuer / MPT issuer account.
+    /// General-purpose test issuer account.
     pub const ACCOUNT_ISSUER: &str = "rvYAfWj5gh67oV6fW32ZzP3Aw4Eubs59B";
     /// General-purpose test holder / clawback target account.
     pub const ACCOUNT_HOLDER: &str = "rN7n7otQDd6FczFgLdSqtcsAUxDkw6fzRH";

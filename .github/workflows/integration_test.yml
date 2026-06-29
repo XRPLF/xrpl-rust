@@ -10,7 +10,7 @@ on:
 name: Integration Test
 
 env:
-  # rippled binary was renamed to xrpld; use the new image name.
+  # binary was renamed to xrpld in newer releases; use the xrpld image.
   # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
   XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
   # Files measured by the integration coverage gate are the inverse of this regex.

@@ -31,4 +31,14 @@ rustc-ice*
 dev/*
 .playwright-mcp/*
 .worktrees/
-xls-70-pr-154.md
+.history/
+
+# Local agent working docs (never push)
+CLAUDE.md
+CLAUDE.local.md
+xls-*.md
+mr-*.md
+pr-*.md
+docs/
+rippled/
+xrpl.js/
