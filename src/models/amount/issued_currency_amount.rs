@@ -6,6 +6,7 @@ use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct IssuedCurrencyAmount<'a> {
     pub currency: Cow<'a, str>,
     pub issuer: Cow<'a, str>,

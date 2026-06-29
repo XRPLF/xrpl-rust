@@ -3,6 +3,7 @@
 pub mod amm;
 pub mod constants;
 pub mod payment;
+pub mod vault;
 pub mod xchain;
 
 use anyhow::Result;
@@ -111,8 +112,12 @@ pub async fn generate_funded_wallet() -> Wallet {
         None, // send_max
     );
 
-    let client = get_client().await;
-    sign_and_submit(&mut payment, client, &genesis, true, true)
+    // Create a fresh client scoped to the current Tokio runtime.
+    // Using the static CLIENT here causes DispatchGone errors when sync
+    // wrapper tests create and drop their own Runtime instances — the static
+    // client's hyper dispatch task is tied to whichever runtime initialised it.
+    let local_client = AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap());
+    sign_and_submit(&mut payment, &local_client, &genesis, true, true)
         .await
         .expect("generate_funded_wallet: funding payment failed");
 
@@ -368,6 +373,55 @@ pub async fn create_transferable_mptoken_issuance(wallet: &Wallet) -> String {
     assert_eq!(
         result.engine_result, "tesSUCCESS",
         "create_transferable_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
+        result.engine_result, result.engine_result_message
+    );
+    let pre_close = get_ledger_close_time().await;
+    ledger_accept().await;
+    wait_for_ledger_close_time(pre_close + 1).await;
+
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing from tx_json") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("failed to decode classic address");
+    let mut id_bytes = Vec::with_capacity(24);
+    id_bytes.extend_from_slice(&sequence.to_be_bytes());
+    id_bytes.extend_from_slice(&account_id);
+    hex::encode_upper(&id_bytes)
+}
+
+/// Create an MPToken issuance with both `TfMPTCanTransfer` and `TfMPTCanClawback`
+/// enabled and return its ID. Used by the MPT vault lifecycle test, which both
+/// moves MPT into a vault and claws it back.
+#[cfg(feature = "std")]
+pub async fn create_transferable_clawbackable_mptoken_issuance(wallet: &Wallet) -> String {
+    use xrpl::asynch::transaction::sign_and_submit;
+    use xrpl::models::transactions::{
+        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+        CommonFields, TransactionType,
+    };
+
+    let mut tx = MPTokenIssuanceCreate {
+        common_fields: CommonFields {
+            account: wallet.classic_address.clone().into(),
+            transaction_type: TransactionType::MPTokenIssuanceCreate,
+            flags: vec![
+                MPTokenIssuanceCreateFlag::TfMPTCanTransfer,
+                MPTokenIssuanceCreateFlag::TfMPTCanClawback,
+            ]
+            .into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = get_client().await;
+    let result = sign_and_submit(&mut tx, client, wallet, true, true)
+        .await
+        .expect("create_transferable_clawbackable_mptoken_issuance: sign_and_submit failed");
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "create_transferable_clawbackable_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
         result.engine_result, result.engine_result_message
     );
     let pre_close = get_ledger_close_time().await;
