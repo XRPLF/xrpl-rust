@@ -267,10 +267,11 @@ impl Amount {
         self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
-    /// Returns true if 2nd bit in 1st byte is set to 1
-    /// (positive amount).
+    /// Returns true if bit 6 of the first byte is set (positive amount).
+    /// Applies to XRP, IOU, and MPT amounts — the positive flag is always
+    /// encoded in byte[0] bit 6 (0x40) of the serialized amount.
     pub fn is_positive(&self) -> bool {
-        self.0[1] & 0x40 > 0
+        self.0[0] & 0x40 > 0
     }
 }
 
@@ -445,18 +446,9 @@ impl TryFrom<serde_json::Value> for Amount {
             let obj = value
                 .as_object()
                 .ok_or(XRPLTypeException::InvalidNoneValue)?;
-            if obj.contains_key("mpt_issuance_id") {
-                // MPT amount: must have mpt_issuance_id + value, no currency/issuer
-                if obj.contains_key("currency") {
-                    return Err(XRPLCoreException::XRPLUtilsError(
-                        "Currency not valid for MPT".to_string(),
-                    ));
-                }
-                if obj.contains_key("issuer") {
-                    return Err(XRPLCoreException::XRPLUtilsError(
-                        "Issuer not valid for MPT".to_string(),
-                    ));
-                }
+            if obj.len() == 2 && obj.contains_key("mpt_issuance_id") && obj.contains_key("value") {
+                // MPT amount: exactly the keys {"mpt_issuance_id", "value"} — matches
+                // xrpl.js isAmountObjectMPT which requires sorted keys === ["mpt_issuance_id","value"].
                 let mpt_id = obj["mpt_issuance_id"]
                     .as_str()
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
@@ -465,8 +457,21 @@ impl TryFrom<serde_json::Value> for Amount {
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
                 let serialized = _serialize_mpt_amount(val, mpt_id)?;
                 Ok(Amount::new(Some(&serialized))?)
-            } else {
+            } else if obj.contains_key("currency")
+                && obj.contains_key("issuer")
+                && obj.contains_key("value")
+            {
+                // ICA: must have {"currency", "issuer", "value"}; extra keys (e.g.
+                // "counterparty") are allowed and ignored per the XRPL amount spec.
                 Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
+            } else {
+                Err(XRPLCoreException::SerdeJsonError(
+                    XRPLSerdeJsonError::UnexpectedValueType {
+                        expected: r#"{"mpt_issuance_id","value"} or {"currency","issuer","value"}"#
+                            .into(),
+                        found: value,
+                    },
+                ))
             }
         } else {
             Err(XRPLCoreException::SerdeJsonError(

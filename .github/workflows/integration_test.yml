@@ -10,7 +10,7 @@ on:
 name: Integration Test
 
 env:
-  # rippled binary was renamed to xrpld; use the new image name.
+  # binary was renamed to xrpld in newer releases; use the xrpld image.
   # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
   XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
   # Files measured by the integration coverage gate are the inverse of this regex.
@@ -37,6 +37,23 @@ jobs:
             --volume "${{ github.workspace }}/.ci-config/":"/etc/xrpld/" \
             --name xrpld-service \
             ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
+
+      - name: Wait for xrpld to be ready
+        run: |
+          echo "Waiting for xrpld RPC on localhost:5005..."
+          for i in $(seq 1 60); do
+            if curl -sf -X POST http://localhost:5005/ \
+                -H 'Content-Type: application/json' \
+                -d '{"method":"server_info","params":[{}]}' \
+                | grep -q '"status":"success"'; then
+              echo "xrpld is ready (attempt $i)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "xrpld did not become ready in time"
+          docker logs xrpld-service || true
+          exit 1
 
       - uses: dtolnay/rust-toolchain@stable
 

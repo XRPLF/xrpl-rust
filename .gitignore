@@ -22,3 +22,23 @@
 **/.DS_Store
 
 rustc-ice*
+
+# Machine-specific Cargo config (e.g. jobs = N) — keep local overrides out of the tree
+.cargo/config.toml
+.cargo/config
+.local/*
+dev/*
+.playwright-mcp/*
+.worktrees/
+.local/
+.history/
+
+# Local agent working docs (never push)
+CLAUDE.md
+CLAUDE.local.md
+xls-*.md
+mr-*.md
+pr-*.md
+docs/
+rippled/
+xrpl.js/

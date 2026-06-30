@@ -9,6 +9,7 @@ pub mod amm_withdraw;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
+pub mod clawback;
 pub mod deposit_preauth;
 pub mod did_delete;
 pub mod did_set;
@@ -17,6 +18,10 @@ pub mod escrow_create;
 pub mod escrow_finish;
 pub mod exceptions;
 pub mod metadata;
+pub mod mptoken_authorize;
+pub mod mptoken_issuance_create;
+pub mod mptoken_issuance_destroy;
+pub mod mptoken_issuance_set;
 pub mod nftoken_accept_offer;
 pub mod nftoken_burn;
 pub mod nftoken_cancel_offer;
@@ -24,6 +29,8 @@ pub mod nftoken_create_offer;
 pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
+pub mod oracle_delete;
+pub mod oracle_set;
 pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
@@ -33,6 +40,13 @@ pub mod set_regular_key;
 pub mod signer_list_set;
 pub mod ticket_create;
 pub mod trust_set;
+pub mod vault_clawback;
+pub(crate) mod vault_common;
+pub mod vault_create;
+pub mod vault_delete;
+pub mod vault_deposit;
+pub mod vault_set;
+pub mod vault_withdraw;
 pub mod xchain_account_create_commit;
 pub mod xchain_add_account_create_attestation;
 pub mod xchain_add_claim_attestation;
@@ -78,12 +92,17 @@ pub enum TransactionType {
     CheckCancel,
     CheckCash,
     CheckCreate,
+    Clawback,
     DIDDelete,
-    DIDSet,
+    DIDSet,  
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,
     EscrowFinish,
+    MPTokenAuthorize,
+    MPTokenIssuanceCreate,
+    MPTokenIssuanceDestroy,
+    MPTokenIssuanceSet,
     NFTokenAcceptOffer,
     NFTokenBurn,
     NFTokenCancelOffer,
@@ -91,6 +110,8 @@ pub enum TransactionType {
     NFTokenMint,
     OfferCancel,
     OfferCreate,
+    OracleDelete,
+    OracleSet,
     #[default]
     Payment,
     PaymentChannelClaim,
@@ -100,6 +121,12 @@ pub enum TransactionType {
     SignerListSet,
     TicketCreate,
     TrustSet,
+    VaultClawback,
+    VaultCreate,
+    VaultDelete,
+    VaultDeposit,
+    VaultSet,
+    VaultWithdraw,
     XChainAccountCreateCommit,
     XChainAddAccountCreateAttestation,
     XChainAddClaimAttestation,
@@ -575,6 +602,89 @@ pub struct Signer {
     pub txn_signature: String,
     pub signing_pub_key: String,
 }
+}
+
+serde_with_tag! {
+/// Represents a single price data entry in an Oracle's PriceDataSeries.
+///
+/// See OracleSet:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/oracleset>`
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct PriceData {
+    pub base_asset: String,
+    pub quote_asset: String,
+    /// The token pair's price. When omitted on an OracleSet update, rippled
+    /// deletes the existing price data entry for this base/quote pair.
+    pub asset_price: Option<String>,
+    /// Decimal scale factor. Actual price = asset_price × 10^(−scale). Range 0–20.
+    /// Must be present when asset_price is present, and absent when asset_price is absent.
+    pub scale: Option<u8>,
+}
+}
+
+/// Maximum allowed value for the `scale` field of a `PriceData` entry.
+pub const MAX_PRICE_DATA_SCALE: u8 = 20;
+
+impl crate::models::Model for PriceData {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        if let Some(scale) = self.scale {
+            if scale > MAX_PRICE_DATA_SCALE {
+                return Err(crate::models::XRPLModelException::ValueTooHigh {
+                    field: "scale".into(),
+                    max: MAX_PRICE_DATA_SCALE as u32,
+                    found: scale as u32,
+                });
+            }
+        }
+        if self.asset_price.is_some() != self.scale.is_some() {
+            return Err(crate::models::XRPLModelException::InvalidValue {
+                field: "price_data".into(),
+                expected: "AssetPrice and Scale both present or both omitted".into(),
+                found: alloc::format!(
+                    "asset_price_present={}, scale_present={}",
+                    self.asset_price.is_some(),
+                    self.scale.is_some()
+                ),
+            });
+        }
+        validate_oracle_currency("base_asset", &self.base_asset)?;
+        validate_oracle_currency("quote_asset", &self.quote_asset)?;
+        validate_oracle_asset_price(&self.asset_price)?;
+        Ok(())
+    }
+}
+
+/// Maximum allowed value for `AssetPrice`.
+pub const MAX_ORACLE_ASSET_PRICE: u64 = u64::MAX;
+
+fn validate_oracle_currency(
+    field: &'static str,
+    value: &str,
+) -> crate::models::XRPLModelResult<()> {
+    if crate::utils::is_iso_code(value) || crate::utils::is_iso_hex(value) {
+        return Ok(());
+    }
+    Err(crate::models::XRPLModelException::InvalidValue {
+        field: field.into(),
+        expected: "a 3-character ISO currency code (including \"XRP\") or 40-character hex code"
+            .into(),
+        found: value.into(),
+    })
+}
+
+fn validate_oracle_asset_price(value: &Option<String>) -> crate::models::XRPLModelResult<()> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    match u64::from_str_radix(value, 16) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(crate::models::XRPLModelException::InvalidValue {
+            field: "asset_price".into(),
+            expected: "a valid UInt64 hexadecimal string (0x0000000000000000..=0xFFFFFFFFFFFFFFFF)"
+                .into(),
+            found: value.clone(),
+        }),
+    }
 }
 
 /// Standard functions for transactions.

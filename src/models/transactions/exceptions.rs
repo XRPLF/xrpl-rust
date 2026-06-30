@@ -8,7 +8,8 @@ use thiserror_no_std::Error;
 #[derive(Debug, PartialEq, Error)]
 pub enum XRPLTransactionException {
     #[error("{0}")]
-    XRPLAccountSetError(#[from] XRPLAccountSetException),
+    XRPLAccountSetError(#[from] XRPLAccountSetException),  
+    XRPLClawbackError(#[from] XRPLClawbackException),
     #[error("{0}")]
     XRPLDIDSetError(#[from] XRPLDIDSetException),
     #[error("{0}")]
@@ -237,3 +238,20 @@ pub enum XRPLDIDSetException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLDIDSetException {}
+pub enum XRPLClawbackException {
+    #[error("Clawback amount must not be XRP — only issued currencies can be clawed back")]
+    AmountMustNotBeXRP,
+    #[error("The `holder` field must not be present for standard issued-currency (IOU) clawback")]
+    HolderMustNotBePresentForIOU,
+    #[error(
+        "For IOU clawback, `amount.issuer` must be the holder's address and must differ from `Account`"
+    )]
+    IssuerMustNotEqualAccount,
+    #[error("The `holder` field is required for MPT clawback")]
+    HolderRequiredForMPT,
+    #[error("The `holder` field must not equal the transaction `Account` (no self-clawback)")]
+    HolderMustNotEqualAccount,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLClawbackException {}

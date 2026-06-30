@@ -3,6 +3,7 @@
 pub mod amm;
 pub mod constants;
 pub mod payment;
+pub mod vault;
 pub mod xchain;
 
 use anyhow::Result;
@@ -115,8 +116,12 @@ pub async fn generate_funded_wallet() -> Wallet {
         None, // send_max
     );
 
-    let client = get_client().await;
-    let result = sign_and_submit(&mut payment, client, &genesis, true, true)
+    // Create a fresh client scoped to the current Tokio runtime.
+    // Using the static CLIENT here causes DispatchGone errors when sync
+    // wrapper tests create and drop their own Runtime instances — the static
+    // client's hyper dispatch task is tied to whichever runtime initialised it.
+    let local_client = AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap());
+    sign_and_submit(&mut payment, &local_client, &genesis, true, true)
         .await
         .expect("generate_funded_wallet: funding payment failed");
 
@@ -172,14 +177,17 @@ pub async fn get_ledger_close_time() -> u64 {
 }
 
 /// Poll until `close_time >= target`, calling `ledger_accept` each iteration.
+/// Panics after 60 iterations to prevent silent hangs when the standalone server
+/// stops advancing (e.g. frozen or unresponsive `ledger_accept` requests).
 #[cfg(feature = "std")]
 pub async fn wait_for_ledger_close_time(target: u64) {
-    loop {
+    for _ in 0..60 {
         if get_ledger_close_time().await >= target {
             return;
         }
         ledger_accept().await;
     }
+    panic!("ledger close_time did not advance to {target} after 60 ledger_accept calls");
 }
 
 /// Serialize all blockchain-mutating tests to prevent sequence number conflicts.
@@ -262,7 +270,14 @@ pub async fn get_escrow_offer_sequence(account: &str) -> u32 {
     }
 }
 
-/// Sign, submit, assert tesSUCCESS, and advance the ledger.
+/// Sign, submit, assert tesSUCCESS, and wait for the ledger to validate.
+///
+/// Uses `sign_and_submit` to get the provisional `engine_result`, asserts
+/// it is `tesSUCCESS`, then calls `ledger_accept` to close the current
+/// ledger and `wait_for_ledger_close_time` to confirm the validated ledger
+/// has advanced past the submission point. This ensures the transaction
+/// is in a validated ledger before the caller proceeds.
+///
 /// This replaces `submit_and_wait` in all integration tests.
 #[cfg(feature = "std")]
 pub async fn test_transaction<'a, T, F>(tx: &mut T, wallet: &Wallet)
@@ -277,6 +292,11 @@ where
 {
     use xrpl::asynch::transaction::sign_and_submit;
     let client = get_client().await;
+
+    // Record the validated ledger close_time before submission so we can
+    // detect that a new ledger has been validated after the transaction lands.
+    let pre_close = get_ledger_close_time().await;
+
     let result = sign_and_submit(tx, client, wallet, true, true)
         .await
         .expect("test_transaction: sign_and_submit failed");
@@ -285,5 +305,187 @@ where
         "Expected tesSUCCESS but got: {} — {}",
         result.engine_result, result.engine_result_message
     );
+
+    // Advance the ledger and wait until a new validated ledger has closed,
+    // ensuring the transaction is in validated state before returning.
     ledger_accept().await;
+    wait_for_ledger_close_time(pre_close + 1).await;
+}
+
+/// Create an MPToken issuance and return the MPTokenIssuanceID.
+///
+/// The ID is `{sequence as 4-byte BE hex}{account_id as 20-byte hex}`.
+#[cfg(feature = "std")]
+pub async fn create_mptoken_issuance(wallet: &Wallet) -> String {
+    use xrpl::asynch::transaction::sign_and_submit;
+    use xrpl::models::transactions::{
+        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+        CommonFields, TransactionType,
+    };
+
+    let mut tx = MPTokenIssuanceCreate {
+        common_fields: CommonFields {
+            account: wallet.classic_address.clone().into(),
+            transaction_type: TransactionType::MPTokenIssuanceCreate,
+            flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanLock].into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = get_client().await;
+    let result = sign_and_submit(&mut tx, client, wallet, true, true)
+        .await
+        .expect("create_mptoken_issuance: sign_and_submit failed");
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "create_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
+        result.engine_result, result.engine_result_message
+    );
+    let pre_close = get_ledger_close_time().await;
+    ledger_accept().await;
+    wait_for_ledger_close_time(pre_close + 1).await;
+
+    // Build MPTokenIssuanceID from the autofilled sequence + account ID
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing from tx_json") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("failed to decode classic address");
+    let mut id_bytes = Vec::with_capacity(24);
+    id_bytes.extend_from_slice(&sequence.to_be_bytes());
+    id_bytes.extend_from_slice(&account_id);
+    hex::encode_upper(&id_bytes)
+}
+
+/// Create an MPToken issuance with TfMPTCanTransfer enabled and return its ID.
+/// Used by tests that need to send MPT via Payment transactions.
+#[cfg(feature = "std")]
+pub async fn create_transferable_mptoken_issuance(wallet: &Wallet) -> String {
+    use xrpl::asynch::transaction::sign_and_submit;
+    use xrpl::models::transactions::{
+        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+        CommonFields, TransactionType,
+    };
+
+    let mut tx = MPTokenIssuanceCreate {
+        common_fields: CommonFields {
+            account: wallet.classic_address.clone().into(),
+            transaction_type: TransactionType::MPTokenIssuanceCreate,
+            flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanTransfer].into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = get_client().await;
+    let result = sign_and_submit(&mut tx, client, wallet, true, true)
+        .await
+        .expect("create_transferable_mptoken_issuance: sign_and_submit failed");
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "create_transferable_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
+        result.engine_result, result.engine_result_message
+    );
+    let pre_close = get_ledger_close_time().await;
+    ledger_accept().await;
+    wait_for_ledger_close_time(pre_close + 1).await;
+
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing from tx_json") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("failed to decode classic address");
+    let mut id_bytes = Vec::with_capacity(24);
+    id_bytes.extend_from_slice(&sequence.to_be_bytes());
+    id_bytes.extend_from_slice(&account_id);
+    hex::encode_upper(&id_bytes)
+}
+
+/// Create an MPToken issuance with both `TfMPTCanTransfer` and `TfMPTCanClawback`
+/// enabled and return its ID. Used by the MPT vault lifecycle test, which both
+/// moves MPT into a vault and claws it back.
+#[cfg(feature = "std")]
+pub async fn create_transferable_clawbackable_mptoken_issuance(wallet: &Wallet) -> String {
+    use xrpl::asynch::transaction::sign_and_submit;
+    use xrpl::models::transactions::{
+        mptoken_issuance_create::{MPTokenIssuanceCreate, MPTokenIssuanceCreateFlag},
+        CommonFields, TransactionType,
+    };
+
+    let mut tx = MPTokenIssuanceCreate {
+        common_fields: CommonFields {
+            account: wallet.classic_address.clone().into(),
+            transaction_type: TransactionType::MPTokenIssuanceCreate,
+            flags: vec![
+                MPTokenIssuanceCreateFlag::TfMPTCanTransfer,
+                MPTokenIssuanceCreateFlag::TfMPTCanClawback,
+            ]
+            .into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = get_client().await;
+    let result = sign_and_submit(&mut tx, client, wallet, true, true)
+        .await
+        .expect("create_transferable_clawbackable_mptoken_issuance: sign_and_submit failed");
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "create_transferable_clawbackable_mptoken_issuance: expected tesSUCCESS but got: {} — {}",
+        result.engine_result, result.engine_result_message
+    );
+    let pre_close = get_ledger_close_time().await;
+    ledger_accept().await;
+    wait_for_ledger_close_time(pre_close + 1).await;
+
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing from tx_json") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("failed to decode classic address");
+    let mut id_bytes = Vec::with_capacity(24);
+    id_bytes.extend_from_slice(&sequence.to_be_bytes());
+    id_bytes.extend_from_slice(&account_id);
+    hex::encode_upper(&id_bytes)
+}
+
+/// Parameters for [`submit_tx`].
+///
+/// Use when asserting a specific non-success `engine_result` (tec/tem codes).
+/// For `tesSUCCESS` paths use [`test_transaction`] instead.
+///
+/// Use struct literal syntax so each argument is self-documenting at call sites.
+#[cfg(feature = "std")]
+pub struct SubmitOptions<'w> {
+    pub wallet: &'w Wallet,
+    /// Auto-fill sequence, fee, and other transaction fields before signing.
+    pub autofill: bool,
+    /// Validate that the fee satisfies the network's minimum requirement.
+    pub check_fee: bool,
+}
+
+/// Submit a transaction without asserting success. Returns the raw
+/// `engine_result` string so callers can assert specific `tec`/`tem` codes.
+///
+/// Use [`test_transaction`] instead when you expect `tesSUCCESS`.
+#[cfg(feature = "std")]
+pub async fn submit_tx<'a, T, F>(tx: &mut T, opts: SubmitOptions<'_>) -> String
+where
+    T: xrpl::models::transactions::Transaction<'a, F>
+        + xrpl::models::Model
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Clone
+        + core::fmt::Debug,
+    F: strum::IntoEnumIterator + serde::Serialize + core::fmt::Debug + PartialEq + Clone + 'a,
+{
+    use xrpl::asynch::transaction::sign_and_submit;
+    let client = get_client().await;
+    sign_and_submit(tx, client, opts.wallet, opts.autofill, opts.check_fee)
+        .await
+        .expect("submit_tx: sign_and_submit failed")
+        .engine_result
+        .to_string()
 }

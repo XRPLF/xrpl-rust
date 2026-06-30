@@ -505,11 +505,13 @@ mod test {
     fn accept_hash_invalid_length_errors() {
         let hash128 = Hash128::try_from("1000000000200000000030000000001234");
         let hash160 = Hash160::try_from("100000000020000000003000000000400000000012");
+        let hash192 = Hash192::try_from("10000000002000000000300000000040000000005000000012");
         let hash256 =
             Hash256::try_from("100000000020000000003000000000400000000050000000006000000000123456");
 
         assert!(hash128.is_err());
         assert!(hash160.is_err());
+        assert!(hash192.is_err());
         assert!(hash256.is_err());
     }
 
@@ -561,5 +563,44 @@ mod test {
         let z48 = "Z".repeat(48);
         let result = Hash192::try_from(z48.as_str());
         assert!(result.is_err());
+    }
+
+    /// JSON ↔ Hash192 round-trip test.
+    ///
+    /// Hash192 is a 24-byte (192-bit) field used for MPTokenIssuanceID.
+    /// The layout of the raw bytes is:
+    ///
+    ///   Bytes [0..4)   — Sequence number (4 bytes, big-endian u32)
+    ///   Bytes [4..24)  — Account ID (20 bytes, classic XRPL address hash)
+    ///
+    /// Example (MPTokenIssuanceID for sequence=1, genesis account):
+    ///   "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8"
+    ///    ^^^^^^^^ sequence=1 (4 bytes)
+    ///            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ account ID (20 bytes)
+    ///
+    /// Serialisation: uppercase ASCII hex string (serde Serialize impl).
+    /// Deserialisation: `TryFrom<&str>` via `#[serde(try_from = "&str")]`.
+    #[test]
+    fn test_hash192_json_round_trip() {
+        // HASH192_HEX_TEST is 48 hex chars = 24 bytes.
+        // Byte layout for reference:
+        //   [0x10,0x00,0x00,0x00] [0x00,0x20,0x00,0x00] [0x00,0x00,0x30,0x00]
+        //   [0x00,0x00,0x00,0x40] [0x00,0x00,0x00,0x00] [0x50,0x00,0x00,0x00]
+        //   ^^^^ seq ends here ^^ ^^^^^^^^^^^ account ID (20 bytes) starts here
+        let json_in = alloc::format!("\"{}\"", HASH192_HEX_TEST);
+
+        // Deserialise from JSON string → Hash192
+        let hash: Hash192 = serde_json::from_str(&json_in).expect("deserialize Hash192");
+
+        // Verify underlying bytes are correct (hex → bytes → hex round-trip)
+        assert_eq!(hash.to_string(), HASH192_HEX_TEST);
+
+        // Re-serialise to JSON and compare byte-for-byte
+        let json_out = serde_json::to_string(&hash).expect("serialize Hash192");
+        assert_eq!(json_out, json_in);
+
+        // Confirm deserialising the re-serialised value gives identical Hash192
+        let hash2: Hash192 = serde_json::from_str(&json_out).expect("re-deserialize Hash192");
+        assert_eq!(hash.as_ref(), hash2.as_ref());
     }
 }

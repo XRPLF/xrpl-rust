@@ -22,6 +22,8 @@ use super::{CommonFields, LedgerObject};
 pub enum AccountRootFlag {
     /// This account is an Automated Market Maker instance.
     LsfAmm = 0x02000000,
+    /// Allow trustline clawback for tokens issued by this account.
+    LsfAllowTrustLineClawback = 0x08000000,
     /// Enable rippling on this addresses's trust lines by default.
     /// Required for issuing addresses; discouraged for others.
     LsfDefaultRipple = 0x00800000,

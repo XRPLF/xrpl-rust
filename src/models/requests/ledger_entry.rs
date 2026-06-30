@@ -1,8 +1,11 @@
 use alloc::borrow::Cow;
+use alloc::string::ToString;
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
+use crate::core::addresscodec::is_valid_classic_address;
+use crate::models::transactions::vault_common::validate_vault_id;
 use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
@@ -56,6 +59,30 @@ pub struct RippleState<'a> {
     pub currency: Cow<'a, str>,
 }
 
+/// Required fields for requesting an Oracle ledger entry by account + document ID.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct OracleIdentifier<'a> {
+    /// The XRPL account that controls the Oracle object.
+    pub account: Cow<'a, str>,
+    /// The unique identifier of the price oracle for the account.
+    #[serde(rename = "oracle_document_id")]
+    pub oracle_document_id: u32,
+}
+
+/// Vault selector for a `ledger_entry` request (XLS-65 SingleAssetVault).
+///
+/// rippled accepts either a direct 256-bit hash object ID or an object
+/// containing the vault owner account and the sequence number of the
+/// `VaultCreate` transaction (LedgerEntry.cpp:751-764).
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum VaultIdentifier<'a> {
+    /// Look up by ledger object ID (64 hex chars, nonzero).
+    Id(Cow<'a, str>),
+    /// Look up by vault owner account + VaultCreate sequence number.
+    OwnerSeq { owner: Cow<'a, str>, seq: u32 },
+}
+
 /// The ledger_entry method returns a single ledger object
 /// from the XRP Ledger in its raw format. See ledger formats
 /// for information on the different types of objects you can
@@ -86,14 +113,39 @@ pub struct LedgerEntry<'a> {
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
     pub offer: Option<Offer<'a>>,
+    pub oracle: Option<OracleIdentifier<'a>>,
     pub payment_channel: Option<Cow<'a, str>>,
     pub ripple_state: Option<RippleState<'a>>,
     pub ticket: Option<Ticket<'a>>,
+    /// Vault selector: either a 256-bit hash ID or an owner + seq pair (XLS-65).
+    pub vault: Option<VaultIdentifier<'a>>,
 }
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self._get_field_error()
+        self._get_field_error()?;
+        if let Some(vault) = &self.vault {
+            match vault {
+                VaultIdentifier::Id(id) => validate_vault_id(id)?,
+                VaultIdentifier::OwnerSeq { owner, seq } => {
+                    if !is_valid_classic_address(owner) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "vault.owner".into(),
+                            expected: "a valid classic account address".into(),
+                            found: owner.as_ref().into(),
+                        });
+                    }
+                    if *seq == 0 {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "vault.seq".into(),
+                            expected: "a positive sequence number (> 0)".into(),
+                            found: seq.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -115,6 +167,9 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.offer.is_some() {
             signing_methods += 1
         }
+        if self.oracle.is_some() {
+            signing_methods += 1
+        }
         if self.ripple_state.is_some() {
             signing_methods += 1
         }
@@ -130,6 +185,9 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.ticket.is_some() {
             signing_methods += 1
         }
+        if self.vault.is_some() {
+            signing_methods += 1
+        }
         if signing_methods != 1 {
             Err(XRPLModelException::ExpectedOneOf(&[
                 "index",
@@ -137,11 +195,13 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "check",
                 "directory",
                 "offer",
+                "oracle",
                 "ripple_state",
                 "escrow",
                 "payment_channel",
                 "deposit_preauth",
                 "ticket",
+                "vault",
             ]))
         } else {
             Ok(())
@@ -172,9 +232,11 @@ impl<'a> LedgerEntry<'a> {
         ledger_hash: Option<Cow<'a, str>>,
         ledger_index: Option<LedgerIndex<'a>>,
         offer: Option<Offer<'a>>,
+        oracle: Option<OracleIdentifier<'a>>,
         payment_channel: Option<Cow<'a, str>>,
         ripple_state: Option<RippleState<'a>>,
         ticket: Option<Ticket<'a>>,
+        vault: Option<VaultIdentifier<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -189,13 +251,40 @@ impl<'a> LedgerEntry<'a> {
             directory,
             escrow,
             offer,
+            oracle,
             ripple_state,
             ticket,
+            vault,
             binary,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
                 ledger_index,
             }),
+        }
+    }
+}
+
+impl<'a> Default for LedgerEntry<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
+                id: None,
+            },
+            account_root: None,
+            binary: None,
+            check: None,
+            deposit_preauth: None,
+            directory: None,
+            escrow: None,
+            index: None,
+            ledger_lookup: None,
+            offer: None,
+            oracle: None,
+            payment_channel: None,
+            ripple_state: None,
+            ticket: None,
+            vault: None,
         }
     }
 }
@@ -230,9 +319,11 @@ mod test_ledger_entry_errors {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
+            None, // oracle
             None,
             None,
             None,
+            None, // vault
         );
         let _expected = XRPLModelException::ExpectedOneOf(&[
             "index",
@@ -240,16 +331,112 @@ mod test_ledger_entry_errors {
             "check",
             "directory",
             "offer",
+            "oracle",
             "ripple_state",
             "escrow",
             "payment_channel",
             "deposit_preauth",
             "ticket",
+            "vault",
         ]);
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, ripple_state, escrow, payment_channel, deposit_preauth, ticket"
+            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, ticket, vault"
         );
+    }
+
+    #[test]
+    fn test_vault_selector_by_id() {
+        let id = "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2";
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id(id.into())),
+            ..Default::default()
+        };
+        assert!(req.validate().is_ok(), "vault id selector should be valid");
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized.validate().is_ok());
+        assert!(
+            serialized.contains("\"vault\""),
+            "expected vault key in JSON"
+        );
+        assert!(serialized.contains(id), "expected vault id in JSON");
+    }
+
+    #[test]
+    fn test_vault_selector_by_owner_seq() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::OwnerSeq {
+                owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                seq: 7,
+            }),
+            ..Default::default()
+        };
+        assert!(
+            req.validate().is_ok(),
+            "vault owner+seq selector should be valid"
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized.validate().is_ok());
+        assert!(serialized.contains("\"owner\""), "expected owner in JSON");
+        assert!(serialized.contains("\"seq\""), "expected seq in JSON");
+    }
+
+    #[test]
+    fn test_vault_id_wrong_length_rejected() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id("DEADBEEF".into())),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "short vault_id must be rejected");
+    }
+
+    #[test]
+    fn test_vault_id_nonhex_rejected() {
+        let non_hex: alloc::string::String = "Z".repeat(64);
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id(non_hex.into())),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "non-hex vault_id must be rejected");
+    }
+
+    #[test]
+    fn test_vault_id_all_zero_rejected() {
+        let zeros: alloc::string::String = "0".repeat(64);
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id(zeros.into())),
+            ..Default::default()
+        };
+        assert!(
+            req.validate().is_err(),
+            "all-zero vault_id must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_vault_owner_seq_invalid_owner_rejected() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::OwnerSeq {
+                owner: "notanaddress".into(),
+                seq: 1,
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "invalid owner must be rejected");
+    }
+
+    #[test]
+    fn test_vault_owner_seq_zero_seq_rejected() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::OwnerSeq {
+                owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                seq: 0,
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "seq == 0 must be rejected");
     }
 
     #[test]
@@ -269,9 +456,11 @@ mod test_ledger_entry_errors {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
+            None, // oracle
             None,
             None,
             None,
+            None, // vault
         );
         let serialized = serde_json::to_string(&req).unwrap();
 

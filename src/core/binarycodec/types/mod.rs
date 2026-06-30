@@ -54,7 +54,6 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-use amount::IssuedCurrency;
 use exceptions::XRPLTypeException;
 use serde::Deserialize;
 use serde_json::Map;
@@ -220,9 +219,11 @@ impl XRPLTypes {
         } else if let Some(value) = value.as_object() {
             // dbg!("is object");
             match name {
-                "Amount" => Ok(Some(XRPLTypes::Amount(Self::amount_from_map(
+                // Route through Amount::try_from so MPT amounts (objects with
+                // `mpt_issuance_id`) are handled in addition to IssuedCurrency.
+                "Amount" => Ok(Some(XRPLTypes::Amount(Amount::try_from(Value::Object(
                     value.to_owned(),
-                )?))),
+                ))?))),
                 "Issue" => Ok(Some(XRPLTypes::Issue(Issue::try_from(Value::Object(
                     value.to_owned(),
                 ))?))),
@@ -292,19 +293,6 @@ impl XRPLTypes {
         value
             .try_into()
             .map_err(|_| XRPLTypeException::TryFromStrError.into())
-    }
-
-    fn amount_from_map<T>(value: Map<String, Value>) -> XRPLCoreResult<T>
-    where
-        T: TryFrom<IssuedCurrency>,
-        <T as TryFrom<IssuedCurrency>>::Error: Display,
-    {
-        match IssuedCurrency::try_from(Value::Object(value)) {
-            Ok(value) => value
-                .try_into()
-                .map_err(|_| XRPLTypeException::TryFromIssuedCurrencyError.into()),
-            Err(error) => Err(error),
-        }
     }
 }
 

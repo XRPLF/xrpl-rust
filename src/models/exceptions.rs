@@ -10,7 +10,7 @@ use crate::XRPLSerdeJsonError;
 use super::{
     results::exceptions::XRPLResultException,
     transactions::exceptions::{
-        XRPLAccountSetException, XRPLDIDSetException, XRPLNFTokenCancelOfferException,
+        XRPLAccountSetException, XRPLClawbackException, XRPLDIDSetException, XRPLNFTokenCancelOfferException,
         XRPLNFTokenCreateOfferException, XRPLPaymentException, XRPLSignerListSetException,
         XRPLTransactionException, XRPLXChainClaimException, XRPLXChainCreateBridgeException,
         XRPLXChainCreateClaimIDException, XRPLXChainModifyBridgeException,
@@ -73,6 +73,8 @@ pub enum XRPLModelException {
 
     #[error("Expected field `{0}` is missing")]
     MissingField(String),
+    #[error("The flags `{flag1:?}` and `{flag2:?}` cannot be set simultaneously")]
+    InvalidFlagCombination { flag1: String, flag2: String },
 
     #[error("From hex error: {0}")]
     FromHexError(#[from] hex::FromHexError),
@@ -155,6 +157,12 @@ impl From<XRPLXChainCreateClaimIDException> for XRPLModelException {
 
 impl From<XRPLXChainModifyBridgeException> for XRPLModelException {
     fn from(error: XRPLXChainModifyBridgeException) -> Self {
+        XRPLModelException::XRPLTransactionError(error.into())
+    }
+}
+
+impl From<XRPLClawbackException> for XRPLModelException {
+    fn from(error: XRPLClawbackException) -> Self {
         XRPLModelException::XRPLTransactionError(error.into())
     }
 }

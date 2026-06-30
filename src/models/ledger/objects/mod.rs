@@ -9,14 +9,18 @@ pub mod directory_node;
 pub mod escrow;
 pub mod fee_settings;
 pub mod ledger_hashes;
+pub mod mptoken;
+pub mod mptoken_issuance;
 pub mod negative_unl;
 pub mod nftoken_offer;
 pub mod nftoken_page;
 pub mod offer;
+pub mod oracle;
 pub mod pay_channel;
 pub mod ripple_state;
 pub mod signer_list;
 pub mod ticket;
+pub mod vault;
 pub mod xchain_owned_claim_id;
 pub mod xchain_owned_create_account_claim_id;
 
@@ -32,10 +36,13 @@ use directory_node::DirectoryNode;
 use escrow::Escrow;
 use fee_settings::FeeSettings;
 use ledger_hashes::LedgerHashes;
+use mptoken::MPToken;
+use mptoken_issuance::MPTokenIssuance;
 use negative_unl::NegativeUNL;
 use nftoken_offer::NFTokenOffer;
 use nftoken_page::NFTokenPage;
 use offer::Offer;
+use oracle::Oracle;
 use pay_channel::PayChannel;
 use ripple_state::RippleState;
 use signer_list::SignerList;
@@ -46,6 +53,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
 use ticket::Ticket;
+use vault::Vault;
 use xchain_owned_claim_id::XChainOwnedClaimID;
 use xchain_owned_create_account_claim_id::XChainOwnedCreateAccountClaimID;
 
@@ -65,14 +73,18 @@ pub enum LedgerEntryType {
     Escrow = 0x0075,
     FeeSettings = 0x0073,
     LedgerHashes = 0x0068,
+    MPToken = 0x007F,
+    MPTokenIssuance = 0x007E,
     NegativeUNL = 0x004E,
     NFTokenOffer = 0x0037,
     NFTokenPage = 0x0050,
     Offer = 0x006F,
+    Oracle = 0x0080,
     PayChannel = 0x0078,
     RippleState = 0x0072,
     SignerList = 0x0053,
     Ticket = 0x0054,
+    Vault = 0x0084,
     XChainOwnedClaimID = 0x0071,
     XChainOwnedCreateAccountClaimID = 0x0074,
 }
@@ -90,14 +102,18 @@ pub enum LedgerEntry<'a> {
     Escrow(Escrow<'a>),
     FeeSettings(FeeSettings<'a>),
     LedgerHashes(LedgerHashes<'a>),
+    MPToken(MPToken<'a>),
+    MPTokenIssuance(MPTokenIssuance<'a>),
     NegativeUNL(NegativeUNL<'a>),
     NFTokenOffer(NFTokenOffer<'a>),
     NFTokenPage(NFTokenPage<'a>),
     Offer(Offer<'a>),
+    Oracle(Oracle<'a>),
     PayChannel(PayChannel<'a>),
     RippleState(RippleState<'a>),
     SignerList(SignerList<'a>),
     Ticket(Ticket<'a>),
+    Vault(Vault<'a>),
     XChainOwnedClaimID(XChainOwnedClaimID<'a>),
     XChainOwnedCreateAccountClaimID(XChainOwnedCreateAccountClaimID<'a>),
 }
