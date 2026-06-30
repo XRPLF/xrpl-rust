@@ -10,10 +10,11 @@ use crate::XRPLSerdeJsonError;
 use super::{
     results::exceptions::XRPLResultException,
     transactions::exceptions::{
-        XRPLAccountSetException, XRPLClawbackException, XRPLDIDSetException, XRPLNFTokenCancelOfferException,
-        XRPLNFTokenCreateOfferException, XRPLPaymentException, XRPLSignerListSetException,
-        XRPLTransactionException, XRPLXChainClaimException, XRPLXChainCreateBridgeException,
-        XRPLXChainCreateClaimIDException, XRPLXChainModifyBridgeException,
+        XRPLAccountSetException, XRPLClawbackException, XRPLDIDSetException,
+        XRPLNFTokenCancelOfferException, XRPLNFTokenCreateOfferException, XRPLPaymentException,
+        XRPLSignerListSetException, XRPLTransactionException, XRPLXChainClaimException,
+        XRPLXChainCreateBridgeException, XRPLXChainCreateClaimIDException,
+        XRPLXChainModifyBridgeException,
     },
 };
 

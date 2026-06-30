@@ -8,7 +8,8 @@ use thiserror_no_std::Error;
 #[derive(Debug, PartialEq, Error)]
 pub enum XRPLTransactionException {
     #[error("{0}")]
-    XRPLAccountSetError(#[from] XRPLAccountSetException),  
+    XRPLAccountSetError(#[from] XRPLAccountSetException),
+    #[error("{0}")]
     XRPLClawbackError(#[from] XRPLClawbackException),
     #[error("{0}")]
     XRPLDIDSetError(#[from] XRPLDIDSetException),
@@ -238,6 +239,8 @@ pub enum XRPLDIDSetException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLDIDSetException {}
+
+#[derive(Debug, PartialEq, Error)]
 pub enum XRPLClawbackException {
     #[error("Clawback amount must not be XRP — only issued currencies can be clawed back")]
     AmountMustNotBeXRP,

@@ -94,7 +94,7 @@ pub enum TransactionType {
     CheckCreate,
     Clawback,
     DIDDelete,
-    DIDSet,  
+    DIDSet,
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,
