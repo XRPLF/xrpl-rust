@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Fixed
+
+## [[v1.2.0]]
+
+### Added
+
 - **XLS-33 Multi-Purpose Tokens (MPT):** full support for the [XLS-0033 MPTokensV1 amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0033-multi-purpose-tokens).
   - **Binary codec:** `Hash192` type for `MPTokenIssuanceID`; MPT amount encode/decode (UInt64 as base-10 string); `AssetScale` (UInt8) and `MPTAmount`/`MaximumAmount`/`OutstandingAmount` field support.
   - **Amount/Currency:** `MPTAmount` and `MPTCurrency` variants in `Amount`/`Currency` enums; digit-only value validation; `i64::MAX` upper-bound enforcement; `is_mpt()` helper.
@@ -21,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Ledger objects:** `MPToken` and `MPTokenIssuance` with `LockedAmount`, `MPTokenIssuanceMutableFlag` bitmask, and non-null index validation.
   - **Requests:** `AccountObjectType::MptIssuance` and `Mptoken` variants.
   - **Integration tests:** full MPT lifecycle end-to-end (create issuance, holder opt-in, lock/unlock, clawback).
+- **XLS-65 Single Asset Vault:** support for the XLS-0065 Single Asset Vault amendment. Adds the `Vault` ledger object; `VaultCreate`, `VaultSet`, `VaultDelete`, `VaultDeposit`, `VaultWithdraw`, and `VaultClawback` transactions; the `vault_info` request and result; `ledger_entry` vault lookup; and the `AccountObjectType::Vault` filter.
+- **XLS-47 Price Oracle:** support for the XLS-0047 PriceOracle amendment. Adds the `Oracle` ledger object; `OracleSet` and `OracleDelete` transactions; the `get_aggregate_price` request and result; `ledger_entry` oracle lookup; and the `AccountObjectType::Oracle` filter.
+- **XLS-89 MPTokenMetadata:** `utils::mptoken_metadata` helpers to encode, decode, validate, and warn on MPT metadata (`encode_mptoken_metadata`, `decode_mptoken_metadata`, `validate_mptoken_metadata`, `mptoken_metadata_warning`).
 - New `xrpl::signing` module containing the pure-crypto signing helpers (`sign`, `multisign`, `prepare_transaction`) extracted from `asynch::transaction` and `transaction`. Available with just `core + models + wallet` features (no `helpers`/runtime/client dependency). The legacy paths `asynch::transaction::sign` and `transaction::multisign` are preserved as re-exports for backward compatibility.
 - Expanded unit-test coverage and raised CI thresholds: lines `73 → 83`, regions `75 → 85`, functions `67 → 73`.
 - Codecov integration with per-PR project (≥83%) and patch (≥80% on new/modified lines) gates.
