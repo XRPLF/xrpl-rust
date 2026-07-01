@@ -66,7 +66,7 @@ To install, add the following to your project's `Cargo.toml`:
 
 ```toml
 [dependencies.xrpl]
-version = "1.0.0"
+version = "1.2.0"
 ```
 
 # Documentation [![docs_status]][docs]
@@ -149,7 +149,7 @@ To install the CLI tool, you can add the `cli` feature to your dependencies:
 
 ```toml
 [dependencies.xrpl]
-version = "0.5.0"
+version = "1.2.0"
 features = ["cli"]
 ```
 
