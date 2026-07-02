@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [[Unreleased]]
 
 ### Added
-- Support for Decentralized Identity (DID, Amendment ID: DB432C3A09D9D5DFC7859F39AE5FF767ABC59AED0A9FB441E83B814D8946C109)
 
 ### Fixed
 
@@ -31,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **XLS-65 Single Asset Vault:** support for the XLS-0065 Single Asset Vault amendment. Adds the `Vault` ledger object; `VaultCreate`, `VaultSet`, `VaultDelete`, `VaultDeposit`, `VaultWithdraw`, and `VaultClawback` transactions; the `vault_info` request and result; `ledger_entry` vault lookup; and the `AccountObjectType::Vault` filter.
 - **XLS-47 Price Oracle:** support for the XLS-0047 PriceOracle amendment. Adds the `Oracle` ledger object; `OracleSet` and `OracleDelete` transactions; the `get_aggregate_price` request and result; `ledger_entry` oracle lookup; and the `AccountObjectType::Oracle` filter.
 - **XLS-89 MPTokenMetadata:** `utils::mptoken_metadata` helpers to encode, decode, validate, and warn on MPT metadata (`encode_mptoken_metadata`, `decode_mptoken_metadata`, `validate_mptoken_metadata`, `mptoken_metadata_warning`).
+- **XLS-39 Clawback:** adds the `Clawback` transaction and the `lsfAllowTrustLineClawback` (`AccountSet`) flag.
+- **XLS-70 Credentials:** adds `CredentialCreate`, `CredentialAccept`, and `CredentialDelete` transactions, the `Credential` ledger object, and credential-based `DepositPreauth` fields.
+- **Decentralized Identity (DID):** adds the `DIDSet` and `DIDDelete` transactions and the `DID` ledger object.
 - New `xrpl::signing` module containing the pure-crypto signing helpers (`sign`, `multisign`, `prepare_transaction`) extracted from `asynch::transaction` and `transaction`. Available with just `core + models + wallet` features (no `helpers`/runtime/client dependency). The legacy paths `asynch::transaction::sign` and `transaction::multisign` are preserved as re-exports for backward compatibility.
 - Expanded unit-test coverage and raised CI thresholds: lines `73 → 83`, regions `75 → 85`, functions `67 → 73`.
 - Codecov integration with per-PR project (≥83%) and patch (≥80% on new/modified lines) gates.
