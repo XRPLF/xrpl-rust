@@ -6,6 +6,8 @@ pub mod payment;
 pub mod vault;
 pub mod xchain;
 
+pub use constants::CREDENTIAL_TYPE_KYC;
+
 use anyhow::Result;
 #[cfg(feature = "std")]
 use once_cell::sync::Lazy;
@@ -19,7 +21,7 @@ use rand::rngs::OsRng;
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 use tokio::net::TcpStream;
 use url::Url;
-#[cfg(feature = "websocket")]
+#[cfg(all(feature = "websocket", not(feature = "std")))]
 use xrpl::asynch::clients::{AsyncWebSocketClient, SingleExecutorMutex, WebSocketOpen};
 use xrpl::{asynch::clients::AsyncJsonRpcClient, wallet::Wallet};
 
@@ -27,6 +29,10 @@ use xrpl::{asynch::clients::AsyncJsonRpcClient, wallet::Wallet};
 /// Address: rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh
 #[cfg(feature = "std")]
 const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
+
+/// HTTP JSON-RPC endpoint for local Docker standalone mode.
+#[cfg(feature = "std")]
+const STANDALONE_URL: &str = "http://127.0.0.1:5005";
 
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub async fn open_websocket(
@@ -117,11 +123,19 @@ pub async fn generate_funded_wallet() -> Wallet {
     // wrapper tests create and drop their own Runtime instances — the static
     // client's hyper dispatch task is tied to whichever runtime initialised it.
     let local_client = AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap());
-    sign_and_submit(&mut payment, &local_client, &genesis, true, true)
+    let result = sign_and_submit(&mut payment, &local_client, &genesis, true, true)
         .await
         .expect("generate_funded_wallet: funding payment failed");
 
+    // Advance the ledger to confirm the funding payment
     ledger_accept().await;
+
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "generate_funded_wallet: funding payment engine_result was {}",
+        result.engine_result
+    );
+
     new_wallet
 }
 
@@ -476,4 +490,133 @@ where
         .expect("submit_tx: sign_and_submit failed")
         .engine_result
         .to_string()
+}
+
+/// Provision an accepted Credential and return its on-chain hash (ledger index).
+///
+/// Submits CredentialCreate (issuer → subject) then CredentialAccept (subject),
+/// reads the resulting Credential ledger object and returns its `index` field.
+#[cfg(feature = "std")]
+pub async fn provision_credential(
+    issuer: &xrpl::wallet::Wallet,
+    subject: &xrpl::wallet::Wallet,
+    credential_type: &str,
+) -> String {
+    use xrpl::asynch::clients::XRPLAsyncClient;
+    use xrpl::models::{
+        requests::account_objects::{AccountObjectType, AccountObjects},
+        results,
+        transactions::{
+            credential_accept::CredentialAccept, credential_create::CredentialCreate, CommonFields,
+            TransactionType,
+        },
+    };
+
+    let client = get_client().await;
+
+    let mut create = CredentialCreate {
+        common_fields: CommonFields {
+            account: issuer.classic_address.clone().into(),
+            transaction_type: TransactionType::CredentialCreate,
+            ..Default::default()
+        },
+        subject: subject.classic_address.clone().into(),
+        credential_type: credential_type.to_owned().into(),
+        ..Default::default()
+    };
+    test_transaction(&mut create, issuer).await;
+
+    let mut accept = CredentialAccept {
+        common_fields: CommonFields {
+            account: subject.classic_address.clone().into(),
+            transaction_type: TransactionType::CredentialAccept,
+            ..Default::default()
+        },
+        issuer: issuer.classic_address.clone().into(),
+        credential_type: credential_type.to_owned().into(),
+    };
+    test_transaction(&mut accept, subject).await;
+
+    let ao_resp = client
+        .request(
+            AccountObjects::new(
+                None,
+                subject.classic_address.clone().into(),
+                None,
+                None,
+                Some(AccountObjectType::Credential),
+                None,
+                None,
+                None,
+            )
+            .into(),
+        )
+        .await
+        .expect("provision_credential: account_objects request failed");
+    let ao_result: results::account_objects::AccountObjects<'_> = ao_resp
+        .try_into()
+        .expect("provision_credential: parse account_objects");
+    assert!(
+        !ao_result.account_objects.is_empty(),
+        "provision_credential: no credential object found after CredentialAccept"
+    );
+    ao_result.account_objects[0]["index"]
+        .as_str()
+        .expect("provision_credential: index field missing on credential object")
+        .to_string()
+}
+
+/// Set up credential-based DepositPreauth: provision an accepted Credential
+/// (issuer → subject), then authorize it on `destination`. Returns the
+/// credential hash so callers can attach it to `credential_ids` on transactions.
+#[cfg(feature = "std")]
+pub async fn provision_credential_for_destination(
+    issuer: &xrpl::wallet::Wallet,
+    subject: &xrpl::wallet::Wallet,
+    destination: &xrpl::wallet::Wallet,
+    credential_type: &str,
+) -> String {
+    use xrpl::models::{
+        transactions::{deposit_preauth::DepositPreauth, CommonFields, TransactionType},
+        CredentialAuthorization, CredentialAuthorizationFields,
+    };
+
+    let credential_hash = provision_credential(issuer, subject, credential_type).await;
+
+    // Enable Deposit Authorization on destination so rippled enforces DepositPreauth rules.
+    // Without lsfDepositAuth set, rippled ignores DepositPreauth entries entirely and any
+    // payment flows through regardless of credential_ids.
+    {
+        use xrpl::models::transactions::account_set::{AccountSet, AccountSetFlag};
+        let mut acct_set = AccountSet {
+            common_fields: CommonFields {
+                account: destination.classic_address.clone().into(),
+                transaction_type: TransactionType::AccountSet,
+                ..Default::default()
+            },
+            set_flag: Some(AccountSetFlag::AsfDepositAuth),
+            ..Default::default()
+        };
+        test_transaction(&mut acct_set, destination).await;
+    }
+
+    let creds = vec![CredentialAuthorization::new(
+        CredentialAuthorizationFields::new(
+            issuer.classic_address.clone().into(),
+            credential_type.to_owned().into(),
+        ),
+    )];
+
+    let mut preauth = DepositPreauth {
+        common_fields: CommonFields {
+            account: destination.classic_address.clone().into(),
+            transaction_type: TransactionType::DepositPreauth,
+            ..Default::default()
+        },
+        authorize_credentials: Some(creds),
+        ..Default::default()
+    };
+    test_transaction(&mut preauth, destination).await;
+
+    credential_hash
 }

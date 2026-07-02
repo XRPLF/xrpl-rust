@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [[Unreleased]]
 
 ### Added
+- Support for Decentralized Identity (DID, Amendment ID: DB432C3A09D9D5DFC7859F39AE5FF767ABC59AED0A9FB441E83B814D8946C109)
 
 ### Fixed
 
@@ -52,10 +53,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[v1.1.0]]
 
+- `DepositPreauth` ledger object: `authorize` field changed from `Cow<'a, str>` to `Option<Cow<'a, str>>` to support XLS-70 credential-based preauthorization. The `new()` constructor is unchanged (still accepts non-optional `authorize`), but direct struct construction must wrap the value in `Some(...)`.
+- `credential_ids` field on `AccountDelete`, `Payment`, `EscrowFinish`, `PaymentChannelClaim`, and `credentials` on `DepositAuthorized` request changed from `Option<Cow<'a, [Cow<'a, str>]>>` to `Option<Vec<Cow<'a, str>>>` for reliable serde round-trip.
+
 ### Added
 
 - Implemented full deserialization from hex binary back to JSON, update `definitions.json` to `xrpl.js` latest, added all codec test fixtures from xrpl.js and implemented tests for all of them.
 - Added integration tests for all transaction types, refactored to separate files.
+- Added initial XLS-70 Credentials model support (`CredentialCreate`, `CredentialAccept`, `CredentialDelete`, `Credential` ledger object, and credential-based `DepositPreauth` fields).
 
 ### Fixed
 
