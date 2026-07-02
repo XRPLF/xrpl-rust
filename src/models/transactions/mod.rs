@@ -10,6 +10,9 @@ pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
 pub mod clawback;
+pub mod credential_accept;
+pub mod credential_create;
+pub mod credential_delete;
 pub mod deposit_preauth;
 pub mod escrow_cancel;
 pub mod escrow_create;
@@ -54,7 +57,7 @@ pub mod xchain_create_bridge;
 pub mod xchain_create_claim_id;
 pub mod xchain_modify_bridge;
 
-use super::{FlagCollection, XRPLModelResult};
+use super::{FlagCollection, XRPLModelException, XRPLModelResult};
 use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
 use crate::{_serde::txn_flags, serde_with_tag};
@@ -76,6 +79,103 @@ use strum_macros::{AsRefStr, Display};
 
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
+fn is_hex(value: &str) -> bool {
+    value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Validate that a `CredentialType` field is a non-empty hex string up to 64 bytes (128 hex chars).
+///
+/// Note: rippled accepts any arbitrary blob up to 64 bytes for `CredentialType` and does not
+/// enforce hex encoding at the protocol level (`kMaxCredentialTypeLength` in `Protocol.h`).
+/// This SDK enforces hex intentionally to match xrpl.js (`validateCredentialType` in `common.ts`),
+/// providing an extra client-side guard before a transaction reaches the network.
+pub(crate) fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
+    let len = credential_type.len();
+    if len == 0 {
+        Err(XRPLModelException::ValueTooShort {
+            field: "credential_type".into(),
+            min: 1,
+            found: 0,
+        })
+    } else if len > 128 {
+        Err(XRPLModelException::ValueTooLong {
+            field: "credential_type".into(),
+            max: 128,
+            found: len,
+        })
+    } else if !len.is_multiple_of(2) {
+        // Odd-length hex strings cannot represent whole bytes; rippled's binary
+        // codec would reject them at serialization time.
+        Err(XRPLModelException::InvalidValueFormat {
+            field: "credential_type".into(),
+            format: "even-length hexadecimal (whole bytes)".into(),
+            found: credential_type.into(),
+        })
+    } else if !is_hex(credential_type) {
+        Err(XRPLModelException::InvalidValueFormat {
+            field: "credential_type".into(),
+            format: "hexadecimal".into(),
+            found: credential_type.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validate that a hex-encoded string contains only hexadecimal characters.
+fn validate_hex(field: &str, value: &str) -> XRPLModelResult<()> {
+    if !is_hex(value) {
+        Err(XRPLModelException::InvalidValueFormat {
+            field: field.into(),
+            format: "hexadecimal".into(),
+            found: value.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validate that a `credential_ids` field, when present, contains 1..=8 unique entries
+/// as required by the XLS-70 specification (sections 8.1 and 8.2).
+pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XRPLModelResult<()> {
+    if let Some(ids) = credential_ids {
+        if ids.is_empty() {
+            return Err(XRPLModelException::ValueTooShort {
+                field: "credential_ids".into(),
+                min: 1,
+                found: 0,
+            });
+        }
+        if ids.len() > 8 {
+            return Err(XRPLModelException::ValueTooLong {
+                field: "credential_ids".into(),
+                max: 8,
+                found: ids.len(),
+            });
+        }
+        for (i, id) in ids.iter().enumerate() {
+            validate_hex("credential_ids", id)?;
+            // Credential IDs are SHA-512Half ledger-object hashes: 256 bits = 32 bytes = 64 hex chars.
+            if id.len() != 64 {
+                return Err(XRPLModelException::InvalidValueFormat {
+                    field: "credential_ids".into(),
+                    format: "64-character hexadecimal ledger-object hash".into(),
+                    found: id.as_ref().into(),
+                });
+            }
+            // Hex credential IDs are compared case-insensitively: rippled normalizes
+            // the raw bytes, so "ABCD" and "abcd" refer to the same credential.
+            if ids[..i].iter().any(|prev| prev.eq_ignore_ascii_case(id)) {
+                return Err(XRPLModelException::ValueEqualsValue {
+                    field1: "credential_ids".into(),
+                    field2: "credential_ids (duplicate entry)".into(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Enum containing the different Transaction types.
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq, Default)]
 pub enum TransactionType {
@@ -91,6 +191,9 @@ pub enum TransactionType {
     CheckCash,
     CheckCreate,
     Clawback,
+    CredentialAccept,
+    CredentialCreate,
+    CredentialDelete,
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,
