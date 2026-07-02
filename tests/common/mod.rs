@@ -30,6 +30,10 @@ use xrpl::{asynch::clients::AsyncJsonRpcClient, wallet::Wallet};
 #[cfg(feature = "std")]
 const GENESIS_SEED: &str = "snoPBrXtMeMyMHUVTgbuqAfg1SUTb";
 
+/// HTTP JSON-RPC endpoint for local Docker standalone mode.
+#[cfg(feature = "std")]
+const STANDALONE_URL: &str = "http://127.0.0.1:5005";
+
 #[cfg(all(feature = "websocket", not(feature = "std")))]
 pub async fn open_websocket(
     uri: Url,
@@ -119,11 +123,19 @@ pub async fn generate_funded_wallet() -> Wallet {
     // wrapper tests create and drop their own Runtime instances — the static
     // client's hyper dispatch task is tied to whichever runtime initialised it.
     let local_client = AsyncJsonRpcClient::connect(Url::parse(constants::STANDALONE_URL).unwrap());
-    sign_and_submit(&mut payment, &local_client, &genesis, true, true)
+    let result = sign_and_submit(&mut payment, &local_client, &genesis, true, true)
         .await
         .expect("generate_funded_wallet: funding payment failed");
 
+    // Advance the ledger to confirm the funding payment
     ledger_accept().await;
+
+    assert_eq!(
+        result.engine_result, "tesSUCCESS",
+        "generate_funded_wallet: funding payment engine_result was {}",
+        result.engine_result
+    );
+
     new_wallet
 }
 

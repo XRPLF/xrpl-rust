@@ -20,6 +20,8 @@ pub struct State<'a> {
     pub closed_ledger: Option<ValidatedLedger<'a>>,
     /// Amount of time spent waiting for I/O operations, in milliseconds
     pub io_latency_ms: Option<u32>,
+    /// The network ID of the chain this server is connected to.
+    pub network_id: Option<u32>,
     /// Number of times server had over 250 transactions waiting to be processed
     pub jq_trans_overflow: Option<Cow<'a, str>>,
     /// Information about the last time the server closed a ledger
@@ -60,8 +62,6 @@ pub struct State<'a> {
     pub validation_quorum: Option<u32>,
     /// List of ports where the server is listening for API commands
     pub ports: Option<Cow<'a, [PortDescriptor<'a>]>>,
-    /// The network ID of the chain. Present on networks with ID >= 1025.
-    pub network_id: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

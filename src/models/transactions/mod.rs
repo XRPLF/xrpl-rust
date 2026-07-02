@@ -14,6 +14,8 @@ pub mod credential_accept;
 pub mod credential_create;
 pub mod credential_delete;
 pub mod deposit_preauth;
+pub mod did_delete;
+pub mod did_set;
 pub mod escrow_cancel;
 pub mod escrow_create;
 pub mod escrow_finish;
@@ -191,6 +193,8 @@ pub enum TransactionType {
     CheckCash,
     CheckCreate,
     Clawback,
+    DIDDelete,
+    DIDSet,
     CredentialAccept,
     CredentialCreate,
     CredentialDelete,
