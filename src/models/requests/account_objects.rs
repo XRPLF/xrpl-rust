@@ -17,6 +17,7 @@ pub enum AccountObjectType {
     #[serde(rename = "did")]
     #[strum(serialize = "did")]
     DID,
+    Credential,
     DepositPreauth,
     Escrow,
     Offer,

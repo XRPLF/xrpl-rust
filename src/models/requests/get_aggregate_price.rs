@@ -1,6 +1,4 @@
 use alloc::borrow::Cow;
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -82,6 +80,8 @@ impl<'a> GetAggregatePrice<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec;
+
     use super::*;
 
     #[test]
