@@ -2,6 +2,7 @@
 name = "xrpl-rust"
 version = "1.2.0"
 edition = "2021"
+rust-version = "1.87"
 authors = [
     "Tanveer Wahid <tan@wahid.email>",
     "LimpidCrypto <contact@limpidcrypto.com>",
@@ -165,3 +166,6 @@ actix-rt = ["dep:actix-rt"]
 async-std-rt = ["dep:async-std"]
 futures-rt = ["dep:futures-timer"]
 smol-rt = ["dep:smol"]
+
+[lints.rust]
+unsafe_code = "forbid"
