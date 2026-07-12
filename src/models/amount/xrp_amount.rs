@@ -164,8 +164,11 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        // Fall back to lexicographic string comparison when either value is
+        // non-numeric (e.g. malformed server response). This keeps Ord total
+        // and non-panicking while still being numerically correct for valid drops.
         self.checked_cmp(other)
-            .expect("cannot compare invalid XRPAmount values")
+            .unwrap_or_else(|_| self.0.cmp(&other.0))
     }
 }
 
@@ -213,12 +216,17 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "cannot compare invalid XRPAmount values")]
-    fn test_cmp_panics_on_malformed() {
+    fn test_cmp_malformed_falls_back_to_lexicographic() {
+        // cmp must not panic on non-numeric values; it falls back to
+        // lexicographic string comparison for a consistent total order.
         let valid = XRPAmount("100".into());
         let malformed = XRPAmount("xyz".into());
 
+        // Must not panic — result is determined by string order
         let _ = valid.cmp(&malformed);
+
+        // Reflexivity: same non-numeric string compares equal to itself
+        assert_eq!(malformed.cmp(&malformed), Ordering::Equal);
     }
 
     #[test]

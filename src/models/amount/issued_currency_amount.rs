@@ -47,6 +47,18 @@ impl<'a> PartialOrd for IssuedCurrencyAmount<'a> {
 
 impl<'a> Ord for IssuedCurrencyAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.value.cmp(&other.value)
+        // Compare numerically when both values parse; fall back to string order.
+        // Then break ties with currency and issuer so that Ord is consistent
+        // with the derived PartialEq (which compares all three fields).
+        let value_cmp = match (
+            self.value.parse::<BigDecimal>(),
+            other.value.parse::<BigDecimal>(),
+        ) {
+            (Ok(a), Ok(b)) => a.partial_cmp(&b).unwrap_or(core::cmp::Ordering::Equal),
+            _ => self.value.cmp(&other.value),
+        };
+        value_cmp
+            .then_with(|| self.currency.cmp(&other.currency))
+            .then_with(|| self.issuer.cmp(&other.issuer))
     }
 }
