@@ -30,10 +30,12 @@ const fn _get_algorithm_sig_length(algo: CryptoAlgorithm) -> usize {
 }
 
 /// Return the CryptoAlgorithm from a key.
-fn _get_algorithm_from_key(key: &str) -> CryptoAlgorithm {
-    match &key[..2] {
-        ED25519_PREFIX => CryptoAlgorithm::ED25519,
-        _ => CryptoAlgorithm::SECP256K1,
+fn _get_algorithm_from_key(key: &str) -> XRPLCoreResult<CryptoAlgorithm> {
+    let prefix = key.get(..2).ok_or(XRPLKeypairsException::InvalidSecret)?;
+    if prefix == ED25519_PREFIX {
+        Ok(CryptoAlgorithm::ED25519)
+    } else {
+        Ok(CryptoAlgorithm::SECP256K1)
     }
 }
 
@@ -48,10 +50,12 @@ fn _get_algorithm_engine(algo: CryptoAlgorithm) -> Box<dyn CryptoImplementation>
 
 /// Return the trait implementation based on the
 /// provided key.
-fn _get_algorithm_engine_from_key(key: &str) -> Box<dyn CryptoImplementation> {
-    match &key[..2] {
-        ED25519_PREFIX => _get_algorithm_engine(CryptoAlgorithm::ED25519),
-        _ => _get_algorithm_engine(CryptoAlgorithm::SECP256K1),
+fn _get_algorithm_engine_from_key(key: &str) -> XRPLCoreResult<Box<dyn CryptoImplementation>> {
+    let prefix = key.get(..2).ok_or(XRPLKeypairsException::InvalidSecret)?;
+    if prefix == ED25519_PREFIX {
+        Ok(_get_algorithm_engine(CryptoAlgorithm::ED25519))
+    } else {
+        Ok(_get_algorithm_engine(CryptoAlgorithm::SECP256K1))
     }
 }
 
@@ -228,7 +232,7 @@ pub fn derive_classic_address(public_key: &str) -> XRPLCoreResult<String> {
 /// assert_eq!(Some(signature), signing);
 /// ```
 pub fn sign(message: &[u8], private_key: &str) -> XRPLCoreResult<String> {
-    let module = _get_algorithm_engine_from_key(private_key);
+    let module = _get_algorithm_engine_from_key(private_key)?;
     Ok(hex::encode_upper(module.sign(message, private_key)?))
 }
 
@@ -255,8 +259,9 @@ pub fn sign(message: &[u8], private_key: &str) -> XRPLCoreResult<String> {
 /// ));
 /// ```
 pub fn is_valid_message(message: &[u8], signature: &str, public_key: &str) -> bool {
-    let module = _get_algorithm_engine_from_key(public_key);
-    module.is_valid_message(message, signature, public_key)
+    _get_algorithm_engine_from_key(public_key).is_ok_and(|module| {
+        module.is_valid_message(message, signature, public_key)
+    })
 }
 
 /// Trait for cryptographic algorithms in the XRP Ledger.
@@ -346,5 +351,25 @@ mod test {
 
         assert!(is_valid_message(message, sig_ed25519, PUBLIC_ED25519));
         assert!(is_valid_message(message, sig_secp256k1, PUBLIC_SECP256K1));
+    }
+
+    #[test]
+    fn test_sign_empty_key_returns_error() {
+        assert!(sign(&[], "").is_err());
+    }
+
+    #[test]
+    fn test_sign_short_key_returns_error() {
+        assert!(sign(&[], "e").is_err());
+    }
+
+    #[test]
+    fn test_is_valid_message_empty_pubkey_returns_false() {
+        assert!(!is_valid_message(&[], "", ""));
+    }
+
+    #[test]
+    fn test_is_valid_message_short_pubkey_returns_false() {
+        assert!(!is_valid_message(&[], "", "ab"));
     }
 }

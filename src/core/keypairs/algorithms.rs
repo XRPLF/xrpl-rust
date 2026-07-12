@@ -416,7 +416,13 @@ impl CryptoImplementation for Ed25519 {
     /// assert_eq!(Some(signature), signing);
     /// ```
     fn sign(&self, message: &[u8], private_key: &str) -> XRPLCoreResult<Vec<u8>> {
-        let raw_private = hex::decode(&private_key[ED25519_PREFIX.len()..])?;
+        if private_key.len() < ED25519_PREFIX.len() {
+            return Err(XRPLKeypairsException::InvalidSecret.into());
+        }
+        let key_suffix = private_key
+            .get(ED25519_PREFIX.len()..)
+            .ok_or(XRPLKeypairsException::InvalidSecret)?;
+        let raw_private = hex::decode(key_suffix)?;
         let raw_private_slice: &[u8; SECRET_KEY_LENGTH] = raw_private
             .as_slice()
             .try_into()
@@ -454,7 +460,14 @@ impl CryptoImplementation for Ed25519 {
     /// ));
     /// ```
     fn is_valid_message(&self, message: &[u8], signature: &str, public_key: &str) -> bool {
-        let raw_public = hex::decode(&public_key[ED25519_PREFIX.len()..]);
+        if public_key.len() < ED25519_PREFIX.len() {
+            return false;
+        }
+        let key_suffix = match public_key.get(ED25519_PREFIX.len()..) {
+            Some(s) => s,
+            None => return false,
+        };
+        let raw_public = hex::decode(key_suffix);
         let decoded_sig = hex::decode(signature);
 
         if raw_public.is_err() || decoded_sig.is_err() {
@@ -462,7 +475,10 @@ impl CryptoImplementation for Ed25519 {
         };
 
         if let (Ok(rpub), Ok(dsig)) = (raw_public, decoded_sig) {
-            let rpub = rpub.as_slice().try_into().unwrap();
+            let rpub: &[u8; 32] = match rpub.as_slice().try_into() {
+                Ok(b) => b,
+                Err(_) => return false,
+            };
             let public = ed25519_dalek::VerifyingKey::from_bytes(rpub);
 
             if dsig.len() != ED25519_SIGNATURE_LENGTH {
@@ -470,8 +486,10 @@ impl CryptoImplementation for Ed25519 {
             };
 
             if let Ok(value) = public {
-                let sig: [u8; ED25519_SIGNATURE_LENGTH] =
-                    dsig.try_into().expect("is_valid_message");
+                let sig: [u8; ED25519_SIGNATURE_LENGTH] = match dsig.try_into() {
+                    Ok(s) => s,
+                    Err(_) => return false,
+                };
                 let converted = &ed25519_dalek::Signature::from(sig);
 
                 value.verify(message, converted).is_ok()
@@ -543,5 +561,16 @@ mod test {
         let message: &[u8] = TEST_MESSAGE.as_bytes();
 
         assert!(Ed25519.is_valid_message(message, signature, PUBLIC_ED25519));
+    }
+
+    #[test]
+    fn test_ed25519_sign_trait_short_key_guard() {
+        // Guard in Ed25519::sign (algorithms.rs) must catch keys shorter than 2 bytes
+        // even if called directly, bypassing the dispatch guard in mod.rs.
+        assert!(
+            Ed25519.sign(&[], "E").is_err(),
+            "single-byte key must return Err"
+        );
+        assert!(Ed25519.sign(&[], "").is_err(), "empty key must return Err");
     }
 }
