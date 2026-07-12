@@ -16,6 +16,13 @@ use strum::IntoEnumIterator;
 
 use super::exceptions::XRPLCoreResult;
 
+/// Minimum byte length of an X-address decoded payload: 2-byte prefix + 20-byte classic address.
+const XADDRESS_MIN_PAYLOAD_LEN: usize = 22;
+
+/// Minimum byte length of the destination-tag suffix in an X-address payload:
+/// 1 flag byte + 8-byte destination tag.
+const TAG_SUFFIX_MIN_LEN: usize = 9;
+
 /// Map the algorithm to the prefix.
 fn _algorithm_to_prefix<'a>(algo: &CryptoAlgorithm) -> &'a [u8] {
     match algo {
@@ -38,6 +45,14 @@ fn _is_test_address(prefix: &[u8]) -> XRPLCoreResult<bool> {
 /// Returns the destination tag extracted from the suffix
 /// of the X-Address.
 fn _get_tag_from_buffer(buffer: &[u8]) -> XRPLCoreResult<Option<u64>> {
+    if buffer.len() < TAG_SUFFIX_MIN_LEN {
+        return Err(XRPLAddressCodecException::UnexpectedPayloadLength {
+            expected: TAG_SUFFIX_MIN_LEN,
+            found: buffer.len(),
+        }
+        .into());
+    }
+
     let flag = &buffer[0];
 
     if flag >= &2 {
@@ -288,6 +303,17 @@ pub fn xaddress_to_classic_address(xaddress: &str) -> XRPLCoreResult<(String, Op
         .with_alphabet(&XRPL_ALPHABET)
         .with_check(None)
         .into_vec()?;
+
+    // Guard the two slice operations below: prefix at [..2] and classic address at [2..22]
+    // require at least XADDRESS_MIN_PAYLOAD_LEN bytes. The 9-byte tag suffix at [22..31]
+    // is validated separately inside _get_tag_from_buffer.
+    if decoded.len() < XADDRESS_MIN_PAYLOAD_LEN {
+        return Err(XRPLAddressCodecException::UnexpectedPayloadLength {
+            expected: XADDRESS_MIN_PAYLOAD_LEN,
+            found: decoded.len(),
+        }
+        .into());
+    }
 
     let is_test_network = _is_test_address(&decoded[..2])?;
     let classic_address_bytes = &decoded[2..22];
@@ -688,6 +714,63 @@ mod test {
         for case in ADDRESS_TEST_CASES {
             assert!(is_valid_xaddress(case.test_xaddress))
         }
+    }
+
+    #[test]
+    fn test_xaddress_to_classic_too_short_returns_error() {
+        // Build a valid-checksum base58 string whose decoded payload is only 5 bytes;
+        // this reaches the decoded.len() < 22 length guard rather than the bs58 error
+        // path, verifying the guard itself fires.
+        let short = bs58::encode([0u8; 5])
+            .with_alphabet(&XRPL_ALPHABET)
+            .with_check()
+            .into_string();
+        assert!(xaddress_to_classic_address(&short).is_err());
+
+        // Malformed inputs (invalid checksum) must also return Err without panicking.
+        assert!(xaddress_to_classic_address("X").is_err());
+        assert!(xaddress_to_classic_address("X1").is_err());
+    }
+
+    #[test]
+    fn test_is_valid_xaddress_short_returns_false() {
+        // A valid-checksum string whose payload is shorter than a full X-address must
+        // return false, exercising the decoded.len() < 22 guard in
+        // xaddress_to_classic_address.
+        let short = bs58::encode([0u8; 5])
+            .with_alphabet(&XRPL_ALPHABET)
+            .with_check()
+            .into_string();
+        assert!(!is_valid_xaddress(&short));
+
+        // Malformed inputs must also return false without panicking.
+        assert!(!is_valid_xaddress("X"));
+        assert!(!is_valid_xaddress("X1"));
+    }
+
+    #[test]
+    fn test_get_tag_from_buffer_short_suffix_returns_error() {
+        // 2-byte valid mainnet prefix + 20-byte account id = exactly 22 bytes:
+        // passes the outer decoded.len() < 22 guard and _is_test_address, so
+        // decoded[22..] (empty, 0 bytes) reaches _get_tag_from_buffer and trips
+        // its buffer.len() < 9 guard with UnexpectedPayloadLength { expected: 9, found: 0 }.
+        use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
+        use crate::core::exceptions::XRPLCoreException;
+        let mut payload = ADDRESS_PREFIX_BYTES_MAIN.to_vec();
+        payload.extend_from_slice(&[0u8; 20]);
+        let encoded = bs58::encode(payload)
+            .with_alphabet(&XRPL_ALPHABET)
+            .with_check()
+            .into_string();
+        assert!(matches!(
+            xaddress_to_classic_address(&encoded),
+            Err(XRPLCoreException::XRPLAddressCodecError(
+                XRPLAddressCodecException::UnexpectedPayloadLength {
+                    expected: 9,
+                    found: 0
+                }
+            ))
+        ));
     }
 
     #[test]

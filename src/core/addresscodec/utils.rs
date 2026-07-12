@@ -88,6 +88,13 @@ pub fn decode_base58(
         .with_check(None)
         .into_vec()?;
 
+    if decoded.len() < prefix_len {
+        return Err(XRPLAddressCodecException::UnexpectedPayloadLength {
+            expected: prefix_len,
+            found: decoded.len(),
+        });
+    }
+
     if &decoded[..prefix_len] != prefix {
         Err(XRPLAddressCodecException::InvalidEncodingPrefixLength)
     } else {
@@ -181,5 +188,14 @@ mod test {
             encode_base58(DECODED, &[0x0], Some(20)),
             Ok(ENCODED.to_string())
         );
+    }
+
+    #[test]
+    fn test_decode_base58_short_payload_returns_error() {
+        // ENCODED decodes to 21 bytes before prefix stripping (1-byte prefix + 20-byte
+        // address). Passing a 22-byte prefix exceeds the decoded payload length, so the
+        // length guard must return Err rather than panicking at the slice operation.
+        let long_prefix = [0u8; 22];
+        assert!(decode_base58(ENCODED, &long_prefix).is_err());
     }
 }
