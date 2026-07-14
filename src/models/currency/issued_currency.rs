@@ -5,6 +5,7 @@ use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct IssuedCurrency<'a> {
     pub currency: Cow<'a, str>,
     pub issuer: Cow<'a, str>,

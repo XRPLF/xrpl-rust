@@ -10,10 +10,11 @@ use crate::XRPLSerdeJsonError;
 use super::{
     results::exceptions::XRPLResultException,
     transactions::exceptions::{
-        XRPLAccountSetException, XRPLClawbackException, XRPLNFTokenCancelOfferException,
-        XRPLNFTokenCreateOfferException, XRPLPaymentException, XRPLSignerListSetException,
-        XRPLTransactionException, XRPLXChainClaimException, XRPLXChainCreateBridgeException,
-        XRPLXChainCreateClaimIDException, XRPLXChainModifyBridgeException,
+        XRPLAccountSetException, XRPLClawbackException, XRPLDIDSetException,
+        XRPLNFTokenCancelOfferException, XRPLNFTokenCreateOfferException, XRPLPaymentException,
+        XRPLSignerListSetException, XRPLTransactionException, XRPLXChainClaimException,
+        XRPLXChainCreateBridgeException, XRPLXChainCreateClaimIDException,
+        XRPLXChainModifyBridgeException,
     },
 };
 
@@ -103,6 +104,12 @@ impl From<serde_json::Error> for XRPLModelException {
 
 impl From<XRPLAccountSetException> for XRPLModelException {
     fn from(error: XRPLAccountSetException) -> Self {
+        XRPLModelException::XRPLTransactionError(error.into())
+    }
+}
+
+impl From<XRPLDIDSetException> for XRPLModelException {
+    fn from(error: XRPLDIDSetException) -> Self {
         XRPLModelException::XRPLTransactionError(error.into())
     }
 }

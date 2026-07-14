@@ -21,12 +21,14 @@ pub mod results;
 pub mod transactions;
 
 mod amount;
+mod credential_authorization;
 mod currency;
 mod exceptions;
 mod flag_collection;
 mod model;
 
 pub use amount::*;
+pub use credential_authorization::*;
 pub use currency::*;
 pub use exceptions::*;
 pub use flag_collection::*;

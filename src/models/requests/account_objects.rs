@@ -14,6 +14,10 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 #[serde(rename_all = "snake_case")]
 pub enum AccountObjectType {
     Check,
+    #[serde(rename = "did")]
+    #[strum(serialize = "did")]
+    DID,
+    Credential,
     DepositPreauth,
     Escrow,
     Offer,
@@ -27,6 +31,8 @@ pub enum AccountObjectType {
     MptIssuance,
     /// Filter for MPToken objects (MPT holdings owned by this account).
     Mptoken,
+    /// Filter for Vault ledger objects (XLS-65 SingleAssetVault).
+    Vault,
 }
 
 /// This request returns the raw ledger format for all objects

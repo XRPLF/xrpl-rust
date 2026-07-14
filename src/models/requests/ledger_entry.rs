@@ -1,18 +1,91 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::models::{requests::RequestMethod, Model, XRPLModelException, XRPLModelResult};
+use crate::core::addresscodec::is_valid_classic_address;
+use crate::models::transactions::vault_common::validate_vault_id;
+use crate::models::{
+    requests::RequestMethod, transactions::validate_credential_type, Model, XRPLModelException,
+    XRPLModelResult,
+};
 
 use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Request};
 
+/// Required credential selector for credential-based DepositPreauth lookup.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct AuthorizedCredential<'a> {
+    pub issuer: Cow<'a, str>,
+    pub credential_type: Cow<'a, str>,
+}
+
 /// Required fields for requesting a DepositPreauth if not
 /// querying by object ID.
+#[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
 pub struct DepositPreauth<'a> {
-    pub authorized: Cow<'a, str>,
     pub owner: Cow<'a, str>,
+    pub authorized: Option<Cow<'a, str>>,
+    pub authorized_credentials: Option<Vec<AuthorizedCredential<'a>>>,
+}
+
+impl Model for DepositPreauth<'_> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        match (&self.authorized, &self.authorized_credentials) {
+            (Some(_), None) => Ok(()),
+            (None, Some(credentials)) => {
+                if credentials.is_empty() {
+                    return Err(XRPLModelException::ValueTooShort {
+                        field: "authorized_credentials".into(),
+                        min: 1,
+                        found: 0,
+                    });
+                }
+                if credentials.len() > 8 {
+                    return Err(XRPLModelException::ValueTooLong {
+                        field: "authorized_credentials".into(),
+                        max: 8,
+                        found: credentials.len(),
+                    });
+                }
+                for (idx, credential) in credentials.iter().enumerate() {
+                    validate_credential_type(&credential.credential_type)?;
+                    if credentials[..idx].iter().any(|previous| {
+                        previous.issuer == credential.issuer
+                            && previous
+                                .credential_type
+                                .eq_ignore_ascii_case(&credential.credential_type)
+                    }) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "authorized_credentials".into(),
+                            expected: "unique issuer and credential_type pairs".into(),
+                            found: credential.credential_type.to_string(),
+                        });
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(XRPLModelException::ExpectedOneOf(&[
+                "authorized",
+                "authorized_credentials",
+            ])),
+        }
+    }
+}
+
+/// Required fields for requesting a Credential if not
+/// querying by object ID.
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, new)]
+pub struct Credential<'a> {
+    pub subject: Cow<'a, str>,
+    pub issuer: Cow<'a, str>,
+    pub credential_type: Cow<'a, str>,
+}
+
+impl<'a> Model for Credential<'a> {
+    fn get_errors(&self) -> XRPLModelResult<()> {
+        validate_credential_type(&self.credential_type)
+    }
 }
 
 /// Required fields for requesting a DirectoryNode if not
@@ -82,6 +155,20 @@ pub struct OracleIdentifier<'a> {
     pub oracle_document_id: u32,
 }
 
+/// Vault selector for a `ledger_entry` request (XLS-65 SingleAssetVault).
+///
+/// rippled accepts either a direct 256-bit hash object ID or an object
+/// containing the vault owner account and the sequence number of the
+/// `VaultCreate` transaction (LedgerEntry.cpp:751-764).
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum VaultIdentifier<'a> {
+    /// Look up by ledger object ID (64 hex chars, nonzero).
+    Id(Cow<'a, str>),
+    /// Look up by vault owner account + VaultCreate sequence number.
+    OwnerSeq { owner: Cow<'a, str>, seq: u32 },
+}
+
 /// The ledger_entry method returns a single ledger object
 /// from the XRP Ledger in its raw format. See ledger formats
 /// for information on the different types of objects you can
@@ -104,6 +191,7 @@ pub struct LedgerEntry<'a> {
     /// data in JSON format. The default is false.
     pub binary: Option<bool>,
     pub check: Option<Cow<'a, str>>,
+    pub credential: Option<Credential<'a>>,
     pub deposit_preauth: Option<DepositPreauth<'a>>,
     pub directory: Option<Directory<'a>>,
     pub escrow: Option<Escrow<'a>>,
@@ -117,11 +205,41 @@ pub struct LedgerEntry<'a> {
     pub permissioned_domain: Option<PermissionedDomain<'a>>,
     pub ripple_state: Option<RippleState<'a>>,
     pub ticket: Option<Ticket<'a>>,
+    /// Vault selector: either a 256-bit hash ID or an owner + seq pair (XLS-65).
+    pub vault: Option<VaultIdentifier<'a>>,
 }
 
 impl<'a: 'static> Model for LedgerEntry<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self._get_field_error()
+        self._get_field_error()?;
+        if let Some(deposit_preauth) = &self.deposit_preauth {
+            deposit_preauth.get_errors()?;
+        }
+        if let Some(credential) = &self.credential {
+            credential.get_errors()?;
+        }
+        if let Some(vault) = &self.vault {
+            match vault {
+                VaultIdentifier::Id(id) => validate_vault_id(id)?,
+                VaultIdentifier::OwnerSeq { owner, seq } => {
+                    if !is_valid_classic_address(owner) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "vault.owner".into(),
+                            expected: "a valid classic account address".into(),
+                            found: owner.as_ref().into(),
+                        });
+                    }
+                    if *seq == 0 {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "vault.seq".into(),
+                            expected: "a positive sequence number (> 0)".into(),
+                            found: seq.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -158,14 +276,20 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.deposit_preauth.is_some() {
             signing_methods += 1
         }
+        if self.credential.is_some() {
+            signing_methods += 1
+        }
         if self.permissioned_domain.is_some() {
             signing_methods += 1
         }
         if self.ticket.is_some() {
             signing_methods += 1
         }
+        if self.vault.is_some() {
+            signing_methods += 1
+        }
         if signing_methods != 1 {
-            return Err(XRPLModelException::ExpectedOneOf(&[
+            Err(XRPLModelException::ExpectedOneOf(&[
                 "index",
                 "account_root",
                 "check",
@@ -176,11 +300,14 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "escrow",
                 "payment_channel",
                 "deposit_preauth",
+                "credential",
                 "permissioned_domain",
                 "ticket",
-            ]));
+                "vault",
+            ]))
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 }
 
@@ -194,12 +321,43 @@ impl<'a> Request<'a> for LedgerEntry<'a> {
     }
 }
 
+impl<'a> Default for LedgerEntry<'a> {
+    fn default() -> Self {
+        Self {
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
+                id: None,
+            },
+            account_root: None,
+            binary: None,
+            check: None,
+            credential: None,
+            deposit_preauth: None,
+            directory: None,
+            escrow: None,
+            index: None,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash: None,
+                ledger_index: None,
+            }),
+            offer: None,
+            oracle: None,
+            payment_channel: None,
+            permissioned_domain: None,
+            ripple_state: None,
+            ticket: None,
+            vault: None,
+        }
+    }
+}
+
 impl<'a> LedgerEntry<'a> {
     pub fn new(
         id: Option<Cow<'a, str>>,
         account_root: Option<Cow<'a, str>>,
         binary: Option<bool>,
         check: Option<Cow<'a, str>>,
+        credential: Option<Credential<'a>>,
         deposit_preauth: Option<DepositPreauth<'a>>,
         directory: Option<Directory<'a>>,
         escrow: Option<Escrow<'a>>,
@@ -211,6 +369,7 @@ impl<'a> LedgerEntry<'a> {
         payment_channel: Option<Cow<'a, str>>,
         ripple_state: Option<RippleState<'a>>,
         ticket: Option<Ticket<'a>>,
+        vault: Option<VaultIdentifier<'a>>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -220,6 +379,7 @@ impl<'a> LedgerEntry<'a> {
             index,
             account_root,
             check,
+            credential,
             payment_channel,
             permissioned_domain: None,
             deposit_preauth,
@@ -229,6 +389,7 @@ impl<'a> LedgerEntry<'a> {
             oracle,
             ripple_state,
             ticket,
+            vault,
             binary,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
@@ -252,15 +413,17 @@ impl<'a> LedgerEntry<'a> {
             index: None,
             account_root: None,
             check: None,
-            payment_channel: None,
-            permissioned_domain: Some(permissioned_domain),
+            credential: None,
             deposit_preauth: None,
             directory: None,
             escrow: None,
             offer: None,
             oracle: None,
+            payment_channel: None,
+            permissioned_domain: Some(permissioned_domain),
             ripple_state: None,
             ticket: None,
+            vault: None,
             binary,
             ledger_lookup: Some(LookupByLedgerRequest {
                 ledger_hash,
@@ -280,70 +443,131 @@ mod test_ledger_entry_errors {
     use super::Offer;
     use crate::models::Model;
     use alloc::format;
+    use alloc::string::ToString;
+    use alloc::vec;
 
     use super::*;
 
     #[test]
     fn test_fields_error() {
-        let ledger_entry = LedgerEntry::new(
-            None,
-            Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(Offer {
+        let ledger_entry = LedgerEntry {
+            account_root: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
+            offer: Some(Offer {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
-            None,
-            None,
-            None,
-            None,
+            ..Default::default()
+        };
+        assert_eq!(
+            ledger_entry.validate().unwrap_err().to_string().as_str(),
+            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, credential, permissioned_domain, ticket, vault"
         );
-        let expected = XRPLModelException::ExpectedOneOf(&[
-            "index",
-            "account_root",
-            "check",
-            "directory",
-            "offer",
-            "oracle",
-            "ripple_state",
-            "escrow",
-            "payment_channel",
-            "deposit_preauth",
-            "permissioned_domain",
-            "ticket",
-        ]);
-        assert_eq!(ledger_entry.validate().unwrap_err(), expected);
+    }
+
+    #[test]
+    fn test_vault_selector_by_id() {
+        let id = "A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2C3D4E5F6A1B2";
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id(id.into())),
+            ..Default::default()
+        };
+        assert!(req.validate().is_ok(), "vault id selector should be valid");
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized.validate().is_ok());
+        assert!(
+            serialized.contains("\"vault\""),
+            "expected vault key in JSON"
+        );
+        assert!(serialized.contains(id), "expected vault id in JSON");
+    }
+
+    #[test]
+    fn test_vault_selector_by_owner_seq() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::OwnerSeq {
+                owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                seq: 7,
+            }),
+            ..Default::default()
+        };
+        assert!(
+            req.validate().is_ok(),
+            "vault owner+seq selector should be valid"
+        );
+        let serialized = serde_json::to_string(&req).unwrap();
+        let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
+        assert!(deserialized.validate().is_ok());
+        assert!(serialized.contains("\"owner\""), "expected owner in JSON");
+        assert!(serialized.contains("\"seq\""), "expected seq in JSON");
+    }
+
+    #[test]
+    fn test_vault_id_wrong_length_rejected() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id("DEADBEEF".into())),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "short vault_id must be rejected");
+    }
+
+    #[test]
+    fn test_vault_id_nonhex_rejected() {
+        let non_hex: alloc::string::String = "Z".repeat(64);
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id(non_hex.into())),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "non-hex vault_id must be rejected");
+    }
+
+    #[test]
+    fn test_vault_id_all_zero_rejected() {
+        let zeros: alloc::string::String = "0".repeat(64);
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::Id(zeros.into())),
+            ..Default::default()
+        };
+        assert!(
+            req.validate().is_err(),
+            "all-zero vault_id must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_vault_owner_seq_invalid_owner_rejected() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::OwnerSeq {
+                owner: "notanaddress".into(),
+                seq: 1,
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "invalid owner must be rejected");
+    }
+
+    #[test]
+    fn test_vault_owner_seq_zero_seq_rejected() {
+        let req = LedgerEntry {
+            vault: Some(VaultIdentifier::OwnerSeq {
+                owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                seq: 0,
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err(), "seq == 0 must be rejected");
     }
 
     #[test]
     fn test_serde() {
-        let req = LedgerEntry::new(
-            None,
-            Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(Offer {
+        let req = LedgerEntry {
+            account_root: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
+            offer: Some(Offer {
                 account: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
                 seq: 359,
             }),
-            None,
-            None,
-            None,
-            None,
-        );
+            ..Default::default()
+        };
         let serialized = serde_json::to_string(&req).unwrap();
 
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
@@ -384,5 +608,130 @@ mod test_ledger_entry_errors {
         assert!(req.validate().is_ok());
         let serialized = serde_json::to_string(&req).unwrap();
         assert!(serialized.contains(&format!("\"permissioned_domain\":\"{}\"", "A".repeat(64))));
+    }
+
+    #[test]
+    fn test_deposit_preauth_with_authorized_credentials_serde() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: Some(vec![AuthorizedCredential {
+                    issuer: "rIssuer".into(),
+                    credential_type: "4B5943".into(),
+                }]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_ok());
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"authorized_credentials\""));
+        assert!(json.contains("\"credential_type\":\"4B5943\""));
+        let deserialized: LedgerEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(req, deserialized);
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_duplicate_authorized_credentials() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: Some(vec![
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4B5943".into(),
+                    },
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4B5943".into(),
+                    },
+                ]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_case_variant_duplicate_credentials() {
+        // "4b5943" and "4B5943" decode to the same bytes — must be treated as duplicates.
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: Some(vec![
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4b5943".into(),
+                    },
+                    AuthorizedCredential {
+                        issuer: "rIssuer".into(),
+                        credential_type: "4B5943".into(),
+                    },
+                ]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_authorized_and_credentials() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: Some("rAuthorized".into()),
+                authorized_credentials: Some(vec![AuthorizedCredential {
+                    issuer: "rIssuer".into(),
+                    credential_type: "4B5943".into(),
+                }]),
+            }),
+            ..Default::default()
+        };
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_credential_selector_valid() {
+        let req = LedgerEntry {
+            credential: Some(Credential {
+                subject: "rSubject".into(),
+                issuer: "rIssuer".into(),
+                credential_type: "4B5943".into(),
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn test_credential_selector_invalid_credential_type_error() {
+        let req = LedgerEntry {
+            credential: Some(Credential {
+                subject: "rSubject".into(),
+                issuer: "rIssuer".into(),
+                credential_type: "NOTHEX".into(),
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_credential_selector_empty_credential_type_error() {
+        let req = LedgerEntry {
+            credential: Some(Credential {
+                subject: "rSubject".into(),
+                issuer: "rIssuer".into(),
+                credential_type: "".into(),
+            }),
+            ..Default::default()
+        };
+        assert!(req.validate().is_err());
     }
 }

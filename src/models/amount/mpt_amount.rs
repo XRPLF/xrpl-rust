@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 /// See MPToken:
 /// `<https://xrpl.org/docs/references/protocol/ledger-data/ledger-entry-types/mptoken>`
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct MPTAmount<'a> {
     /// The token quantity, expressed as a non-negative integer string.
     pub value: Cow<'a, str>,

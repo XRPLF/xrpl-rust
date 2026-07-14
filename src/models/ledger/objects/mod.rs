@@ -3,7 +3,9 @@ pub mod amendments;
 pub mod amm;
 pub mod bridge;
 pub mod check;
+pub mod credential;
 pub mod deposit_preauth;
+pub mod did;
 pub mod directory_node;
 pub mod escrow;
 pub mod fee_settings;
@@ -20,6 +22,7 @@ pub mod permissioned_domain;
 pub mod ripple_state;
 pub mod signer_list;
 pub mod ticket;
+pub mod vault;
 pub mod xchain_owned_claim_id;
 pub mod xchain_owned_create_account_claim_id;
 
@@ -28,8 +31,10 @@ use amendments::Amendments;
 use amm::AMM;
 use bridge::Bridge;
 use check::Check;
+use credential::Credential;
 use deposit_preauth::DepositPreauth;
 use derive_new::new;
+use did::DID;
 use directory_node::DirectoryNode;
 use escrow::Escrow;
 use fee_settings::FeeSettings;
@@ -52,6 +57,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
 use ticket::Ticket;
+use vault::Vault;
 use xchain_owned_claim_id::XChainOwnedClaimID;
 use xchain_owned_create_account_claim_id::XChainOwnedCreateAccountClaimID;
 
@@ -65,6 +71,8 @@ pub enum LedgerEntryType {
     AMM = 0x0079,
     Bridge = 0x0069,
     Check = 0x0043,
+    DID = 0x0049,
+    Credential = 0x0081,
     DepositPreauth = 0x0070,
     DirectoryNode = 0x0064,
     Escrow = 0x0075,
@@ -82,6 +90,7 @@ pub enum LedgerEntryType {
     RippleState = 0x0072,
     SignerList = 0x0053,
     Ticket = 0x0054,
+    Vault = 0x0084,
     XChainOwnedClaimID = 0x0071,
     XChainOwnedCreateAccountClaimID = 0x0074,
 }
@@ -93,6 +102,8 @@ pub enum LedgerEntry<'a> {
     AMM(AMM<'a>),
     Bridge(Bridge<'a>),
     Check(Check<'a>),
+    DID(DID<'a>),
+    Credential(Credential<'a>),
     DepositPreauth(DepositPreauth<'a>),
     DirectoryNode(DirectoryNode<'a>),
     Escrow(Escrow<'a>),
@@ -110,6 +121,7 @@ pub enum LedgerEntry<'a> {
     RippleState(RippleState<'a>),
     SignerList(SignerList<'a>),
     Ticket(Ticket<'a>),
+    Vault(Vault<'a>),
     XChainOwnedClaimID(XChainOwnedClaimID<'a>),
     XChainOwnedCreateAccountClaimID(XChainOwnedCreateAccountClaimID<'a>),
 }

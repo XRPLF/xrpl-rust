@@ -40,6 +40,7 @@ pub mod subscribe;
 pub mod transaction_entry;
 pub mod tx;
 pub mod unsubscribe;
+pub mod vault_info;
 
 use super::{requests::XRPLRequest, Amount, XRPLModelException, XRPLModelResult};
 #[cfg(not(feature = "std"))]
@@ -152,6 +153,7 @@ pub enum XRPLResult<'a> {
     SubmitMultisigned(submit_multisigned::SubmitMultisigned<'a>),
     TransactionEntry(transaction_entry::TransactionEntry<'a>),
     Tx(tx::TxVersionMap<'a>),
+    VaultInfo(vault_info::VaultInfo<'a>),
     // Other must come before Subscribe/Unsubscribe/Ping so that unrecognized
     // JSON objects fall into Other(Value) — where the raw data is recoverable —
     // rather than into Subscribe (empty PhantomData struct, data unrecoverable).
@@ -215,6 +217,7 @@ impl_from_result!(transaction_entry, TransactionEntry);
 impl_from_result!(ping, Ping);
 impl_from_result!(subscribe, Subscribe);
 impl_from_result!(unsubscribe, Unsubscribe);
+impl_from_result!(vault_info, VaultInfo);
 
 impl<'a> From<Value> for XRPLResult<'a> {
     fn from(value: Value) -> Self {
@@ -447,6 +450,7 @@ impl_try_from_result!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_result!(ping, Ping, Ping);
 impl_try_from_result!(subscribe, Subscribe, Subscribe);
 impl_try_from_result!(unsubscribe, Unsubscribe, Unsubscribe);
+impl_try_from_result!(vault_info, VaultInfo, VaultInfo);
 
 impl<'a> TryInto<Value> for XRPLResult<'a> {
     type Error = XRPLModelException;
@@ -501,6 +505,7 @@ impl XRPLResult<'_> {
             XRPLResult::Subscribe(_) => "Subscribe".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
             XRPLResult::Unsubscribe(_) => "Unsubscribe".to_string(),
+            XRPLResult::VaultInfo(_) => "VaultInfo".to_string(),
             XRPLResult::Other(_) => "Other".to_string(),
         }
     }
@@ -813,6 +818,7 @@ where
 impl_try_from_response!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_response!(subscribe, Subscribe, Subscribe);
 impl_try_from_response!(unsubscribe, Unsubscribe, Unsubscribe);
+impl_try_from_response!(vault_info, VaultInfo, VaultInfo);
 
 fn is_subscription_stream_item(item: &Map<String, Value>) -> bool {
     item.get("result").is_none() && item.get("error_code").is_none()
