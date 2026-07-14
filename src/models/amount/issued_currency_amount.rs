@@ -5,13 +5,36 @@ use core::convert::TryInto;
 use core::str::FromStr;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Default)]
+// PartialEq and Eq are implemented manually (not derived) so that Eq agrees with
+// Ord: two amounts with numerically equal values, same currency, and same issuer
+// are considered equal regardless of their string representation (e.g. "100" and
+// "100.0" compare Equal). When a value is not a valid decimal, comparison falls
+// back to byte-wise string equality — consistent with the Ord fallback.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct IssuedCurrencyAmount<'a> {
     pub currency: Cow<'a, str>,
     pub issuer: Cow<'a, str>,
     pub value: Cow<'a, str>,
 }
+
+impl<'a> PartialEq for IssuedCurrencyAmount<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.currency != other.currency || self.issuer != other.issuer {
+            return false;
+        }
+        // Numeric comparison when both values are valid decimals, matching Ord semantics.
+        match (
+            BigDecimal::from_str(&self.value),
+            BigDecimal::from_str(&other.value),
+        ) {
+            (Ok(sv), Ok(ov)) => sv == ov,
+            _ => self.value == other.value,
+        }
+    }
+}
+
+impl<'a> Eq for IssuedCurrencyAmount<'a> {}
 
 impl<'a> Model for IssuedCurrencyAmount<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
@@ -47,9 +70,18 @@ impl<'a> PartialOrd for IssuedCurrencyAmount<'a> {
 
 impl<'a> Ord for IssuedCurrencyAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        let sv = BigDecimal::from_str(&self.value).unwrap_or_default();
-        let ov = BigDecimal::from_str(&other.value).unwrap_or_default();
-        sv.cmp(&ov)
+        // Parse values as BigDecimal for numeric comparison. If either value is
+        // malformed, fall back to lexicographic string comparison so the sort
+        // remains total without silently treating the invalid value as zero
+        // (mapping to zero would misplace malformed amounts in sorted output).
+        let value_ord = match (
+            BigDecimal::from_str(&self.value),
+            BigDecimal::from_str(&other.value),
+        ) {
+            (Ok(sv), Ok(ov)) => sv.cmp(&ov),
+            _ => self.value.cmp(&other.value),
+        };
+        value_ord
             .then_with(|| self.currency.cmp(&other.currency))
             .then_with(|| self.issuer.cmp(&other.issuer))
     }
@@ -117,5 +149,49 @@ mod tests {
         let a = ica("USD", "rA", "50");
         let b = ica("USD", "rA", "100");
         assert_eq!(a.partial_cmp(&b), Some(Ordering::Less));
+    }
+
+    // "100" and "100.0" must be Eq-equal under numeric comparison
+    #[test]
+    fn test_eq_canonical_forms_numeric() {
+        let a = ica("USD", "rA", "100");
+        let b = ica("USD", "rA", "100.0");
+        assert_eq!(
+            a, b,
+            "'100' and '100.0' must be Eq-equal with numeric comparison"
+        );
+        assert_eq!(
+            a.cmp(&b),
+            Ordering::Equal,
+            "'100' and '100.0' must be Ord-Equal"
+        );
+    }
+
+    // Currency tiebreak: EUR < USD when values are numerically equal
+    #[test]
+    fn test_ord_tiebreak_currency_when_value_equal() {
+        let eur = ica("EUR", "rA", "100");
+        let usd = ica("USD", "rA", "100");
+        assert!(eur < usd, "EUR sorts before USD when values are equal");
+        assert_ne!(eur, usd, "different currencies must not be Eq-equal");
+    }
+
+    // Malformed value does not silently sort as zero — it falls back to
+    // lexicographic string comparison rather than mapping to the zero BigDecimal.
+    #[test]
+    fn test_ord_malformed_value_not_silent_zero() {
+        let malformed = ica("USD", "rA", "not-a-number");
+        let zero = ica("USD", "rA", "0");
+        // Both fail to parse in the same (Err, Ok) branch — wait, "0" is valid.
+        // Malformed hits the _ fallback → lexicographic "not-a-number" vs "0".
+        // "n" (110) > "0" (48), so malformed > zero lexicographically.
+        // Key invariant: malformed != zero (it is NOT silently treated as 0).
+        assert_ne!(malformed, zero, "malformed value must not equal zero");
+        // And they have a defined, stable ordering (not zero-based).
+        let ord = malformed.cmp(&zero);
+        assert!(
+            ord != Ordering::Equal,
+            "malformed value must not compare Equal to zero"
+        );
     }
 }
