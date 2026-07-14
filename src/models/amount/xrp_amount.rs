@@ -174,13 +174,13 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Values from TryFrom<Value> are always valid u64 drops; checked_cmp succeeds.
+        // Values from TryFrom<Value> are always canonical u64 drops; checked_cmp succeeds.
         // For values constructed via infallible From<&str>/From<String> with non-numeric
-        // content, return Equal as a neutral sentinel. Lexicographic fallback is wrong
-        // for numeric strings ("9" > "10"), so we prefer a stable no-op over silent
-        // incorrect ordering.
+        // content, fall back to lexicographic comparison — consistent with derived Eq
+        // (both byte-for-byte), satisfying the Ord contract (cmp == Equal ↔ eq).
+        // Numeric ordering is not meaningful for non-numeric strings.
         self.checked_cmp(other)
-            .unwrap_or(core::cmp::Ordering::Equal)
+            .unwrap_or_else(|_| self.0.cmp(&other.0))
     }
 }
 
