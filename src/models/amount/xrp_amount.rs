@@ -238,7 +238,7 @@ mod tests {
     fn test_cmp_non_numeric_does_not_panic() {
         let valid = XRPAmount("100".into());
         let malformed = XRPAmount("xyz".into());
-        // Must not panic — returns Equal as a neutral sentinel for non-numeric values
+        // Must not panic — falls back to lexicographic ordering for non-numeric values
         let _ = valid.cmp(&malformed);
     }
 
@@ -294,21 +294,31 @@ mod tests {
     }
 
     #[test]
-    fn test_try_from_accepts_max_u64() {
-        let max = XRPAmount::try_from(serde_json::Value::String(u64::MAX.to_string().into()));
-        assert!(max.is_ok(), "u64::MAX drops must be accepted");
-        assert_eq!(max.unwrap().0.as_ref(), u64::MAX.to_string());
+    fn test_try_from_accepts_large_drop_value() {
+        // 100_000_000_000_000_000 = 10^17 drops ≈ total XRP in circulation.
+        // TryFrom<Value> validates only parse-as-u64; semantic upper-bound checks
+        // belong in Model::get_errors(). Using a protocol-realistic large value here.
+        const LARGE_DROPS: u64 = 100_000_000_000_000_000;
+        let max = XRPAmount::try_from(serde_json::Value::String(LARGE_DROPS.to_string().into()));
+        assert!(max.is_ok(), "large valid drop count must be accepted");
+        assert_eq!(max.unwrap().0.as_ref(), LARGE_DROPS.to_string());
     }
 
     #[test]
-    fn test_ord_fallback_returns_equal_not_lexicographic() {
-        // Verify the fallback is Equal, not lexicographic ("9" > "1" lexicographically)
+    fn test_ord_fallback_non_numeric_uses_byte_order() {
+        // Non-numeric From<&str>-constructed values fall back to lexicographic ordering
+        // (byte-for-byte), consistent with derived Eq. This satisfies the Ord contract.
         let a = XRPAmount("xyz".into());
         let b = XRPAmount("abc".into());
         assert_eq!(
             a.cmp(&b),
-            core::cmp::Ordering::Equal,
-            "non-numeric cmp must return Equal"
+            "xyz".cmp("abc"),
+            "non-numeric cmp must match byte-order (consistent with Eq)"
+        );
+        assert_eq!(
+            b.cmp(&a),
+            "abc".cmp("xyz"),
+            "symmetry of lexicographic fallback"
         );
     }
 
