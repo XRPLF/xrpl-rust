@@ -149,10 +149,9 @@ where
         } else if name_str == "\"Destination\"" {
             ("Destination", "DestinationTag")
         } else {
-            return Err(XRPLTransactionFieldException::UnknownAccountField(
-                name_str.to_string(),
-            )
-            .into());
+            return Err(
+                XRPLTransactionFieldException::UnknownAccountField(name_str.to_string()).into(),
+            );
         }
     };
     let account_address = match account_field {
