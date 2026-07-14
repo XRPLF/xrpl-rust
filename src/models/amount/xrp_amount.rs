@@ -106,16 +106,19 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
             .map_err(XRPLModelException::from)?
             .replace('"', "");
 
-        // Validate numeric content and normalize to canonical form.
-        // This prevents non-numeric strings from reaching Ord::cmp (closing the
-        // panic path) and stores a canonical representation so Eq and Ord agree.
-        let decimal = BigDecimal::from_str(&raw).map_err(|_| XRPLModelException::InvalidValue {
-            field: "XRPAmount".into(),
-            expected: "a valid numeric amount".into(),
-            found: raw.clone(),
-        })?;
+        // Enforce non-negative integer drops at the deserialization boundary.
+        // u64::parse rejects negatives, fractions, and non-numerics in one step
+        // and produces a canonical decimal string (no trailing zeros, no scientific
+        // notation), ensuring Eq and Ord agree for all TryFrom<Value>-constructed values.
+        let drops = raw
+            .parse::<u64>()
+            .map_err(|_| XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: "a non-negative integer (XRP drops)".into(),
+                found: raw,
+            })?;
 
-        Ok(Self(decimal.to_string().into()))
+        Ok(Self(drops.to_string().into()))
     }
 }
 
@@ -171,11 +174,13 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Fall back to lexicographic comparison when either side is non-numeric.
-        // Values deserialized via try_from are always numeric, so the fallback
-        // only applies to instances constructed directly via From<&str>/From<String>.
+        // Values from TryFrom<Value> are always valid u64 drops; checked_cmp succeeds.
+        // For values constructed via infallible From<&str>/From<String> with non-numeric
+        // content, return Equal as a neutral sentinel. Lexicographic fallback is wrong
+        // for numeric strings ("9" > "10"), so we prefer a stable no-op over silent
+        // incorrect ordering.
         self.checked_cmp(other)
-            .unwrap_or_else(|_| self.0.cmp(&other.0))
+            .unwrap_or(core::cmp::Ordering::Equal)
     }
 }
 
@@ -228,7 +233,7 @@ mod tests {
     fn test_cmp_non_numeric_does_not_panic() {
         let valid = XRPAmount("100".into());
         let malformed = XRPAmount("xyz".into());
-        // Must not panic — falls back to lexicographic ordering
+        // Must not panic — returns Equal as a neutral sentinel for non-numeric values
         let _ = valid.cmp(&malformed);
     }
 
@@ -255,6 +260,50 @@ mod tests {
             a.cmp(&b),
             core::cmp::Ordering::Equal,
             "must be Equal by Ord"
+        );
+    }
+
+    #[test]
+    fn test_try_from_rejects_negative_drops() {
+        let bad = XRPAmount::try_from(serde_json::Value::String("-100".into()));
+        assert!(bad.is_err(), "negative drop amount must be rejected");
+
+        let bad_num = XRPAmount::try_from(serde_json::json!(-100_i64));
+        assert!(bad_num.is_err(), "negative JSON number must be rejected");
+    }
+
+    #[test]
+    fn test_try_from_rejects_fractional_drops() {
+        let bad = XRPAmount::try_from(serde_json::Value::String("1.5".into()));
+        assert!(bad.is_err(), "fractional drop amount must be rejected");
+
+        let bad2 = XRPAmount::try_from(serde_json::Value::String("100.00".into()));
+        assert!(bad2.is_err(), "decimal-formatted drop must be rejected");
+    }
+
+    #[test]
+    fn test_try_from_accepts_zero() {
+        let zero = XRPAmount::try_from(serde_json::json!(0_u64));
+        assert!(zero.is_ok(), "zero drops must be accepted");
+        assert_eq!(zero.unwrap().0.as_ref(), "0");
+    }
+
+    #[test]
+    fn test_try_from_accepts_max_u64() {
+        let max = XRPAmount::try_from(serde_json::Value::String(u64::MAX.to_string().into()));
+        assert!(max.is_ok(), "u64::MAX drops must be accepted");
+        assert_eq!(max.unwrap().0.as_ref(), u64::MAX.to_string());
+    }
+
+    #[test]
+    fn test_ord_fallback_returns_equal_not_lexicographic() {
+        // Verify the fallback is Equal, not lexicographic ("9" > "1" lexicographically)
+        let a = XRPAmount("xyz".into());
+        let b = XRPAmount("abc".into());
+        assert_eq!(
+            a.cmp(&b),
+            core::cmp::Ordering::Equal,
+            "non-numeric cmp must return Equal"
         );
     }
 
