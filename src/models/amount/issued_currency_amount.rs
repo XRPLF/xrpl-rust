@@ -47,6 +47,75 @@ impl<'a> PartialOrd for IssuedCurrencyAmount<'a> {
 
 impl<'a> Ord for IssuedCurrencyAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.value.cmp(&other.value)
+        let sv = BigDecimal::from_str(&self.value).unwrap_or_default();
+        let ov = BigDecimal::from_str(&other.value).unwrap_or_default();
+        sv.cmp(&ov)
+            .then_with(|| self.currency.cmp(&other.currency))
+            .then_with(|| self.issuer.cmp(&other.issuer))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::cmp::Ordering;
+
+    fn ica(
+        currency: &'static str,
+        issuer: &'static str,
+        value: &'static str,
+    ) -> IssuedCurrencyAmount<'static> {
+        IssuedCurrencyAmount::new(currency.into(), issuer.into(), value.into())
+    }
+
+    // Ord == Equal ↔ Eq: same value+currency+issuer
+    #[test]
+    fn test_ord_eq_consistent_equal() {
+        let a = ica("USD", "rA", "100");
+        let b = ica("USD", "rA", "100");
+        assert_eq!(a, b);
+        assert_eq!(a.cmp(&b), Ordering::Equal);
+    }
+
+    // Different currency, same value: Eq says unequal, Ord must NOT say Equal
+    #[test]
+    fn test_ord_eq_consistent_different_currency() {
+        let a = ica("USD", "rA", "100");
+        let b = ica("EUR", "rA", "100");
+        assert_ne!(a, b);
+        assert_ne!(
+            a.cmp(&b),
+            Ordering::Equal,
+            "same value, different currency must not be Ord-Equal"
+        );
+    }
+
+    // Different issuer, same value: Eq says unequal, Ord must NOT say Equal
+    #[test]
+    fn test_ord_eq_consistent_different_issuer() {
+        let a = ica("USD", "rA", "100");
+        let b = ica("USD", "rB", "100");
+        assert_ne!(a, b);
+        assert_ne!(
+            a.cmp(&b),
+            Ordering::Equal,
+            "same value, different issuer must not be Ord-Equal"
+        );
+    }
+
+    // Numeric ordering: 10 > 9 (lexicographic "10" < "9" was the old bug)
+    #[test]
+    fn test_numeric_ordering() {
+        let nine = ica("USD", "rA", "9");
+        let ten = ica("USD", "rA", "10");
+        assert!(ten > nine, "10 must be greater than 9 numerically");
+    }
+
+    // PartialOrd consistent with Ord
+    #[test]
+    fn test_partial_ord_consistent() {
+        let a = ica("USD", "rA", "50");
+        let b = ica("USD", "rA", "100");
+        assert_eq!(a.partial_cmp(&b), Some(Ordering::Less));
     }
 }
