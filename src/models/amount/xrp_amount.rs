@@ -102,13 +102,20 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
             });
         }
 
-        match serde_json::to_string(&value) {
-            Ok(amount_string) => {
-                let amount_string = amount_string.clone().replace("\"", "");
-                Ok(Self(amount_string.into()))
-            }
-            Err(serde_error) => Err(serde_error.into()),
-        }
+        let raw = serde_json::to_string(&value)
+            .map_err(XRPLModelException::from)?
+            .replace('"', "");
+
+        // Validate numeric content and normalize to canonical form.
+        // This prevents non-numeric strings from reaching Ord::cmp (closing the
+        // panic path) and stores a canonical representation so Eq and Ord agree.
+        let decimal = BigDecimal::from_str(&raw).map_err(|_| XRPLModelException::InvalidValue {
+            field: "XRPAmount".into(),
+            expected: "a valid numeric amount".into(),
+            found: raw.clone(),
+        })?;
+
+        Ok(Self(decimal.to_string().into()))
     }
 }
 
@@ -164,8 +171,11 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        // Fall back to lexicographic comparison when either side is non-numeric.
+        // Values deserialized via try_from are always numeric, so the fallback
+        // only applies to instances constructed directly via From<&str>/From<String>.
         self.checked_cmp(other)
-            .expect("cannot compare invalid XRPAmount values")
+            .unwrap_or_else(|_| self.0.cmp(&other.0))
     }
 }
 
@@ -212,13 +222,40 @@ mod tests {
         assert!(invalid1.checked_cmp(&invalid2).is_err());
     }
 
+    // Regression for #347: cmp must not panic on non-numeric strings constructed
+    // via From<&str> (the deserialization path now rejects them before storage).
     #[test]
-    #[should_panic(expected = "cannot compare invalid XRPAmount values")]
-    fn test_cmp_panics_on_malformed() {
+    fn test_cmp_non_numeric_does_not_panic() {
         let valid = XRPAmount("100".into());
         let malformed = XRPAmount("xyz".into());
-
+        // Must not panic — falls back to lexicographic ordering
         let _ = valid.cmp(&malformed);
+    }
+
+    // Regression for #347: try_from must reject non-numeric strings, closing
+    // the path that allowed malformed values into Ord::cmp.
+    #[test]
+    fn test_try_from_rejects_non_numeric_string() {
+        let bad = XRPAmount::try_from(serde_json::Value::String("not-a-number".into()));
+        assert!(bad.is_err(), "non-numeric string must be rejected");
+
+        let bad2 = XRPAmount::try_from(serde_json::Value::String("1e2x".into()));
+        assert!(bad2.is_err(), "malformed numeric string must be rejected");
+    }
+
+    // Regression for #349: non-canonical strings normalize to canonical form
+    // so Eq and Ord agree for deserialized values.
+    #[test]
+    fn test_try_from_normalizes_canonical_form() {
+        let a = XRPAmount::try_from(serde_json::Value::String("0100".into())).unwrap();
+        let b = XRPAmount::try_from(serde_json::Value::String("100".into())).unwrap();
+        // After normalization both store "100", so Eq and Ord agree
+        assert_eq!(a, b, "normalized forms must be equal by Eq");
+        assert_eq!(
+            a.cmp(&b),
+            core::cmp::Ordering::Equal,
+            "must be Equal by Ord"
+        );
     }
 
     #[test]
