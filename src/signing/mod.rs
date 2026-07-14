@@ -141,21 +141,19 @@ where
     F: IntoEnumIterator + Serialize + Debug + PartialEq,
     T: Transaction<'a, F> + Serialize + DeserializeOwned + Clone,
 {
-    let (account_field_name, tag_field_name) = match serde_json::to_string(&account_field) {
-        Ok(name) => {
-            let name_str = name.as_str().trim();
-            if name_str == "\"Account\"" {
-                ("Account", "SourceTag")
-            } else if name_str == "\"Destination\"" {
-                ("Destination", "DestinationTag")
-            } else {
-                return Err(XRPLTransactionFieldException::UnknownAccountField(
-                    name_str.to_string(),
-                )
-                .into());
-            }
+    let (account_field_name, tag_field_name) = {
+        let name = serde_json::to_string(&account_field)?;
+        let name_str = name.as_str().trim();
+        if name_str == "\"Account\"" {
+            ("Account", "SourceTag")
+        } else if name_str == "\"Destination\"" {
+            ("Destination", "DestinationTag")
+        } else {
+            return Err(XRPLTransactionFieldException::UnknownAccountField(
+                name_str.to_string(),
+            )
+            .into());
         }
-        Err(error) => return Err(error.into()),
     };
     let account_address = match account_field {
         AccountFieldType::Account => prepared_transaction.get_common_fields().account.clone(),
@@ -194,10 +192,7 @@ where
 {
     let address = get_transaction_field_value::<F, _, String>(transaction, field_name)?;
     if is_valid_xaddress(&address) {
-        let classic_address = match xaddress_to_classic_address(&address) {
-            Ok(t) => t.0,
-            Err(error) => return Err(error.into()),
-        };
+        let classic_address = xaddress_to_classic_address(&address)?.0;
         Ok(set_transaction_field_value(
             transaction,
             field_name,
