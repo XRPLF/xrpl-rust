@@ -102,9 +102,14 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
             });
         }
 
-        let raw = serde_json::to_string(&value)
-            .map_err(XRPLModelException::from)?
-            .replace('"', "");
+        // Extract the string representation directly — no serde_json roundtrip needed.
+        // For JSON strings use as_str(); for JSON numbers use to_string(). The earlier
+        // type guard ensures only these two variants reach this point.
+        let raw = match &value {
+            Value::String(s) => s.clone(),
+            Value::Number(n) => n.to_string(),
+            _ => unreachable!(),
+        };
 
         // Enforce non-negative integer drops at the deserialization boundary.
         // u64::parse rejects negatives, fractions, and non-numerics in one step
