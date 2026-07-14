@@ -167,6 +167,5 @@ async-std-rt = ["dep:async-std"]
 futures-rt = ["dep:futures-timer"]
 smol-rt = ["dep:smol"]
 
-
 [lints.rust]
 unsafe_code = "forbid"
