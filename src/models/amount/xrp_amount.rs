@@ -1,4 +1,5 @@
 use crate::models::{Model, XRPLModelException, XRPLModelResult};
+use crate::utils::MAX_DROPS;
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
@@ -115,6 +116,8 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
         // u64::parse rejects negatives, fractions, and non-numerics in one step
         // and produces a canonical decimal string (no trailing zeros, no scientific
         // notation), ensuring Eq and Ord agree for all TryFrom<Value>-constructed values.
+        // The parsed value is additionally bounded by MAX_DROPS (10^17) to match
+        // the protocol limit enforced by verify_valid_xrp_value elsewhere in the crate.
         let drops = raw
             .parse::<u64>()
             .map_err(|_| XRPLModelException::InvalidValue {
@@ -122,6 +125,14 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
                 expected: "a non-negative integer (XRP drops)".into(),
                 found: raw,
             })?;
+
+        if drops > MAX_DROPS {
+            return Err(XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: alloc::format!("a drop amount <= {} (MAX_DROPS)", MAX_DROPS),
+                found: drops.to_string(),
+            });
+        }
 
         Ok(Self(drops.to_string().into()))
     }
@@ -295,13 +306,26 @@ mod tests {
 
     #[test]
     fn test_try_from_accepts_large_drop_value() {
-        // 100_000_000_000_000_000 = 10^17 drops ≈ total XRP in circulation.
-        // TryFrom<Value> validates only parse-as-u64; semantic upper-bound checks
-        // belong in Model::get_errors(). Using a protocol-realistic large value here.
-        const LARGE_DROPS: u64 = 100_000_000_000_000_000;
-        let max = XRPAmount::try_from(serde_json::Value::String(LARGE_DROPS.to_string().into()));
-        assert!(max.is_ok(), "large valid drop count must be accepted");
-        assert_eq!(max.unwrap().0.as_ref(), LARGE_DROPS.to_string());
+        // MAX_DROPS = 10^17 is the protocol-defined upper bound on valid drops.
+        // The boundary value itself must be accepted.
+        use crate::utils::MAX_DROPS;
+        let max = XRPAmount::try_from(serde_json::Value::String(MAX_DROPS.to_string().into()));
+        assert!(max.is_ok(), "MAX_DROPS must be accepted as a valid amount");
+        assert_eq!(max.unwrap().0.as_ref(), MAX_DROPS.to_string());
+    }
+
+    #[test]
+    fn test_try_from_rejects_above_max_drops() {
+        // Values exceeding MAX_DROPS (10^17) must be rejected at deserialization
+        // to stay consistent with verify_valid_xrp_value and the binary codec.
+        use crate::utils::MAX_DROPS;
+        let over = MAX_DROPS + 1;
+        let err = XRPAmount::try_from(serde_json::Value::String(over.to_string().into()));
+        assert!(
+            err.is_err(),
+            "a drop amount above MAX_DROPS must be rejected, got Ok for {}",
+            over
+        );
     }
 
     #[test]
