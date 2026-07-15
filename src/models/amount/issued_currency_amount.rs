@@ -23,16 +23,9 @@ impl<'a> PartialEq for IssuedCurrencyAmount<'a> {
         if self.currency != other.currency || self.issuer != other.issuer {
             return false;
         }
-        // Numeric comparison when both values are valid decimals, matching Ord semantics.
-        // Delegate to cmp (not BigDecimal's PartialEq) so that eq and cmp use the
-        // identical comparison operation and the Ord/Eq invariant holds by construction.
-        match (
-            BigDecimal::from_str(&self.value),
-            BigDecimal::from_str(&other.value),
-        ) {
-            (Ok(sv), Ok(ov)) => sv.cmp(&ov) == core::cmp::Ordering::Equal,
-            _ => self.value == other.value,
-        }
+        // Delegate to Ord::cmp so the Ord/Eq invariant holds by construction:
+        // any change to cmp is automatically reflected here with no risk of divergence.
+        self.cmp(other) == core::cmp::Ordering::Equal
     }
 }
 
@@ -72,16 +65,20 @@ impl<'a> PartialOrd for IssuedCurrencyAmount<'a> {
 
 impl<'a> Ord for IssuedCurrencyAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Parse values as BigDecimal for numeric comparison. If either value is
-        // malformed, fall back to lexicographic string comparison so the sort
-        // remains total without silently treating the invalid value as zero
-        // (mapping to zero would misplace malformed amounts in sorted output).
+        // Parse values as BigDecimal for numeric comparison. Valid decimals sort
+        // before malformed strings so the ordering is total and transitive:
+        //   (valid, valid)   → numeric order
+        //   (valid, invalid) → valid sorts first (Less)
+        //   (invalid, valid) → invalid sorts last (Greater)
+        //   (invalid, invalid) → lexicographic fallback on the raw strings
         let value_ord = match (
             BigDecimal::from_str(&self.value),
             BigDecimal::from_str(&other.value),
         ) {
             (Ok(sv), Ok(ov)) => sv.cmp(&ov),
-            _ => self.value.cmp(&other.value),
+            (Ok(_), Err(_)) => core::cmp::Ordering::Less,
+            (Err(_), Ok(_)) => core::cmp::Ordering::Greater,
+            (Err(_), Err(_)) => self.value.cmp(&other.value),
         };
         value_ord
             .then_with(|| self.currency.cmp(&other.currency))
@@ -203,9 +200,8 @@ mod tests {
     fn test_ord_malformed_value_not_silent_zero() {
         let malformed = ica("USD", "rA", "not-a-number");
         let zero = ica("USD", "rA", "0");
-        // Both fail to parse in the same (Err, Ok) branch — wait, "0" is valid.
-        // Malformed hits the _ fallback → lexicographic "not-a-number" vs "0".
-        // "n" (110) > "0" (48), so malformed > zero lexicographically.
+        // "not-a-number" fails to parse; "0" is valid.
+        // Hits the (Err, Ok) arm → Greater (invalid sorts after valid).
         // Key invariant: malformed != zero (it is NOT silently treated as 0).
         assert_ne!(malformed, zero, "malformed value must not equal zero");
         // And they have a defined, stable ordering (not zero-based).
