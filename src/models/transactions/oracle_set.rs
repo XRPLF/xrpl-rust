@@ -701,10 +701,10 @@ mod tests {
     }
 
     #[test]
-    fn test_arbitrary_non_empty_base_asset_accepted() {
-        // rippled imposes no ISO/hex restriction on BaseAsset/QuoteAsset —
-        // any non-empty string is valid (e.g. EURO, BTC, DOGE, AAPL).
-        for code in &["EURO", "BTC", "DOGE", "AAPL", "X", "LONGTICKER"] {
+    fn test_valid_iso_base_asset_accepted() {
+        // 3-character ISO codes are accepted — they can be serialized by
+        // Currency::try_from in the binary codec.
+        for code in &["BTC", "ETH", "EUR"] {
             let oracle_set = OracleSet {
                 common_fields: CommonFields {
                     account: TEST_ACCOUNT.into(),
@@ -722,7 +722,38 @@ mod tests {
 
             assert!(
                 oracle_set.get_errors().is_ok(),
-                "non-empty base_asset {code:?} should be accepted"
+                "3-char ISO base_asset {code:?} should be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn test_invalid_base_asset_rejected() {
+        // Non-ISO, non-hex strings cannot be serialized by Currency::try_from and
+        // must be rejected at validation time to prevent a silent sign/encode failure.
+        for code in &["EURO", "DOGE", "AAPL", "X", "LONGTICKER"] {
+            let oracle_set = OracleSet {
+                common_fields: CommonFields {
+                    account: TEST_ACCOUNT.into(),
+                    transaction_type: TransactionType::OracleSet,
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+            .with_price_data_series(vec![PriceData {
+                base_asset: code.to_string(),
+                quote_asset: "USD".to_string(),
+                asset_price: Some("100".to_string()),
+                scale: Some(1),
+            }]);
+
+            let err = oracle_set.get_errors().unwrap_err();
+            assert!(
+                matches!(
+                    err,
+                    XRPLModelException::InvalidValue { ref field, .. } if field == "base_asset"
+                ),
+                "non-ISO/hex base_asset {code:?} should be rejected"
             );
         }
     }
