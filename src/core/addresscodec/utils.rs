@@ -196,6 +196,12 @@ mod test {
         // address). Passing a 22-byte prefix exceeds the decoded payload length, so the
         // length guard must return Err rather than panicking at the slice operation.
         let long_prefix = [0u8; 22];
-        assert!(decode_base58(ENCODED, &long_prefix).is_err());
+        assert!(matches!(
+            decode_base58(ENCODED, &long_prefix),
+            Err(XRPLAddressCodecException::UnexpectedPayloadLength {
+                expected: 22,
+                found: 21,
+            })
+        ));
     }
 }

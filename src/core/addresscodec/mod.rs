@@ -718,6 +718,9 @@ mod test {
 
     #[test]
     fn test_xaddress_to_classic_too_short_returns_error() {
+        use crate::core::addresscodec::exceptions::XRPLAddressCodecException;
+        use crate::core::exceptions::XRPLCoreException;
+
         // Build a valid-checksum base58 string whose decoded payload is only 5 bytes;
         // this reaches the decoded.len() < 22 length guard rather than the bs58 error
         // path, verifying the guard itself fires.
@@ -725,7 +728,15 @@ mod test {
             .with_alphabet(&XRPL_ALPHABET)
             .with_check()
             .into_string();
-        assert!(xaddress_to_classic_address(&short).is_err());
+        assert!(matches!(
+            xaddress_to_classic_address(&short),
+            Err(XRPLCoreException::XRPLAddressCodecError(
+                XRPLAddressCodecException::UnexpectedPayloadLength {
+                    expected: 22,
+                    found: 5,
+                }
+            ))
+        ));
 
         // Malformed inputs (invalid checksum) must also return Err without panicking.
         assert!(xaddress_to_classic_address("X").is_err());
