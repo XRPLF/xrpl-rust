@@ -24,11 +24,13 @@ impl<'a> PartialEq for IssuedCurrencyAmount<'a> {
             return false;
         }
         // Numeric comparison when both values are valid decimals, matching Ord semantics.
+        // Delegate to cmp (not BigDecimal's PartialEq) so that eq and cmp use the
+        // identical comparison operation and the Ord/Eq invariant holds by construction.
         match (
             BigDecimal::from_str(&self.value),
             BigDecimal::from_str(&other.value),
         ) {
-            (Ok(sv), Ok(ov)) => sv == ov,
+            (Ok(sv), Ok(ov)) => sv.cmp(&ov) == core::cmp::Ordering::Equal,
             _ => self.value == other.value,
         }
     }
@@ -174,6 +176,25 @@ mod tests {
         let usd = ica("USD", "rA", "100");
         assert!(eur < usd, "EUR sorts before USD when values are equal");
         assert_ne!(eur, usd, "different currencies must not be Eq-equal");
+    }
+
+    // Numerically-equal values with different string representations ("1.0" vs
+    // "1.00") must be Eq-equal AND Ord-Equal so that cmp == Equal ↔ eq always holds.
+    // This guards against a scale-sensitive BigDecimal PartialEq ever being used
+    // instead of the Ord-based comparison in the eq implementation.
+    #[test]
+    fn test_eq_and_ord_agree_for_different_decimal_repr() {
+        let a = ica("USD", "rA", "1.0");
+        let b = ica("USD", "rA", "1.00");
+        assert_eq!(
+            a, b,
+            "'1.0' and '1.00' must be Eq-equal (numeric comparison)"
+        );
+        assert_eq!(
+            a.cmp(&b),
+            Ordering::Equal,
+            "'1.0' and '1.00' must be Ord-Equal (numeric comparison)"
+        );
     }
 
     // Malformed value does not silently sort as zero — it falls back to
