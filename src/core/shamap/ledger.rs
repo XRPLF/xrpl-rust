@@ -302,6 +302,132 @@ mod tests {
     //   packages/xrpl/test/hashLedger.test.ts
     // -------------------------------------------------------------------
 
+    // -------------------------------------------------------------------
+    // Protocol vector tests for the index-appended leaf paths
+    // (tnTRANSACTION_MD and tnACCOUNT_STATE).
+    //
+    // Source: packages/ripple-binary-codec/test/fixtures/ledger-full-38129.json
+    // Vectors computed with ripple-binary-codec v3 (confirmed against the
+    // official ledger fixture where account_hash and transaction_hash are
+    // published ground truth from a real XRP Ledger close).
+    // -------------------------------------------------------------------
+
+    /// Known-answer test for `transaction_tree_hash` using a real Payment
+    /// transaction from XRP Ledger 38129.
+    ///
+    /// The `data` blob is `writeLengthEncoded(STObject(tx)) ||
+    /// writeLengthEncoded(STObject(meta))` as produced by ripple-binary-codec's
+    /// `transactionItemizer`. The expected root hash matches the
+    /// `transaction_hash` field published in the ledger fixture.
+    ///
+    /// Source: packages/ripple-binary-codec/test/fixtures/ledger-full-38129.json
+    #[test]
+    fn test_xrpljs_transaction_tree_hash_vector() {
+        // Transaction hash (ShaMap index) from ledger 38129
+        let index = hex_to_32("3B1A4E1C9BB6A7208EB146BCDB86ECEA6068ED01466D933528CA2B4C64F753EF");
+
+        // Serialized blob: writeLengthEncoded(tx_stobject) || writeLengthEncoded(meta_stobject)
+        // Produced by ripple-binary-codec transactionItemizer for the single
+        // Payment transaction in ledger-full-38129.json.
+        let data = hex::decode(concat!(
+            "B71200002200000000240000003E6140000002540BE400684000000000000",
+            "00A7321034AADB09CFF4A4804073701EC53C3510CDC95917C2BB0150FB74",
+            "2D0C66E6CEE9E74473045022022EB32AECEF7C644C891C19F87966DF9C62",
+            "B1F34BABA6BE774325E4BB8E2DD62022100A51437898C28C2B297112DF813",
+            "1F2BB39EA5FE613487DDD611525F17962646398114550FC62003E785DC231A",
+            "1058A05E56E3F09CF4E68314D4CC8AB5B21D86A82C3E9E8D0ECF2404B77FE",
+            "CBAC122201C00000000F8E3110061564C6ACBD635B0F07101F7FA25871B09",
+            "25F8836155462152172755845CE691C49EE824000000016240000002540BE4",
+            "008114D4CC8AB5B21D86A82C3E9E8D0ECF2404B77FECBAE1E1E51100612500",
+            "007A55552485FDC606352F1B0785DA5DE96FB9DBAF43EB60ECBB01B7F6FA97",
+            "0F512CDA5F56B33FDD5CF3445E1A7F2BE9B06336BEBD73A5E3EE885D3EF93F",
+            "7E3E2992E46F1AE6240000003E62400000E6D8EEB01EE1E722000000002400",
+            "00003F2D0000000062400000E484E2CC148114550FC62003E785DC231A1058",
+            "A05E56E3F09CF4E6E1E1F1031000"
+        ))
+        .unwrap();
+
+        // Expected: the `transaction_hash` field from ledger-full-38129.json
+        let expected =
+            hex_to_32("DB83BF807416C5B3499A73130F843CF615AB8E797D79FE7D330ADF1BFA93951A");
+
+        let result = transaction_tree_hash(&[TransactionItem { index, data }]);
+
+        assert_eq!(
+            result, expected,
+            "transaction_tree_hash must match xrpl.js ledger-38129 vector"
+        );
+    }
+
+    /// Known-answer test for `account_state_hash` using two real AccountRoot
+    /// entries from XRP Ledger 38129.
+    ///
+    /// The `data` for each entry is `serializeObject(entry)` (without the
+    /// `index` field) as produced by ripple-binary-codec's `entryItemizer`.
+    /// The expected root hash was computed by ripple-binary-codec
+    /// `accountStateHash([entry1, entry2])` and verified to be
+    /// order-independent.
+    ///
+    /// Source: packages/ripple-binary-codec/test/fixtures/ledger-full-38129.json
+    #[test]
+    fn test_xrpljs_account_state_hash_vector() {
+        // Entry 1: AccountRoot for rBKPS4oLSaV2KVVuHH8EpQqMGgGefGFQs7
+        let idx1 = hex_to_32("02CE52E3E46AD340B1C7900F86AFB959AE0C246916E3463905EDD61DE26FFFDD");
+        let data1 = hex::decode(concat!(
+            "1100612200000000240000000125000022C52D00000000558D7F42ED0621FB",
+            "CFAE55CC6F2A9403A2AFB205708CCBA3109BB61DB8DDA261B46240000000160",
+            "DC0808114712B799C79D1EEE3094B59EF9920C7FEB3CE4499"
+        ))
+        .unwrap();
+
+        // Entry 2: AccountRoot for rLs1MzkFWCxTbuAHgjeTZK4fcCDDnf2KRv
+        let idx2 = hex_to_32("032D4205B5D7DCEC8A4E56851C44555F6DC7D410AA823AE140C78674B8734DBF");
+        let data2 = hex::decode(concat!(
+            "1100612200000000240000000125000000072D0000000055DF530FB14C530485",
+            "2F20080B0A8EEF3A6BDD044F41F4EBBD68B8B321145FE4FF6240000002540BE",
+            "4008114D0F5430B66E06498D4CEEC816C7B3337F9982337"
+        ))
+        .unwrap();
+
+        // Expected: ripple-binary-codec accountStateHash([entry1, entry2])
+        // Verified order-independent by the generating script.
+        let expected =
+            hex_to_32("9CCA89E983211E80529E590EE9AE9646A5292380A05623D398D206FCAE81DE35");
+
+        let result = account_state_hash(&[
+            AccountStateItem {
+                index: idx1,
+                data: data1.clone(),
+            },
+            AccountStateItem {
+                index: idx2,
+                data: data2.clone(),
+            },
+        ]);
+
+        assert_eq!(
+            result, expected,
+            "account_state_hash must match xrpl.js ledger-38129 vector"
+        );
+
+        // Also verify order independence
+        let result_rev = account_state_hash(&[
+            AccountStateItem {
+                index: idx2,
+                data: data2,
+            },
+            AccountStateItem {
+                index: idx1,
+                data: data1,
+            },
+        ]);
+
+        assert_eq!(
+            result, result_rev,
+            "account_state_hash must be order-independent"
+        );
+    }
+
     /// Helper: decode a hex string to a 32-byte array.
     fn hex_to_32(hex: &str) -> [u8; 32] {
         let bytes = hex::decode(hex).unwrap();

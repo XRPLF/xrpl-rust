@@ -1506,6 +1506,47 @@ mod tests {
         }
     }
 
+    // --- Duplicate-key replacement ---
+
+    /// `add_item` must return `false` when an existing leaf is overwritten,
+    /// update the stored data, and change the root hash.
+    ///
+    /// This exercises the branch at `ShaMapInner::add_item` lines 295–300 where
+    /// a duplicate key is detected and the leaf is replaced in-place.
+    #[test]
+    fn test_add_item_duplicate_key_replacement() {
+        let prefix = [0x01, 0x03, 0x03, 0x07];
+        let mut map = ShaMap::new();
+
+        let idx: ShaMapIndex = [0xAA; 32];
+
+        // First insert: new key → returns true
+        let inserted = map.add_item(idx, prefix, vec![1u8]);
+        assert!(inserted, "first insert must return true");
+        let hash_after_first = map.hash();
+
+        // Second insert with same key: overwrite → returns false
+        let replaced = map.add_item(idx, prefix, vec![2u8]);
+        assert!(!replaced, "overwrite of existing key must return false");
+
+        // The leaf data must be updated to the new value
+        assert_eq!(
+            map.get(&idx).unwrap().data,
+            vec![2u8],
+            "get must return the new data after replacement"
+        );
+
+        // The hash must change because the leaf content changed
+        let hash_after_replace = map.hash();
+        assert_ne!(
+            hash_after_first, hash_after_replace,
+            "root hash must change after replacement"
+        );
+
+        // The map size does not grow on replacement
+        assert_eq!(map.len(), 1, "len must remain 1 after replacement");
+    }
+
     // -----------------------------------------------------------------------
     // xrpl.js compatibility tests — ported from:
     //   packages/xrpl/test/shamap.test.ts
