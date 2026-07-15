@@ -14,13 +14,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Represents an amount of XRP in Drops.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct XRPAmount<'a>(pub Cow<'a, str>);
 
 impl<'a> Model for XRPAmount<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.0.parse::<u32>()?;
-
+        let drops = self.0.parse::<u64>()?;
+        if drops > MAX_DROPS {
+            return Err(XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: alloc::format!("a drop amount <= {} (MAX_DROPS)", MAX_DROPS),
+                found: drops.to_string(),
+            });
+        }
         Ok(())
     }
 }
@@ -182,6 +188,14 @@ impl<'a> XRPAmount<'a> {
     }
 }
 
+impl<'a> PartialEq for XRPAmount<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == core::cmp::Ordering::Equal
+    }
+}
+
+impl<'a> Eq for XRPAmount<'a> {}
+
 impl<'a> PartialOrd for XRPAmount<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
@@ -190,13 +204,21 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        // Values from TryFrom<Value> are always canonical u64 drops; checked_cmp succeeds.
-        // For values constructed via infallible From<&str>/From<String> with non-numeric
-        // content, fall back to lexicographic comparison — consistent with derived Eq
-        // (both byte-for-byte), satisfying the Ord contract (cmp == Equal ↔ eq).
-        // Numeric ordering is not meaningful for non-numeric strings.
-        self.checked_cmp(other)
-            .unwrap_or_else(|_| self.0.cmp(&other.0))
+        // Partition into two groups: parseable u64 drop amounts and everything else.
+        // - Both numeric: compare by integer value (guarantees transitivity).
+        // - One numeric, one non-numeric: numeric < non-numeric (stable partition).
+        // - Both non-numeric: lexicographic (byte) order.
+        //
+        // This ensures a total order with full transitivity even when mixed
+        // numeric/non-numeric values appear in the same collection. PartialEq/Eq
+        // are defined in terms of this method so that a == b ↔ cmp(a, b) == Equal
+        // always holds, including non-canonical inputs such as "0100" vs "100".
+        match (self.0.parse::<u64>(), other.0.parse::<u64>()) {
+            (Ok(a), Ok(b)) => a.cmp(&b),
+            (Ok(_), Err(_)) => core::cmp::Ordering::Less,
+            (Err(_), Ok(_)) => core::cmp::Ordering::Greater,
+            (Err(_), Err(_)) => self.0.cmp(&other.0),
+        }
     }
 }
 
@@ -331,7 +353,7 @@ mod tests {
     #[test]
     fn test_ord_fallback_non_numeric_uses_byte_order() {
         // Non-numeric From<&str>-constructed values fall back to lexicographic ordering
-        // (byte-for-byte), consistent with derived Eq. This satisfies the Ord contract.
+        // (byte-for-byte), consistent with Eq. This satisfies the Ord contract.
         let a = XRPAmount("xyz".into());
         let b = XRPAmount("abc".into());
         assert_eq!(
@@ -344,6 +366,37 @@ mod tests {
             "abc".cmp("xyz"),
             "symmetry of lexicographic fallback"
         );
+    }
+
+    // Regression for the transitivity counter-example from the review finding:
+    // a="9" (numeric), b="10" (numeric), c="1x" (non-numeric).
+    // The partition-based Ord must place all numerics before all non-numerics,
+    // so all three pairwise comparisons must be Less (a < b < c, a < c).
+    #[test]
+    fn test_ord_transitivity_mixed_numeric_and_non_numeric() {
+        let a = XRPAmount("9".into());
+        let b = XRPAmount("10".into());
+        let c = XRPAmount("1x".into());
+        assert_eq!(a.cmp(&b), Ordering::Less, "9 < 10 (numeric)");
+        assert_eq!(
+            b.cmp(&c),
+            Ordering::Less,
+            "10 < \"1x\" (numeric before non-numeric)"
+        );
+        assert_eq!(
+            a.cmp(&c),
+            Ordering::Less,
+            "9 < \"1x\" (numeric before non-numeric)"
+        );
+    }
+
+    // Verify that custom Eq is consistent with Ord for non-canonical forms.
+    #[test]
+    fn test_eq_consistent_with_ord_for_non_canonical_strings() {
+        let a = XRPAmount("0100".into());
+        let b = XRPAmount("100".into());
+        assert_eq!(a.cmp(&b), Ordering::Equal, "0100 == 100 numerically");
+        assert_eq!(a, b, "Eq must agree with Ord for non-canonical forms");
     }
 
     #[test]
