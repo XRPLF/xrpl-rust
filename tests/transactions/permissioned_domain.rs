@@ -550,20 +550,32 @@ use xrpl::models::Model;
 #[test]
 fn test_pd_set_rejects_empty_credentials() {
     let tx = new_pd_set("rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh", None, vec![]);
-    assert!(tx.validate().is_err(), "empty AcceptedCredentials must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "empty AcceptedCredentials must be rejected"
+    );
 }
 
 #[test]
 fn test_pd_set_rejects_too_many_credentials() {
     let issuer = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
     let eleven: Vec<_> = (1..=11)
-        .map(|i| Credential { issuer: issuer.to_string(), credential_type: format!("{:02X}", i) })
+        .map(|i| Credential {
+            issuer: issuer.to_string(),
+            credential_type: format!("{:02X}", i),
+        })
         .collect();
     let tx = new_pd_set(issuer, None, eleven.clone());
-    assert!(tx.validate().is_err(), ">10 AcceptedCredentials must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        ">10 AcceptedCredentials must be rejected"
+    );
     let ten = eleven[..10].to_vec();
     let tx10 = new_pd_set(issuer, None, ten);
-    assert!(tx10.validate().is_ok(), "10 AcceptedCredentials must be accepted");
+    assert!(
+        tx10.validate().is_ok(),
+        "10 AcceptedCredentials must be accepted"
+    );
 }
 
 #[test]
@@ -574,7 +586,10 @@ fn test_pd_set_rejects_duplicate_credentials() {
         None,
         vec![kyc_credential(issuer), kyc_credential(issuer)],
     );
-    assert!(tx.validate().is_err(), "duplicate credentials must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "duplicate credentials must be rejected"
+    );
 }
 
 #[test]
@@ -584,11 +599,20 @@ fn test_pd_set_rejects_case_variant_duplicate_credentials() {
         issuer,
         None,
         vec![
-            Credential { issuer: issuer.to_string(), credential_type: "4b5943".to_string() },
-            Credential { issuer: issuer.to_string(), credential_type: "4B5943".to_string() },
+            Credential {
+                issuer: issuer.to_string(),
+                credential_type: "4b5943".to_string(),
+            },
+            Credential {
+                issuer: issuer.to_string(),
+                credential_type: "4B5943".to_string(),
+            },
         ],
     );
-    assert!(tx.validate().is_err(), "case-variant duplicate credentials must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "case-variant duplicate credentials must be rejected"
+    );
 }
 
 #[test]
@@ -596,9 +620,15 @@ fn test_pd_set_rejects_invalid_issuer() {
     let tx = new_pd_set(
         "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
         None,
-        vec![Credential { issuer: "not-an-address".to_string(), credential_type: "4B5943".to_string() }],
+        vec![Credential {
+            issuer: "not-an-address".to_string(),
+            credential_type: "4B5943".to_string(),
+        }],
     );
-    assert!(tx.validate().is_err(), "invalid issuer address must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "invalid issuer address must be rejected"
+    );
 }
 
 #[test]
@@ -607,9 +637,15 @@ fn test_pd_set_rejects_non_hex_credential_type() {
     let tx = new_pd_set(
         issuer,
         None,
-        vec![Credential { issuer: issuer.to_string(), credential_type: "NOTHEX".to_string() }],
+        vec![Credential {
+            issuer: issuer.to_string(),
+            credential_type: "NOTHEX".to_string(),
+        }],
     );
-    assert!(tx.validate().is_err(), "non-hex credential_type must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "non-hex credential_type must be rejected"
+    );
 }
 
 #[test]
@@ -618,9 +654,15 @@ fn test_pd_set_rejects_odd_length_credential_type() {
     let tx = new_pd_set(
         issuer,
         None,
-        vec![Credential { issuer: issuer.to_string(), credential_type: "4B594".to_string() }],
+        vec![Credential {
+            issuer: issuer.to_string(),
+            credential_type: "4B594".to_string(),
+        }],
     );
-    assert!(tx.validate().is_err(), "odd-length credential_type must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "odd-length credential_type must be rejected"
+    );
 }
 
 #[test]
@@ -629,9 +671,15 @@ fn test_pd_set_rejects_empty_credential_type() {
     let tx = new_pd_set(
         issuer,
         None,
-        vec![Credential { issuer: issuer.to_string(), credential_type: "".to_string() }],
+        vec![Credential {
+            issuer: issuer.to_string(),
+            credential_type: "".to_string(),
+        }],
     );
-    assert!(tx.validate().is_err(), "empty credential_type must be rejected");
+    assert!(
+        tx.validate().is_err(),
+        "empty credential_type must be rejected"
+    );
 }
 
 #[test]
@@ -644,7 +692,11 @@ fn test_pd_set_rejects_zero_domain_id() {
 #[test]
 fn test_pd_set_rejects_short_domain_id() {
     let issuer = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
-    let tx = new_pd_set(issuer, Some("DEADBEEF".to_string()), vec![kyc_credential(issuer)]);
+    let tx = new_pd_set(
+        issuer,
+        Some("DEADBEEF".to_string()),
+        vec![kyc_credential(issuer)],
+    );
     assert!(tx.validate().is_err(), "short DomainID must be rejected");
 }
 
@@ -652,7 +704,10 @@ fn test_pd_set_rejects_short_domain_id() {
 fn test_pd_set_accepts_valid_update_domain_id() {
     let issuer = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
     let tx = new_pd_set(issuer, Some("A".repeat(64)), vec![kyc_credential(issuer)]);
-    assert!(tx.validate().is_ok(), "valid DomainID update must be accepted");
+    assert!(
+        tx.validate().is_ok(),
+        "valid DomainID update must be accepted"
+    );
 }
 
 #[test]
