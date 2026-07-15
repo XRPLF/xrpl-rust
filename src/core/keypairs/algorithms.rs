@@ -573,4 +573,26 @@ mod test {
         );
         assert!(Ed25519.sign(&[], "").is_err(), "empty key must return Err");
     }
+
+    #[test]
+    fn test_ed25519_is_valid_message_trait_wrong_length_key() {
+        // "EDAB" has the valid "ED" prefix; suffix "AB" hex-decodes to 1 byte ≠ 32.
+        // Previously this path called .unwrap() and panicked; after the fix it must
+        // return false without panicking.
+        assert!(
+            !Ed25519.is_valid_message(b"", "AB", "EDAB"),
+            "1-byte decoded key must return false"
+        );
+        // Single-char public key — too short to contain the "ED" prefix at a char boundary.
+        assert!(
+            !Ed25519.is_valid_message(b"", "", "E"),
+            "single-byte public key must return false"
+        );
+        // Multi-byte char boundary guard: "E£" is 3 bytes, so slicing at byte 2
+        // falls inside the £ codepoint and must return false rather than panic.
+        assert!(
+            !Ed25519.is_valid_message(b"", "", "E\u{00A3}"),
+            "non-char-boundary public key must return false"
+        );
+    }
 }
