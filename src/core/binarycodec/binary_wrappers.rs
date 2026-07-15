@@ -385,10 +385,10 @@ pub trait Serialization {
     /// use xrpl::core::binarycodec::Serialization;
     ///
     /// let expected: Vec<u8> = [3, 0, 17, 34].to_vec();
-    /// let mut test_bytes: Vec<u8> = [0, 17, 34].to_vec();
+    /// let test_bytes: Vec<u8> = [0, 17, 34].to_vec();
     /// let mut serializer: BinarySerializer = BinarySerializer::new();
     ///
-    /// serializer.write_length_encoded(&mut test_bytes, true).unwrap();
+    /// serializer.write_length_encoded(&test_bytes, true).unwrap();
     /// assert_eq!(expected, serializer);
     /// ```
     fn write_length_encoded(&mut self, value: &[u8], encode_value: bool) -> XRPLCoreResult<&Self>;
@@ -442,15 +442,13 @@ impl Serialization for BinarySerializer {
     }
 
     fn write_length_encoded(&mut self, value: &[u8], encode_value: bool) -> XRPLCoreResult<&Self> {
-        let mut byte_object: Vec<u8> = Vec::new();
-        if encode_value {
-            // write value to byte_object
-            byte_object.extend_from_slice(value);
-        }
-        let length_prefix = _encode_variable_length_prefix(&byte_object.len())?;
+        let length = if encode_value { value.len() } else { 0 };
+        let length_prefix = _encode_variable_length_prefix(&length)?;
 
         self.extend_from_slice(&length_prefix);
-        self.extend_from_slice(&byte_object);
+        if encode_value {
+            self.extend_from_slice(value);
+        }
 
         Ok(self)
     }
