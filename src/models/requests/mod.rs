@@ -122,6 +122,7 @@ pub enum RequestMethod {
     VaultInfo,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(untagged)]
 pub enum XRPLRequest<'a> {

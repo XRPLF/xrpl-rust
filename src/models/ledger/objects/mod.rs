@@ -18,6 +18,7 @@ pub mod nftoken_page;
 pub mod offer;
 pub mod oracle;
 pub mod pay_channel;
+pub mod permissioned_domain;
 pub mod ripple_state;
 pub mod signer_list;
 pub mod ticket;
@@ -46,6 +47,7 @@ use nftoken_page::NFTokenPage;
 use offer::Offer;
 use oracle::Oracle;
 use pay_channel::PayChannel;
+use permissioned_domain::PermissionedDomain;
 use ripple_state::RippleState;
 use signer_list::SignerList;
 use strum::IntoEnumIterator;
@@ -84,6 +86,7 @@ pub enum LedgerEntryType {
     Offer = 0x006F,
     Oracle = 0x0080,
     PayChannel = 0x0078,
+    PermissionedDomain = 0x0082,
     RippleState = 0x0072,
     SignerList = 0x0053,
     Ticket = 0x0054,
@@ -114,6 +117,7 @@ pub enum LedgerEntry<'a> {
     Offer(Offer<'a>),
     Oracle(Oracle<'a>),
     PayChannel(PayChannel<'a>),
+    PermissionedDomain(PermissionedDomain<'a>),
     RippleState(RippleState<'a>),
     SignerList(SignerList<'a>),
     Ticket(Ticket<'a>),
