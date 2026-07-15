@@ -119,7 +119,10 @@ pub enum DeliveredAmount<'a> {
     /// The literal string `"unavailable"` for partial payments before
     /// 2014-01-20. Must be first variant so serde tries it before
     /// `Amount::XRPAmount` which would match any string.
-    #[serde(deserialize_with = "deserialize_unavailable")]
+    #[serde(
+        deserialize_with = "deserialize_unavailable",
+        serialize_with = "serialize_unavailable"
+    )]
     Unavailable,
     Amount(Amount<'a>),
 }
@@ -134,6 +137,13 @@ where
     } else {
         Err(serde::de::Error::custom("expected \"unavailable\""))
     }
+}
+
+fn serialize_unavailable<S>(s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    s.serialize_str("unavailable")
 }
 
 impl<'a> DeliveredAmount<'a> {
