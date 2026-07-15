@@ -4,7 +4,7 @@ use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use bigdecimal::BigDecimal;
 
 use crate::{
-    models::{transactions::offer_create::OfferCreateFlag, Amount, FlagCollection},
+    models::{transactions::offer_create::OfferCreateFlag, Amount, FlagCollection, MPTAmount},
     utils::exceptions::XRPLUtilsResult,
 };
 
@@ -32,6 +32,12 @@ impl<'a: 'b, 'b> From<Amount<'a>> for Balance<'b> {
                 value: amount.value,
                 issuer: Some(amount.issuer),
             },
+            Amount::MPTAmount(amount) => Self {
+                // Use the MPTokenIssuanceID as the currency identifier for balance tracking.
+                currency: amount.mpt_issuance_id,
+                value: amount.value,
+                issuer: None,
+            },
         }
     }
 }
@@ -40,11 +46,16 @@ impl<'a> From<Balance<'a>> for Amount<'a> {
     fn from(balance: Balance<'a>) -> Self {
         if balance.currency == "XRP" {
             Amount::XRPAmount(balance.value.into())
-        } else {
+        } else if let Some(issuer) = balance.issuer {
             Amount::IssuedCurrencyAmount(crate::models::IssuedCurrencyAmount {
                 currency: balance.currency,
                 value: balance.value,
-                issuer: balance.issuer.unwrap_or("".into()),
+                issuer,
+            })
+        } else {
+            Amount::MPTAmount(MPTAmount {
+                value: balance.value,
+                mpt_issuance_id: balance.currency,
             })
         }
     }
@@ -110,7 +121,7 @@ pub fn negate(value: &BigDecimal) -> XRPLUtilsResult<BigDecimal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{IssuedCurrencyAmount, XRPAmount};
+    use crate::models::{IssuedCurrencyAmount, MPTAmount, XRPAmount};
     use alloc::string::ToString;
 
     #[test]
@@ -168,17 +179,49 @@ mod tests {
     }
 
     #[test]
-    fn test_balance_to_issued_currency_no_issuer_falls_back_to_empty() {
+    fn test_balance_from_mpt_amount() {
+        let amount = Amount::MPTAmount(MPTAmount {
+            value: "10".into(),
+            mpt_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+        });
+        let balance: Balance = amount.into();
+        assert_eq!(
+            balance.currency,
+            "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58"
+        );
+        assert_eq!(balance.value, "10");
+        assert!(balance.issuer.is_none());
+    }
+
+    #[test]
+    fn test_balance_to_mpt_amount_when_issuer_absent() {
         let balance = Balance {
-            currency: "USD".into(),
+            currency: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             value: "10".into(),
             issuer: None,
         };
         let amount: Amount = balance.into();
         match amount {
-            Amount::IssuedCurrencyAmount(ic) => assert_eq!(ic.issuer, ""),
-            _ => panic!("expected IssuedCurrencyAmount"),
+            Amount::MPTAmount(mpt) => {
+                assert_eq!(mpt.value, "10");
+                assert_eq!(
+                    mpt.mpt_issuance_id,
+                    "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58"
+                );
+            }
+            _ => panic!("expected MPTAmount"),
         }
+    }
+
+    #[test]
+    fn test_balance_mpt_round_trip() {
+        let original = Amount::MPTAmount(MPTAmount {
+            value: "10".into(),
+            mpt_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+        });
+        let balance: Balance = original.clone().into();
+        let round_tripped: Amount = balance.into();
+        assert_eq!(round_tripped, original);
     }
 
     #[test]

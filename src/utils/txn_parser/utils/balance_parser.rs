@@ -112,7 +112,9 @@ fn get_trustline_quantity<'a>(
         let low_limit_issuer = low_limit.issuer.as_ref();
         let balance_currency = match balance {
             Amount::IssuedCurrencyAmount(ic) => Some(ic.currency.as_ref()),
-            _ => Some("XRP"),
+            Amount::XRPAmount(_) => Some("XRP"),
+            // MPT amounts do not appear in RippleState trustline nodes.
+            Amount::MPTAmount(_) => None,
         };
         let high_limit_issuer = high_limit.issuer.as_ref();
 

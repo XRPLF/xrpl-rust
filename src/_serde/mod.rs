@@ -23,7 +23,7 @@ where
             let flag_vec_result: Result<Vec<u32>, serde_json::Error> =
                 serde_json::from_value(flags_as_value);
             match flag_vec_result {
-                Ok(flags_vec) => s.serialize_u32(flags_vec.iter().sum()),
+                Ok(flags_vec) => s.serialize_u32(flags_vec.iter().fold(0, |acc, &f| acc | f)),
                 Err(_) => {
                     // TODO: Find a way to use custom errors
                     Err(ser::Error::custom("SerdeIntermediateStepError: Failed to turn flags into `Vec<u32>` during serialization"))
@@ -119,6 +119,37 @@ pub(crate) mod lgr_obj_flags {
         D: Deserializer<'de>,
     {
         deserialize_flags(d)
+    }
+}
+
+/// Serde module for `Option<FlagCollection<F>>` fields that must round-trip as an integer
+/// (matching the rippled JSON API format) rather than a JSON array.
+pub(crate) mod opt_lgr_obj_flags {
+    use core::fmt::Debug;
+
+    use crate::_serde::{deserialize_flags, serialize_flag};
+    use crate::models::FlagCollection;
+    use serde::{Deserializer, Serialize, Serializer};
+    use strum::IntoEnumIterator;
+
+    pub fn serialize<F, S>(flags: &Option<FlagCollection<F>>, s: S) -> Result<S::Ok, S::Error>
+    where
+        F: Serialize + IntoEnumIterator,
+        S: Serializer,
+    {
+        match flags {
+            Some(f) if !f.0.is_empty() => serialize_flag(f, s),
+            Some(_) => s.serialize_u32(0),
+            None => s.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, F, D>(d: D) -> Result<Option<FlagCollection<F>>, D::Error>
+    where
+        F: Serialize + IntoEnumIterator + Debug,
+        D: Deserializer<'de>,
+    {
+        deserialize_flags(d).map(Some)
     }
 }
 

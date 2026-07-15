@@ -9,7 +9,13 @@ pub mod amm_withdraw;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
+pub mod clawback;
+pub mod credential_accept;
+pub mod credential_create;
+pub mod credential_delete;
 pub mod deposit_preauth;
+pub mod did_delete;
+pub mod did_set;
 pub mod escrow_cancel;
 pub mod escrow_create;
 pub mod escrow_finish;
@@ -24,6 +30,10 @@ pub mod loan_manage;
 pub mod loan_pay;
 pub mod loan_set;
 pub mod metadata;
+pub mod mptoken_authorize;
+pub mod mptoken_issuance_create;
+pub mod mptoken_issuance_destroy;
+pub mod mptoken_issuance_set;
 pub mod nftoken_accept_offer;
 pub mod nftoken_burn;
 pub mod nftoken_cancel_offer;
@@ -31,15 +41,26 @@ pub mod nftoken_create_offer;
 pub mod nftoken_mint;
 pub mod offer_cancel;
 pub mod offer_create;
+pub mod oracle_delete;
+pub mod oracle_set;
 pub mod payment;
 pub mod payment_channel_claim;
 pub mod payment_channel_create;
 pub mod payment_channel_fund;
+pub mod permissioned_domain_delete;
+pub mod permissioned_domain_set;
 pub mod pseudo_transactions;
 pub mod set_regular_key;
 pub mod signer_list_set;
 pub mod ticket_create;
 pub mod trust_set;
+pub mod vault_clawback;
+pub(crate) mod vault_common;
+pub mod vault_create;
+pub mod vault_delete;
+pub mod vault_deposit;
+pub mod vault_set;
+pub mod vault_withdraw;
 pub mod xchain_account_create_commit;
 pub mod xchain_add_account_create_attestation;
 pub mod xchain_add_claim_attestation;
@@ -49,7 +70,7 @@ pub mod xchain_create_bridge;
 pub mod xchain_create_claim_id;
 pub mod xchain_modify_bridge;
 
-use super::{FlagCollection, XRPLModelResult};
+use super::{FlagCollection, XRPLModelException, XRPLModelResult};
 use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
 use crate::{_serde::txn_flags, serde_with_tag};
@@ -71,6 +92,103 @@ use strum_macros::{AsRefStr, Display};
 
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
 
+fn is_hex(value: &str) -> bool {
+    value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Validate that a `CredentialType` field is a non-empty hex string up to 64 bytes (128 hex chars).
+///
+/// Note: rippled accepts any arbitrary blob up to 64 bytes for `CredentialType` and does not
+/// enforce hex encoding at the protocol level (`kMaxCredentialTypeLength` in `Protocol.h`).
+/// This SDK enforces hex intentionally to match xrpl.js (`validateCredentialType` in `common.ts`),
+/// providing an extra client-side guard before a transaction reaches the network.
+pub(crate) fn validate_credential_type(credential_type: &str) -> XRPLModelResult<()> {
+    let len = credential_type.len();
+    if len == 0 {
+        Err(XRPLModelException::ValueTooShort {
+            field: "credential_type".into(),
+            min: 1,
+            found: 0,
+        })
+    } else if len > 128 {
+        Err(XRPLModelException::ValueTooLong {
+            field: "credential_type".into(),
+            max: 128,
+            found: len,
+        })
+    } else if !len.is_multiple_of(2) {
+        // Odd-length hex strings cannot represent whole bytes; rippled's binary
+        // codec would reject them at serialization time.
+        Err(XRPLModelException::InvalidValueFormat {
+            field: "credential_type".into(),
+            format: "even-length hexadecimal (whole bytes)".into(),
+            found: credential_type.into(),
+        })
+    } else if !is_hex(credential_type) {
+        Err(XRPLModelException::InvalidValueFormat {
+            field: "credential_type".into(),
+            format: "hexadecimal".into(),
+            found: credential_type.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validate that a hex-encoded string contains only hexadecimal characters.
+fn validate_hex(field: &str, value: &str) -> XRPLModelResult<()> {
+    if !is_hex(value) {
+        Err(XRPLModelException::InvalidValueFormat {
+            field: field.into(),
+            format: "hexadecimal".into(),
+            found: value.into(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+/// Validate that a `credential_ids` field, when present, contains 1..=8 unique entries
+/// as required by the XLS-70 specification (sections 8.1 and 8.2).
+pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XRPLModelResult<()> {
+    if let Some(ids) = credential_ids {
+        if ids.is_empty() {
+            return Err(XRPLModelException::ValueTooShort {
+                field: "credential_ids".into(),
+                min: 1,
+                found: 0,
+            });
+        }
+        if ids.len() > 8 {
+            return Err(XRPLModelException::ValueTooLong {
+                field: "credential_ids".into(),
+                max: 8,
+                found: ids.len(),
+            });
+        }
+        for (i, id) in ids.iter().enumerate() {
+            validate_hex("credential_ids", id)?;
+            // Credential IDs are SHA-512Half ledger-object hashes: 256 bits = 32 bytes = 64 hex chars.
+            if id.len() != 64 {
+                return Err(XRPLModelException::InvalidValueFormat {
+                    field: "credential_ids".into(),
+                    format: "64-character hexadecimal ledger-object hash".into(),
+                    found: id.as_ref().into(),
+                });
+            }
+            // Hex credential IDs are compared case-insensitively: rippled normalizes
+            // the raw bytes, so "ABCD" and "abcd" refer to the same credential.
+            if ids[..i].iter().any(|prev| prev.eq_ignore_ascii_case(id)) {
+                return Err(XRPLModelException::ValueEqualsValue {
+                    field1: "credential_ids".into(),
+                    field2: "credential_ids (duplicate entry)".into(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Enum containing the different Transaction types.
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq, Default)]
 pub enum TransactionType {
@@ -85,6 +203,12 @@ pub enum TransactionType {
     CheckCancel,
     CheckCash,
     CheckCreate,
+    Clawback,
+    DIDDelete,
+    DIDSet,
+    CredentialAccept,
+    CredentialCreate,
+    CredentialDelete,
     DepositPreauth,
     EscrowCancel,
     EscrowCreate,
@@ -98,6 +222,10 @@ pub enum TransactionType {
     LoanManage,
     LoanPay,
     LoanSet,
+    MPTokenAuthorize,
+    MPTokenIssuanceCreate,
+    MPTokenIssuanceDestroy,
+    MPTokenIssuanceSet,
     NFTokenAcceptOffer,
     NFTokenBurn,
     NFTokenCancelOffer,
@@ -105,15 +233,25 @@ pub enum TransactionType {
     NFTokenMint,
     OfferCancel,
     OfferCreate,
+    OracleDelete,
+    OracleSet,
     #[default]
     Payment,
     PaymentChannelClaim,
+    PermissionedDomainDelete,
+    PermissionedDomainSet,
     PaymentChannelCreate,
     PaymentChannelFund,
     SetRegularKey,
     SignerListSet,
     TicketCreate,
     TrustSet,
+    VaultClawback,
+    VaultCreate,
+    VaultDelete,
+    VaultDeposit,
+    VaultSet,
+    VaultWithdraw,
     XChainAccountCreateCommit,
     XChainAddAccountCreateAttestation,
     XChainAddClaimAttestation,
@@ -191,6 +329,7 @@ where
     /// The network ID of the chain this transaction is intended for.
     /// MUST BE OMITTED for Mainnet and some test networks.
     /// REQUIRED on chains whose network ID is 1025 or higher.
+    #[serde(rename = "NetworkID")]
     pub network_id: Option<u32>,
     /// The sequence number of the account sending the transaction.
     /// A transaction is only valid if the Sequence number is exactly
@@ -590,6 +729,101 @@ pub struct Signer {
 }
 }
 
+serde_with_tag! {
+/// Represents a single price data entry in an Oracle's PriceDataSeries.
+///
+/// See OracleSet:
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/oracleset>`
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct PriceData {
+    pub base_asset: String,
+    pub quote_asset: String,
+    /// The token pair's price. When omitted on an OracleSet update, rippled
+    /// deletes the existing price data entry for this base/quote pair.
+    pub asset_price: Option<String>,
+    /// Decimal scale factor. Actual price = asset_price × 10^(−scale). Range 0–20.
+    /// Must be present when asset_price is present, and absent when asset_price is absent.
+    pub scale: Option<u8>,
+}
+}
+
+/// Maximum allowed value for the `scale` field of a `PriceData` entry.
+pub const MAX_PRICE_DATA_SCALE: u8 = 20;
+
+impl crate::models::Model for PriceData {
+    fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        if let Some(scale) = self.scale {
+            if scale > MAX_PRICE_DATA_SCALE {
+                return Err(crate::models::XRPLModelException::ValueTooHigh {
+                    field: "scale".into(),
+                    max: MAX_PRICE_DATA_SCALE as u32,
+                    found: scale as u32,
+                });
+            }
+        }
+        if self.asset_price.is_some() != self.scale.is_some() {
+            return Err(crate::models::XRPLModelException::InvalidValue {
+                field: "price_data".into(),
+                expected: "AssetPrice and Scale both present or both omitted".into(),
+                found: alloc::format!(
+                    "asset_price_present={}, scale_present={}",
+                    self.asset_price.is_some(),
+                    self.scale.is_some()
+                ),
+            });
+        }
+        validate_oracle_currency("base_asset", &self.base_asset)?;
+        validate_oracle_currency("quote_asset", &self.quote_asset)?;
+        validate_oracle_asset_price(&self.asset_price)?;
+        Ok(())
+    }
+}
+
+/// Maximum allowed value for `AssetPrice`.
+pub const MAX_ORACLE_ASSET_PRICE: u64 = u64::MAX;
+
+fn validate_oracle_currency(
+    field: &'static str,
+    value: &str,
+) -> crate::models::XRPLModelResult<()> {
+    if crate::utils::is_iso_code(value) || crate::utils::is_iso_hex(value) {
+        return Ok(());
+    }
+    Err(crate::models::XRPLModelException::InvalidValue {
+        field: field.into(),
+        expected: "a 3-character ISO currency code (including \"XRP\") or 40-character hex code"
+            .into(),
+        found: value.into(),
+    })
+}
+
+fn validate_oracle_asset_price(value: &Option<String>) -> crate::models::XRPLModelResult<()> {
+    let Some(value) = value else {
+        return Ok(());
+    };
+    match u64::from_str_radix(value, 16) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(crate::models::XRPLModelException::InvalidValue {
+            field: "asset_price".into(),
+            expected: "a valid UInt64 hexadecimal string (0x0000000000000000..=0xFFFFFFFFFFFFFFFF)"
+                .into(),
+            found: value.clone(),
+        }),
+    }
+}
+
+serde_with_tag! {
+/// A credential entry used in PermissionedDomain transactions.
+/// Wraps as `{"Credential": {"Issuer": ..., "CredentialType": ...}}` in JSON.
+///
+/// See XLS-80 PermissionedDomains:
+/// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0080-permissioned-domains>`
+#[derive(Debug, PartialEq, Eq, Clone, Default, new)]
+pub struct Credential {
+    pub issuer: String,
+    pub credential_type: String,
+}
+}
 /// Standard functions for transactions.
 pub trait Transaction<'a, T>
 where

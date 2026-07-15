@@ -6,6 +6,7 @@ use serde_json::Value;
 pub mod objects;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(untagged)]
 pub enum LedgerVersionMap<'a> {
     Default(Ledger<'a>),
     V1(LedgerV1<'a>),

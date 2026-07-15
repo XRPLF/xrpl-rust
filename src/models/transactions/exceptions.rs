@@ -10,6 +10,10 @@ pub enum XRPLTransactionException {
     #[error("{0}")]
     XRPLAccountSetError(#[from] XRPLAccountSetException),
     #[error("{0}")]
+    XRPLClawbackError(#[from] XRPLClawbackException),
+    #[error("{0}")]
+    XRPLDIDSetError(#[from] XRPLDIDSetException),
+    #[error("{0}")]
     XRPLNFTokenCancelOfferError(#[from] XRPLNFTokenCancelOfferException),
     #[error("{0}")]
     XRPLNFTokenCreateOfferError(#[from] XRPLNFTokenCreateOfferException),
@@ -214,3 +218,43 @@ pub enum XRPLAMMCreateException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLAMMCreateException {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum XRPLDIDSetException {
+    #[error("Must have at least one of `data`, `did_document`, and `uri`")]
+    MustHaveAtLeastOneField,
+    #[error("At least one of the fields `data`, `did_document`, and `uri` must have a length greater than zero")]
+    AtLeastOneFieldMustBeNonEmpty,
+    #[error("The field `{field:?}` must be hex-encoded")]
+    InvalidFieldHex { field: String },
+    #[error("The field `{field:?}` must be <= {max} characters (found {found})")]
+    FieldTooLong {
+        field: String,
+        max: usize,
+        found: usize,
+    },
+    #[error("The field `{field:?}` must be hex-encoded and must be <= 512 characters (found {found_length})")]
+    InvalidFieldHexAndTooLong { field: String, found_length: usize },
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLDIDSetException {}
+
+#[derive(Debug, PartialEq, Error)]
+pub enum XRPLClawbackException {
+    #[error("Clawback amount must not be XRP — only issued currencies can be clawed back")]
+    AmountMustNotBeXRP,
+    #[error("The `holder` field must not be present for standard issued-currency (IOU) clawback")]
+    HolderMustNotBePresentForIOU,
+    #[error(
+        "For IOU clawback, `amount.issuer` must be the holder's address and must differ from `Account`"
+    )]
+    IssuerMustNotEqualAccount,
+    #[error("The `holder` field is required for MPT clawback")]
+    HolderRequiredForMPT,
+    #[error("The `holder` field must not equal the transaction `Account` (no self-clawback)")]
+    HolderMustNotEqualAccount,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLClawbackException {}

@@ -1,0 +1,193 @@
+//! Shared validation helpers for XLS-65 Vault transactions.
+
+use alloc::string::ToString;
+use bigdecimal::BigDecimal;
+use core::str::FromStr;
+
+use crate::models::{Amount, XRPLModelException, XRPLModelResult};
+
+/// The canonical length, in hex characters, of a VaultID.
+///
+/// A VaultID is a 256-bit hash, which is 32 bytes or 64 hex characters
+/// when serialized on the wire.
+pub(crate) const VAULT_ID_HEX_LEN: usize = 64;
+
+/// Validate a VaultID value: must be exactly 64 ASCII hex characters.
+///
+/// Used by every vault transaction that references an existing vault
+/// (VaultSet, VaultDelete, VaultDeposit, VaultWithdraw, VaultClawback).
+pub(crate) fn validate_hash256(field: &'static str, value: &str) -> XRPLModelResult<()> {
+    if value.len() != VAULT_ID_HEX_LEN {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "64 hex characters (256-bit hash)".to_string(),
+            found: value.to_string(),
+        });
+    }
+    if !value.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "ASCII hexadecimal".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_vault_id(vault_id: &str) -> XRPLModelResult<()> {
+    if vault_id.len() != VAULT_ID_HEX_LEN {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: "vault_id".to_string(),
+            format: "64 hex characters (256-bit hash)".to_string(),
+            found: vault_id.to_string(),
+        });
+    }
+    validate_hash256("vault_id", vault_id)?;
+    if vault_id.bytes().all(|b| b == b'0') {
+        return Err(XRPLModelException::InvalidValue {
+            field: "vault_id".to_string(),
+            expected: "nonzero 256-bit hash".to_string(),
+            found: vault_id.to_string(),
+        });
+    }
+    Ok(())
+}
+
+/// Validate a hex-encoded blob field: must be pure ASCII hex and not exceed
+/// `max_hex_chars` characters in length (2 hex chars per byte).
+pub(crate) fn validate_hex_blob(
+    field: &'static str,
+    value: &str,
+    max_hex_chars: usize,
+) -> XRPLModelResult<()> {
+    if value.is_empty() || !value.len().is_multiple_of(2) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "non-empty even-length ASCII hexadecimal".to_string(),
+            found: value.to_string(),
+        });
+    }
+    // Check hex content before length so the diagnostic is "not hex"
+    // rather than "too long" when both conditions apply.
+    if !value.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "ASCII hexadecimal".to_string(),
+            found: value.to_string(),
+        });
+    }
+    if value.len() > max_hex_chars {
+        return Err(XRPLModelException::ValueTooLong {
+            field: field.to_string(),
+            max: max_hex_chars,
+            found: value.len(),
+        });
+    }
+    Ok(())
+}
+
+/// Validate a field that must be a non-negative XRPL Number string.
+/// Used for AssetsMaximum, which is serialized as the XRPL `Number` type and
+/// therefore accepts decimal and exponent notation (for example, `100.5` and `1e6`).
+pub(crate) fn validate_nonnegative_number(field: &'static str, value: &str) -> XRPLModelResult<()> {
+    let parsed =
+        BigDecimal::from_str(value).map_err(|_| XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "a valid decimal number".to_string(),
+            found: value.to_string(),
+        })?;
+    if parsed < 0 {
+        return Err(XRPLModelException::InvalidValue {
+            field: field.to_string(),
+            expected: "a nonnegative number".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_positive_amount(
+    field: &'static str,
+    amount: &Amount<'_>,
+) -> XRPLModelResult<()> {
+    let value = match amount {
+        Amount::MPTAmount(amount) => amount.value.as_ref(),
+        Amount::IssuedCurrencyAmount(amount) => amount.value.as_ref(),
+        Amount::XRPAmount(amount) => amount.0.as_ref(),
+    };
+    let parsed =
+        BigDecimal::from_str(value).map_err(|_| XRPLModelException::InvalidValueFormat {
+            field: field.to_string(),
+            format: "a valid decimal number".to_string(),
+            found: value.to_string(),
+        })?;
+    if parsed <= 0 {
+        return Err(XRPLModelException::InvalidValue {
+            field: field.to_string(),
+            expected: "a positive amount".to_string(),
+            found: value.to_string(),
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_vault_id_accepts_valid_id() {
+        let id = "A0000000000000000000000000000000000000000000000000000000DEADBEEF";
+        assert!(validate_vault_id(id).is_ok());
+    }
+
+    #[test]
+    fn test_validate_vault_id_rejects_wrong_length() {
+        assert!(validate_vault_id("DEADBEEF").is_err());
+        let too_long = "A".repeat(65);
+        assert!(validate_vault_id(&too_long).is_err());
+    }
+
+    #[test]
+    fn test_validate_vault_id_rejects_non_hex() {
+        let id = "Z0000000000000000000000000000000000000000000000000000000DEADBEEF";
+        assert!(validate_vault_id(id).is_err());
+    }
+
+    #[test]
+    fn test_validate_hex_blob_accepts_valid() {
+        assert!(validate_hex_blob("data", "48656C6C6F", 512).is_ok());
+    }
+
+    #[test]
+    fn test_validate_hex_blob_rejects_too_long() {
+        let long = "A".repeat(513);
+        assert!(validate_hex_blob("data", &long, 512).is_err());
+    }
+
+    #[test]
+    fn test_validate_hex_blob_rejects_non_hex() {
+        assert!(validate_hex_blob("data", "XYZ", 512).is_err());
+    }
+
+    #[test]
+    fn test_validate_hex_blob_rejects_empty_or_odd_length() {
+        assert!(validate_hex_blob("data", "", 512).is_err());
+        assert!(validate_hex_blob("data", "ABC", 512).is_err());
+    }
+
+    #[test]
+    fn test_validate_nonnegative_number_accepts_valid() {
+        assert!(validate_nonnegative_number("f", "0").is_ok());
+        assert!(validate_nonnegative_number("f", "1000000000").is_ok());
+        assert!(validate_nonnegative_number("f", "100.5").is_ok());
+        assert!(validate_nonnegative_number("f", "1e6").is_ok());
+    }
+
+    #[test]
+    fn test_validate_nonnegative_number_rejects_empty_negative_and_nonnumeric() {
+        assert!(validate_nonnegative_number("f", "").is_err());
+        assert!(validate_nonnegative_number("f", "abc").is_err());
+        assert!(validate_nonnegative_number("f", "-5").is_err());
+    }
+}

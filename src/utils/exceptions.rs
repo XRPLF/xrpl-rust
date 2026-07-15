@@ -27,6 +27,8 @@ pub enum XRPLUtilsException {
     XRPLTxnParserError(#[from] XRPLTxnParserException),
     #[error("XRPL XChain Claim ID error: {0}")]
     XRPLXChainClaimIdError(#[from] XRPLXChainClaimIdException),
+    #[error("XRPL MPTokenMetadata error: {0}")]
+    XRPLMPTokenMetadataError(#[from] XRPLMPTokenMetadataException),
     #[error("ISO Code error: {0}")]
     ISOCodeError(#[from] ISOCodeException),
     #[error("Decimal error: {0}")]
@@ -95,6 +97,18 @@ pub enum XRPLXChainClaimIdException {
 
 #[cfg(feature = "std")]
 impl alloc::error::Error for XRPLXChainClaimIdException {}
+
+#[derive(Debug, Clone, PartialEq, Error)]
+#[non_exhaustive]
+pub enum XRPLMPTokenMetadataException {
+    #[error("MPTokenMetadata must be in hex format.")]
+    InvalidHex,
+    #[error("MPTokenMetadata must be a JSON object.")]
+    NotJsonObject,
+}
+
+#[cfg(feature = "std")]
+impl alloc::error::Error for XRPLMPTokenMetadataException {}
 
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]

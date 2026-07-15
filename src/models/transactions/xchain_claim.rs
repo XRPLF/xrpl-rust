@@ -109,6 +109,10 @@ impl<'a> XChainClaim<'a> {
                     Ok(())
                 }
             }
+            Amount::MPTAmount(_) => {
+                // Cross-chain bridges only support XRP or issued currency, not MPT.
+                Err(XRPLXChainClaimException::AmountMismatch.into())
+            }
         }
     }
 }

@@ -27,6 +27,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [[v1.2.0]]
+
+### Added
+
+- **XLS-33 Multi-Purpose Tokens (MPT):** full support for the [XLS-0033 MPTokensV1 amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0033-multi-purpose-tokens).
+  - **Binary codec:** `Hash192` type for `MPTokenIssuanceID`; MPT amount encode/decode (UInt64 as base-10 string); `AssetScale` (UInt8) and `MPTAmount`/`MaximumAmount`/`OutstandingAmount` field support.
+  - **Amount/Currency:** `MPTAmount` and `MPTCurrency` variants in `Amount`/`Currency` enums; digit-only value validation; `i64::MAX` upper-bound enforcement; `is_mpt()` helper.
+  - **Transaction models:** `MPTokenIssuanceCreate`, `MPTokenIssuanceDestroy`, `MPTokenIssuanceSet`, `MPTokenAuthorize`; `Clawback` extended with `MPTAmount` support and optional `Holder` field.
+  - **Ledger objects:** `MPToken` and `MPTokenIssuance` with `LockedAmount`, `MPTokenIssuanceMutableFlag` bitmask, and non-null index validation.
+  - **Requests:** `AccountObjectType::MptIssuance` and `Mptoken` variants.
+  - **Integration tests:** full MPT lifecycle end-to-end (create issuance, holder opt-in, lock/unlock, clawback).
+- **XLS-65 Single Asset Vault:** support for the XLS-0065 Single Asset Vault amendment. Adds the `Vault` ledger object; `VaultCreate`, `VaultSet`, `VaultDelete`, `VaultDeposit`, `VaultWithdraw`, and `VaultClawback` transactions; the `vault_info` request and result; `ledger_entry` vault lookup; and the `AccountObjectType::Vault` filter.
+- **XLS-47 Price Oracle:** support for the XLS-0047 PriceOracle amendment. Adds the `Oracle` ledger object; `OracleSet` and `OracleDelete` transactions; the `get_aggregate_price` request and result; `ledger_entry` oracle lookup; and the `AccountObjectType::Oracle` filter.
+- **XLS-89 MPTokenMetadata:** `utils::mptoken_metadata` helpers to encode, decode, validate, and warn on MPT metadata (`encode_mptoken_metadata`, `decode_mptoken_metadata`, `validate_mptoken_metadata`, `mptoken_metadata_warning`).
+- **XLS-39 Clawback:** adds the `Clawback` transaction and the `lsfAllowTrustLineClawback` (`AccountSet`) flag.
+- **XLS-70 Credentials:** adds `CredentialCreate`, `CredentialAccept`, and `CredentialDelete` transactions, the `Credential` ledger object, and credential-based `DepositPreauth` fields.
+- **Decentralized Identity (DID):** adds the `DIDSet` and `DIDDelete` transactions and the `DID` ledger object.
+- New `xrpl::signing` module containing the pure-crypto signing helpers (`sign`, `multisign`, `prepare_transaction`) extracted from `asynch::transaction` and `transaction`. Available with just `core + models + wallet` features (no `helpers`/runtime/client dependency). The legacy paths `asynch::transaction::sign` and `transaction::multisign` are preserved as re-exports for backward compatibility.
+- Expanded unit-test coverage and raised CI thresholds: lines `73 → 83`, regions `75 → 85`, functions `67 → 73`.
+- Codecov integration with per-PR project (≥83%) and patch (≥80% on new/modified lines) gates.
+- Integration-test coverage gate: a CI workflow runs all five integration test binaries under `cargo-llvm-cov`, uploads to codecov under an `integration` flag, and gates the project at ≥65%.
+
+### Changed
+
+- **Breaking:** `Amount::is_issued_currency()` now returns `false` for `MPTAmount`. Previously it returned `!is_xrp()`, so any non-XRP amount yielded `true`. With the introduction of the `MPTAmount` variant, callers that used `is_issued_currency()` as a proxy for "not XRP" must be updated to also check `is_mpt()`. Use the new `is_mpt()` helper for MPT-specific branches.
+- Unit-test and integration-test coverage are now scoped via Cargo feature flags rather than path regex. The unit-test workflow builds with `--no-default-features --features std,core,utils,wallet,models`, so integration-territory code (CLI, async clients, sync wrappers, faucet) simply isn't compiled and doesn't appear in the unit coverage report.
+- Network-dependent inline tests in `src/asynch/transaction/` and `src/asynch/wallet/` (`test_autofill_txn`, `test_autofill_and_sign`, `test_submit_and_wait`, `test_generate_faucet_wallet`) are now gated behind `feature = "integration"` so `cargo test --release` is hermetic by default.
+- Codecov **patch** coverage is now gated per flag (separate `unit` and `integration` sections) rather than a single combined gate.
+
+### Fixed
+
+- Non-cryptographic RNG (`Hc128Rng`) was being used for wallet seed generation; replaced with `OsRng` so all key material is sourced from the OS entropy pool (closes #286).
 - `RipplePathFind::destination_amount` changed from `Currency<'a>` to `Amount<'a>` to match the XRPL wire format.
 - `NoRippleCheckRole` no longer serializes with the `#[serde(tag = "role")]` discriminator; now emits a plain `snake_case` string matching the XRPL wire format.
 - `is_success()` now reports success correctly for responses deserialized into typed `XRPLResult` variants (e.g. `ServerInfo`); it consults the preserved raw result JSON instead of the re-serialized typed value.
@@ -34,10 +66,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[v1.1.0]]
 
+- `DepositPreauth` ledger object: `authorize` field changed from `Cow<'a, str>` to `Option<Cow<'a, str>>` to support XLS-70 credential-based preauthorization. The `new()` constructor is unchanged (still accepts non-optional `authorize`), but direct struct construction must wrap the value in `Some(...)`.
+- `credential_ids` field on `AccountDelete`, `Payment`, `EscrowFinish`, `PaymentChannelClaim`, and `credentials` on `DepositAuthorized` request changed from `Option<Cow<'a, [Cow<'a, str>]>>` to `Option<Vec<Cow<'a, str>>>` for reliable serde round-trip.
+
 ### Added
 
 - Implemented full deserialization from hex binary back to JSON, update `definitions.json` to `xrpl.js` latest, added all codec test fixtures from xrpl.js and implemented tests for all of them.
 - Added integration tests for all transaction types, refactored to separate files.
+- Added initial XLS-70 Credentials model support (`CredentialCreate`, `CredentialAccept`, `CredentialDelete`, `Credential` ledger object, and credential-based `DepositPreauth` fields).
 
 ### Fixed
 

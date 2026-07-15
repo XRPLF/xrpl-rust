@@ -14,15 +14,27 @@ use super::{CommonFields, LedgerIndex, LookupByLedgerRequest, Marker, Request};
 #[serde(rename_all = "snake_case")]
 pub enum AccountObjectType {
     Check,
+    #[serde(rename = "did")]
+    #[strum(serialize = "did")]
+    DID,
+    Credential,
     DepositPreauth,
     Escrow,
     Loan,
     LoanBroker,
     Offer,
+    Oracle,
     PaymentChannel,
+    PermissionedDomain,
     SignerList,
     State,
     Ticket,
+    /// Filter for MPTokenIssuance objects (MPT issuances created by this account).
+    MptIssuance,
+    /// Filter for MPToken objects (MPT holdings owned by this account).
+    Mptoken,
+    /// Filter for Vault ledger objects (XLS-65 SingleAssetVault).
+    Vault,
 }
 
 /// This request returns the raw ledger format for all objects
@@ -104,12 +116,13 @@ impl<'a> AccountObjects<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::testing::test_constants::*;
 
     #[test]
     fn test_serde_round_trip() {
         let req = AccountObjects::new(
             Some("ao-1".into()),
-            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            ACCOUNT_GENESIS.into(),
             None,
             None,
             Some(AccountObjectType::Escrow),
@@ -122,5 +135,38 @@ mod tests {
         assert_eq!(req, deserialized);
         assert!(serialized.contains("\"command\":\"account_objects\""));
         assert!(serialized.contains("\"type\":\"escrow\""));
+    }
+
+    #[test]
+    fn test_serde_mpt_variants() {
+        let req_issuance = AccountObjects {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id: None,
+            },
+            account: ACCOUNT_GENESIS.into(),
+            ledger_lookup: None,
+            r#type: Some(AccountObjectType::MptIssuance),
+            deletion_blockers_only: None,
+            limit: None,
+            marker: None,
+        };
+        let serialized_issuance = serde_json::to_string(&req_issuance).unwrap();
+        assert!(serialized_issuance.contains("\"type\":\"mpt_issuance\""));
+
+        let req_token = AccountObjects {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id: None,
+            },
+            account: ACCOUNT_GENESIS.into(),
+            ledger_lookup: None,
+            r#type: Some(AccountObjectType::Mptoken),
+            deletion_blockers_only: None,
+            limit: None,
+            marker: None,
+        };
+        let serialized_token = serde_json::to_string(&req_token).unwrap();
+        assert!(serialized_token.contains("\"type\":\"mptoken\""));
     }
 }
