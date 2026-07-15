@@ -279,8 +279,8 @@ impl Amount {
     }
 
     /// Returns true if the positive-sign bit (0x40) in byte 0 is set.
-    /// Returns false on an empty or structurally invalid buffer. Callers that need to
-    /// distinguish "not positive" from "invalid/empty" should check `!self.0.is_empty()` first.
+    /// Returns false on an empty buffer. Callers that need to distinguish
+    /// "not positive" from "empty" should check `!self.0.is_empty()` first.
     pub fn is_positive(&self) -> bool {
         !self.0.is_empty() && self.0[0] & 0x40 > 0
     }
@@ -403,7 +403,9 @@ impl Serialize for Amount {
             let leading = bytes[0];
             let is_positive = leading & 0x40 != 0;
             if !is_positive {
-                return Err(S::Error::custom("MPT amount has negative sign bit set"));
+                return Err(S::Error::custom(
+                    "MPT amount positive-sign bit (0x40) is not set",
+                ));
             }
             let mut amount_bytes = [0u8; 8];
             amount_bytes.copy_from_slice(&bytes[1..9]);
@@ -467,11 +469,23 @@ impl TryFrom<serde_json::Value> for Amount {
                 .as_object()
                 .ok_or(XRPLTypeException::InvalidNoneValue)?;
             if obj.contains_key("mpt_issuance_id") {
-                // Primary MPT discriminator — presence of mpt_issuance_id marks this as MPT.
+                // MPT discriminator: must be exactly {"mpt_issuance_id", "value"} —
+                // matches xrpl.js isAmountObjectMPT (sorted keys === ["mpt_issuance_id","value"]).
+                // Reject objects with "currency"/"issuer" or any extra keys to stay
+                // consistent with the strict shape enforced in src/models/amount/mod.rs.
                 if obj.contains_key("currency") || obj.contains_key("issuer") {
                     return Err(XRPLCoreException::SerdeJsonError(
                         XRPLSerdeJsonError::UnexpectedValueType {
                             expected: r#"MPT amount must not contain "currency" or "issuer" keys"#
+                                .into(),
+                            found: value,
+                        },
+                    ));
+                }
+                if obj.len() != 2 || !obj.contains_key("value") {
+                    return Err(XRPLCoreException::SerdeJsonError(
+                        XRPLSerdeJsonError::UnexpectedValueType {
+                            expected: r#"MPT amount must have exactly {"mpt_issuance_id","value"}"#
                                 .into(),
                             found: value,
                         },
