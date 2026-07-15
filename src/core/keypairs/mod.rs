@@ -51,12 +51,7 @@ fn _get_algorithm_engine(algo: CryptoAlgorithm) -> Box<dyn CryptoImplementation>
 /// Return the trait implementation based on the
 /// provided key.
 fn _get_algorithm_engine_from_key(key: &str) -> XRPLCoreResult<Box<dyn CryptoImplementation>> {
-    let prefix = key.get(..2).ok_or(XRPLKeypairsException::InvalidSecret)?;
-    if prefix == ED25519_PREFIX {
-        Ok(_get_algorithm_engine(CryptoAlgorithm::ED25519))
-    } else {
-        Ok(_get_algorithm_engine(CryptoAlgorithm::SECP256K1))
-    }
+    _get_algorithm_from_key(key).map(_get_algorithm_engine)
 }
 
 /// Generate a seed value that cryptographic keys
@@ -259,9 +254,8 @@ pub fn sign(message: &[u8], private_key: &str) -> XRPLCoreResult<String> {
 /// ));
 /// ```
 pub fn is_valid_message(message: &[u8], signature: &str, public_key: &str) -> bool {
-    _get_algorithm_engine_from_key(public_key).is_ok_and(|module| {
-        module.is_valid_message(message, signature, public_key)
-    })
+    _get_algorithm_engine_from_key(public_key)
+        .is_ok_and(|module| module.is_valid_message(message, signature, public_key))
 }
 
 /// Trait for cryptographic algorithms in the XRP Ledger.
@@ -370,6 +364,14 @@ mod test {
 
     #[test]
     fn test_is_valid_message_short_pubkey_returns_false() {
-        assert!(!is_valid_message(&[], "", "ab"));
+        // 1-byte key: exercises the <2-byte guard (the original panic case)
+        assert!(!is_valid_message(&[], "", "a"));
+    }
+
+    #[test]
+    fn test_is_valid_message_multibyte_pubkey_returns_false() {
+        // "E£" is 3 bytes (E + 2-byte UTF-8 £); key.get(..2) crosses a char
+        // boundary and returns None, verifying the non-char-boundary guard.
+        assert!(!is_valid_message(&[], "", "E\u{00A3}"));
     }
 }
