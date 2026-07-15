@@ -259,13 +259,16 @@ impl Amount {
     }
 
     /// Returns True if this amount is a native XRP amount.
+    /// Requires exactly 8 bytes so that downstream slicing (`self.as_ref()[..8]`)
+    /// cannot panic on short buffers.
     pub fn is_native(&self) -> bool {
-        !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
+        self.0.len() == 8 && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
     }
 
     /// Returns True if this amount is an MPT amount.
+    /// Requires exactly 33 bytes so that downstream slicing cannot panic on short buffers.
     pub fn is_mpt(&self) -> bool {
-        !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
+        self.0.len() == 33 && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
     /// Returns true if the positive-sign bit (0x40) in byte 0 is set.
@@ -381,15 +384,15 @@ impl Serialize for Amount {
             serializer.serialize_str(&self._deserialize_native_amount())
         } else if self.is_mpt() {
             // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id = 33 bytes total.
+            // is_mpt() guarantees len() == 33, so no bounds check needed here.
             let bytes = self.as_ref();
-            if bytes.len() < 33 {
-                return Err(S::Error::custom("MPT amount buffer too short"));
-            }
             let leading = bytes[0];
             let is_positive = leading & 0x40 != 0;
             // MPT amounts are unsigned; a cleared positive bit indicates a malformed payload.
             if !is_positive {
-                return Err(S::Error::custom("MPT amount has negative sign bit set"));
+                return Err(S::Error::custom(
+                    "MPT amount positive bit (0x40) not set: malformed sign byte",
+                ));
             }
             let mut amount_bytes = [0u8; 8];
             amount_bytes.copy_from_slice(&bytes[1..9]);
@@ -402,6 +405,11 @@ impl Serialize for Amount {
             builder.serialize_entry("mpt_issuance_id", &mpt_id)?;
             builder.end()
         } else {
+            // IOU amounts are exactly 48 bytes (8 value + 20 currency + 20 issuer).
+            // Reject short buffers before passing to the parser to prevent panics.
+            if self.as_ref().len() != _CURRENCY_AMOUNT_BYTE_LENGTH as usize {
+                return Err(S::Error::custom("Amount buffer has unexpected length"));
+            }
             let mut parser = BinaryParser::from(self.as_ref());
 
             if let Ok(ic) = IssuedCurrency::from_parser(&mut parser, None) {
@@ -619,8 +627,6 @@ mod test {
     // Issue #258: uppercase 0X prefix must be rejected (only lowercase 0x is valid).
     #[test]
     fn test_mpt_reject_uppercase_hex_prefix() {
-        let mpt_id =
-            "A000000000000000000000000000000000000000000000000000000000000000"[..48].to_string();
         // A valid 48-char mpt_issuance_id (all zeros).
         let mpt_id_zeros = "000000000000000000000000000000000000000000000000";
         let json = serde_json::json!({
