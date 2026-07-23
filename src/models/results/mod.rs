@@ -14,6 +14,7 @@ pub mod deposit_authorize;
 pub mod exceptions;
 pub mod fee;
 pub mod gateway_balances;
+pub mod get_aggregate_price;
 pub mod ledger;
 pub mod ledger_closed;
 pub mod ledger_current;
@@ -39,6 +40,7 @@ pub mod subscribe;
 pub mod transaction_entry;
 pub mod tx;
 pub mod unsubscribe;
+pub mod vault_info;
 
 use super::{requests::XRPLRequest, Amount, XRPLModelException, XRPLModelResult};
 #[cfg(not(feature = "std"))]
@@ -130,6 +132,7 @@ pub enum XRPLResult<'a> {
     DepositAuthorized(deposit_authorize::DepositAuthorized<'a>),
     Fee(fee::Fee<'a>),
     GatewayBalances(gateway_balances::GatewayBalances<'a>),
+    GetAggregatePrice(get_aggregate_price::GetAggregatePrice<'a>),
     Ledger(ledger::Ledger<'a>),
     LedgerClosed(ledger_closed::LedgerClosed<'a>),
     LedgerCurrent(ledger_current::LedgerCurrent<'a>),
@@ -150,6 +153,7 @@ pub enum XRPLResult<'a> {
     SubmitMultisigned(submit_multisigned::SubmitMultisigned<'a>),
     TransactionEntry(transaction_entry::TransactionEntry<'a>),
     Tx(tx::TxVersionMap<'a>),
+    VaultInfo(vault_info::VaultInfo<'a>),
     // Other must come before Subscribe/Unsubscribe/Ping so that unrecognized
     // JSON objects fall into Other(Value) — where the raw data is recoverable —
     // rather than into Subscribe (empty PhantomData struct, data unrecoverable).
@@ -182,6 +186,7 @@ impl_from_result!(channel_verify, ChannelVerify);
 impl_from_result!(deposit_authorize, DepositAuthorized);
 impl_from_result!(fee, Fee);
 impl_from_result!(gateway_balances, GatewayBalances);
+impl_from_result!(get_aggregate_price, GetAggregatePrice);
 impl_from_result!(ledger, Ledger);
 impl_from_result!(ledger_closed, LedgerClosed);
 impl_from_result!(ledger_current, LedgerCurrent);
@@ -212,6 +217,7 @@ impl_from_result!(transaction_entry, TransactionEntry);
 impl_from_result!(ping, Ping);
 impl_from_result!(subscribe, Subscribe);
 impl_from_result!(unsubscribe, Unsubscribe);
+impl_from_result!(vault_info, VaultInfo);
 
 impl<'a> From<Value> for XRPLResult<'a> {
     fn from(value: Value) -> Self {
@@ -276,6 +282,7 @@ impl_try_from_result!(channel_verify, ChannelVerify, ChannelVerify);
 impl_try_from_result!(deposit_authorize, DepositAuthorized, DepositAuthorized);
 impl_try_from_result!(fee, Fee, Fee);
 impl_try_from_result!(gateway_balances, GatewayBalances, GatewayBalances);
+impl_try_from_result!(get_aggregate_price, GetAggregatePrice, GetAggregatePrice);
 impl_try_from_result!(ledger, Ledger, Ledger);
 impl_try_from_result!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_result!(ledger_current, LedgerCurrent, LedgerCurrent);
@@ -443,6 +450,7 @@ impl_try_from_result!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_result!(ping, Ping, Ping);
 impl_try_from_result!(subscribe, Subscribe, Subscribe);
 impl_try_from_result!(unsubscribe, Unsubscribe, Unsubscribe);
+impl_try_from_result!(vault_info, VaultInfo, VaultInfo);
 
 impl<'a> TryInto<Value> for XRPLResult<'a> {
     type Error = XRPLModelException;
@@ -473,6 +481,7 @@ impl XRPLResult<'_> {
             XRPLResult::DepositAuthorized(_) => "DepositAuthorized".to_string(),
             XRPLResult::Fee(_) => "Fee".to_string(),
             XRPLResult::GatewayBalances(_) => "GatewayBalances".to_string(),
+            XRPLResult::GetAggregatePrice(_) => "GetAggregatePrice".to_string(),
             XRPLResult::Ledger(_) => "Ledger".to_string(),
             XRPLResult::LedgerClosed(_) => "LedgerClosed".to_string(),
             XRPLResult::LedgerCurrent(_) => "LedgerCurrent".to_string(),
@@ -496,6 +505,7 @@ impl XRPLResult<'_> {
             XRPLResult::Subscribe(_) => "Subscribe".to_string(),
             XRPLResult::Tx(_) => "Tx".to_string(),
             XRPLResult::Unsubscribe(_) => "Unsubscribe".to_string(),
+            XRPLResult::VaultInfo(_) => "VaultInfo".to_string(),
             XRPLResult::Other(_) => "Other".to_string(),
         }
     }
@@ -617,6 +627,7 @@ impl_try_from_response!(channel_verify, ChannelVerify, ChannelVerify);
 impl_try_from_response!(deposit_authorize, DepositAuthorized, DepositAuthorized);
 impl_try_from_response!(fee, Fee, Fee);
 impl_try_from_response!(gateway_balances, GatewayBalances, GatewayBalances);
+impl_try_from_response!(get_aggregate_price, GetAggregatePrice, GetAggregatePrice);
 impl_try_from_response!(ledger, Ledger, Ledger);
 impl_try_from_response!(ledger_closed, LedgerClosed, LedgerClosed);
 impl_try_from_response!(ledger_current, LedgerCurrent, LedgerCurrent);
@@ -807,6 +818,7 @@ where
 impl_try_from_response!(transaction_entry, TransactionEntry, TransactionEntry);
 impl_try_from_response!(subscribe, Subscribe, Subscribe);
 impl_try_from_response!(unsubscribe, Unsubscribe, Unsubscribe);
+impl_try_from_response!(vault_info, VaultInfo, VaultInfo);
 
 fn is_subscription_stream_item(item: &Map<String, Value>) -> bool {
     item.get("result").is_none() && item.get("error_code").is_none()
