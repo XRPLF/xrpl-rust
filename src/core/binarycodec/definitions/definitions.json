@@ -3696,7 +3696,7 @@
     },
     "MPTokenIssuance": {
       "lsfMPTCanClawback": 64,
-      "lsfMPTCanConfidentialAmount": 128,
+      "lsfMPTCanHoldConfidentialBalance": 128,
       "lsfMPTCanEscrow": 8,
       "lsfMPTCanLock": 2,
       "lsfMPTCanTrade": 16,
@@ -3712,8 +3712,7 @@
       "lsmfMPTCanMutateCanTransfer": 32,
       "lsmfMPTCanMutateMetadata": 65536,
       "lsmfMPTCanMutateRequireAuth": 4,
-      "lsmfMPTCanMutateTransferFee": 131072,
-      "lsmfMPTCannotMutateCanConfidentialAmount": 262144
+      "lsmfMPTCanMutateTransferFee": 131072
     },
     "NFTokenOffer": {
       "lsfSellNFToken": 1
@@ -5185,7 +5184,7 @@
     },
     "MPTokenIssuanceCreate": {
       "tfMPTCanClawback": 64,
-      "tfMPTCanConfidentialAmount": 128,
+      "tfMPTCanHoldConfidentialBalance": 128,
       "tfMPTCanEscrow": 8,
       "tfMPTCanLock": 2,
       "tfMPTCanTrade": 16,
@@ -5194,6 +5193,7 @@
     },
     "MPTokenIssuanceSet": {
       "tfMPTLock": 1,
+      "tfMPTSetCanHoldConfidentialBalance": 256,
       "tfMPTUnlock": 2
     },
     "NFTokenCreateOffer": {

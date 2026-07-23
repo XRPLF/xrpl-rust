@@ -44,12 +44,34 @@ pub fn encrypt(amount: u64, pubkey: &Pubkey, blinding: &BlindingFactor) -> Resul
     Ok(Ciphertext::new(out))
 }
 
-/// Decrypts a ciphertext using the holder's secret key, recovering the
-/// original `u64` amount.
+/// Default upper bound for the discrete-log search performed by [`decrypt`].
+///
+/// `mpt_decrypt_amount` (mpt-crypto >= 1.0) recovers the amount by searching the
+/// inclusive range `[range_low, range_high]`; cost scales linearly with its
+/// width (~3s for `0..=1_000_000` on Apple Silicon). Matches xrpl-py's
+/// `DEFAULT_DECRYPT_RANGE_HIGH`. Use [`decrypt_in_range`] for other windows.
+pub const DEFAULT_DECRYPT_RANGE_HIGH: u64 = 1_000_000;
+
+/// Decrypts a ciphertext using the holder's secret key, recovering the original
+/// `u64` amount by searching `0..=DEFAULT_DECRYPT_RANGE_HIGH`.
 ///
 /// The C implementation uses a discrete-log lookup table for u64 — fast for
-/// small / typical balances, slow if the recovered scalar is unusually large.
+/// small / typical balances, slow over wide ranges. Use [`decrypt_in_range`] to
+/// search a different window.
 pub fn decrypt(ciphertext: &Ciphertext, privkey: &Privkey) -> Result<u64> {
+    decrypt_in_range(ciphertext, privkey, 0, DEFAULT_DECRYPT_RANGE_HIGH)
+}
+
+/// Decrypts a ciphertext, searching the inclusive range `[range_low, range_high]`.
+///
+/// `range_high` must be `< u64::MAX` and `>= range_low`; otherwise the underlying
+/// call returns `-2`, surfaced here as [`Error::NonZeroRc`].
+pub fn decrypt_in_range(
+    ciphertext: &Ciphertext,
+    privkey: &Privkey,
+    range_low: u64,
+    range_high: u64,
+) -> Result<u64> {
     let mut amount: u64 = 0;
     // SAFETY: pointers are valid for the call; `&mut amount` is exclusive.
     let rc = unsafe {
@@ -57,6 +79,8 @@ pub fn decrypt(ciphertext: &Ciphertext, privkey: &Privkey) -> Result<u64> {
             ciphertext.as_bytes().as_ptr(),
             privkey.as_bytes().as_ptr(),
             &mut amount,
+            range_low,
+            range_high,
         )
     };
     if rc != 0 {

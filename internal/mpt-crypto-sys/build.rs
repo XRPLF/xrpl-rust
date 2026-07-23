@@ -18,13 +18,13 @@ use std::path::{Path, PathBuf};
 
 /// Upstream mpt-crypto release tag this crate is built against.
 /// Must match the version whose headers generated `src/bindings.rs`.
-const MPT_CRYPTO_VERSION: &str = "0.3.0-rc2";
+const MPT_CRYPTO_VERSION: &str = "1.0.2";
 
 /// SHA-256 of `mpt-crypto-natives-<MPT_CRYPTO_VERSION>.tar.gz`.
 /// Computed at release time; verified on every download.
 ///
 /// Update via `scripts/fetch_upstream.sh` which prints the new value.
-const BUNDLE_SHA256: &str = "486c775b5b3c1fc18c3a9e8cbd4b458802b49eb307475df695fc899127226c0d";
+const BUNDLE_SHA256: &str = "8a765db71473ca4b1034f1f3140743b36ff80b66f3a1ab71769489e8f03231e9";
 
 fn main() {
     let target = env::var("TARGET").expect("cargo did not set TARGET");

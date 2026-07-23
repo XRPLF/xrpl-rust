@@ -1,47 +1,15 @@
 #ifndef MPT_UTILITY_H
 #define MPT_UTILITY_H
 
+#include <mpt_protocol.h>
 #include <secp256k1.h>
 #include <secp256k1_mpt.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// XRPL Transaction Types, the number MUST match rippled's definitions
-#define ttCONFIDENTIAL_MPT_CONVERT 85
-#define ttCONFIDENTIAL_MPT_MERGE_INBOX 86
-#define ttCONFIDENTIAL_MPT_CONVERT_BACK 87
-#define ttCONFIDENTIAL_MPT_SEND 88
-#define ttCONFIDENTIAL_MPT_CLAWBACK 89
-
-// General crypto primitive sizes in bytes
-#define kMPT_HALF_SHA_SIZE 32
-#define kMPT_PUBKEY_SIZE 33
-#define kMPT_PRIVKEY_SIZE 32
-#define kMPT_BLINDING_FACTOR_SIZE 32
-
-// Gamal & Pedersen primitive sizes in bytes
-#define kMPT_ELGAMAL_CIPHER_SIZE 33
-#define kMPT_ELGAMAL_TOTAL_SIZE 66
-#define kMPT_PEDERSEN_COMMIT_SIZE 33
-
-// Proof sizes in bytes
-#define kMPT_SCHNORR_PROOF_SIZE 64
-#define kMPT_SINGLE_BULLETPROOF_SIZE 688
-#define kMPT_DOUBLE_BULLETPROOF_SIZE 754
-
-// Context hash size
-#define kMPT_ZKP_CONTEXT_HASH_SIZE 74
-
-// Account ID size in bytes
-#define kMPT_ACCOUNT_ID_SIZE 20
-
-// MPTokenIssuance ID size in bytes
-#define kMPT_ISSUANCE_ID_SIZE 24
 
 /**
  * @brief Represents a unique 24-byte MPT issuance ID.
@@ -206,13 +174,22 @@ mpt_encrypt_amount(
  * @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).
  * @param privkey    [in]  The 32-byte private key.
  * @param out_amount [out] Pointer to store the decrypted uint64_t amount.
- * @return 0 on success, -1 on failure.
+ * @param range_low  [in]  Lower bound of the search range (inclusive).
+ * @param range_high [in]  Upper bound of the search range (inclusive).
+ *                         Must satisfy range_low <= range_high and
+ *                         range_high != UINT64_MAX.
+ * @return 0 on success, -1 on failure, -2 if range_low > range_high or
+ *         range_high == UINT64_MAX.
+ * @note Performance scales linearly with (range_high - range_low). A range of [0, 1,000,000] takes
+ * approximately 3 seconds on Apple Silicon. Do not pass arbitrarily large ranges.
  */
 int
 mpt_decrypt_amount(
     uint8_t const ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
     uint8_t const privkey[kMPT_PRIVKEY_SIZE],
-    uint64_t* out_amount);
+    uint64_t* out_amount,
+    uint64_t range_low,
+    uint64_t range_high);
 
 /* ============================================================================
  * ZKProof Generation

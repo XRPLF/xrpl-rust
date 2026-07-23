@@ -505,7 +505,7 @@ async fn confidential_mpt_merge_inbox() {
 }
 
 /// XLS-0096 §9.2.1.2 protocol-level failure #2: `ConfidentialMPTMergeInbox` on
-/// an issuance that lacks `lsfMPTCanConfidentialAmount` must be rejected with
+/// an issuance that lacks `lsfMPTCanHoldConfidentialBalance` must be rejected with
 /// `tecNO_PERMISSION`. The issuance is created without the confidential flag and
 /// the holder is authorized, so the `MPTokenIssuance` and `MPToken` both exist
 /// (preclaim check #1 passes) — only the missing-capability check (#2) fires.
@@ -515,7 +515,7 @@ async fn confidential_mpt_merge_inbox_rejects_non_confidential_issuance() {
         let issuer = generate_funded_wallet().await;
         let holder = generate_funded_wallet().await;
 
-        // Plain (non-confidential) issuance: no tfMPTCanConfidentialAmount.
+        // Plain (non-confidential) issuance: no tfMPTCanHoldConfidentialBalance.
         submit_signed(
             &issuer.seed,
             serde_json::json!({

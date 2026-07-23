@@ -43,6 +43,10 @@ tar -xzf "$BUNDLE" -C "$TMP"
 
 cp "$TMP/include/secp256k1_mpt.h"       "$VENDOR/include/"
 cp "$TMP/include/utility/mpt_utility.h" "$VENDOR/include/utility/"
+# secp256k1.h is transitively included by secp256k1_mpt.h; refresh it too.
+[ -f "$TMP/include/secp256k1.h" ]   && cp "$TMP/include/secp256k1.h"   "$VENDOR/include/"
+# mpt_protocol.h is new in >=1.0.x (mpt_utility.h #includes it); required for bindgen.
+[ -f "$TMP/include/mpt_protocol.h" ] && cp "$TMP/include/mpt_protocol.h" "$VENDOR/include/"
 
 # Map upstream platform names → Rust target triples
 for PAIR in \
