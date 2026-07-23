@@ -9,13 +9,13 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::_serde::opt_lgr_obj_flags;
 use crate::core::addresscodec::decode_classic_address;
+use crate::models::transactions::mptoken_issuance_create::{
+    TIF_MPTOKENISSUANCE_IMMUTABLE_MASK, TIF_MPTOKENISSUANCE_VALID_MASK,
+};
 use crate::models::{
     ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag,
     transactions::{Transaction, TransactionType},
     FlagCollection, Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
-};
-use crate::models::transactions::mptoken_issuance_create::{
-    TIF_MPTOKENISSUANCE_IMMUTABLE_MASK, TIF_MPTOKENISSUANCE_VALID_MASK,
 };
 
 use super::{CommonFields, CommonTransactionBuilder};
@@ -393,7 +393,11 @@ impl<'a> MPTokenIssuanceSet<'a> {
     /// `ImmutableFlags`, when present, must be non-zero and use only known `tif*` bits.
     fn _get_immutable_flags_error(&self) -> XRPLModelResult<()> {
         if let Some(flags) = &self.immutable_flags {
-            let bits: u32 = flags.0.iter().map(|f| f.clone() as u32).fold(0, |acc, v| acc | v);
+            let bits: u32 = flags
+                .0
+                .iter()
+                .map(|f| f.clone() as u32)
+                .fold(0, |acc, v| acc | v);
             if bits == 0 || (bits & TIF_MPTOKENISSUANCE_IMMUTABLE_MASK) != 0 {
                 return Err(XRPLModelException::InvalidValue {
                     field: "immutable_flags".into(),
@@ -863,9 +867,7 @@ mod tests {
                 ..Default::default()
             },
             mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
-            immutable_flags: Some(
-                vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into()),
             ..Default::default()
         };
         let json = serde_json::to_string(&txn).unwrap();
@@ -1069,9 +1071,7 @@ mod tests {
                 ..Default::default()
             },
             mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
-            immutable_flags: Some(
-                vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into()),
             ..Default::default()
         };
         assert!(txn.validate().is_ok());

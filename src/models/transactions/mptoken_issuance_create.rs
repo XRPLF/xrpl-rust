@@ -333,8 +333,7 @@ impl<'a> MPTokenIssuanceCreate<'a> {
 
     /// `DomainID` may only be set when `tfMPTRequireAuth` is also set.
     fn _get_domain_id_requires_require_auth_error(&self) -> XRPLModelResult<()> {
-        if self.domain_id.is_some()
-            && !self.has_flag(&MPTokenIssuanceCreateFlag::TfMPTRequireAuth)
+        if self.domain_id.is_some() && !self.has_flag(&MPTokenIssuanceCreateFlag::TfMPTRequireAuth)
         {
             return Err(XRPLModelException::InvalidFieldCombination {
                 field: "domain_id",
@@ -350,7 +349,11 @@ impl<'a> MPTokenIssuanceCreate<'a> {
     fn _get_immutable_flags_error(&self) -> XRPLModelResult<()> {
         if let Some(flags) = &self.immutable_flags {
             // Compute the raw integer value from the FlagCollection.
-            let bits: u32 = flags.0.iter().map(|f| f.clone() as u32).fold(0, |acc, v| acc | v);
+            let bits: u32 = flags
+                .0
+                .iter()
+                .map(|f| f.clone() as u32)
+                .fold(0, |acc, v| acc | v);
             if bits == 0 || (bits & TIF_MPTOKENISSUANCE_IMMUTABLE_MASK) != 0 {
                 return Err(XRPLModelException::InvalidValue {
                     field: "immutable_flags".into(),
@@ -808,9 +811,7 @@ mod tests {
                 transaction_type: TransactionType::MPTokenIssuanceCreate,
                 ..Default::default()
             },
-            immutable_flags: Some(
-                vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into()),
             ..Default::default()
         };
         let json = serde_json::to_string(&txn).unwrap();
@@ -864,9 +865,7 @@ mod tests {
                 ..Default::default()
             },
             transfer_fee: Some(1),
-            immutable_flags: Some(
-                vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into()),
             ..Default::default()
         };
         assert!(txn.validate().is_ok());

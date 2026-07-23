@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **XLS-94D DynamicMPT:** support for the [XLS-0094D DynamicMPT amendment](https://github.com/XRPLF/XRPL-Standards/pull/583), which makes MPT issuance fields and capability flags mutable by default after creation (opt-in immutability).
+  - **`ImmutableFlags` field** on `MPTokenIssuanceCreate`, `MPTokenIssuanceSet`, and the `MPTokenIssuance` ledger object — replaces the old `MutableFlags`/`sfMutableFlags` field. Serializes as `"ImmutableFlags"` on the wire. Bits are monotonic: once set they can never be cleared.
+  - **`MPTokenIssuanceImmutableFlag` enum** (`lsif*` prefix) replaces `MPTokenIssuanceMutableFlag` (`lsmf*`). New variant: `LsifMPTCanHoldConfidentialBalance` (XLS-96).
+  - **`TfMPTCanHoldConfidentialBalance`** added to `MPTokenIssuanceCreateFlag`.
+  - **Seven new `MPTokenIssuanceSetFlag` variants** (`tfMPTSet*`): `TfMPTSetCanLock`, `TfMPTSetRequireAuth`, `TfMPTSetCanEscrow`, `TfMPTSetCanTrade`, `TfMPTSetCanTransfer`, `TfMPTSetCanClawback`, `TfMPTSetCanHoldConfidentialBalance` — one-way capability-enabling flags that set the corresponding `lsf*` bit on the ledger object.
+  - **Binary codec:** `"MutableFlags"` field renamed to `"ImmutableFlags"` in `definitions.json`.
+  - **Validation (`MPTokenIssuanceCreate`):** `ImmutableFlags` must be non-zero and use only known `tif*` bits; `DomainID` requires `tfMPTRequireAuth`.
+  - **Validation (`MPTokenIssuanceSet`):** no-op transactions rejected; `ImmutableFlags` mask validation; `DomainID` and `Holder` are mutually exclusive; `Holder` cannot equal `Account`; empty `MPTokenMetadata` string is valid (clears the field); lock/unlock flags cannot be combined with mutation ops or `Holder`.
+  - **Integration tests** (11 scenarios, run against rippled `3.3.0-rc2`): base lock/unlock; enable all capability flags post-creation; immutable capability rejection (`tecNO_PERMISSION`); `TransferFee` mutation and immutability; `MPTokenMetadata` mutation and immutability; `DomainID` persistence, update, and rejection without `tfMPTRequireAuth`; `Flags`/`ImmutableFlags` ledger persistence.
+  - **CI:** `XRPLD_PRIVATE_VERSION=3.3.0-rc2` in `.github/xrpld-image.env`; `MPTokensV1` and `DynamicMPT` added to `.ci-config/xrpld.cfg` `[features]` stanza.
+
 ### Fixed
 
 ## [[v1.2.0]]
@@ -24,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Binary codec:** `Hash192` type for `MPTokenIssuanceID`; MPT amount encode/decode (UInt64 as base-10 string); `AssetScale` (UInt8) and `MPTAmount`/`MaximumAmount`/`OutstandingAmount` field support.
   - **Amount/Currency:** `MPTAmount` and `MPTCurrency` variants in `Amount`/`Currency` enums; digit-only value validation; `i64::MAX` upper-bound enforcement; `is_mpt()` helper.
   - **Transaction models:** `MPTokenIssuanceCreate`, `MPTokenIssuanceDestroy`, `MPTokenIssuanceSet`, `MPTokenAuthorize`; `Clawback` extended with `MPTAmount` support and optional `Holder` field.
-  - **Ledger objects:** `MPToken` and `MPTokenIssuance` with `LockedAmount`, `MPTokenIssuanceMutableFlag` bitmask, and non-null index validation.
+  - **Ledger objects:** `MPToken` and `MPTokenIssuance` with `LockedAmount`, `MPTokenIssuanceImmutableFlag` bitmask (`ImmutableFlags`), and non-null index validation.
   - **Requests:** `AccountObjectType::MptIssuance` and `Mptoken` variants.
   - **Integration tests:** full MPT lifecycle end-to-end (create issuance, holder opt-in, lock/unlock, clawback).
 - **XLS-65 Single Asset Vault:** support for the XLS-0065 Single Asset Vault amendment. Adds the `Vault` ledger object; `VaultCreate`, `VaultSet`, `VaultDelete`, `VaultDeposit`, `VaultWithdraw`, and `VaultClawback` transactions; the `vault_info` request and result; `ledger_entry` vault lookup; and the `AccountObjectType::Vault` filter.

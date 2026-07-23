@@ -88,10 +88,11 @@ async fn create_plain_issuance(wallet: &Wallet) -> String {
         "create_plain_issuance: {}",
         result.engine_result_message
     );
-    let sequence = result.tx_json["Sequence"].as_u64().expect("Sequence missing") as u32;
-    let account_id =
-        xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
-            .expect("decode_classic_address failed");
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("decode_classic_address failed");
     let mut id_bytes = [0u8; 24];
     id_bytes[..4].copy_from_slice(&sequence.to_be_bytes());
     id_bytes[4..].copy_from_slice(&account_id);
@@ -110,10 +111,11 @@ async fn create_issuance_with(wallet: &Wallet, mut tx: MPTokenIssuanceCreate<'_>
         "create_issuance_with: {}",
         result.engine_result_message
     );
-    let sequence = result.tx_json["Sequence"].as_u64().expect("Sequence missing") as u32;
-    let account_id =
-        xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
-            .expect("decode_classic_address failed");
+    let sequence = result.tx_json["Sequence"]
+        .as_u64()
+        .expect("Sequence missing") as u32;
+    let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+        .expect("decode_classic_address failed");
     let mut id_bytes = [0u8; 24];
     id_bytes[..4].copy_from_slice(&sequence.to_be_bytes());
     id_bytes[4..].copy_from_slice(&account_id);
@@ -142,8 +144,9 @@ async fn read_mpt_issuance(wallet: &Wallet, issuance_id: &str) -> serde_json::Va
         )
         .await
         .expect("read_mpt_issuance: account_objects request failed");
-    let ao: results::account_objects::AccountObjects<'_> =
-        ao_response.try_into().expect("read_mpt_issuance: parse failed");
+    let ao: results::account_objects::AccountObjects<'_> = ao_response
+        .try_into()
+        .expect("read_mpt_issuance: parse failed");
     ao.account_objects
         .iter()
         .find(|o| {
@@ -204,10 +207,11 @@ async fn create_permissioned_domain(wallet: &Wallet) -> String {
     let ao: results::account_objects::AccountObjects<'_> = ao_response
         .try_into()
         .expect("create_permissioned_domain: parse failed");
-    assert!(!ao.account_objects.is_empty(), "No PermissionedDomain found after creation");
-    ao.account_objects
-        .last()
-        .expect("empty")["index"]
+    assert!(
+        !ao.account_objects.is_empty(),
+        "No PermissionedDomain found after creation"
+    );
+    ao.account_objects.last().expect("empty")["index"]
         .as_str()
         .expect("index field missing")
         .to_string()
@@ -251,12 +255,36 @@ async fn test_mptoken_issuance_set_enables_every_capability_flag() {
         let flags_before = before["Flags"].as_u64().unwrap_or(0) as u32;
 
         // None of the capability flags should be set on a fresh issuance.
-        assert_eq!(flags_before & 0x00000002, 0, "lsfMPTCanLock unexpectedly set");
-        assert_eq!(flags_before & 0x00000004, 0, "lsfMPTRequireAuth unexpectedly set");
-        assert_eq!(flags_before & 0x00000008, 0, "lsfMPTCanEscrow unexpectedly set");
-        assert_eq!(flags_before & 0x00000010, 0, "lsfMPTCanTrade unexpectedly set");
-        assert_eq!(flags_before & 0x00000020, 0, "lsfMPTCanTransfer unexpectedly set");
-        assert_eq!(flags_before & 0x00000040, 0, "lsfMPTCanClawback unexpectedly set");
+        assert_eq!(
+            flags_before & 0x00000002,
+            0,
+            "lsfMPTCanLock unexpectedly set"
+        );
+        assert_eq!(
+            flags_before & 0x00000004,
+            0,
+            "lsfMPTRequireAuth unexpectedly set"
+        );
+        assert_eq!(
+            flags_before & 0x00000008,
+            0,
+            "lsfMPTCanEscrow unexpectedly set"
+        );
+        assert_eq!(
+            flags_before & 0x00000010,
+            0,
+            "lsfMPTCanTrade unexpectedly set"
+        );
+        assert_eq!(
+            flags_before & 0x00000020,
+            0,
+            "lsfMPTCanTransfer unexpectedly set"
+        );
+        assert_eq!(
+            flags_before & 0x00000040,
+            0,
+            "lsfMPTCanClawback unexpectedly set"
+        );
 
         // Enable all six capability flags in a single MPTokenIssuanceSet transaction.
         let mut enable_all_tx = MPTokenIssuanceSet {
@@ -283,11 +311,23 @@ async fn test_mptoken_issuance_set_enables_every_capability_flag() {
         let flags_after = after["Flags"].as_u64().unwrap_or(0) as u32;
 
         assert_ne!(flags_after & 0x00000002, 0, "lsfMPTCanLock should be set");
-        assert_ne!(flags_after & 0x00000004, 0, "lsfMPTRequireAuth should be set");
+        assert_ne!(
+            flags_after & 0x00000004,
+            0,
+            "lsfMPTRequireAuth should be set"
+        );
         assert_ne!(flags_after & 0x00000008, 0, "lsfMPTCanEscrow should be set");
         assert_ne!(flags_after & 0x00000010, 0, "lsfMPTCanTrade should be set");
-        assert_ne!(flags_after & 0x00000020, 0, "lsfMPTCanTransfer should be set");
-        assert_ne!(flags_after & 0x00000040, 0, "lsfMPTCanClawback should be set");
+        assert_ne!(
+            flags_after & 0x00000020,
+            0,
+            "lsfMPTCanTransfer should be set"
+        );
+        assert_ne!(
+            flags_after & 0x00000040,
+            0,
+            "lsfMPTCanClawback should be set"
+        );
     })
     .await;
 }
@@ -307,9 +347,7 @@ async fn test_mptoken_issuance_set_rejects_capability_made_immutable() {
                     transaction_type: TransactionType::MPTokenIssuanceCreate,
                     ..Default::default()
                 },
-                immutable_flags: Some(
-                    vec![MPTokenIssuanceImmutableFlag::LsifMPTCanLock].into(),
-                ),
+                immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTCanLock].into()),
                 ..Default::default()
             },
         )
@@ -465,9 +503,7 @@ async fn test_mptoken_issuance_set_makes_transfer_fee_immutable() {
             },
             mptoken_issuance_id: issuance_id.clone().into(),
             transfer_fee: Some(200),
-            immutable_flags: Some(
-                vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into()),
             ..Default::default()
         };
         test_transaction(&mut set_and_lock_tx, &issuer).await;
@@ -575,9 +611,7 @@ async fn test_mptoken_issuance_set_rejects_metadata_when_immutable() {
                     ..Default::default()
                 },
                 mptoken_metadata: Some("DEADBEEF".into()),
-                immutable_flags: Some(
-                    vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into(),
-                ),
+                immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into()),
                 ..Default::default()
             },
         )

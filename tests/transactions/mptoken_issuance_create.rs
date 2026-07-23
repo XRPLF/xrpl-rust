@@ -107,8 +107,9 @@ async fn test_mptoken_issuance_create_base() {
             .await
             .expect("account_objects request failed");
 
-        let ao: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("account_objects parse failed");
+        let ao: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("account_objects parse failed");
 
         assert_eq!(
             ao.account_objects.len(),
@@ -142,9 +143,7 @@ async fn test_mptoken_issuance_create_persists_flags_and_immutable_flags() {
                 flags: vec![MPTokenIssuanceCreateFlag::TfMPTCanTransfer].into(),
                 ..Default::default()
             },
-            immutable_flags: Some(
-                vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into()),
             ..Default::default()
         };
 
@@ -160,9 +159,8 @@ async fn test_mptoken_issuance_create_persists_flags_and_immutable_flags() {
         let sequence = result.tx_json["Sequence"]
             .as_u64()
             .expect("Sequence missing") as u32;
-        let account_id =
-            xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
-                .expect("decode_classic_address failed");
+        let account_id = xrpl::core::addresscodec::decode_classic_address(&wallet.classic_address)
+            .expect("decode_classic_address failed");
         let mut id_bytes = [0u8; 24];
         id_bytes[..4].copy_from_slice(&sequence.to_be_bytes());
         id_bytes[4..].copy_from_slice(&account_id);
@@ -189,8 +187,9 @@ async fn test_mptoken_issuance_create_persists_flags_and_immutable_flags() {
             .await
             .expect("account_objects request failed");
 
-        let ao: results::account_objects::AccountObjects<'_> =
-            ao_response.try_into().expect("account_objects parse failed");
+        let ao: results::account_objects::AccountObjects<'_> = ao_response
+            .try_into()
+            .expect("account_objects parse failed");
 
         let issuance = ao
             .account_objects
@@ -219,7 +218,10 @@ async fn test_mptoken_issuance_create_persists_flags_and_immutable_flags() {
         // Verify ImmutableFlags: lsifMPTTransferFee (0x20000) must be set.
         let immutable_val = issuance["ImmutableFlags"].as_u64();
         assert!(
-            has_lsif(immutable_val, MPTokenIssuanceImmutableFlag::LsifMPTTransferFee),
+            has_lsif(
+                immutable_val,
+                MPTokenIssuanceImmutableFlag::LsifMPTTransferFee
+            ),
             "lsifMPTTransferFee should be set in ImmutableFlags (got {immutable_val:?})"
         );
 
