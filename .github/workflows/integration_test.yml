@@ -10,22 +10,90 @@ on:
 name: Integration Test
 
 env:
-    # binary was renamed to xrpld in newer releases; use the xrpld image.
-    # Tracks xrpl.js PR #3270 (https://github.com/XRPLF/xrpl.js/pull/3270).
-    XRPLD_DOCKER_IMAGE: rippleci/xrpld:develop
     # Files measured by the integration coverage gate are the inverse of this regex.
     # Unit-test territory (models, core, utils, _serde) is excluded; integration territory
     # (CLI, asynch::clients, account/, ledger/, transaction/, faucet) is what remains.
     COVERAGE_IGNORE_REGEX: '(_serde|core|models|utils)/|constants\.rs$|macros\.rs$|lib\.rs$|asynch/transaction/submit_and_wait\.rs$|wallet/(mod|exceptions)\.rs$|tests/'
 
 jobs:
-    integration_test:
-        name: Integration Test
+    resolve_xrpld_image:
+        name: Resolve xrpld image
         runs-on: ubuntu-latest
-        timeout-minutes: 30
+        timeout-minutes: 2
+        permissions:
+            contents: read
+        outputs:
+            image: ${{ steps.resolve.outputs.image }}
+            is_private: ${{ steps.resolve.outputs.is_private }}
 
         steps:
             - uses: actions/checkout@v4
+
+            - name: Resolve xrpld image
+              id: resolve
+              env:
+                  IMAGE_CONFIG_FILE: .github/xrpld-image.env
+                  DEFAULT_IMAGE: rippleci/xrpld:develop
+                  PRIVATE_IMAGE_REPO: registry.gitlab.com/ripple/xrpledger/xrpld_package_deploy/xrpld-private
+                  GITLAB_REGISTRY_USERNAME: ${{ vars.GITLAB_REGISTRY_USERNAME }}
+                  GITLAB_REGISTRY_TOKEN: ${{ secrets.GITLAB_REGISTRY_TOKEN }}
+              run: |
+                  set -euo pipefail
+
+                  # Read the requested private version from the committed config file.
+                  # The file is never sourced: on fork pull requests its contents are
+                  # untrusted, so we only extract the value and validate it strictly.
+                  PRIVATE_VERSION=""
+                  if [[ -f "${IMAGE_CONFIG_FILE}" ]]; then
+                    RAW_LINE="$(grep -E '^[[:space:]]*XRPLD_PRIVATE_VERSION[[:space:]]*=' "${IMAGE_CONFIG_FILE}" | tail -n1 || true)"
+                    PRIVATE_VERSION="$(printf '%s' "${RAW_LINE#*=}" | tr -d "[:space:]\"'")"
+                  fi
+
+                  if [[ -z "${PRIVATE_VERSION}" ]]; then
+                    echo "No private xrpld version configured in ${IMAGE_CONFIG_FILE}; using default image ${DEFAULT_IMAGE}."
+                    {
+                      echo "image=${DEFAULT_IMAGE}"
+                      echo "is_private=false"
+                    } >> "${GITHUB_OUTPUT}"
+                    exit 0
+                  fi
+
+                  if ! [[ "${PRIVATE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(b|rc)[0-9]+)?$ ]]; then
+                    echo "XRPLD_PRIVATE_VERSION in ${IMAGE_CONFIG_FILE} must use X.Y.Z, X.Y.Z-bN, or X.Y.Z-rcN format (got '${PRIVATE_VERSION}')." >&2
+                    exit 1
+                  fi
+
+                  if [[ -z "${GITLAB_REGISTRY_USERNAME}" || -z "${GITLAB_REGISTRY_TOKEN}" ]]; then
+                    echo "A private xrpld version (${PRIVATE_VERSION}) is configured but the GITLAB_REGISTRY_USERNAME variable and GITLAB_REGISTRY_TOKEN secret are unavailable. These are not exposed to fork pull requests; run the private build from a branch in this repository, or clear XRPLD_PRIVATE_VERSION to use the default image." >&2
+                    exit 1
+                  fi
+
+                  echo "Using private xrpld image for version ${PRIVATE_VERSION}."
+                  {
+                    echo "image=${PRIVATE_IMAGE_REPO}:private-${PRIVATE_VERSION}"
+                    echo "is_private=true"
+                  } >> "${GITHUB_OUTPUT}"
+
+    integration_test:
+        name: Integration Test
+        needs: resolve_xrpld_image
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        env:
+            XRPLD_DOCKER_IMAGE: ${{ needs.resolve_xrpld_image.outputs.image }}
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Log in to the private GitLab registry
+              if: ${{ needs.resolve_xrpld_image.outputs.is_private == 'true' }}
+              env:
+                  GITLAB_REGISTRY_USERNAME: ${{ vars.GITLAB_REGISTRY_USERNAME }}
+                  GITLAB_REGISTRY_TOKEN: ${{ secrets.GITLAB_REGISTRY_TOKEN }}
+              run: |
+                  printf '%s' "${GITLAB_REGISTRY_TOKEN}" | docker login registry.gitlab.com \
+                    --username "${GITLAB_REGISTRY_USERNAME}" \
+                    --password-stdin
 
             - name: Run xrpld in standalone mode
               run: |
@@ -36,79 +104,79 @@ jobs:
                     --publish 6006:6006 \
                     --volume "${{ github.workspace }}/.ci-config/":"/etc/xrpld/" \
                     --name xrpld-service \
-                    ${{ env.XRPLD_DOCKER_IMAGE }} --standalone
+                    "${XRPLD_DOCKER_IMAGE}" --standalone
 
-            - name: Wait for xrpld to be ready
-              run: |
-                  echo "Waiting for xrpld RPC on localhost:5005..."
-                  for i in $(seq 1 60); do
-                    if curl -sf --max-time 5 -X POST http://localhost:5005/ \
-                        -H 'Content-Type: application/json' \
-                        -d '{"method":"server_info","params":[{}]}' \
-                        | grep -q '"status":"success"'; then
-                      echo "xrpld is ready (attempt $i)"
-                      exit 0
-                    fi
-                    sleep 2
-                  done
-                  echo "xrpld did not become ready in time"
-                  docker logs xrpld-service 2>&1 || true
-                  exit 1
+                    - name: Wait for xrpld to be ready
+                      run: |
+                          echo "Waiting for xrpld RPC on localhost:5005..."
+                          for i in $(seq 1 60); do
+                            if curl -sf --max-time 5 -X POST http://localhost:5005/ \
+                                -H 'Content-Type: application/json' \
+                                -d '{"method":"server_info","params":[{}]}' \
+                                | grep -q '"status":"success"'; then
+                              echo "xrpld is ready (attempt $i)"
+                              exit 0
+                            fi
+                            sleep 2
+                          done
+                          echo "xrpld did not become ready in time"
+                          docker logs xrpld-service 2>&1 || true
+                          exit 1
 
-            - uses: dtolnay/rust-toolchain@stable
+                    - uses: dtolnay/rust-toolchain@stable
 
-            - name: Install cargo-llvm-cov
-              uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2.79.3
-              with:
-                  tool: cargo-llvm-cov
+                    - name: Install cargo-llvm-cov
+                      uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2.79.3
+                      with:
+                          tool: cargo-llvm-cov
 
-            - name: Cache cargo registry
-              uses: actions/cache@v4
-              with:
-                  path: |
-                      ~/.cargo/registry
-                      ~/.cargo/git
-                      target
-                  key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
-                  restore-keys: |
-                      ${{ runner.os }}-cargo-integration-
+                    - name: Cache cargo registry
+                      uses: actions/cache@v4
+                      with:
+                          path: |
+                              ~/.cargo/registry
+                              ~/.cargo/git
+                              target
+                          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+                          restore-keys: |
+                              ${{ runner.os }}-cargo-integration-
 
-            - name: Run integration tests under coverage
-              run: |
-                  cargo llvm-cov --no-report --release \
-                    --features std,json-rpc,helpers,cli,websocket,integration \
-                    --test integration_test \
-                    --test cli_integration \
-                    --test funding \
-                    --test utils \
-                    --test test_utils \
-                    -- --test-threads=1
-              env:
-                  RUST_BACKTRACE: 1
+                    - name: Run integration tests under coverage
+                      run: |
+                          cargo llvm-cov --no-report --release \
+                            --features std,json-rpc,helpers,cli,websocket,integration \
+                            --test integration_test \
+                            --test cli_integration \
+                            --test funding \
+                            --test utils \
+                            --test test_utils \
+                            -- --test-threads=1
+                      env:
+                          RUST_BACKTRACE: 1
 
-            - name: Generate lcov report (scoped to integration territory)
-              run: |
-                  cargo llvm-cov report --release \
-                    --lcov --output-path lcov.info \
-                    --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
+                    - name: Generate lcov report (scoped to integration territory)
+                      run: |
+                          cargo llvm-cov report --release \
+                            --lcov --output-path lcov.info \
+                            --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
 
-            - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
-              with:
-                  token: ${{ secrets.CODECOV_TOKEN }}
-                  files: lcov.info
-                  flags: integration
-                  fail_ci_if_error: true
+                    - name: Upload coverage to Codecov
+                      uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+                      with:
+                          token: ${{ secrets.CODECOV_TOKEN }}
+                          files: lcov.info
+                          flags: integration
+                          fail_ci_if_error: true
 
-            - name: Upload coverage report
-              if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: integration-lcov-report
-                  path: lcov.info
+                    - name: Upload coverage report
+                      if: always()
+                      uses: actions/upload-artifact@v4
+                      with:
+                          name: integration-lcov-report
+                          path: lcov.info
 
-            - name: Dump xrpld logs and stop container
-              if: always()
-              run: |
-                  docker logs xrpld-service 2>&1 || echo "::warning::xrpld-service container not present for logs"
-                  docker stop xrpld-service 2>/dev/null || true
+                    - name: Dump xrpld logs and stop container
+                      if: always()
+                      run: |
+                          docker logs xrpld-service 2>&1 || echo "::warning::xrpld-service container not present for logs"
+                          docker stop xrpld-service 2>/dev/null || true
