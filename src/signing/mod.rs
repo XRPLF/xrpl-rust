@@ -82,7 +82,7 @@ where
 /// Combine signer-signed copies of `transaction` into a single multisigned
 /// transaction. `tx_list` must contain copies of `transaction` each signed by
 /// a different signer.
-pub fn multisign<'a, T, F>(transaction: &mut T, tx_list: &'a Vec<T>) -> XRPLHelperResult<()>
+pub fn multisign<'a, 'b, T, F>(transaction: &mut T, tx_list: &'b [T]) -> XRPLHelperResult<()>
 where
     F: IntoEnumIterator + Serialize + Debug + PartialEq + 'a,
     T: Transaction<'a, F>,
