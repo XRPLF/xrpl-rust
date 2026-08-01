@@ -54,6 +54,7 @@ use strum::IntoEnumIterator;
 
 use alloc::borrow::Cow;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use serde_with::skip_serializing_none;
 use strum_macros::Display;
 use ticket::Ticket;
@@ -95,7 +96,15 @@ pub enum LedgerEntryType {
     XChainOwnedCreateAccountClaimID = 0x0074,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// A ledger object, as returned inline by `ledger` (full/accounts) and `ledger_entry`.
+///
+/// The XRPL wire format for these is a flat JSON object carrying its own
+/// `LedgerEntryType` discriminator field (e.g. `{"LedgerEntryType": "AccountRoot",
+/// "Account": ..., ...}`), not serde's default externally-tagged representation
+/// (`{"AccountRoot": {...}}`). `Serialize`/`Deserialize` are implemented by hand
+/// below to match that wire format: deserialization reads `LedgerEntryType` to pick
+/// the variant, and serialization flattens straight through to the inner type.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LedgerEntry<'a> {
     AccountRoot(AccountRoot<'a>),
     Amendments(Amendments<'a>),
@@ -124,6 +133,129 @@ pub enum LedgerEntry<'a> {
     Vault(Vault<'a>),
     XChainOwnedClaimID(XChainOwnedClaimID<'a>),
     XChainOwnedCreateAccountClaimID(XChainOwnedCreateAccountClaimID<'a>),
+}
+
+const LEDGER_ENTRY_TYPE_VARIANTS: &[&str] = &[
+    "AccountRoot",
+    "Amendments",
+    "AMM",
+    "Bridge",
+    "Check",
+    "DID",
+    "Credential",
+    "DepositPreauth",
+    "DirectoryNode",
+    "Escrow",
+    "FeeSettings",
+    "LedgerHashes",
+    "MPToken",
+    "MPTokenIssuance",
+    "NegativeUNL",
+    "NFTokenOffer",
+    "NFTokenPage",
+    "Offer",
+    "Oracle",
+    "PayChannel",
+    "PermissionedDomain",
+    "RippleState",
+    "SignerList",
+    "Ticket",
+    "Vault",
+    "XChainOwnedClaimID",
+    "XChainOwnedCreateAccountClaimID",
+];
+
+impl<'a> Serialize for LedgerEntry<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            LedgerEntry::AccountRoot(inner) => inner.serialize(serializer),
+            LedgerEntry::Amendments(inner) => inner.serialize(serializer),
+            LedgerEntry::AMM(inner) => inner.serialize(serializer),
+            LedgerEntry::Bridge(inner) => inner.serialize(serializer),
+            LedgerEntry::Check(inner) => inner.serialize(serializer),
+            LedgerEntry::DID(inner) => inner.serialize(serializer),
+            LedgerEntry::Credential(inner) => inner.serialize(serializer),
+            LedgerEntry::DepositPreauth(inner) => inner.serialize(serializer),
+            LedgerEntry::DirectoryNode(inner) => inner.serialize(serializer),
+            LedgerEntry::Escrow(inner) => inner.serialize(serializer),
+            LedgerEntry::FeeSettings(inner) => inner.serialize(serializer),
+            LedgerEntry::LedgerHashes(inner) => inner.serialize(serializer),
+            LedgerEntry::MPToken(inner) => inner.serialize(serializer),
+            LedgerEntry::MPTokenIssuance(inner) => inner.serialize(serializer),
+            LedgerEntry::NegativeUNL(inner) => inner.serialize(serializer),
+            LedgerEntry::NFTokenOffer(inner) => inner.serialize(serializer),
+            LedgerEntry::NFTokenPage(inner) => inner.serialize(serializer),
+            LedgerEntry::Offer(inner) => inner.serialize(serializer),
+            LedgerEntry::Oracle(inner) => inner.serialize(serializer),
+            LedgerEntry::PayChannel(inner) => inner.serialize(serializer),
+            LedgerEntry::PermissionedDomain(inner) => inner.serialize(serializer),
+            LedgerEntry::RippleState(inner) => inner.serialize(serializer),
+            LedgerEntry::SignerList(inner) => inner.serialize(serializer),
+            LedgerEntry::Ticket(inner) => inner.serialize(serializer),
+            LedgerEntry::Vault(inner) => inner.serialize(serializer),
+            LedgerEntry::XChainOwnedClaimID(inner) => inner.serialize(serializer),
+            LedgerEntry::XChainOwnedCreateAccountClaimID(inner) => inner.serialize(serializer),
+        }
+    }
+}
+
+impl<'de, 'a> Deserialize<'de> for LedgerEntry<'a> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        let ledger_entry_type = value
+            .get("LedgerEntryType")
+            .and_then(Value::as_str)
+            .ok_or_else(|| serde::de::Error::missing_field("LedgerEntryType"))?
+            .to_owned();
+
+        let result: serde_json::Result<Self> = match ledger_entry_type.as_str() {
+            "AccountRoot" => serde_json::from_value(value).map(LedgerEntry::AccountRoot),
+            "Amendments" => serde_json::from_value(value).map(LedgerEntry::Amendments),
+            "AMM" => serde_json::from_value(value).map(LedgerEntry::AMM),
+            "Bridge" => serde_json::from_value(value).map(LedgerEntry::Bridge),
+            "Check" => serde_json::from_value(value).map(LedgerEntry::Check),
+            "DID" => serde_json::from_value(value).map(LedgerEntry::DID),
+            "Credential" => serde_json::from_value(value).map(LedgerEntry::Credential),
+            "DepositPreauth" => serde_json::from_value(value).map(LedgerEntry::DepositPreauth),
+            "DirectoryNode" => serde_json::from_value(value).map(LedgerEntry::DirectoryNode),
+            "Escrow" => serde_json::from_value(value).map(LedgerEntry::Escrow),
+            "FeeSettings" => serde_json::from_value(value).map(LedgerEntry::FeeSettings),
+            "LedgerHashes" => serde_json::from_value(value).map(LedgerEntry::LedgerHashes),
+            "MPToken" => serde_json::from_value(value).map(LedgerEntry::MPToken),
+            "MPTokenIssuance" => serde_json::from_value(value).map(LedgerEntry::MPTokenIssuance),
+            "NegativeUNL" => serde_json::from_value(value).map(LedgerEntry::NegativeUNL),
+            "NFTokenOffer" => serde_json::from_value(value).map(LedgerEntry::NFTokenOffer),
+            "NFTokenPage" => serde_json::from_value(value).map(LedgerEntry::NFTokenPage),
+            "Offer" => serde_json::from_value(value).map(LedgerEntry::Offer),
+            "Oracle" => serde_json::from_value(value).map(LedgerEntry::Oracle),
+            "PayChannel" => serde_json::from_value(value).map(LedgerEntry::PayChannel),
+            "PermissionedDomain" => {
+                serde_json::from_value(value).map(LedgerEntry::PermissionedDomain)
+            }
+            "RippleState" => serde_json::from_value(value).map(LedgerEntry::RippleState),
+            "SignerList" => serde_json::from_value(value).map(LedgerEntry::SignerList),
+            "Ticket" => serde_json::from_value(value).map(LedgerEntry::Ticket),
+            "Vault" => serde_json::from_value(value).map(LedgerEntry::Vault),
+            "XChainOwnedClaimID" => {
+                serde_json::from_value(value).map(LedgerEntry::XChainOwnedClaimID)
+            }
+            "XChainOwnedCreateAccountClaimID" => {
+                serde_json::from_value(value).map(LedgerEntry::XChainOwnedCreateAccountClaimID)
+            }
+            other => Err(<serde_json::Error as serde::de::Error>::unknown_variant(
+                other,
+                LEDGER_ENTRY_TYPE_VARIANTS,
+            )),
+        };
+
+        result.map_err(serde::de::Error::custom)
+    }
 }
 
 #[skip_serializing_none]
@@ -243,9 +375,55 @@ mod tests {
         );
         let entry = LedgerEntry::Bridge(bridge);
         let serialized = serde_json::to_string(&entry).unwrap();
-        // The enum is untagged-ish; default behaviour is externally tagged on
-        // variant name. Either way, round-trip must work for the same JSON.
+        // Serialize/Deserialize are hand-written to match the flat XRPL wire
+        // format (tagged via an inline `LedgerEntryType` field), not serde's
+        // default externally-tagged `{"Bridge": {...}}`.
+        assert!(!serialized.starts_with("{\"Bridge\":"));
         let deserialized: LedgerEntry = serde_json::from_str(&serialized).unwrap();
         assert_eq!(entry, deserialized);
+    }
+
+    #[test]
+    fn test_ledger_entry_enum_deserializes_flat_wire_format() {
+        // Real rippled `ledger_entry`/`ledger` output: a flat object with an
+        // inline `LedgerEntryType` discriminator, no externally-tagged wrapper.
+        // Covers a non-AccountRoot entry, since that's the shape that used to
+        // fail before `node` was widened past a hardcoded AccountRoot struct.
+        let json = r#"{
+            "Flags": 0,
+            "Indexes": ["AAB0000000000000000000000000000000000000000000000000000000000"],
+            "IndexNext": 1,
+            "IndexPrevious": 0,
+            "LedgerEntryType": "DirectoryNode",
+            "Owner": "rN7n3473SaZBCG4dFL83w7p1W9cgPLAPkS",
+            "RootIndex": "A832B09498B80B1B1BB0E2B31B41B8A3A4B57B8C1C23DAF43A76C6B1B3F7CD60",
+            "index": "A832B09498B80B1B1BB0E2B31B41B8A3A4B57B8C1C23DAF43A76C6B1B3F7CD60"
+        }"#;
+
+        let entry: LedgerEntry = serde_json::from_str(json).unwrap();
+        match entry {
+            LedgerEntry::DirectoryNode(directory_node) => {
+                assert_eq!(
+                    directory_node.owner.as_deref(),
+                    Some("rN7n3473SaZBCG4dFL83w7p1W9cgPLAPkS")
+                );
+                assert_eq!(directory_node.index_next, Some(1));
+            }
+            other => panic!("expected DirectoryNode, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_ledger_entry_enum_rejects_unknown_ledger_entry_type() {
+        let json = r#"{"LedgerEntryType": "NotARealType", "index": "AABB"}"#;
+        let err = serde_json::from_str::<LedgerEntry>(json).unwrap_err();
+        assert!(err.to_string().contains("NotARealType"));
+    }
+
+    #[test]
+    fn test_ledger_entry_enum_missing_ledger_entry_type() {
+        let json = r#"{"index": "AABB"}"#;
+        let err = serde_json::from_str::<LedgerEntry>(json).unwrap_err();
+        assert!(err.to_string().contains("LedgerEntryType"));
     }
 }
