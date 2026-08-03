@@ -343,25 +343,25 @@ impl<'a> MPTokenIssuanceCreate<'a> {
         Ok(())
     }
 
-    /// `ImmutableFlags`, when present, must be non-zero and must not contain any
-    /// bit outside the known `tif*` mask. rippled rejects violating values with
-    /// `temINVALID_FLAG`.
+    /// `ImmutableFlags`, when present, must be non-zero. rippled rejects a
+    /// zero value with `temINVALID_FLAG`.
+    ///
+    /// Note: unknown bits are filtered out at deserialization time by
+    /// `FlagCollection::try_from`, so a mask check against
+    /// `TIF_MPTOKENISSUANCE_IMMUTABLE_MASK` would always evaluate to zero and
+    /// is therefore not needed here.
     fn _get_immutable_flags_error(&self) -> XRPLModelResult<()> {
         if let Some(flags) = &self.immutable_flags {
-            // Compute the raw integer value from the FlagCollection.
             let bits: u32 = flags
                 .0
                 .iter()
                 .map(|f| f.clone() as u32)
                 .fold(0, |acc, v| acc | v);
-            if bits == 0 || (bits & TIF_MPTOKENISSUANCE_IMMUTABLE_MASK) != 0 {
+            if bits == 0 {
                 return Err(XRPLModelException::InvalidValue {
                     field: "immutable_flags".into(),
-                    expected: alloc::format!(
-                        "non-zero value using only known tif* bits (mask 0x{:08X})",
-                        TIF_MPTOKENISSUANCE_VALID_MASK
-                    ),
-                    found: alloc::format!("0x{bits:08X}"),
+                    expected: "non-zero value using known tif* bits".into(),
+                    found: "0x00000000".into(),
                 });
             }
         }

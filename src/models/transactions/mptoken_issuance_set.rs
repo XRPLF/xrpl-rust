@@ -9,9 +9,7 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::_serde::opt_lgr_obj_flags;
 use crate::core::addresscodec::decode_classic_address;
-use crate::models::transactions::mptoken_issuance_create::{
-    TIF_MPTOKENISSUANCE_IMMUTABLE_MASK, TIF_MPTOKENISSUANCE_VALID_MASK,
-};
+
 use crate::models::{
     ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag,
     transactions::{Transaction, TransactionType},
@@ -354,11 +352,12 @@ impl<'a> MPTokenIssuanceSet<'a> {
             || self.mptoken_metadata.is_some()
             || self.transfer_fee.is_some()
             || self.immutable_flags.is_some()
+            || self.domain_id.is_some()
         {
             return Err(XRPLModelException::InvalidFieldCombination {
                 field: "tfMPTLock or tfMPTUnlock",
                 other_fields: &[
-                    "tfMPTSet* flags, mptoken_metadata, transfer_fee, or immutable_flags \
+                    "tfMPTSet* flags, mptoken_metadata, transfer_fee, domain_id, or immutable_flags \
                      (lock/unlock cannot be combined with mutation ops)",
                 ],
             });
@@ -390,7 +389,12 @@ impl<'a> MPTokenIssuanceSet<'a> {
         Ok(())
     }
 
-    /// `ImmutableFlags`, when present, must be non-zero and use only known `tif*` bits.
+    /// `ImmutableFlags`, when present, must be non-zero. rippled rejects a
+    /// zero value with `temINVALID_FLAG`.
+    ///
+    /// Note: unknown bits are filtered out at deserialization time by
+    /// `FlagCollection::try_from`, so a mask check would always evaluate to
+    /// zero and is not needed here.
     fn _get_immutable_flags_error(&self) -> XRPLModelResult<()> {
         if let Some(flags) = &self.immutable_flags {
             let bits: u32 = flags
@@ -398,14 +402,11 @@ impl<'a> MPTokenIssuanceSet<'a> {
                 .iter()
                 .map(|f| f.clone() as u32)
                 .fold(0, |acc, v| acc | v);
-            if bits == 0 || (bits & TIF_MPTOKENISSUANCE_IMMUTABLE_MASK) != 0 {
+            if bits == 0 {
                 return Err(XRPLModelException::InvalidValue {
                     field: "immutable_flags".into(),
-                    expected: alloc::format!(
-                        "non-zero value using only known tif* bits (mask 0x{:08X})",
-                        TIF_MPTOKENISSUANCE_VALID_MASK
-                    ),
-                    found: alloc::format!("0x{bits:08X}"),
+                    expected: "non-zero value using known tif* bits".into(),
+                    found: "0x00000000".into(),
                 });
             }
         }
@@ -967,6 +968,25 @@ mod tests {
             },
             mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             mptoken_metadata: Some("CAFEBABE".into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_lock_flag_with_domain_id_rejected() {
+        // Lock/unlock flags cannot be combined with a DomainID update.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            domain_id: Some(
+                "AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233".into(),
+            ),
             ..Default::default()
         };
         assert!(txn.validate().is_err());
