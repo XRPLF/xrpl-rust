@@ -352,12 +352,11 @@ impl<'a> MPTokenIssuanceSet<'a> {
             || self.mptoken_metadata.is_some()
             || self.transfer_fee.is_some()
             || self.immutable_flags.is_some()
-            || self.domain_id.is_some()
         {
             return Err(XRPLModelException::InvalidFieldCombination {
                 field: "tfMPTLock or tfMPTUnlock",
                 other_fields: &[
-                    "tfMPTSet* flags, mptoken_metadata, transfer_fee, domain_id, or immutable_flags \
+                    "tfMPTSet* flags, mptoken_metadata, transfer_fee, or immutable_flags \
                      (lock/unlock cannot be combined with mutation ops)",
                 ],
             });
@@ -968,25 +967,6 @@ mod tests {
             },
             mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             mptoken_metadata: Some("CAFEBABE".into()),
-            ..Default::default()
-        };
-        assert!(txn.validate().is_err());
-    }
-
-    #[test]
-    fn test_lock_flag_with_domain_id_rejected() {
-        // Lock/unlock flags cannot be combined with a DomainID update.
-        let txn = MPTokenIssuanceSet {
-            common_fields: CommonFields {
-                account: ACCOUNT_ISSUER.into(),
-                transaction_type: TransactionType::MPTokenIssuanceSet,
-                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
-                ..Default::default()
-            },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
-            domain_id: Some(
-                "AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233".into(),
-            ),
             ..Default::default()
         };
         assert!(txn.validate().is_err());
