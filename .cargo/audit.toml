@@ -1,0 +1,16 @@
+# cargo-audit configuration (auto-loaded by `cargo audit`).
+#
+# [advisories].ignore lists RustSec advisory IDs that are known and
+# intentionally accepted, each with a justification. Revisit periodically.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2026-0235 — rkyv 0.7.x out-of-bounds read in archives with Rc/Arc.
+    # Not reachable here: rkyv is only an *optional* dependency of rust_decimal,
+    # which we build with `default-features = false, features = ["serde"]` — the
+    # `rkyv` feature is never enabled, so rkyv is not compiled or executed. It
+    # appears in Cargo.lock (which cargo-audit scans) purely as a resolved
+    # optional dep. rust_decimal 1.x pins rkyv `^0.7`, so there is no upgrade
+    # path today. Remove this once rust_decimal moves to rkyv >= 0.8.17.
+    "RUSTSEC-2026-0235",
+]
