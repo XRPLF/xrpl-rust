@@ -5,7 +5,6 @@ edition = "2024"
 description = "Low-level FFI bindings to the mpt-crypto C library for XLS-0096 Confidential MPTs."
 license = "ISC"
 repository = "https://github.com/XRPLF/xrpl-rust"
-publish = false
 links = "mpt-crypto"
 
 # If this crate is ever published, the committed binaries would exceed

@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Safe Rust wrappers around mpt-crypto-sys (XLS-0096 Confidential MPTs)."
 license = "ISC"
-repository = "https://github.com/sephynox/xrpl-rust"
-publish = false
+repository = "https://github.com/XRPLF/xrpl-rust"
 
 [lib]
 name = "mpt_crypto"
