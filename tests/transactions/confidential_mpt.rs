@@ -195,6 +195,25 @@ struct ConfidentialSetup {
 /// `MPTokenIssuanceCreate` → `MPTokenIssuanceSet` (register IssuerEncryptionKey)
 /// → `MPTokenAuthorize` → `Payment` (public MPT balance to the holder).
 async fn setup_confidential_issuance(issuance_flags: u32) -> ConfidentialSetup {
+    setup_confidential_issuance_inner(issuance_flags, None).await
+}
+
+/// Like [`setup_confidential_issuance`] but also registers an `AuditorEncryptionKey`
+/// (rippled requires it in the *same* transaction as the issuer key). Returns the
+/// setup plus the auditor's ElGamal keypair so tests can decrypt the auditor mirror.
+async fn setup_confidential_issuance_with_auditor(
+    issuance_flags: u32,
+) -> (ConfidentialSetup, Privkey, Pubkey) {
+    let (auditor_sk, auditor_pk) =
+        xrpl::mpt_crypto::keypair::generate().expect("auditor ElGamal keypair");
+    let setup = setup_confidential_issuance_inner(issuance_flags, Some(&auditor_pk)).await;
+    (setup, auditor_sk, auditor_pk)
+}
+
+async fn setup_confidential_issuance_inner(
+    issuance_flags: u32,
+    auditor_pk: Option<&Pubkey>,
+) -> ConfidentialSetup {
     use xrpl::mpt_crypto::keypair;
 
     // Issuer and holder are distinct funded accounts (Convert requires the
@@ -224,18 +243,21 @@ async fn setup_confidential_issuance(issuance_flags: u32) -> ConfidentialSetup {
     .await;
     let issuance_id = sole_issuance_id(&issuer.classic_address).await;
 
-    // 2. Issuer registers its ElGamal public key on the issuance.
-    submit_signed(
-        &issuer.seed,
-        serde_json::json!({
-            "TransactionType": "MPTokenIssuanceSet",
-            "Account": issuer.classic_address,
-            "MPTokenIssuanceID": issuance_id,
-            "IssuerEncryptionKey": uppercase_hex(issuer_elgamal_pk.as_bytes()),
-            "Fee": MPT_TXN_FEE,
-        }),
-    )
-    .await;
+    // 2. Issuer registers its ElGamal public key on the issuance (and the
+    //    auditor key in the same tx, when requested — rippled requires both
+    //    together).
+    let mut issuance_set = serde_json::json!({
+        "TransactionType": "MPTokenIssuanceSet",
+        "Account": issuer.classic_address,
+        "MPTokenIssuanceID": issuance_id,
+        "IssuerEncryptionKey": uppercase_hex(issuer_elgamal_pk.as_bytes()),
+        "Fee": MPT_TXN_FEE,
+    });
+    if let Some(auditor_pk) = auditor_pk {
+        issuance_set["AuditorEncryptionKey"] =
+            serde_json::Value::String(uppercase_hex(auditor_pk.as_bytes()));
+    }
+    submit_signed(&issuer.seed, issuance_set).await;
 
     // 3. Holder opts in to the issuance.
     submit_signed(
@@ -455,6 +477,56 @@ async fn confidential_mpt_convert() {
         assert_eq!(
             inbox, amount,
             "confidential inbox should decrypt to {amount}"
+        );
+    })
+    .await;
+}
+
+/// Auditor disclosure: an issuance with a registered `AuditorEncryptionKey`. A
+/// Convert carrying an auditor ciphertext lets the auditor decrypt the holder's
+/// on-ledger mirror balance. Also exercises the `xrpl::confidential` assembly
+/// layer end-to-end (assembly → sign → submit → auditor decrypt).
+#[tokio::test]
+async fn confidential_mpt_convert_with_auditor() {
+    with_blockchain_lock(|| async {
+        let (setup, auditor_sk, auditor_pk) =
+            setup_confidential_issuance_with_auditor(TF_MPT_CAN_CONFIDENTIAL_AMOUNT).await;
+        let client = get_client().await;
+
+        let amount: u64 = 100;
+        // The proof binds to the exact sequence the transaction carries.
+        let sequence =
+            get_next_valid_seq_number(setup.holder.classic_address.clone().into(), client, None)
+                .await
+                .expect("fetch holder sequence");
+
+        // Build the first Convert (with auditor ciphertext) via the assembly layer.
+        let mut tx = xrpl::confidential::assemble_convert(xrpl::confidential::ConvertParams {
+            account: &setup.holder.classic_address,
+            issuance_id_hex: &setup.issuance_id,
+            sequence,
+            amount,
+            issuer_pubkey: &setup.issuer_elgamal_pk,
+            holder_privkey: &setup.holder_elgamal_sk,
+            holder_pubkey: &setup.holder_elgamal_pk,
+            auditor_pubkey: Some(&auditor_pk),
+            register_key: true,
+        })
+        .expect("assemble convert with auditor");
+
+        test_transaction(&mut tx, &setup.holder).await;
+
+        // The auditor decrypts the holder's on-ledger auditor mirror to the exact
+        // converted amount.
+        let mptoken = holder_mptoken(&setup.holder.classic_address, &setup.issuance_id).await;
+        let auditor_balance_hex = mptoken["AuditorEncryptedBalance"]
+            .as_str()
+            .expect("AuditorEncryptedBalance present");
+        let disclosed = xrpl::confidential::decrypt_balance(auditor_balance_hex, &auditor_sk)
+            .expect("decrypt auditor mirror");
+        assert_eq!(
+            disclosed, amount,
+            "auditor mirror should decrypt to the converted amount"
         );
     })
     .await;

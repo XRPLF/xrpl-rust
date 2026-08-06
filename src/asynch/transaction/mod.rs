@@ -193,8 +193,13 @@ where
     }
     let mut base_fee_decimal: BigDecimal = base_fee.try_into()?;
     if let Some(signers_count) = signers_count {
+        // rippled charges one extra reference base fee per signer on top of the
+        // transaction's own base cost (Transactor::calculateBaseFee:
+        // `base + signerCount * base`). base_fee already includes the reference
+        // "1", so add only `signers_count` more — NOT `1 + signers_count`, which
+        // would double-count the reference fee and overcharge by one base fee.
         let net_fee_decimal: BigDecimal = net_fee.try_into()?;
-        let signer_count_fee_decimal: BigDecimal = (1 + signers_count).into();
+        let signer_count_fee_decimal: BigDecimal = signers_count.into();
         base_fee_decimal += &(net_fee_decimal * signer_count_fee_decimal);
     }
 

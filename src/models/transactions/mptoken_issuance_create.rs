@@ -45,6 +45,9 @@ pub enum MPTokenIssuanceCreateFlag {
     TfMPTCanTransfer = 0x00000020,
     /// If set, indicates that the issuer can claw back the MPT.
     TfMPTCanClawback = 0x00000040,
+    /// If set, indicates that this MPT can hold a confidential (encrypted)
+    /// balance, enabling Confidential MPT (XLS-0096) transfers.
+    TfMPTCanHoldConfidentialBalance = 0x00000080,
 }
 
 impl TryFrom<u32> for MPTokenIssuanceCreateFlag {
@@ -58,6 +61,7 @@ impl TryFrom<u32> for MPTokenIssuanceCreateFlag {
             0x00000010 => Ok(MPTokenIssuanceCreateFlag::TfMPTCanTrade),
             0x00000020 => Ok(MPTokenIssuanceCreateFlag::TfMPTCanTransfer),
             0x00000040 => Ok(MPTokenIssuanceCreateFlag::TfMPTCanClawback),
+            0x00000080 => Ok(MPTokenIssuanceCreateFlag::TfMPTCanHoldConfidentialBalance),
             _ => Err(()),
         }
     }
@@ -83,6 +87,9 @@ impl MPTokenIssuanceCreateFlag {
         }
         if bits & 0x00000040 != 0 {
             flags.push(MPTokenIssuanceCreateFlag::TfMPTCanClawback);
+        }
+        if bits & 0x00000080 != 0 {
+            flags.push(MPTokenIssuanceCreateFlag::TfMPTCanHoldConfidentialBalance);
         }
         flags
     }
@@ -594,8 +601,11 @@ mod tests {
             MPTokenIssuanceCreateFlag::try_from(0x00000040),
             Ok(MPTokenIssuanceCreateFlag::TfMPTCanClawback)
         );
+        assert_eq!(
+            MPTokenIssuanceCreateFlag::try_from(0x00000080),
+            Ok(MPTokenIssuanceCreateFlag::TfMPTCanHoldConfidentialBalance)
+        );
         assert!(MPTokenIssuanceCreateFlag::try_from(0x00000001).is_err());
-        assert!(MPTokenIssuanceCreateFlag::try_from(0x00000080).is_err());
     }
 
     #[test]

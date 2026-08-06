@@ -69,6 +69,12 @@ pub extern crate serde_json;
 #[cfg(feature = "confidential-mpt")]
 pub extern crate mpt_crypto;
 
+/// High-level assembly of Confidential MPT (XLS-0096) transactions: wraps the
+/// [`mpt_crypto`] primitives into the full encrypt → commit → prove → model
+/// flow. Available only with the `confidential-mpt` feature.
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential;
+
 #[cfg(feature = "models")]
 mod _serde;
 
