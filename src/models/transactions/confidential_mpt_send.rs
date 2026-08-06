@@ -47,6 +47,10 @@ pub struct ConfidentialMPTSend<'a> {
     /// Destination XRPL account.
     pub destination: Cow<'a, str>,
 
+    /// Arbitrary tag that identifies the reason for the transfer, or a hosted
+    /// recipient at the destination account.
+    pub destination_tag: Option<u32>,
+
     #[serde(rename = "MPTokenIssuanceID")]
     pub mptoken_issuance_id: Cow<'a, str>,
 
@@ -174,6 +178,7 @@ impl<'a> ConfidentialMPTSend<'a> {
         source_tag: Option<u32>,
         ticket_sequence: Option<u32>,
         destination: Cow<'a, str>,
+        destination_tag: Option<u32>,
         mptoken_issuance_id: Cow<'a, str>,
         sender_encrypted_amount: Cow<'a, str>,
         destination_encrypted_amount: Cow<'a, str>,
@@ -202,6 +207,7 @@ impl<'a> ConfidentialMPTSend<'a> {
                 None,
             ),
             destination,
+            destination_tag,
             mptoken_issuance_id,
             sender_encrypted_amount,
             destination_encrypted_amount,
@@ -228,6 +234,7 @@ mod tests {
                 ..Default::default()
             },
             destination: "rRecipientAccount111111111111".into(),
+            destination_tag: None,
             mptoken_issuance_id: "610F33".repeat(4).into(),
             sender_encrypted_amount: "AD".repeat(66).into(),
             destination_encrypted_amount: "DF".repeat(66).into(),

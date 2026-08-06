@@ -1124,6 +1124,7 @@ async fn confidential_mpt_send() {
             None,           // source_tag
             None,           // ticket_sequence
             dest.classic_address.clone().into(),
+            None, // destination_tag
             setup.issuance_id.clone().into(),
             m.sender_encrypted_amount.into(),
             m.destination_encrypted_amount.into(),
