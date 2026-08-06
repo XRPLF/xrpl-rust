@@ -6,10 +6,14 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, ValidateCurrencies,
+    Model, ValidateCurrencies, XRPLModelException,
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use super::confidential_mpt_constants::{
+    validate_hex_length, CIPHERTEXT_LENGTH, COMMITMENT_LENGTH, SEND_PROOF_LENGTH,
+};
+use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// A `ConfidentialMPTSend` transaction transfers a confidential MPT amount
@@ -79,7 +83,57 @@ pub struct ConfidentialMPTSend<'a> {
 
 impl<'a> Model for ConfidentialMPTSend<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self._get_destination_error()?;
+        self._get_field_length_errors()?;
         self.validate_currencies()
+    }
+}
+
+impl<'a> ConfidentialMPTSend<'a> {
+    /// rippled rejects a self-send with `temMALFORMED`.
+    fn _get_destination_error(&self) -> crate::models::XRPLModelResult<()> {
+        if self.destination == self.common_fields.account {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "destination".into(),
+                field2: "account".into(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Ciphertext, commitment and proof lengths (`temBAD_CIPHERTEXT` /
+    /// `temMALFORMED` in rippled's preflight).
+    fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        validate_hex_length(
+            "sender_encrypted_amount",
+            self.sender_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        validate_hex_length(
+            "destination_encrypted_amount",
+            self.destination_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        validate_hex_length(
+            "issuer_encrypted_amount",
+            self.issuer_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        if let Some(auditor) = self.auditor_encrypted_amount.as_deref() {
+            validate_hex_length("auditor_encrypted_amount", auditor, CIPHERTEXT_LENGTH)?;
+        }
+        validate_hex_length(
+            "amount_commitment",
+            self.amount_commitment.as_ref(),
+            COMMITMENT_LENGTH,
+        )?;
+        validate_hex_length(
+            "balance_commitment",
+            self.balance_commitment.as_ref(),
+            COMMITMENT_LENGTH,
+        )?;
+        validate_hex_length("zk_proof", self.zk_proof.as_ref(), SEND_PROOF_LENGTH)
     }
 }
 

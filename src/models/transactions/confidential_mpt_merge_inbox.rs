@@ -10,6 +10,7 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// A `ConfidentialMPTMergeInbox` transaction merges a holder's confidential
@@ -47,6 +48,7 @@ pub struct ConfidentialMPTMergeInbox<'a> {
 
 impl<'a> Model for ConfidentialMPTMergeInbox<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
         self.validate_currencies()
     }
 }
@@ -151,7 +153,7 @@ mod tests {
             None,
             None,
             None,
-            "610F33".repeat(4).into(),
+            "610F33".repeat(8).into(),
         )
         .with_fee(XRPAmount::from("20000"))
         .with_sequence(7);

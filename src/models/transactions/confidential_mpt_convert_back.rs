@@ -10,6 +10,11 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use super::confidential_mpt_constants::{
+    validate_hex_length, validate_mpt_amount, BLINDING_FACTOR_LENGTH, CIPHERTEXT_LENGTH,
+    COMMITMENT_LENGTH, CONVERT_BACK_PROOF_LENGTH,
+};
+use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// A `ConfidentialMPTConvertBack` transaction converts confidential MPT
@@ -67,7 +72,44 @@ pub struct ConfidentialMPTConvertBack<'a> {
 
 impl<'a> Model for ConfidentialMPTConvertBack<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self._get_field_length_errors()?;
         self.validate_currencies()
+    }
+}
+
+impl<'a> ConfidentialMPTConvertBack<'a> {
+    fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        // A zero-amount ConvertBack is a no-op; rippled rejects it.
+        validate_mpt_amount("mpt_amount", self.mpt_amount.as_ref(), true)?;
+        validate_hex_length(
+            "holder_encrypted_amount",
+            self.holder_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        validate_hex_length(
+            "issuer_encrypted_amount",
+            self.issuer_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        if let Some(auditor) = self.auditor_encrypted_amount.as_deref() {
+            validate_hex_length("auditor_encrypted_amount", auditor, CIPHERTEXT_LENGTH)?;
+        }
+        validate_hex_length(
+            "blinding_factor",
+            self.blinding_factor.as_ref(),
+            BLINDING_FACTOR_LENGTH,
+        )?;
+        validate_hex_length(
+            "balance_commitment",
+            self.balance_commitment.as_ref(),
+            COMMITMENT_LENGTH,
+        )?;
+        validate_hex_length(
+            "zk_proof",
+            self.zk_proof.as_ref(),
+            CONVERT_BACK_PROOF_LENGTH,
+        )
     }
 }
 

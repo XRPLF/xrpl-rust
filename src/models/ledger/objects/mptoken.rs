@@ -61,6 +61,25 @@ pub struct MPToken<'a> {
     /// The amount of this MPT currently locked in escrow or by other
     /// mechanisms. Present only when the TokenEscrow amendment is active.
     pub locked_amount: Option<Cow<'a, str>>,
+    /// `CB_IN` — the holder's confidential inbox balance: a 66-byte EC-ElGamal
+    /// ciphertext accumulating incoming confidential transfers until the
+    /// holder merges them with `ConfidentialMPTMergeInbox` (XLS-0096).
+    pub confidential_balance_inbox: Option<Cow<'a, str>>,
+    /// `CB_S` — the holder's confidential spending balance, as a 66-byte
+    /// EC-ElGamal ciphertext. Proofs are generated against this balance.
+    pub confidential_balance_spending: Option<Cow<'a, str>>,
+    /// Monotonic counter bumped whenever `CB_S` changes, binding proofs to a
+    /// specific balance state (folded into the transaction's context hash).
+    pub confidential_balance_version: Option<u32>,
+    /// The issuer's mirror of this holder's confidential balance, encrypted
+    /// under the issuance's `IssuerEncryptionKey`.
+    pub issuer_encrypted_balance: Option<Cow<'a, str>>,
+    /// The auditor's mirror of this holder's confidential balance, encrypted
+    /// under the issuance's `AuditorEncryptionKey`, when one is registered.
+    pub auditor_encrypted_balance: Option<Cow<'a, str>>,
+    /// The holder's 33-byte compressed EC-ElGamal public key, registered by
+    /// the holder's first `ConfidentialMPTConvert`.
+    pub holder_encryption_key: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for MPToken<'a> {
@@ -109,6 +128,12 @@ mod tests {
             previous_txn_lgr_seq: 123456,
             owner_node: Some("0".into()),
             locked_amount: None,
+            confidential_balance_inbox: None,
+            confidential_balance_spending: None,
+            confidential_balance_version: None,
+            issuer_encrypted_balance: None,
+            auditor_encrypted_balance: None,
+            holder_encryption_key: None,
         };
 
         let serialized = serde_json::to_string(&mptoken).unwrap();
@@ -135,6 +160,12 @@ mod tests {
             previous_txn_lgr_seq: 123456,
             owner_node: None,
             locked_amount: Some("250".into()),
+            confidential_balance_inbox: None,
+            confidential_balance_spending: None,
+            confidential_balance_version: None,
+            issuer_encrypted_balance: None,
+            auditor_encrypted_balance: None,
+            holder_encryption_key: None,
         };
 
         let serialized = serde_json::to_string(&mptoken).unwrap();
@@ -163,6 +194,12 @@ mod tests {
             previous_txn_lgr_seq: 0,
             owner_node: None,
             locked_amount: None,
+            confidential_balance_inbox: None,
+            confidential_balance_spending: None,
+            confidential_balance_version: None,
+            issuer_encrypted_balance: None,
+            auditor_encrypted_balance: None,
+            holder_encryption_key: None,
         };
 
         assert!(mptoken.validate().is_err());
@@ -187,6 +224,12 @@ mod tests {
             previous_txn_lgr_seq: 0,
             owner_node: None,
             locked_amount: None,
+            confidential_balance_inbox: None,
+            confidential_balance_spending: None,
+            confidential_balance_version: None,
+            issuer_encrypted_balance: None,
+            auditor_encrypted_balance: None,
+            holder_encryption_key: None,
         };
         assert!(mptoken.validate().is_ok());
     }
@@ -210,6 +253,12 @@ mod tests {
             previous_txn_lgr_seq: 4999998,
             owner_node: None,
             locked_amount: None,
+            confidential_balance_inbox: None,
+            confidential_balance_spending: None,
+            confidential_balance_version: None,
+            issuer_encrypted_balance: None,
+            auditor_encrypted_balance: None,
+            holder_encryption_key: None,
         };
 
         assert_eq!(mptoken.get_ledger_entry_type(), LedgerEntryType::MPToken);

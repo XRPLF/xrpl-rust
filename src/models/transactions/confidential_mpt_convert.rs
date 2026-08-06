@@ -6,10 +6,15 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, ValidateCurrencies,
+    Model, ValidateCurrencies, XRPLModelException,
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use super::confidential_mpt_constants::{
+    validate_hex_length, validate_mpt_amount, BLINDING_FACTOR_LENGTH, CIPHERTEXT_LENGTH,
+    ENCRYPTION_KEY_LENGTH, SCHNORR_PROOF_LENGTH,
+};
+use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// A `ConfidentialMPTConvert` transaction converts a holder's public MPT
@@ -74,7 +79,61 @@ pub struct ConfidentialMPTConvert<'a> {
 
 impl<'a> Model for ConfidentialMPTConvert<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self._get_registration_error()?;
+        self._get_field_length_errors()?;
         self.validate_currencies()
+    }
+}
+
+impl<'a> ConfidentialMPTConvert<'a> {
+    /// `HolderEncryptionKey` and the Schnorr `ZKProof` are all-or-nothing:
+    /// both present on the registering (first) Convert, both absent after
+    /// (XLS-0096 §7.3.1 rules 2 and 3).
+    fn _get_registration_error(&self) -> crate::models::XRPLModelResult<()> {
+        match (
+            self.holder_encryption_key.is_some(),
+            self.zk_proof.is_some(),
+        ) {
+            (true, false) => Err(XRPLModelException::FieldRequiresField {
+                field1: "holder_encryption_key".into(),
+                field2: "zk_proof".into(),
+            }),
+            (false, true) => Err(XRPLModelException::FieldRequiresField {
+                field1: "zk_proof".into(),
+                field2: "holder_encryption_key".into(),
+            }),
+            _ => Ok(()),
+        }
+    }
+
+    fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        validate_mpt_amount("mpt_amount", self.mpt_amount.as_ref(), false)?;
+        validate_hex_length(
+            "holder_encrypted_amount",
+            self.holder_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        validate_hex_length(
+            "issuer_encrypted_amount",
+            self.issuer_encrypted_amount.as_ref(),
+            CIPHERTEXT_LENGTH,
+        )?;
+        if let Some(auditor) = self.auditor_encrypted_amount.as_deref() {
+            validate_hex_length("auditor_encrypted_amount", auditor, CIPHERTEXT_LENGTH)?;
+        }
+        validate_hex_length(
+            "blinding_factor",
+            self.blinding_factor.as_ref(),
+            BLINDING_FACTOR_LENGTH,
+        )?;
+        if let Some(key) = self.holder_encryption_key.as_deref() {
+            validate_hex_length("holder_encryption_key", key, ENCRYPTION_KEY_LENGTH)?;
+        }
+        if let Some(proof) = self.zk_proof.as_deref() {
+            validate_hex_length("zk_proof", proof, SCHNORR_PROOF_LENGTH)?;
+        }
+        Ok(())
     }
 }
 
@@ -220,7 +279,7 @@ mod tests {
             None,
             None,
             None,
-            "610F33".repeat(4).into(),
+            "610F33".repeat(8).into(),
             "1000".into(),
             "AD3F".repeat(33).into(),
             "BC2E".repeat(33).into(),

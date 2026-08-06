@@ -6,10 +6,14 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, ValidateCurrencies,
+    Model, ValidateCurrencies, XRPLModelException,
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use super::confidential_mpt_constants::{
+    validate_hex_length, validate_mpt_amount, CLAWBACK_PROOF_LENGTH,
+};
+use super::mptoken_issuance_set::{validate_holder_address, validate_mptoken_issuance_id};
 use super::{CommonFields, CommonTransactionBuilder};
 
 /// A `ConfidentialMPTClawback` transaction is an issuer-only operation
@@ -56,7 +60,29 @@ pub struct ConfidentialMPTClawback<'a> {
 
 impl<'a> Model for ConfidentialMPTClawback<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
+        self._get_holder_error()?;
+        self._get_field_length_errors()?;
         self.validate_currencies()
+    }
+}
+
+impl<'a> ConfidentialMPTClawback<'a> {
+    /// An issuer cannot claw back from itself (`temMALFORMED`).
+    fn _get_holder_error(&self) -> crate::models::XRPLModelResult<()> {
+        validate_holder_address(self.holder.as_ref())?;
+        if self.holder == self.common_fields.account {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "holder".into(),
+                field2: "account".into(),
+            });
+        }
+        Ok(())
+    }
+
+    fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
+        validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        validate_mpt_amount("mpt_amount", self.mpt_amount.as_ref(), true)?;
+        validate_hex_length("zk_proof", self.zk_proof.as_ref(), CLAWBACK_PROOF_LENGTH)
     }
 }
 

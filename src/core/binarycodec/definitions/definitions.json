@@ -3439,12 +3439,22 @@
       }
     ],
     [
-      "BlindingFactor",
+      "ReferenceHolding",
       {
         "isSerialized": true,
         "isSigningField": true,
         "isVLEncoded": false,
         "nth": 39,
+        "type": "Hash256"
+      }
+    ],
+    [
+      "BlindingFactor",
+      {
+        "isSerialized": true,
+        "isSigningField": true,
+        "isVLEncoded": false,
+        "nth": 40,
         "type": "Hash256"
       }
     ],
@@ -3705,14 +3715,15 @@
       "lsfMPTRequireAuth": 4
     },
     "MPTokenIssuanceMutable": {
-      "lsmfMPTCanMutateCanClawback": 64,
-      "lsmfMPTCanMutateCanEscrow": 8,
-      "lsmfMPTCanMutateCanLock": 2,
-      "lsmfMPTCanMutateCanTrade": 16,
-      "lsmfMPTCanMutateCanTransfer": 32,
+      "lsmfMPTCanEnableCanClawback": 64,
+      "lsmfMPTCanEnableCanEscrow": 8,
+      "lsmfMPTCanEnableCanLock": 2,
+      "lsmfMPTCanEnableCanTrade": 16,
+      "lsmfMPTCanEnableCanTransfer": 32,
+      "lsmfMPTCanEnableRequireAuth": 4,
       "lsmfMPTCanMutateMetadata": 65536,
-      "lsmfMPTCanMutateRequireAuth": 4,
-      "lsmfMPTCanMutateTransferFee": 131072
+      "lsmfMPTCanMutateTransferFee": 131072,
+      "lsmfMPTCannotEnableCanHoldConfidentialBalance": 128
     },
     "NFTokenOffer": {
       "lsfSellNFToken": 1
@@ -4073,6 +4084,10 @@
       {
         "name": "OwnerNode",
         "optionality": 0
+      },
+      {
+        "name": "DestinationNode",
+        "optionality": 1
       },
       {
         "name": "PreviousTxnID",
@@ -4575,6 +4590,10 @@
       {
         "name": "MutableFlags",
         "optionality": 2
+      },
+      {
+        "name": "ReferenceHolding",
+        "optionality": 1
       },
       {
         "name": "IssuerEncryptionKey",
@@ -5193,7 +5212,6 @@
     },
     "MPTokenIssuanceSet": {
       "tfMPTLock": 1,
-      "tfMPTSetCanHoldConfidentialBalance": 256,
       "tfMPTUnlock": 2
     },
     "NFTokenCreateOffer": {
@@ -5793,6 +5811,10 @@
       },
       {
         "name": "Owner",
+        "optionality": 1
+      },
+      {
+        "name": "BookDirectory",
         "optionality": 1
       }
     ],
@@ -6446,6 +6468,10 @@
       {
         "name": "VaultID",
         "optionality": 0
+      },
+      {
+        "name": "MemoData",
+        "optionality": 1
       }
     ],
     "VaultDeposit": [
@@ -6944,7 +6970,9 @@
     "terPRE_TICKET": -88,
     "terQUEUED": -89,
     "terRETRY": -99,
-    "tesSUCCESS": 0
+    "tesSUCCESS": 0,
+    "tefBAD_PATH_COUNT": -176,
+    "tefNO_DST_PARTIAL": -177
   },
   "TRANSACTION_TYPES": {
     "AMMBid": 39,

@@ -12,6 +12,9 @@ pub mod check_create;
 pub mod clawback;
 #[cfg(feature = "confidential-mpt")]
 pub mod confidential_mpt_clawback;
+// Pure length constants + hex validation: no native crypto dependency, and
+// `MPTokenIssuanceSet` needs them regardless of the `confidential-mpt` feature.
+pub mod confidential_mpt_constants;
 #[cfg(feature = "confidential-mpt")]
 pub mod confidential_mpt_convert;
 #[cfg(feature = "confidential-mpt")]

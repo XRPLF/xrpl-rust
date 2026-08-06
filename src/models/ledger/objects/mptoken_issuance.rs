@@ -36,6 +36,9 @@ pub enum MPTokenIssuanceFlag {
     LsfMPTCanTransfer = 0x00000020,
     /// The issuer can claw back tokens from holders.
     LsfMPTCanClawback = 0x00000040,
+    /// This MPT can hold confidential balances (XLS-0096). Must be set for any
+    /// `ConfidentialMPT*` transaction against this issuance to succeed.
+    LsfMPTCanHoldConfidentialBalance = 0x00000080,
 }
 
 impl TryFrom<u32> for MPTokenIssuanceFlag {
@@ -158,6 +161,19 @@ pub struct MPTokenIssuance<'a> {
     /// mechanisms across all holders. Present only when the TokenEscrow
     /// amendment is active.
     pub locked_amount: Option<Cow<'a, str>>,
+    /// The issuer's 33-byte compressed EC-ElGamal public key, used to mirror
+    /// every holder's confidential balance (XLS-0096). Registered via
+    /// `MPTokenIssuanceSet`; its presence is what enables confidential
+    /// participation for this issuance.
+    pub issuer_encryption_key: Option<Cow<'a, str>>,
+    /// An optional auditor's 33-byte compressed EC-ElGamal public key for
+    /// regulatory oversight. When present, every confidential transaction must
+    /// carry a matching `AuditorEncryptedAmount`.
+    pub auditor_encryption_key: Option<Cow<'a, str>>,
+    /// `COA` — the plaintext total of this issuance currently held in
+    /// confidential form. Maintained in the clear alongside
+    /// `OutstandingAmount`.
+    pub confidential_outstanding_amount: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for MPTokenIssuance<'a> {
@@ -213,6 +229,9 @@ mod tests {
                 MPTokenIssuanceMutableFlag::LsmfMPTCanMutateTransferFee,
             ])),
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         let serialized = serde_json::to_string(&issuance).unwrap();
@@ -249,6 +268,9 @@ mod tests {
             previous_txn_lgr_seq: 100,
             mutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert_eq!(
@@ -279,6 +301,9 @@ mod tests {
             previous_txn_lgr_seq: 0,
             mutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert!(issuance.validate().is_ok());
@@ -306,6 +331,9 @@ mod tests {
             previous_txn_lgr_seq: 0,
             mutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert!(issuance.validate().is_err());

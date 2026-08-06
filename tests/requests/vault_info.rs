@@ -80,7 +80,7 @@ mod tests {
                 assert!(idx > 0, "ledger_current_index should be positive");
             }
 
-            let vault_obj = result.vault.expect("vault field missing in response");
+            let vault_obj = result.vault;
 
             // Typed access — no string indexing required.
             assert_eq!(
@@ -155,7 +155,7 @@ mod tests {
                 Err(e) => panic!("failed to parse vault_info result: {e}"),
             };
 
-            let vault_obj = result.vault.expect("vault field missing");
+            let vault_obj = result.vault;
             let shares = vault_obj
                 .shares
                 .as_ref()
@@ -235,7 +235,7 @@ mod tests {
                 Err(e) => panic!("failed to parse vault_info result: {e}"),
             };
 
-            let vault_obj = result.vault.expect("vault field missing");
+            let vault_obj = result.vault;
             assert_eq!(
                 vault_obj.vault.scale,
                 Some(SCALE),
@@ -279,7 +279,7 @@ mod tests {
                 Err(e) => panic!("failed to parse vault_info result: {e}"),
             };
 
-            let vault_obj = result.vault.expect("vault field missing in response");
+            let vault_obj = result.vault;
             // Both lookup modes must return the same vault object index.
             assert_eq!(
                 vault_obj.vault.common_fields.index.as_deref(),
