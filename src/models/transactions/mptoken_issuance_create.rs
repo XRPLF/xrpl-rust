@@ -900,7 +900,7 @@ mod tests {
 
     #[test]
     fn test_domain_id_all_zeros_rejected() {
-        // rippled rejects a DomainID of all zeros (temINVALID_FLAG equivalent).
+        // rippled rejects a DomainID of all zeros (the zero hash is not a valid object index).
         let txn = MPTokenIssuanceCreate {
             common_fields: CommonFields {
                 account: ACCOUNT_ISSUER.into(),
@@ -911,15 +911,6 @@ mod tests {
             domain_id: Some("0".repeat(64).into()),
             ..Default::default()
         };
-        // A 64-char hex string of all zeros is the zero hash — rejected.
-        // Our validate_domain_id only checks length/hex, so this passes format checks.
-        // This test documents that the all-zeros hash is format-valid but semantically
-        // rejected by rippled; the client does not currently enforce the semantic check.
-        // Keeping test to track parity with xrpl.js behaviour.
-        let result = txn.validate();
-        // Currently passes format check — uncomment the assertion below once the
-        // semantic zero-hash check is added.
-        // assert!(result.is_err());
-        let _ = result; // suppress unused warning
+        assert!(txn.validate().is_err());
     }
 }

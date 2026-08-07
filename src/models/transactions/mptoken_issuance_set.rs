@@ -473,12 +473,19 @@ pub(crate) fn validate_holder_address(holder: &str) -> XRPLModelResult<()> {
 /// Expected length (in hex characters) of a DomainID (Hash256 = 32 bytes = 64 hex chars).
 const DOMAIN_ID_HEX_LEN: usize = 64;
 
-/// Validates that a `DomainID` is a 64-char ASCII hex string.
+/// Validates that a `DomainID` is a 64-char ASCII hex string and is not the zero hash.
 pub(crate) fn validate_domain_id(id: &str) -> XRPLModelResult<()> {
     if id.len() != DOMAIN_ID_HEX_LEN || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(XRPLModelException::InvalidValueFormat {
             field: "domain_id".into(),
             format: alloc::format!("{DOMAIN_ID_HEX_LEN}-char ASCII hex string"),
+            found: id.into(),
+        });
+    }
+    if id.bytes().all(|b| b == b'0') {
+        return Err(XRPLModelException::InvalidValue {
+            field: "domain_id".into(),
+            expected: "non-zero Hash256".into(),
             found: id.into(),
         });
     }
