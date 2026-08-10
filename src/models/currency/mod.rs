@@ -16,6 +16,11 @@ pub trait ToAmount<'a, A> {
     fn to_amount(&self, value: Cow<'a, str>) -> A;
 }
 
+// NOTE: `#[serde(untagged)]` only affects the derived `Serialize` here.
+// Deserialization is handled by the hand-written `Deserialize` impl below and
+// MUST NOT rely on this attribute: the MPT/IOU variants overlap on field sets,
+// so derived untagged decoding would reintroduce enum-fallthrough. Do not
+// delete the manual impl in favor of this attribute.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Display)]
 #[serde(untagged)]
 pub enum Currency<'a> {

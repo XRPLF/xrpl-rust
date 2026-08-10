@@ -37,6 +37,13 @@ const _MAX_MANTISSA: u128 = u128::pow(10, 16) - 1;
 const _NOT_XRP_BIT_MASK: u8 = 0x80;
 const _POS_SIGN_BIT_MASK: i64 = 0x4000000000000000;
 const _ZERO_CURRENCY_AMOUNT_HEX: u64 = 0x8000000000000000;
+
+/// Leading-byte flag (bit 7): set for IOU amounts, clear for XRP and MPT.
+const LEADING_IOU_FLAG: u8 = 0x80;
+/// Leading-byte flag (bit 5): set for MPT amounts.
+const LEADING_MPT_FLAG: u8 = 0x20;
+/// Leading-byte flag (bit 6): set when the amount is positive.
+const LEADING_POS_FLAG: u8 = 0x40;
 const _NATIVE_AMOUNT_BYTE_LENGTH: u8 = 8;
 const _CURRENCY_AMOUNT_BYTE_LENGTH: u8 = 48;
 const _MPT_AMOUNT_BYTE_LENGTH: u8 = 33;
@@ -237,8 +244,8 @@ fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[
     })?;
 
     let mut result = [0u8; 33];
-    // Leading byte: 0x60 = MPT flag (0x20) + positive flag (0x40)
-    result[0] = 0x60;
+    // Leading byte: MPT flag (0x20) + positive flag (0x40) = 0x60.
+    result[0] = LEADING_MPT_FLAG | LEADING_POS_FLAG;
     // Amount as big-endian u64
     let amount_bytes = amount.to_be_bytes();
     result[1..9].copy_from_slice(&amount_bytes);
@@ -259,19 +266,19 @@ impl Amount {
 
     /// Returns True if this amount is a native XRP amount.
     pub fn is_native(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
+        self.0[0] & LEADING_IOU_FLAG == 0 && self.0[0] & LEADING_MPT_FLAG == 0
     }
 
     /// Returns True if this amount is an MPT amount.
     pub fn is_mpt(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
+        self.0[0] & LEADING_IOU_FLAG == 0 && self.0[0] & LEADING_MPT_FLAG != 0
     }
 
     /// Returns true if bit 6 of the first byte is set (positive amount).
     /// Applies to XRP, IOU, and MPT amounts — the positive flag is always
     /// encoded in byte[0] bit 6 (0x40) of the serialized amount.
     pub fn is_positive(&self) -> bool {
-        self.0[0] & 0x40 > 0
+        self.0[0] & LEADING_POS_FLAG > 0
     }
 }
 
@@ -300,7 +307,7 @@ impl IssuedCurrency {
             value = BigDecimal::new(int_mantissa.into(), scale);
 
             // Handle the sign
-            if bytes[0] & 0x40 > 0 {
+            if bytes[0] & LEADING_POS_FLAG > 0 {
                 // Set the value to positive (BigDecimal assumes positive by default)
                 value = value.abs();
             } else {
@@ -343,9 +350,9 @@ impl TryFromParser for Amount {
         // 0x80 set => IOU (48 bytes)
         // 0x80 clear, 0x20 set => MPT (33 bytes)
         // 0x80 clear, 0x20 clear => Native XRP (8 bytes)
-        let num_bytes = if first_byte[0] & 0x80 != 0 {
+        let num_bytes = if first_byte[0] & LEADING_IOU_FLAG != 0 {
             _CURRENCY_AMOUNT_BYTE_LENGTH
-        } else if first_byte[0] & 0x20 != 0 {
+        } else if first_byte[0] & LEADING_MPT_FLAG != 0 {
             _MPT_AMOUNT_BYTE_LENGTH
         } else {
             _NATIVE_AMOUNT_BYTE_LENGTH
@@ -383,14 +390,21 @@ impl Serialize for Amount {
             // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id
             let bytes = self.as_ref();
             let leading = bytes[0];
-            let is_positive = leading & 0x40 != 0;
-            let sign = if is_positive { "" } else { "-" };
+            // Per XLS-33, MPT amounts are strictly unsigned: rippled's STAmount
+            // always sets the positive bit (0x40) for MPT. A cleared sign bit is
+            // malformed wire data — reject it rather than synthesizing a negative
+            // value string that would fail re-validation on the model layer.
+            if leading & LEADING_POS_FLAG == 0 {
+                return Err(S::Error::custom(
+                    "MPT amount has cleared sign bit (negative MPT amounts are invalid)",
+                ));
+            }
             let mut amount_bytes = [0u8; 8];
             amount_bytes.copy_from_slice(&bytes[1..9]);
             let amount_val = u64::from_be_bytes(amount_bytes);
             let mpt_id = hex::encode_upper(&bytes[9..33]);
 
-            let value_str = alloc::format!("{}{}", sign, amount_val);
+            let value_str = alloc::format!("{}", amount_val);
             let mut builder = serializer.serialize_map(Some(2))?;
             builder.serialize_entry("value", &value_str)?;
             builder.serialize_entry("mpt_issuance_id", &mpt_id)?;
@@ -608,5 +622,55 @@ mod test {
                 assert!(amount.is_err());
             }
         }
+    }
+
+    // Helper: build a 33-byte MPT amount blob — 1 leading byte + 8-byte BE value
+    // + 24-byte issuance ID.
+    fn mpt_blob(leading: u8, value: u64) -> Vec<u8> {
+        let mut bytes = alloc::vec![0u8; 33];
+        bytes[0] = leading;
+        bytes[1..9].copy_from_slice(&value.to_be_bytes());
+        // Arbitrary but fixed 24-byte issuance ID.
+        let id = hex::decode("00000000A407AF5856CEFBF81F3D4A0000000000A407AF58").unwrap();
+        bytes[9..33].copy_from_slice(&id);
+        bytes
+    }
+
+    #[test]
+    fn test_is_positive_reads_byte0_sign_bit() {
+        // Regression: is_positive() must read byte[0] & 0x40, not byte[1].
+        // MPT leading 0x60 = MPT flag (0x20) | positive (0x40).
+        let positive = Amount(mpt_blob(0x60, 1000));
+        assert!(positive.is_positive());
+        // Cleared sign bit (0x20) => not positive.
+        let negative = Amount(mpt_blob(0x20, 1000));
+        assert!(!negative.is_positive());
+    }
+
+    #[test]
+    fn test_mpt_amount_decode_boundaries() {
+        // Zero, i64::MAX, and a mid value must round-trip the value string.
+        for value in [0u64, 1000u64, i64::MAX as u64] {
+            let amount = Amount(mpt_blob(0x60, value));
+            let json = serde_json::to_value(&amount).unwrap();
+            assert_eq!(json["value"], value.to_string());
+            assert_eq!(
+                json["mpt_issuance_id"],
+                "00000000A407AF5856CEFBF81F3D4A0000000000A407AF58"
+            );
+        }
+    }
+
+    #[test]
+    fn test_mpt_amount_decode_rejects_cleared_sign_bit() {
+        // MPT amounts are strictly unsigned (XLS-33). A cleared 0x40 bit is
+        // malformed wire data and must be rejected on serialize, not rendered
+        // as a negative value.
+        let amount = Amount(mpt_blob(0x20, 1000));
+        let result = serde_json::to_value(&amount);
+        assert!(
+            result.is_err(),
+            "expected serialize to reject MPT amount with cleared sign bit"
+        );
     }
 }
