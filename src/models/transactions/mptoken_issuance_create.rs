@@ -21,17 +21,6 @@ const MAX_MPT_TRANSFER_FEE: u16 = 50000;
 /// Maximum MPT metadata byte length per XLS-89.
 const MAX_MPT_METADATA_BYTES: usize = 1024;
 
-/// Bitmask of all valid `ImmutableFlags` bits (XLS-94D `tif*` prefix).
-/// Any bit outside this mask is rejected with `temINVALID_FLAG`.
-///
-/// Valid bits: tifMPTCanLock(0x02) | tifMPTRequireAuth(0x04) | tifMPTCanEscrow(0x08) |
-///             tifMPTCanTrade(0x10) | tifMPTCanTransfer(0x20) | tifMPTCanClawback(0x40) |
-///             tifMPTCanHoldConfidentialBalance(0x80) | tifMPTMetadata(0x10000) |
-///             tifMPTTransferFee(0x20000)
-pub const TIF_MPTOKENISSUANCE_VALID_MASK: u32 = 0x000300FE;
-/// The complement — any bit set here is invalid.
-pub const TIF_MPTOKENISSUANCE_IMMUTABLE_MASK: u32 = !TIF_MPTOKENISSUANCE_VALID_MASK;
-
 /// Transactions of the MPTokenIssuanceCreate type support additional values
 /// in the Flags field.
 ///
@@ -347,9 +336,8 @@ impl<'a> MPTokenIssuanceCreate<'a> {
     /// zero value with `temINVALID_FLAG`.
     ///
     /// Note: unknown bits are filtered out at deserialization time by
-    /// `FlagCollection::try_from`, so a mask check against
-    /// `TIF_MPTOKENISSUANCE_IMMUTABLE_MASK` would always evaluate to zero and
-    /// is therefore not needed here.
+    /// `FlagCollection::try_from`, so a mask check for unknown bits would always
+    /// evaluate to zero and is therefore not needed here.
     fn _get_immutable_flags_error(&self) -> XRPLModelResult<()> {
         if let Some(flags) = &self.immutable_flags {
             let bits: u32 = flags
@@ -887,8 +875,8 @@ mod tests {
 
     #[test]
     fn test_immutable_flags_invalid_mask_rejected() {
-        // ImmutableFlags containing a reserved/unknown bit must be rejected.
-        // 0x00000001 is reserved; TIF_MPTOKENISSUANCE_IMMUTABLE_MASK filters it out.
+        // ImmutableFlags containing only reserved/unknown bits deserializes to an empty
+        // FlagCollection (bits == 0) and must be rejected. 0x00000001 is reserved.
         let json = r#"{
             "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
             "TransactionType": "MPTokenIssuanceCreate",
