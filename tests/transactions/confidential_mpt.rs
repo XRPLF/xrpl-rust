@@ -177,7 +177,9 @@ async fn onledger_spending(setup: &ConfidentialSetup) -> ([u8; 66], u32) {
 /// (0 when the field is absent, e.g. before the first merge or after clawback).
 async fn spending_balance(account: &str, issuance_id: &str, sk: &Privkey) -> u64 {
     let mptoken = holder_mptoken(account, issuance_id).await;
-    let hex = mptoken["ConfidentialBalanceSpending"].as_str().unwrap_or("");
+    let hex = mptoken["ConfidentialBalanceSpending"]
+        .as_str()
+        .unwrap_or("");
     if hex.is_empty() {
         0
     } else {
