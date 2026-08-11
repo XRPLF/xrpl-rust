@@ -89,7 +89,7 @@ impl<'a> LoanDelete<'a> {
         LoanDelete {
             common_fields: CommonFields::new(
                 account,
-                TransactionType::LoanBrokerSet,
+                TransactionType::LoanDelete,
                 account_txn_id,
                 fee,
                 Some(FlagCollection::default()),
@@ -130,7 +130,7 @@ mod tests {
         let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanDeleter6T5weJ9mZg","TransactionType":"LoanDelete","Flags":0,"SigningPubKey":"","LoanID":"rDB303FC1C7611B22C09E773B51044F6BE"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
-        let serialized_tx = serde_json::to_value(&serde_json::to_string(&tx).unwrap()).unwrap();
+        let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
 
         assert_eq!(serialized_tx, default_json_value);
 

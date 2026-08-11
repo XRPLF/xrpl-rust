@@ -129,37 +129,29 @@ impl<'a> LoanBrokerCoverClawback<'a> {
     fn validate_field_requirements(&self) -> XRPLModelResult<()> {
         match (&self.loan_broker_id, &self.amount) {
             // Amount present without loan_broker_id
-            (None, Some(_)) => self.validate_amount_without_broker(),
-            (Some(_), None) => Err(XRPLModelException::FieldRequiresField {
-                field1: "loan_broker_id".into(),
-                field2: "amount".into(),
-            }),
+            (None, Some(amount)) => self.validate_amount_without_broker(amount),
+            (Some(_), _) => Ok(()),
             // Neither field is present
             (None, None) => Err(XRPLModelException::MissingField(
-                "'loan_broker_id' and 'amount'".into(),
+                "'loan_broker_id' and(or) 'amount'".into(),
             )),
-            // Both present
-            (Some(_), Some(_)) => Ok(()),
         }
     }
 
-    fn validate_amount_without_broker(&self) -> XRPLModelResult<()> {
-        match &self.amount {
-            Some(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount { issuer, .. })) => {
+    fn validate_amount_without_broker(&self, amount: &Amount) -> XRPLModelResult<()> {
+        match amount {
+            Amount::IssuedCurrencyAmount(IssuedCurrencyAmount { issuer, .. }) => {
                 // Issuer must not be the submitter
-                let issuer_is_submitter = *issuer == self.common_fields.account;
-                if issuer_is_submitter {
-                    Err(XRPLModelException::InvalidValue {
-                        field: "amount.issuer".into(),
-                        expected: "Issuer account".into(),
-                        found: "submitter account".into(),
-                    })
+
+                if *issuer == self.common_fields.account {
+                    Err(XRPLModelException::MissingField("loan_broker_id".into()))
                 } else {
                     Ok(())
                 }
             }
-            // XRP already rejected
-            _ => Ok(()),
+            Amount::MPTAmount(_) => Err(XRPLModelException::MissingField("loan_broker_id".into())),
+
+            Amount::XRPAmount(_) => Ok(()),
         }
     }
 }
@@ -187,7 +179,7 @@ mod tests {
         let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverClawback5weJ9mZgQ","TransactionType":"LoanBrokerCoverClawback","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C7611B22C09E773B51044F6BEA02EF9","Amount":"1000000"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
-        let serialized_tx = serde_json::to_value(&serde_json::to_string(&tx).unwrap()).unwrap();
+        let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
 
         assert_eq!(serialized_tx, default_json_value);
 
@@ -254,12 +246,10 @@ mod tests {
             })),
         };
 
-        dbg!(&tx.get_errors().err());
-
         assert!(tx.get_errors().is_err());
         assert!(matches!(
             tx.get_errors().err(),
-            Some(XRPLModelException::InvalidValue { .. })
+            Some(XRPLModelException::MissingField(_))
         ))
     }
 

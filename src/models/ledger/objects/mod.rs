@@ -64,6 +64,8 @@ use xchain_owned_claim_id::XChainOwnedClaimID;
 use xchain_owned_create_account_claim_id::XChainOwnedCreateAccountClaimID;
 
 use crate::_serde::lgr_obj_flags;
+use crate::models::ledger::objects::loan::Loan;
+use crate::models::ledger::objects::loan_broker::LoanBroker;
 use crate::models::{Amount, FlagCollection};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
@@ -113,6 +115,8 @@ pub enum LedgerEntry<'a> {
     Escrow(Escrow<'a>),
     FeeSettings(FeeSettings<'a>),
     LedgerHashes(LedgerHashes<'a>),
+    Loan(Loan<'a>),
+    LoanBroker(LoanBroker<'a>),
     MPToken(MPToken<'a>),
     MPTokenIssuance(MPTokenIssuance<'a>),
     NegativeUNL(NegativeUNL<'a>),

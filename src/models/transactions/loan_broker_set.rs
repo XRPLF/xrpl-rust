@@ -56,11 +56,7 @@ impl Model for LoanBrokerSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        if self
-            .data
-            .as_ref()
-            .map_or(false, |s: &Cow<'_, str>| s.len() > 256)
-        {
+        if self.data.as_ref().is_some_and(|s| s.len() > 256) {
             return Err(XRPLModelException::ValueTooLong {
                 field: "data".into(),
                 max: 256,
@@ -68,11 +64,7 @@ impl Model for LoanBrokerSet<'_> {
             });
         }
 
-        if self
-            .data
-            .as_ref()
-            .map_or(false, |s: &Cow<'_, str>| s.is_empty())
-        {
+        if self.data.as_ref().is_some_and(|s| s.is_empty()) {
             return Err(XRPLModelException::ValueTooShort {
                 field: "data".into(),
                 min: 1,
@@ -84,7 +76,7 @@ impl Model for LoanBrokerSet<'_> {
             return Err(XRPLModelException::FromHexError(e));
         }
 
-        if self.management_fee_rate.map_or(false, |v| v > 10_000) {
+        if self.management_fee_rate.is_some_and(|v| v > 10_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "management_fee_rate".into(),
                 max: 10_000,
@@ -92,26 +84,26 @@ impl Model for LoanBrokerSet<'_> {
             });
         }
 
-        if self.cover_rate_minimum.map_or(false, |v| v > 100_000) {
+        if self.cover_rate_minimum.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "cover_rate_minimum".into(),
                 max: 100_000,
-                found: self.cover_rate_minimum.unwrap() as u32,
+                found: self.cover_rate_minimum.unwrap(),
             });
         }
 
-        if self.cover_rate_liquidation.map_or(false, |v| v > 100_000) {
+        if self.cover_rate_liquidation.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "cover_rate_liquidation".into(),
                 max: 100_000,
-                found: self.cover_rate_liquidation.unwrap() as u32,
+                found: self.cover_rate_liquidation.unwrap(),
             });
         }
 
         if let Some(s) = &self.debt_maximum {
             let decimal = s
                 .parse::<BigDecimal>()
-                .map_err(|e| XRPLModelException::BigDecimalError(e))?;
+                .map_err(XRPLModelException::BigDecimalError)?;
 
             if decimal.is_negative() {
                 return Err(XRPLModelException::InvalidValue {
@@ -507,7 +499,7 @@ mod tests {
         let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerSetter5weJ9mZg","TransactionType":"LoanBrokerSet","Flags":0,"SigningPubKey":"","VaultID":"rDB303FC1C7611B22C09E773B51044F6BE","ManagementFeeRate":10,"DebtMaximum":"10000","CoverRateMinimum":0,"CoverRateLiquidation":0}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
-        let serialized_tx = serde_json::to_value(&serde_json::to_string(&tx).unwrap()).unwrap();
+        let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
 
         assert_eq!(serialized_tx, default_json_value);
 

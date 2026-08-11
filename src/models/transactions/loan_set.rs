@@ -60,7 +60,7 @@ pub struct LoanSet<'a> {
     /// The address of the counterparty of the Loan.
     pub counterparty: Option<Cow<'a, str>>,
     /// The signature of the counterparty over the transaction.
-    pub counterparty_signature: CounterpartySignature<'a>,
+    pub counterparty_signature: Option<CounterpartySignature<'a>>,
     /// A nominal funds amount paid to the LoanBroker.Owner when the Loan is created.
     pub loan_origination_fee: Option<Cow<'a, str>>,
     /// A nominal amount paid to the LoanBroker.Owner with every Loan payment.
@@ -105,6 +105,7 @@ pub struct LoanSet<'a> {
     Clone,
     xrpl_rust_macros::ValidateCurrencies,
 )]
+#[serde(rename_all = "PascalCase")]
 pub struct CounterpartySignature<'a> {
     pub signing_pub_key: Option<Cow<'a, str>>,
     pub txn_signature: Option<Cow<'a, str>>,
@@ -115,11 +116,40 @@ impl Model for LoanSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        if self
-            .data
-            .as_ref()
-            .map_or(false, |s: &Cow<'_, str>| s.len() > 256)
-        {
+        if let Some(cs) = &self.counterparty_signature {
+            let has_single_sig = cs.signing_pub_key.is_some();
+            let has_txn_sig = cs.txn_signature.is_some();
+            let has_signers = cs.signers.as_ref().is_some_and(|s| !s.is_empty());
+
+            // spec: TxnSignature is invalid alongside Signers — the two branches
+            // are mutually exclusive, not just "at least one"
+            if has_txn_sig && has_signers {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "counterparty_signature".into(),
+                    expected: "Either (SigningPubKey + TxnSignature) or Signers, not both".into(),
+                    found: "both txn_signature and signers set".into(),
+                });
+            }
+
+            if has_txn_sig && !has_single_sig {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "counterparty_signature".into(),
+                    expected: "TxnSignature requires SigningPubKey".into(),
+                    found: "txn_signature without signing_pub_key".into(),
+                });
+            }
+
+            if !has_txn_sig && !has_signers {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "counterparty_signature".into(),
+                    expected: "Either (SigningPubKey + TxnSignature) or a non-empty Signers list"
+                        .into(),
+                    found: "neither".into(),
+                });
+            }
+        }
+
+        if self.data.as_ref().is_some_and(|s| s.len() > 256) {
             return Err(XRPLModelException::ValueTooLong {
                 field: "data".into(),
                 max: 256,
@@ -127,11 +157,7 @@ impl Model for LoanSet<'_> {
             });
         }
 
-        if self
-            .data
-            .as_ref()
-            .map_or(false, |s: &Cow<'_, str>| s.is_empty())
-        {
+        if self.data.as_ref().is_some_and(|s| s.is_empty()) {
             return Err(XRPLModelException::ValueTooShort {
                 field: "data".into(),
                 min: 1,
@@ -146,7 +172,7 @@ impl Model for LoanSet<'_> {
         if let Some(lsf) = &self.loan_service_fee {
             let lsf_decimal = lsf
                 .parse::<BigDecimal>()
-                .map_err(|e| XRPLModelException::BigDecimalError(e))?;
+                .map_err(XRPLModelException::BigDecimalError)?;
 
             if lsf_decimal < 0 {
                 return Err(XRPLModelException::InvalidValue {
@@ -160,7 +186,7 @@ impl Model for LoanSet<'_> {
         if let Some(lpf) = &self.late_payment_fee {
             let lpf_decimal = lpf
                 .parse::<BigDecimal>()
-                .map_err(|e| XRPLModelException::BigDecimalError(e))?;
+                .map_err(XRPLModelException::BigDecimalError)?;
 
             if lpf_decimal < 0 {
                 return Err(XRPLModelException::InvalidValue {
@@ -174,7 +200,7 @@ impl Model for LoanSet<'_> {
         if let Some(cpf) = &self.close_payment_fee {
             let cpf_decimal = cpf
                 .parse::<BigDecimal>()
-                .map_err(|e| XRPLModelException::BigDecimalError(e))?;
+                .map_err(XRPLModelException::BigDecimalError)?;
 
             if cpf_decimal < 0 {
                 return Err(XRPLModelException::InvalidValue {
@@ -185,53 +211,50 @@ impl Model for LoanSet<'_> {
             }
         }
 
-        if self.overpayment_fee.map_or(false, |v| v > 100_000) {
+        if self.overpayment_fee.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "overpayment_fee".into(),
                 max: 100_000,
-                found: self.overpayment_fee.unwrap() as u32,
+                found: self.overpayment_fee.unwrap(),
             });
         }
 
-        if self.interest_rate.map_or(false, |v| v > 100_000) {
+        if self.interest_rate.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "interest_rate".into(),
                 max: 100_000,
-                found: self.interest_rate.unwrap() as u32,
+                found: self.interest_rate.unwrap(),
             });
         }
 
-        if self.late_interest_rate.map_or(false, |v| v > 100_000) {
+        if self.late_interest_rate.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "late_interest_rate".into(),
                 max: 100_000,
-                found: self.late_interest_rate.unwrap() as u32,
+                found: self.late_interest_rate.unwrap(),
             });
         }
 
-        if self.close_interest_rate.map_or(false, |v| v > 100_000) {
+        if self.close_interest_rate.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "close_interest_rate".into(),
                 max: 100_000,
-                found: self.close_interest_rate.unwrap() as u32,
+                found: self.close_interest_rate.unwrap(),
             });
         }
 
-        if self
-            .overpayment_interest_rate
-            .map_or(false, |v| v > 100_000)
-        {
+        if self.overpayment_interest_rate.is_some_and(|v| v > 100_000) {
             return Err(XRPLModelException::ValueTooHigh {
                 field: "overpayment_interest_rate".into(),
                 max: 100_000,
-                found: self.overpayment_interest_rate.unwrap() as u32,
+                found: self.overpayment_interest_rate.unwrap(),
             });
         }
 
         let pr_decimal = &self
             .principal_requested
             .parse::<BigDecimal>()
-            .map_err(|e| XRPLModelException::BigDecimalError(e))?;
+            .map_err(XRPLModelException::BigDecimalError)?;
 
         if pr_decimal < 1 {
             return Err(XRPLModelException::InvalidValue {
@@ -244,7 +267,7 @@ impl Model for LoanSet<'_> {
         if let Some(lof) = &self.loan_origination_fee {
             let lof_decimal = lof
                 .parse::<BigDecimal>()
-                .map_err(|e| XRPLModelException::BigDecimalError(e))?;
+                .map_err(XRPLModelException::BigDecimalError)?;
 
             if lof_decimal < 0 {
                 return Err(XRPLModelException::InvalidValue {
@@ -266,7 +289,7 @@ impl Model for LoanSet<'_> {
             }
         }
 
-        if self.payment_total.map_or(false, |v| v == 0) {
+        if self.payment_total.is_some_and(|v| v == 0) {
             return Err(XRPLModelException::ValueTooLow {
                 field: "payment_total".into(),
                 min: 1,
@@ -274,7 +297,7 @@ impl Model for LoanSet<'_> {
             });
         }
 
-        if self.payment_interval.map_or(false, |v| v < 60) {
+        if self.payment_interval.is_some_and(|v| v < 60) {
             return Err(XRPLModelException::ValueTooLow {
                 field: "payment_interval".into(),
                 min: 60,
@@ -282,7 +305,7 @@ impl Model for LoanSet<'_> {
             });
         }
 
-        if self.grace_period.map_or(false, |v| v < 60) {
+        if self.grace_period.is_some_and(|v| v < 60) {
             return Err(XRPLModelException::ValueTooLow {
                 field: "grace_period".into(),
                 min: 60,
@@ -342,7 +365,7 @@ impl<'a> LoanSet<'a> {
         loan_broker_id: Cow<'a, str>,
         data: Option<Cow<'a, str>>,
         counterparty: Option<Cow<'a, str>>,
-        counterparty_signature: CounterpartySignature<'a>,
+        counterparty_signature: Option<CounterpartySignature<'a>>,
         loan_origination_fee: Option<Cow<'a, str>>,
         loan_service_fee: Option<Cow<'a, str>>,
         late_payment_fee: Option<Cow<'a, str>>,
@@ -499,11 +522,7 @@ mod tests {
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -519,10 +538,10 @@ mod tests {
             grace_period: None,
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanSetter5weJ9mZg","TransactionType":"LoanSet","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C76LOANBROKER09E773B51044F6BE","CounterpartySignature":{},"PrincipalRequested":"1000"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanSetter5weJ9mZg","TransactionType":"LoanSet","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C76LOANBROKER09E773B51044F6BE","PrincipalRequested":"1000"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
-        let serialized_tx = serde_json::to_value(&serde_json::to_string(&tx).unwrap()).unwrap();
+        let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
 
         assert_eq!(serialized_tx, default_json_value);
 
@@ -536,18 +555,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: Some("A".repeat(257).into()),
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -575,18 +590,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: Some("".into()),
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -614,18 +625,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: Some("Z".into()),
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -653,18 +660,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -692,18 +695,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -731,18 +730,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -770,18 +765,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -809,18 +800,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -848,18 +835,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -887,18 +870,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -926,18 +905,14 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -965,18 +940,14 @@ mod tests {
         let mut tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -1012,18 +983,14 @@ mod tests {
         let mut tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: Some("".into()),
             loan_service_fee: None,
             late_payment_fee: None,
@@ -1059,18 +1026,14 @@ mod tests {
         let mut tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: Some("".into()),
             late_payment_fee: None,
@@ -1106,18 +1069,14 @@ mod tests {
         let mut tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: Some("".into()),
@@ -1153,18 +1112,14 @@ mod tests {
         let mut tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: None,
             loan_service_fee: None,
             late_payment_fee: None,
@@ -1207,11 +1162,7 @@ mod tests {
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: Some("11".into()),
             loan_service_fee: None,
             late_payment_fee: None,
@@ -1246,11 +1197,7 @@ mod tests {
             loan_broker_id: LOAN_BROKER_ID.into(),
             data: None,
             counterparty: None,
-            counterparty_signature: CounterpartySignature {
-                signing_pub_key: None,
-                txn_signature: None,
-                signers: None,
-            },
+            counterparty_signature: None,
             loan_origination_fee: Some("11".into()),
             loan_service_fee: Some("11".into()),
             late_payment_fee: Some("11".into()),
