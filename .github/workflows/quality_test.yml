@@ -21,4 +21,7 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: Audit dependencies
-        run: cargo audit
+        # RUSTSEC-2026-0235: rkyv 0.7 is an optional dep of rust_decimal that
+        # we do not enable (features = ["serde"] only); ignored until
+        # rust_decimal ships rkyv 0.8+ support.
+        run: cargo audit --ignore RUSTSEC-2026-0235

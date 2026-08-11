@@ -9,7 +9,9 @@ use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::_serde::opt_lgr_obj_flags;
 use crate::core::addresscodec::decode_classic_address;
+
 use crate::models::{
+    ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag,
     transactions::{Transaction, TransactionType},
     FlagCollection, Model, ValidateCurrencies, XRPLModelException, XRPLModelResult,
 };
@@ -38,6 +40,20 @@ pub enum MPTokenIssuanceSetFlag {
     TfMPTLock = 0x00000001,
     /// Unlock the MPT at the issuance or individual holder level.
     TfMPTUnlock = 0x00000002,
+    /// Enable the `lsfMPTCanLock` capability flag (one-way; cannot be unset).
+    TfMPTSetCanLock = 0x00000004,
+    /// Enable the `lsfMPTRequireAuth` capability flag (one-way; cannot be unset).
+    TfMPTSetRequireAuth = 0x00000008,
+    /// Enable the `lsfMPTCanEscrow` capability flag (one-way; cannot be unset).
+    TfMPTSetCanEscrow = 0x00000010,
+    /// Enable the `lsfMPTCanTrade` capability flag (one-way; cannot be unset).
+    TfMPTSetCanTrade = 0x00000020,
+    /// Enable the `lsfMPTCanTransfer` capability flag (one-way; cannot be unset).
+    TfMPTSetCanTransfer = 0x00000040,
+    /// Enable the `lsfMPTCanClawback` capability flag (one-way; cannot be unset).
+    TfMPTSetCanClawback = 0x00000080,
+    /// Enable the `lsfMPTCanHoldConfidentialBalance` capability flag (one-way; XLS-96).
+    TfMPTSetCanHoldConfidentialBalance = 0x00000100,
 }
 
 impl TryFrom<u32> for MPTokenIssuanceSetFlag {
@@ -47,12 +63,33 @@ impl TryFrom<u32> for MPTokenIssuanceSetFlag {
         match value {
             0x00000001 => Ok(MPTokenIssuanceSetFlag::TfMPTLock),
             0x00000002 => Ok(MPTokenIssuanceSetFlag::TfMPTUnlock),
+            0x00000004 => Ok(MPTokenIssuanceSetFlag::TfMPTSetCanLock),
+            0x00000008 => Ok(MPTokenIssuanceSetFlag::TfMPTSetRequireAuth),
+            0x00000010 => Ok(MPTokenIssuanceSetFlag::TfMPTSetCanEscrow),
+            0x00000020 => Ok(MPTokenIssuanceSetFlag::TfMPTSetCanTrade),
+            0x00000040 => Ok(MPTokenIssuanceSetFlag::TfMPTSetCanTransfer),
+            0x00000080 => Ok(MPTokenIssuanceSetFlag::TfMPTSetCanClawback),
+            0x00000100 => Ok(MPTokenIssuanceSetFlag::TfMPTSetCanHoldConfidentialBalance),
             _ => Err(()),
         }
     }
 }
 
 impl MPTokenIssuanceSetFlag {
+    /// Returns true if this flag is a capability-enabling flag (`tfMPTSet*`).
+    pub fn is_capability_flag(&self) -> bool {
+        matches!(
+            self,
+            MPTokenIssuanceSetFlag::TfMPTSetCanLock
+                | MPTokenIssuanceSetFlag::TfMPTSetRequireAuth
+                | MPTokenIssuanceSetFlag::TfMPTSetCanEscrow
+                | MPTokenIssuanceSetFlag::TfMPTSetCanTrade
+                | MPTokenIssuanceSetFlag::TfMPTSetCanTransfer
+                | MPTokenIssuanceSetFlag::TfMPTSetCanClawback
+                | MPTokenIssuanceSetFlag::TfMPTSetCanHoldConfidentialBalance
+        )
+    }
+
     pub fn from_bits(bits: u32) -> Vec<Self> {
         let mut flags = Vec::new();
         if bits & 0x00000001 != 0 {
@@ -61,54 +98,28 @@ impl MPTokenIssuanceSetFlag {
         if bits & 0x00000002 != 0 {
             flags.push(MPTokenIssuanceSetFlag::TfMPTUnlock);
         }
-        flags
-    }
-}
-
-/// Values carried in the `MutableFlags` field of an `MPTokenIssuanceSet`
-/// transaction (the `tmfMPTSet*` namespace, rippled `TxFlags.h`). These are the
-/// *actions* a Set performs to toggle the issuance's `lsf*` flags, and are a
-/// DIFFERENT namespace from the create-time `MPTokenIssuanceMutableFlag`
-/// (`lsmfMPTCanMutate*`) permission set. Requires the DynamicMPT amendment;
-/// `TmfMPTSetCanHoldConfidentialBalance` additionally requires
-/// ConfidentialTransfer (XLS-0096).
-#[derive(
-    Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
-)]
-#[repr(u32)]
-pub enum MPTokenIssuanceSetMutableFlag {
-    /// Toggle the issuance's `lsfMPTCanLock`.
-    TmfMPTSetCanLock = 0x00000001,
-    /// Toggle the issuance's `lsfMPTRequireAuth`.
-    TmfMPTSetRequireAuth = 0x00000002,
-    /// Toggle the issuance's `lsfMPTCanEscrow`.
-    TmfMPTSetCanEscrow = 0x00000004,
-    /// Toggle the issuance's `lsfMPTCanTrade`.
-    TmfMPTSetCanTrade = 0x00000008,
-    /// Toggle the issuance's `lsfMPTCanTransfer`.
-    TmfMPTSetCanTransfer = 0x00000010,
-    /// Toggle the issuance's `lsfMPTCanClawback`.
-    TmfMPTSetCanClawback = 0x00000020,
-    /// Set `lsfMPTCanHoldConfidentialBalance`, enabling confidential transfers
-    /// post-issuance (XLS-0096). Enabling is one-way — there is no flag to clear
-    /// it once set.
-    TmfMPTSetCanHoldConfidentialBalance = 0x00000040,
-}
-
-impl TryFrom<u32> for MPTokenIssuanceSetMutableFlag {
-    type Error = ();
-
-    fn try_from(value: u32) -> Result<Self, Self::Error> {
-        match value {
-            0x00000001 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetCanLock),
-            0x00000002 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetRequireAuth),
-            0x00000004 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetCanEscrow),
-            0x00000008 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetCanTrade),
-            0x00000010 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetCanTransfer),
-            0x00000020 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetCanClawback),
-            0x00000040 => Ok(MPTokenIssuanceSetMutableFlag::TmfMPTSetCanHoldConfidentialBalance),
-            _ => Err(()),
+        if bits & 0x00000004 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetCanLock);
         }
+        if bits & 0x00000008 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetRequireAuth);
+        }
+        if bits & 0x00000010 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetCanEscrow);
+        }
+        if bits & 0x00000020 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetCanTrade);
+        }
+        if bits & 0x00000040 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetCanTransfer);
+        }
+        if bits & 0x00000080 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetCanClawback);
+        }
+        if bits & 0x00000100 != 0 {
+            flags.push(MPTokenIssuanceSetFlag::TfMPTSetCanHoldConfidentialBalance);
+        }
+        flags
     }
 }
 
@@ -159,16 +170,15 @@ pub struct MPTokenIssuanceSet<'a> {
     pub mptoken_metadata: Option<Cow<'a, str>>,
     /// Transfer fee to update, in hundredths of a basis point (0–50000).
     pub transfer_fee: Option<u16>,
-    /// Actions to apply to the issuance's `lsf*` flags, in the `tmfMPTSet*`
-    /// namespace (e.g. enable confidential balances). Stored as a UInt32 on the
-    /// wire. NOTE: this is a different namespace from the create-time
-    /// `MPTokenIssuanceMutableFlag` (`lsmfMPTCanMutate*`) permission set.
+    /// Bitmask of fields and capability flags to permanently lock. Additive only —
+    /// ORed into the ledger object's `ImmutableFlags` field.
     #[serde(
         default,
+        rename = "ImmutableFlags",
         with = "opt_lgr_obj_flags",
         skip_serializing_if = "Option::is_none"
     )]
-    pub mutable_flags: Option<FlagCollection<MPTokenIssuanceSetMutableFlag>>,
+    pub immutable_flags: Option<FlagCollection<MPTokenIssuanceImmutableFlag>>,
 }
 
 impl<'a> Model for MPTokenIssuanceSet<'a> {
@@ -177,9 +187,15 @@ impl<'a> Model for MPTokenIssuanceSet<'a> {
         self._get_mptoken_issuance_id_error()?;
         self._get_holder_error()?;
         self._get_domain_id_error()?;
+        self._get_domain_id_and_holder_conflict()?;
+        self._get_holder_equals_account_error()?;
         self._get_metadata_error()?;
         self._get_transfer_fee_error()?;
         self._get_encryption_keys_error()?;
+        self._get_immutable_flags_error()?;
+        self._get_mutation_with_holder_error()?;
+        self._get_mutation_with_lock_flags_error()?;
+        self._get_no_op_error()?;
         self.validate_currencies()
     }
 }
@@ -248,8 +264,8 @@ impl<'a> MPTokenIssuanceSet<'a> {
         self
     }
 
-    pub fn with_mutable_flags(mut self, flags: Vec<MPTokenIssuanceSetMutableFlag>) -> Self {
-        self.mutable_flags = Some(flags.into());
+    pub fn with_immutable_flags(mut self, flags: Vec<MPTokenIssuanceImmutableFlag>) -> Self {
+        self.immutable_flags = Some(flags.into());
         self
     }
 
@@ -297,7 +313,11 @@ impl<'a> MPTokenIssuanceSet<'a> {
 
     fn _get_metadata_error(&self) -> XRPLModelResult<()> {
         if let Some(metadata) = &self.mptoken_metadata {
-            validate_mpt_metadata(metadata.as_ref())?;
+            // An empty string is valid for MPTokenIssuanceSet: it clears the field on-ledger.
+            // Only non-empty values must be valid hex and within the size limit.
+            if !metadata.is_empty() {
+                validate_mpt_metadata(metadata.as_ref())?;
+            }
         }
         Ok(())
     }
@@ -344,6 +364,149 @@ impl<'a> MPTokenIssuanceSet<'a> {
 
         Ok(())
     }
+
+    /// Capability-setting flags (`tfMPTSet*`), `MPTokenMetadata`, `TransferFee`, and
+    /// `ImmutableFlags` cannot be combined with `Holder`. Those operations target the
+    /// issuance as a whole, not an individual holder.
+    fn _get_mutation_with_holder_error(&self) -> XRPLModelResult<()> {
+        if self.holder.is_none() {
+            return Ok(());
+        }
+        let has_capability_flag = self
+            .common_fields
+            .flags
+            .0
+            .iter()
+            .any(|f| f.is_capability_flag());
+        if has_capability_flag
+            || self.mptoken_metadata.is_some()
+            || self.transfer_fee.is_some()
+            || self.immutable_flags.is_some()
+        {
+            return Err(XRPLModelException::InvalidFieldCombination {
+                field: "holder",
+                other_fields: &[
+                    "tfMPTSet* flags, mptoken_metadata, transfer_fee, or immutable_flags \
+                     (mutation ops cannot be combined with holder)",
+                ],
+            });
+        }
+        Ok(())
+    }
+
+    /// Lock/unlock flags (`tfMPTLock`/`tfMPTUnlock`) cannot be combined with capability-setting
+    /// flags (`tfMPTSet*`), `MPTokenMetadata`, `TransferFee`, or `ImmutableFlags`.
+    fn _get_mutation_with_lock_flags_error(&self) -> XRPLModelResult<()> {
+        let has_lock = self.has_flag(&MPTokenIssuanceSetFlag::TfMPTLock);
+        let has_unlock = self.has_flag(&MPTokenIssuanceSetFlag::TfMPTUnlock);
+        if !has_lock && !has_unlock {
+            return Ok(());
+        }
+        let has_capability_flag = self
+            .common_fields
+            .flags
+            .0
+            .iter()
+            .any(|f| f.is_capability_flag());
+        if has_capability_flag
+            || self.mptoken_metadata.is_some()
+            || self.transfer_fee.is_some()
+            || self.immutable_flags.is_some()
+        {
+            return Err(XRPLModelException::InvalidFieldCombination {
+                field: "tfMPTLock or tfMPTUnlock",
+                other_fields: &[
+                    "tfMPTSet* flags, mptoken_metadata, transfer_fee, or immutable_flags \
+                     (lock/unlock cannot be combined with mutation ops)",
+                ],
+            });
+        }
+        Ok(())
+    }
+
+    /// `DomainID` and `Holder` are mutually exclusive.
+    fn _get_domain_id_and_holder_conflict(&self) -> XRPLModelResult<()> {
+        if self.domain_id.is_some() && self.holder.is_some() {
+            return Err(XRPLModelException::InvalidFieldCombination {
+                field: "domain_id",
+                other_fields: &["holder (DomainID and Holder cannot both be set)"],
+            });
+        }
+        Ok(())
+    }
+
+    /// `Holder` must not be the same address as `Account`.
+    fn _get_holder_equals_account_error(&self) -> XRPLModelResult<()> {
+        if let Some(holder) = &self.holder {
+            if holder.as_ref() == self.common_fields.account.as_ref() {
+                return Err(XRPLModelException::InvalidFieldCombination {
+                    field: "holder",
+                    other_fields: &["account (Holder cannot be the same as Account)"],
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// `ImmutableFlags`, when present, must be non-zero. rippled rejects a
+    /// zero value with `temINVALID_FLAG`.
+    ///
+    /// Note: unknown bits are filtered out at deserialization time by
+    /// `FlagCollection::try_from`, so a mask check would always evaluate to
+    /// zero and is not needed here.
+    fn _get_immutable_flags_error(&self) -> XRPLModelResult<()> {
+        if let Some(flags) = &self.immutable_flags {
+            let bits: u32 = flags
+                .0
+                .iter()
+                .map(|f| f.clone() as u32)
+                .fold(0, |acc, v| acc | v);
+            if bits == 0 {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "immutable_flags".into(),
+                    expected: "non-zero value using known tif* bits".into(),
+                    found: "0x00000000".into(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Reject no-op transactions — something must change on the ledger object.
+    /// The effective flags value is the numeric OR of all flags; an all-false
+    /// object-form is equivalent to numeric 0 (no flags set).
+    fn _get_no_op_error(&self) -> XRPLModelResult<()> {
+        // Compute the effective numeric flags value.
+        let flags_bits: u32 = self
+            .common_fields
+            .flags
+            .0
+            .iter()
+            .map(|f| *f as u32)
+            .fold(0, |acc, v| acc | v);
+
+        let has_any_change = flags_bits != 0
+            || self.domain_id.is_some()
+            || self.mptoken_metadata.is_some()
+            || self.transfer_fee.is_some()
+            || self.immutable_flags.is_some()
+            // Registering confidential encryption keys (XLS-0096) mutates the
+            // issuance, so it is a valid state change on its own.
+            || self.issuer_encryption_key.is_some()
+            || self.auditor_encryption_key.is_some();
+
+        // A Holder field alone (without a lock/unlock flag or mutation) does nothing.
+        if !has_any_change {
+            return Err(XRPLModelException::InvalidFieldCombination {
+                field: "MPTokenIssuanceSet",
+                other_fields: &[
+                    "transaction does not change the state of the MPTokenIssuance ledger object \
+                     (no flags, no field mutations)",
+                ],
+            });
+        }
+        Ok(())
+    }
 }
 
 /// Validates that an `MPTokenIssuanceID` string is 48 ASCII hex characters
@@ -387,12 +550,19 @@ pub(crate) fn validate_holder_address(holder: &str) -> XRPLModelResult<()> {
 /// Expected length (in hex characters) of a DomainID (Hash256 = 32 bytes = 64 hex chars).
 const DOMAIN_ID_HEX_LEN: usize = 64;
 
-/// Validates that a `DomainID` is a 64-char ASCII hex string.
+/// Validates that a `DomainID` is a 64-char ASCII hex string and is not the zero hash.
 pub(crate) fn validate_domain_id(id: &str) -> XRPLModelResult<()> {
     if id.len() != DOMAIN_ID_HEX_LEN || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(XRPLModelException::InvalidValueFormat {
             field: "domain_id".into(),
             format: alloc::format!("{DOMAIN_ID_HEX_LEN}-char ASCII hex string"),
+            found: id.into(),
+        });
+    }
+    if id.bytes().all(|b| b == b'0') {
+        return Err(XRPLModelException::InvalidValue {
+            field: "domain_id".into(),
+            expected: "non-zero Hash256".into(),
             found: id.into(),
         });
     }
@@ -514,9 +684,9 @@ mod tests {
     }
 
     #[test]
-    fn test_no_flag_is_valid() {
-        // No-flag submissions are valid per rippled (e.g. DomainID-only changes).
-        // rippled only rejects when both TfMPTLock and TfMPTUnlock are set simultaneously.
+    fn test_no_flag_is_no_op_rejected() {
+        // A transaction with no flags and no field changes is a no-op — rejected.
+        // (A Holder field alone with no lock/unlock flag is also a no-op.)
         let txn = MPTokenIssuanceSet {
             common_fields: CommonFields {
                 account: ACCOUNT_ISSUER.into(),
@@ -526,8 +696,24 @@ mod tests {
             mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
             ..Default::default()
         };
+        assert!(txn.validate().is_err());
+    }
 
-        assert!(txn.holder.is_none());
+    #[test]
+    fn test_domain_id_only_change_is_valid() {
+        // A DomainID-only change with no flags is not a no-op — it mutates the ledger object.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            domain_id: Some(
+                "AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233".into(),
+            ),
+            ..Default::default()
+        };
         assert!(txn.validate().is_ok());
     }
 
@@ -624,7 +810,11 @@ mod tests {
             MPTokenIssuanceSetFlag::try_from(0x00000002),
             Ok(MPTokenIssuanceSetFlag::TfMPTUnlock)
         );
-        assert!(MPTokenIssuanceSetFlag::try_from(0x00000004).is_err());
+        assert_eq!(
+            MPTokenIssuanceSetFlag::try_from(0x00000004),
+            Ok(MPTokenIssuanceSetFlag::TfMPTSetCanLock)
+        );
+        assert!(MPTokenIssuanceSetFlag::try_from(0x00000200).is_err());
     }
 
     #[test]
@@ -673,24 +863,6 @@ mod tests {
         .with_flags(vec![MPTokenIssuanceSetFlag::TfMPTLock]);
 
         assert!(txn.has_flag(&MPTokenIssuanceSetFlag::TfMPTLock));
-        assert!(txn.validate().is_ok());
-    }
-
-    #[test]
-    fn test_domain_id_only_valid() {
-        // No-flag DomainID-only update — referenced in the existing comment at _get_flag_error.
-        let txn = MPTokenIssuanceSet {
-            common_fields: CommonFields {
-                account: ACCOUNT_ISSUER.into(),
-                transaction_type: TransactionType::MPTokenIssuanceSet,
-                ..Default::default()
-            },
-            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
-            domain_id: Some(
-                "AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233".into(),
-            ),
-            ..Default::default()
-        };
         assert!(txn.validate().is_ok());
     }
 
@@ -770,7 +942,8 @@ mod tests {
     }
 
     #[test]
-    fn test_set_mutable_flags_serde_as_integer() {
+    fn test_set_immutable_flags_serde_as_integer() {
+        use crate::models::ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag;
         let txn = MPTokenIssuanceSet {
             common_fields: CommonFields {
                 account: ACCOUNT_ISSUER.into(),
@@ -778,16 +951,13 @@ mod tests {
                 ..Default::default()
             },
             mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
-            mutable_flags: Some(
-                vec![MPTokenIssuanceSetMutableFlag::TmfMPTSetCanHoldConfidentialBalance].into(),
-            ),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTTransferFee].into()),
             ..Default::default()
         };
         let json = serde_json::to_string(&txn).unwrap();
         assert!(
-            json.contains("\"MutableFlags\":64"),
-            "MutableFlags should serialize as integer 64 (tmfMPTSetCanHoldConfidentialBalance), \
-             got: {json}"
+            json.contains("\"ImmutableFlags\":131072"),
+            "ImmutableFlags should serialize as integer 131072, got: {json}"
         );
         let roundtrip: MPTokenIssuanceSet = serde_json::from_str(&json).unwrap();
         assert_eq!(txn, roundtrip);
@@ -877,6 +1047,7 @@ mod tests {
 
     #[test]
     fn test_all_new_fields_builder() {
+        use crate::models::ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag;
         let txn = MPTokenIssuanceSet {
             common_fields: CommonFields {
                 account: ACCOUNT_ISSUER.into(),
@@ -889,7 +1060,7 @@ mod tests {
         .with_domain_id("AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233".into())
         .with_mptoken_metadata("CAFEBABE".into())
         .with_transfer_fee(500)
-        .with_mutable_flags(vec![MPTokenIssuanceSetMutableFlag::TmfMPTSetCanTransfer]);
+        .with_immutable_flags(vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata]);
 
         assert_eq!(
             txn.domain_id.as_deref(),
@@ -897,7 +1068,306 @@ mod tests {
         );
         assert_eq!(txn.mptoken_metadata.as_deref(), Some("CAFEBABE"));
         assert_eq!(txn.transfer_fee, Some(500));
-        assert!(txn.mutable_flags.is_some());
+        assert!(txn.immutable_flags.is_some());
         assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_capability_flag_is_valid() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTSetCanTransfer].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_capability_flag_with_holder_rejected() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTSetCanTransfer].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            holder: Some(ACCOUNT_GENESIS.into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_lock_flag_with_capability_flag_rejected() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![
+                    MPTokenIssuanceSetFlag::TfMPTLock,
+                    MPTokenIssuanceSetFlag::TfMPTSetCanTransfer,
+                ]
+                .into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_lock_flag_with_metadata_rejected() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            mptoken_metadata: Some("CAFEBABE".into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_flag_try_from_capability_flags() {
+        assert_eq!(
+            MPTokenIssuanceSetFlag::try_from(0x00000004),
+            Ok(MPTokenIssuanceSetFlag::TfMPTSetCanLock)
+        );
+        assert_eq!(
+            MPTokenIssuanceSetFlag::try_from(0x00000040),
+            Ok(MPTokenIssuanceSetFlag::TfMPTSetCanTransfer)
+        );
+        assert_eq!(
+            MPTokenIssuanceSetFlag::try_from(0x00000100),
+            Ok(MPTokenIssuanceSetFlag::TfMPTSetCanHoldConfidentialBalance)
+        );
+        assert!(MPTokenIssuanceSetFlag::try_from(0x00000200).is_err());
+    }
+
+    #[test]
+    fn test_flag_from_bits_capability() {
+        let flags = MPTokenIssuanceSetFlag::from_bits(0x000001FC);
+        assert_eq!(flags.len(), 7); // all tfMPTSet* flags
+        assert!(flags.contains(&MPTokenIssuanceSetFlag::TfMPTSetCanLock));
+        assert!(flags.contains(&MPTokenIssuanceSetFlag::TfMPTSetCanHoldConfidentialBalance));
+    }
+
+    // ── XLS-94D / DynamicMPT tests (mirrors JS MPTokenIssuanceSet.test.ts) ──
+
+    #[test]
+    fn test_multiple_capability_flags_valid() {
+        // Setting multiple capability flags at once is valid.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![
+                    MPTokenIssuanceSetFlag::TfMPTSetCanLock,
+                    MPTokenIssuanceSetFlag::TfMPTSetRequireAuth,
+                    MPTokenIssuanceSetFlag::TfMPTSetCanEscrow,
+                    MPTokenIssuanceSetFlag::TfMPTSetCanTrade,
+                    MPTokenIssuanceSetFlag::TfMPTSetCanTransfer,
+                    MPTokenIssuanceSetFlag::TfMPTSetCanClawback,
+                ]
+                .into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_transfer_fee_and_metadata_mutation_valid() {
+        // Updating TransferFee and MPTokenMetadata together is valid.
+        use crate::models::ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag;
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            transfer_fee: Some(100),
+            mptoken_metadata: Some("CAFEBABE".into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_enable_can_transfer_and_set_transfer_fee_atomically_valid() {
+        // XLS-94D allows enabling lsfMPTCanTransfer and setting a non-zero
+        // TransferFee in the same transaction.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTSetCanTransfer].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            transfer_fee: Some(200),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_immutable_flags_alone_valid() {
+        // ImmutableFlags alone (no other flags, no fields) is valid — permanently
+        // locks a capability flag already set on the ledger.
+        use crate::models::ledger::objects::mptoken_issuance::MPTokenIssuanceImmutableFlag;
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            immutable_flags: Some(vec![MPTokenIssuanceImmutableFlag::LsifMPTMetadata].into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_empty_metadata_clears_field_valid() {
+        // An empty string for MPTokenMetadata is valid in MPTokenIssuanceSet:
+        // rippled treats it as clearing the field (makeFieldAbsent).
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            mptoken_metadata: Some("".into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_immutable_flags_zero_rejected() {
+        // ImmutableFlags present but zero must be rejected.
+        let json = r#"{
+            "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+            "TransactionType": "MPTokenIssuanceSet",
+            "MPTokenIssuanceID": "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58",
+            "ImmutableFlags": 0
+        }"#;
+        let txn: MPTokenIssuanceSet = serde_json::from_str(json).unwrap();
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_immutable_flags_reserved_bit_rejected() {
+        // Bit 0x00000001 is reserved and not a valid tif* bit.
+        let json = r#"{
+            "Account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+            "TransactionType": "MPTokenIssuanceSet",
+            "MPTokenIssuanceID": "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58",
+            "ImmutableFlags": 1
+        }"#;
+        let txn: MPTokenIssuanceSet = serde_json::from_str(json).unwrap();
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_domain_id_and_holder_conflict_rejected() {
+        // DomainID and Holder cannot both be set.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            holder: Some(ACCOUNT_GENESIS.into()),
+            domain_id: Some(
+                "AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233AABBCCDD00112233".into(),
+            ),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_holder_equals_account_rejected() {
+        // Holder cannot be the same address as Account.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTLock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            holder: Some(ACCOUNT_ISSUER.into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_no_op_rejected() {
+        // A transaction with no flags and no mutations is a no-op — rejected.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_holder_with_metadata_mutation_rejected() {
+        // Holder + metadata mutation is rejected.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            holder: Some(ACCOUNT_GENESIS.into()),
+            mptoken_metadata: Some("CAFEBABE".into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_unlock_with_metadata_rejected() {
+        // tfMPTUnlock combined with metadata mutation is rejected.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                flags: vec![MPTokenIssuanceSetFlag::TfMPTUnlock].into(),
+                ..Default::default()
+            },
+            mptoken_issuance_id: "00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into(),
+            mptoken_metadata: Some("CAFEBABE".into()),
+            ..Default::default()
+        };
+        assert!(txn.validate().is_err());
     }
 }
