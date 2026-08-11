@@ -14,6 +14,8 @@
 //! syntax, which makes call sites self-documenting and avoids parameter-
 //! ordering bugs.
 
+use zeroize::Zeroize;
+
 use crate::{
     Error, Result,
     types::{
@@ -119,7 +121,10 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
         3
     };
 
-    let balance_params = sys::mpt_pedersen_proof_params {
+    // Holds a copy of the secret balance blinding factor + the plaintext
+    // balance. The C struct doesn't implement Zeroize, so wipe those fields
+    // ourselves after the call rather than leave them in a freed stack frame.
+    let mut balance_params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
         amount: p.current_balance,
         ciphertext: *p.balance_ciphertext.as_bytes(),
@@ -147,6 +152,8 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
             &mut out_len,
         )
     };
+    balance_params.blinding_factor.zeroize();
+    balance_params.amount.zeroize();
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }
@@ -178,7 +185,8 @@ pub struct ConvertBackProofParams<'a> {
 
 /// Generates the 816-byte `ConfidentialMPTConvertBack` proof bundle.
 pub fn convert_back(p: ConvertBackProofParams<'_>) -> Result<ConvertBackProof> {
-    let params = sys::mpt_pedersen_proof_params {
+    // See `send`: wipe the secret blinding + plaintext balance after the call.
+    let mut params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
         amount: p.current_balance,
         ciphertext: *p.balance_ciphertext.as_bytes(),
@@ -196,6 +204,8 @@ pub fn convert_back(p: ConvertBackProofParams<'_>) -> Result<ConvertBackProof> {
             out.as_mut_ptr(),
         )
     };
+    params.blinding_factor.zeroize();
+    params.amount.zeroize();
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }

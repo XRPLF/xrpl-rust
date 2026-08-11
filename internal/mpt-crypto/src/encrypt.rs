@@ -1,5 +1,7 @@
 //! EC-ElGamal encryption / decryption and blinding-factor generation.
 
+use zeroize::Zeroizing;
+
 use crate::{
     Error, Result,
     types::{BlindingFactor, Ciphertext, Privkey, Pubkey},
@@ -12,13 +14,15 @@ use mpt_crypto_sys as sys;
 /// and (in Send proofs) as the Pedersen blinding factor for `AmountCommitment`
 /// — see XLS-0096 §5.4 "reused randomness" optimization.
 pub fn random_blinding_factor() -> Result<BlindingFactor> {
-    let mut r = [0u8; 32];
+    // Zeroize the intermediate secret scalar on drop, so it is not left in a
+    // freed stack frame after being copied into the BlindingFactor wrapper.
+    let mut r = Zeroizing::new([0u8; 32]);
     // SAFETY: `r` is exclusively borrowed; size matches the 32-byte contract.
     let rc = unsafe { sys::mpt_generate_blinding_factor(r.as_mut_ptr()) };
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }
-    Ok(BlindingFactor::new(r))
+    Ok(BlindingFactor::new(*r))
 }
 
 /// Encrypts a 64-bit `amount` under `pubkey` with the supplied `blinding`.

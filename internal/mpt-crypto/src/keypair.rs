@@ -1,5 +1,7 @@
 //! ElGamal/secp256k1 keypair generation.
 
+use zeroize::Zeroizing;
+
 use crate::{
     Error, Result,
     types::{Privkey, Pubkey},
@@ -12,8 +14,10 @@ use mpt_crypto_sys as sys;
 /// linked into the dylib). The private key is wiped from memory when the
 /// returned `Privkey` is dropped.
 pub fn generate() -> Result<(Privkey, Pubkey)> {
-    let mut sk = [0u8; 32];
-    let mut pk = [0u8; 33];
+    // Zeroize the intermediate secret buffer on drop, so the private key is not
+    // left in a freed stack frame after being copied into the Privkey wrapper.
+    let mut sk = Zeroizing::new([0u8; 32]);
+    let mut pk = [0u8; 33]; // public key — not secret
 
     // SAFETY: `sk` and `pk` are mutable for the duration of the call;
     //         their sizes match the FFI contract (32 / 33 bytes).
@@ -21,7 +25,7 @@ pub fn generate() -> Result<(Privkey, Pubkey)> {
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }
-    Ok((Privkey::new(sk), Pubkey::new(pk)))
+    Ok((Privkey::new(*sk), Pubkey::new(pk)))
 }
 
 /// Derives an ElGamal keypair from a caller-supplied 32-byte secret scalar.
@@ -35,6 +39,11 @@ pub fn generate() -> Result<(Privkey, Pubkey)> {
 ///
 /// The secret is wiped from memory when the returned [`Privkey`] is dropped.
 pub fn from_secret_key(secret: [u8; 32]) -> Result<(Privkey, Pubkey)> {
+    // `secret` is a `Copy` value, so this function owns its own copy. Wrap it so
+    // that copy is zeroized on *every* exit path (including the error paths
+    // below), rather than lingering in a freed stack frame.
+    let secret = Zeroizing::new(secret);
+
     // SAFETY: `mpt_secp256k1_context` returns libmpt-crypto's shared, valid,
     //         thread-safe context (owned by the library; never destroyed here).
     let ctx = unsafe { sys::mpt_secp256k1_context() };
@@ -74,7 +83,7 @@ pub fn from_secret_key(secret: [u8; 32]) -> Result<(Privkey, Pubkey)> {
         ));
     }
 
-    Ok((Privkey::new(secret), Pubkey::new(out)))
+    Ok((Privkey::new(*secret), Pubkey::new(out)))
 }
 
 #[cfg(test)]

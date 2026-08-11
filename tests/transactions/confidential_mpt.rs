@@ -173,6 +173,18 @@ async fn onledger_spending(setup: &ConfidentialSetup) -> ([u8; 66], u32) {
     (spending, version)
 }
 
+/// `account`'s decrypted `ConfidentialBalanceSpending` for `issuance_id`
+/// (0 when the field is absent, e.g. before the first merge or after clawback).
+async fn spending_balance(account: &str, issuance_id: &str, sk: &Privkey) -> u64 {
+    let mptoken = holder_mptoken(account, issuance_id).await;
+    let hex = mptoken["ConfidentialBalanceSpending"].as_str().unwrap_or("");
+    if hex.is_empty() {
+        0
+    } else {
+        decrypt_confidential_balance(hex, sk)
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 //  Prerequisite ledger state for a confidential MPT
 // ─────────────────────────────────────────────────────────────────────────
@@ -527,6 +539,212 @@ async fn confidential_mpt_convert_with_auditor() {
         assert_eq!(
             disclosed, amount,
             "auditor mirror should decrypt to the converted amount"
+        );
+    })
+    .await;
+}
+
+/// End-to-end check of the client-querying `prepare_confidential_*` layer: it
+/// fetches the account sequence and (for Convert) auto-detects first-vs-subsequent
+/// from the on-ledger MPToken, then hands back a ready-to-sign transaction.
+#[tokio::test]
+async fn confidential_mpt_prepare_convert() {
+    with_blockchain_lock(|| async {
+        let setup = setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT).await;
+        let client = get_client().await;
+
+        let amount: u64 = 100;
+        let mut tx = xrpl::confidential::prepare_confidential_convert(
+            client,
+            &setup.holder.classic_address,
+            &setup.issuance_id,
+            amount,
+            &setup.issuer_elgamal_pk,
+            &setup.holder_elgamal_sk,
+            &setup.holder_elgamal_pk,
+            None,
+        )
+        .await
+        .expect("prepare_confidential_convert");
+
+        // The builder registered the holder key (first convert) and pinned the
+        // fetched sequence.
+        assert!(tx.holder_encryption_key.is_some());
+        assert!(tx.zk_proof.is_some());
+        test_transaction(&mut tx, &setup.holder).await;
+
+        // Inbox decrypts to the converted amount — the prepared tx verified on-ledger.
+        let mptoken = holder_mptoken(&setup.holder.classic_address, &setup.issuance_id).await;
+        let inbox = decrypt_confidential_balance(
+            mptoken["ConfidentialBalanceInbox"]
+                .as_str()
+                .expect("ConfidentialBalanceInbox present"),
+            &setup.holder_elgamal_sk,
+        );
+        assert_eq!(inbox, amount, "prepared convert should credit the inbox");
+    })
+    .await;
+}
+
+/// Full confidential lifecycle driven entirely by the client-querying
+/// `prepare_confidential_*` layer (parity with xrpl-py's workflow test):
+/// convert → merge → send → merge → convert-back → clawback, exercising all five
+/// `prepare_*` functions end-to-end with balance-decryption assertions.
+#[tokio::test]
+async fn confidential_mpt_prepare_lifecycle() {
+    use xrpl::confidential::{
+        prepare_confidential_clawback, prepare_confidential_convert,
+        prepare_confidential_convert_back, prepare_confidential_merge_inbox,
+        prepare_confidential_send,
+    };
+
+    with_blockchain_lock(|| async {
+        let setup = setup_confidential_issuance(
+            TF_MPT_CAN_CONFIDENTIAL_AMOUNT | TF_MPT_CAN_TRANSFER | TF_MPT_CAN_CLAWBACK,
+        )
+        .await;
+        let client = get_client().await;
+        let issuance = &setup.issuance_id;
+        let holder1 = &setup.holder;
+
+        // A second holder (transfer recipient), authorized + funded with public MPT.
+        let holder2 = generate_funded_wallet().await;
+        let (holder2_sk, holder2_pk) =
+            xrpl::mpt_crypto::keypair::generate().expect("holder2 keypair");
+        submit_signed(
+            &holder2.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenAuthorize",
+                "Account": holder2.classic_address,
+                "MPTokenIssuanceID": issuance,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+        submit_signed(
+            &setup.issuer.seed,
+            serde_json::json!({
+                "TransactionType": "Payment",
+                "Account": setup.issuer.classic_address,
+                "Destination": holder2.classic_address,
+                "Amount": { "mpt_issuance_id": issuance, "value": FUNDED_MPT },
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        // Bounds the O(range) decrypt search inside the prepare_* helpers.
+        let max_balance: u64 = 1000;
+
+        // 1. holder1: convert 10 (registers key) then merge → spending 10.
+        let mut tx = prepare_confidential_convert(
+            client,
+            &holder1.classic_address,
+            issuance,
+            10,
+            &setup.issuer_elgamal_pk,
+            &setup.holder_elgamal_sk,
+            &setup.holder_elgamal_pk,
+            None,
+        )
+        .await
+        .expect("prepare convert holder1");
+        test_transaction(&mut tx, holder1).await;
+        let mut tx = prepare_confidential_merge_inbox(client, &holder1.classic_address, issuance)
+            .await
+            .expect("prepare merge holder1");
+        test_transaction(&mut tx, holder1).await;
+        assert_eq!(
+            spending_balance(&holder1.classic_address, issuance, &setup.holder_elgamal_sk).await,
+            10,
+            "holder1 spending after convert+merge"
+        );
+
+        // 2. holder2: convert 1 (opt-in / register key).
+        let mut tx = prepare_confidential_convert(
+            client,
+            &holder2.classic_address,
+            issuance,
+            1,
+            &setup.issuer_elgamal_pk,
+            &holder2_sk,
+            &holder2_pk,
+            None,
+        )
+        .await
+        .expect("prepare convert holder2");
+        test_transaction(&mut tx, &holder2).await;
+
+        // 3. holder1 sends 3 to holder2, then holder2 merges.
+        let mut tx = prepare_confidential_send(
+            client,
+            &holder1.classic_address,
+            &holder2.classic_address,
+            issuance,
+            3,
+            max_balance,
+            &setup.holder_elgamal_sk,
+            &setup.holder_elgamal_pk,
+            &holder2_pk,
+            &setup.issuer_elgamal_pk,
+            None,
+        )
+        .await
+        .expect("prepare send");
+        test_transaction(&mut tx, holder1).await;
+        let mut tx = prepare_confidential_merge_inbox(client, &holder2.classic_address, issuance)
+            .await
+            .expect("prepare merge holder2");
+        test_transaction(&mut tx, &holder2).await;
+        assert_eq!(
+            spending_balance(&holder1.classic_address, issuance, &setup.holder_elgamal_sk).await,
+            7,
+            "holder1 spending after send (10 - 3)"
+        );
+        assert_eq!(
+            spending_balance(&holder2.classic_address, issuance, &holder2_sk).await,
+            4,
+            "holder2 spending after receiving send (1 + 3)"
+        );
+
+        // 4. holder1 converts 2 back to public → spending 5.
+        let mut tx = prepare_confidential_convert_back(
+            client,
+            &holder1.classic_address,
+            issuance,
+            2,
+            max_balance,
+            &setup.holder_elgamal_sk,
+            &setup.holder_elgamal_pk,
+            &setup.issuer_elgamal_pk,
+            None,
+        )
+        .await
+        .expect("prepare convert_back");
+        test_transaction(&mut tx, holder1).await;
+        assert_eq!(
+            spending_balance(&holder1.classic_address, issuance, &setup.holder_elgamal_sk).await,
+            5,
+            "holder1 spending after convert-back (7 - 2)"
+        );
+
+        // 5. issuer claws back holder2's entire confidential balance (4) → 0.
+        let mut tx = prepare_confidential_clawback(
+            client,
+            &setup.issuer.classic_address,
+            &holder2.classic_address,
+            issuance,
+            4,
+            &setup.issuer_elgamal_sk,
+            &setup.issuer_elgamal_pk,
+        )
+        .await
+        .expect("prepare clawback");
+        test_transaction(&mut tx, &setup.issuer).await;
+        assert_eq!(
+            spending_balance(&holder2.classic_address, issuance, &holder2_sk).await,
+            0,
+            "holder2 spending after clawback"
         );
     })
     .await;

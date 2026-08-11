@@ -51,6 +51,10 @@ pub enum ConfidentialAssemblyError {
     /// An on-ledger ciphertext blob is not 66 bytes of hex (132 chars).
     #[error("invalid ciphertext (expected 132-char hex): {0}")]
     InvalidCiphertext(String),
+    /// A ledger query failed, returned an error, or was missing an expected
+    /// field (only produced by the `prepare_confidential_*` client helpers).
+    #[error("ledger query error: {0}")]
+    Ledger(String),
 }
 
 type Result<T> = core::result::Result<T, ConfidentialAssemblyError>;
@@ -426,6 +430,247 @@ pub fn assemble_merge_inbox(
             sequence,
         ),
         mptoken_issuance_id: Cow::Owned(issuance_id_hex.to_string()),
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Client-querying convenience layer.
+//
+// The `assemble_*` functions above are pure — the caller supplies all
+// ledger-derived state. These `prepare_confidential_*` wrappers fetch that state
+// from an async client (account sequence, the on-ledger MPToken's confidential
+// balance ciphertext + version, decrypting the current balance), mirroring
+// xrpl-py's `prepare_confidential_*` layer. The fee is left to autofill.
+//
+// Available whenever the `confidential-mpt` feature is on (it implies `std`,
+// which provides the async client).
+// ─────────────────────────────────────────────────────────────────────────────
+pub use prepare::*;
+
+mod prepare {
+    use alloc::format;
+    use alloc::string::ToString;
+
+    use serde_json::Value;
+
+    use super::{
+        assemble_clawback, assemble_convert, assemble_convert_back, assemble_merge_inbox,
+        assemble_send, decrypt_balance_in_range, ClawbackParams, ConfidentialAssemblyError,
+        ConvertBackParams, ConvertParams, Result, SendParams,
+    };
+    use crate::asynch::account::get_next_valid_seq_number;
+    use crate::asynch::clients::XRPLAsyncClient;
+    use crate::models::requests::account_objects::{AccountObjectType, AccountObjects};
+    use crate::models::requests::{CommonFields, RequestMethod};
+    use crate::models::results::account_objects::AccountObjects as AccountObjectsResult;
+    use crate::models::transactions::confidential_mpt_clawback::ConfidentialMPTClawback;
+    use crate::models::transactions::confidential_mpt_convert::ConfidentialMPTConvert;
+    use crate::models::transactions::confidential_mpt_convert_back::ConfidentialMPTConvertBack;
+    use crate::models::transactions::confidential_mpt_merge_inbox::ConfidentialMPTMergeInbox;
+    use crate::models::transactions::confidential_mpt_send::ConfidentialMPTSend;
+    use crate::mpt_crypto::{Privkey, Pubkey};
+
+    async fn fetch_sequence<C: XRPLAsyncClient>(client: &C, account: &str) -> Result<u32> {
+        get_next_valid_seq_number(account.to_string().into(), client, None)
+            .await
+            .map_err(|e| ConfidentialAssemblyError::Ledger(format!("fetch sequence failed: {e}")))
+    }
+
+    /// Read `account`'s MPToken for `issuance_id_hex` as raw JSON (the typed
+    /// ledger objects do not yet expose the confidential fields).
+    async fn read_mptoken<C: XRPLAsyncClient>(
+        client: &C,
+        account: &str,
+        issuance_id_hex: &str,
+    ) -> Result<Value> {
+        let request = AccountObjects {
+            common_fields: CommonFields {
+                command: RequestMethod::AccountObjects,
+                id: None,
+            },
+            account: account.to_string().into(),
+            ledger_lookup: None,
+            r#type: Some(AccountObjectType::Mptoken),
+            deletion_blockers_only: None,
+            limit: None,
+            marker: None,
+        };
+        let response = client.request(request.into()).await.map_err(|e| {
+            ConfidentialAssemblyError::Ledger(format!("account_objects request failed: {e}"))
+        })?;
+        let objects = AccountObjectsResult::try_from(response).map_err(|e| {
+            ConfidentialAssemblyError::Ledger(format!("could not parse account_objects: {e}"))
+        })?;
+        objects
+            .account_objects
+            .iter()
+            .find(|o| o.get("MPTokenIssuanceID").and_then(Value::as_str) == Some(issuance_id_hex))
+            .cloned()
+            .ok_or_else(|| {
+                ConfidentialAssemblyError::Ledger(format!(
+                    "no MPToken for issuance {issuance_id_hex} owned by {account}"
+                ))
+            })
+    }
+
+    fn field_str<'a>(node: &'a Value, field: &str) -> Result<&'a str> {
+        node.get(field).and_then(Value::as_str).ok_or_else(|| {
+            ConfidentialAssemblyError::Ledger(format!("MPToken is missing field {field}"))
+        })
+    }
+
+    fn balance_version(node: &Value) -> u32 {
+        node.get("ConfidentialBalanceVersion")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u32
+    }
+
+    /// Prepare a `ConfidentialMPTConvert`, fetching the account sequence and
+    /// auto-detecting whether this is the first convert (which registers the
+    /// holder key) from the on-ledger MPToken.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn prepare_confidential_convert<C: XRPLAsyncClient>(
+        client: &C,
+        account: &str,
+        issuance_id_hex: &str,
+        amount: u64,
+        issuer_pubkey: &Pubkey,
+        holder_privkey: &Privkey,
+        holder_pubkey: &Pubkey,
+        auditor_pubkey: Option<&Pubkey>,
+    ) -> Result<ConfidentialMPTConvert<'static>> {
+        let sequence = fetch_sequence(client, account).await?;
+        let node = read_mptoken(client, account, issuance_id_hex).await?;
+        // First convert (opt-in) registers the holder key; later ones must not
+        // (rippled returns tecDUPLICATE).
+        let register_key = node
+            .get("HolderEncryptionKey")
+            .and_then(Value::as_str)
+            .is_none();
+        assemble_convert(ConvertParams {
+            account,
+            issuance_id_hex,
+            sequence,
+            amount,
+            issuer_pubkey,
+            holder_privkey,
+            holder_pubkey,
+            auditor_pubkey,
+            register_key,
+        })
+    }
+
+    /// Prepare a `ConfidentialMPTSend`, fetching the sender's sequence + on-ledger
+    /// spending balance and decrypting it. `max_balance` bounds the decrypt
+    /// discrete-log search (cost is O(max_balance)); pass the issuance's
+    /// outstanding amount or a known upper bound.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn prepare_confidential_send<C: XRPLAsyncClient>(
+        client: &C,
+        sender_account: &str,
+        destination_account: &str,
+        issuance_id_hex: &str,
+        amount: u64,
+        max_balance: u64,
+        sender_privkey: &Privkey,
+        sender_pubkey: &Pubkey,
+        destination_pubkey: &Pubkey,
+        issuer_pubkey: &Pubkey,
+        auditor_pubkey: Option<&Pubkey>,
+    ) -> Result<ConfidentialMPTSend<'static>> {
+        let sequence = fetch_sequence(client, sender_account).await?;
+        let node = read_mptoken(client, sender_account, issuance_id_hex).await?;
+        let balance_ciphertext_hex = field_str(&node, "ConfidentialBalanceSpending")?.to_string();
+        let version = balance_version(&node);
+        let current_balance =
+            decrypt_balance_in_range(&balance_ciphertext_hex, sender_privkey, 0, max_balance)?;
+        assemble_send(SendParams {
+            sender_account,
+            destination_account,
+            issuance_id_hex,
+            sequence,
+            version,
+            amount,
+            current_balance,
+            balance_ciphertext_hex: &balance_ciphertext_hex,
+            sender_privkey,
+            sender_pubkey,
+            destination_pubkey,
+            issuer_pubkey,
+            auditor_pubkey,
+        })
+    }
+
+    /// Prepare a `ConfidentialMPTConvertBack`, fetching + decrypting the holder's
+    /// on-ledger spending balance. See `prepare_confidential_send` re `max_balance`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn prepare_confidential_convert_back<C: XRPLAsyncClient>(
+        client: &C,
+        account: &str,
+        issuance_id_hex: &str,
+        amount: u64,
+        max_balance: u64,
+        holder_privkey: &Privkey,
+        holder_pubkey: &Pubkey,
+        issuer_pubkey: &Pubkey,
+        auditor_pubkey: Option<&Pubkey>,
+    ) -> Result<ConfidentialMPTConvertBack<'static>> {
+        let sequence = fetch_sequence(client, account).await?;
+        let node = read_mptoken(client, account, issuance_id_hex).await?;
+        let balance_ciphertext_hex = field_str(&node, "ConfidentialBalanceSpending")?.to_string();
+        let version = balance_version(&node);
+        let current_balance =
+            decrypt_balance_in_range(&balance_ciphertext_hex, holder_privkey, 0, max_balance)?;
+        assemble_convert_back(ConvertBackParams {
+            account,
+            issuance_id_hex,
+            sequence,
+            version,
+            amount,
+            current_balance,
+            balance_ciphertext_hex: &balance_ciphertext_hex,
+            holder_privkey,
+            holder_pubkey,
+            issuer_pubkey,
+            auditor_pubkey,
+        })
+    }
+
+    /// Prepare a `ConfidentialMPTClawback`, fetching the issuer's sequence and the
+    /// holder's on-ledger `IssuerEncryptedBalance`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn prepare_confidential_clawback<C: XRPLAsyncClient>(
+        client: &C,
+        issuer_account: &str,
+        holder_account: &str,
+        issuance_id_hex: &str,
+        amount: u64,
+        issuer_privkey: &Privkey,
+        issuer_pubkey: &Pubkey,
+    ) -> Result<ConfidentialMPTClawback<'static>> {
+        let sequence = fetch_sequence(client, issuer_account).await?;
+        let node = read_mptoken(client, holder_account, issuance_id_hex).await?;
+        let issuer_encrypted_balance_hex = field_str(&node, "IssuerEncryptedBalance")?.to_string();
+        assemble_clawback(ClawbackParams {
+            issuer_account,
+            holder_account,
+            issuance_id_hex,
+            sequence,
+            amount,
+            issuer_privkey,
+            issuer_pubkey,
+            issuer_encrypted_balance_hex: &issuer_encrypted_balance_hex,
+        })
+    }
+
+    /// Prepare a `ConfidentialMPTMergeInbox`, fetching the account sequence.
+    pub async fn prepare_confidential_merge_inbox<C: XRPLAsyncClient>(
+        client: &C,
+        account: &str,
+        issuance_id_hex: &str,
+    ) -> Result<ConfidentialMPTMergeInbox<'static>> {
+        let sequence = fetch_sequence(client, account).await?;
+        Ok(assemble_merge_inbox(account, issuance_id_hex, sequence))
     }
 }
 
