@@ -10,18 +10,17 @@ pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
 pub mod clawback;
-#[cfg(feature = "confidential-mpt")]
+// The ConfidentialMPT transaction *models* are plain data structs (hex-string
+// fields, no native crypto dependency), so they compile like any other model —
+// independent of the `confidential-mpt` feature. That feature gates only the
+// FFI-backed crypto (`mpt_crypto`) and the `confidential` assembly layer, so a
+// caller can build / sign / serialize these transactions without linking the
+// native libmpt-crypto library.
 pub mod confidential_mpt_clawback;
-// Pure length constants + hex validation: no native crypto dependency, and
-// `MPTokenIssuanceSet` needs them regardless of the `confidential-mpt` feature.
 pub mod confidential_mpt_constants;
-#[cfg(feature = "confidential-mpt")]
 pub mod confidential_mpt_convert;
-#[cfg(feature = "confidential-mpt")]
 pub mod confidential_mpt_convert_back;
-#[cfg(feature = "confidential-mpt")]
 pub mod confidential_mpt_merge_inbox;
-#[cfg(feature = "confidential-mpt")]
 pub mod confidential_mpt_send;
 pub mod credential_accept;
 pub mod credential_create;

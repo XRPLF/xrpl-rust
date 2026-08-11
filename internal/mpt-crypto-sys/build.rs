@@ -27,6 +27,16 @@ const MPT_CRYPTO_VERSION: &str = "1.0.2";
 const BUNDLE_SHA256: &str = "8a765db71473ca4b1034f1f3140743b36ff80b66f3a1ab71769489e8f03231e9";
 
 fn main() {
+    // docs.rs builds in a network-isolated sandbox with no native
+    // `libmpt-crypto` available, so tier-3 download resolution would fail.
+    // rustdoc type-checks the crate but never performs the final native link,
+    // so skipping resolution + link directives lets `cargo doc` succeed while
+    // producing identical documentation. (docs.rs sets `DOCS_RS=1`.)
+    if env::var_os("DOCS_RS").is_some() {
+        println!("cargo:rerun-if-changed=build.rs");
+        return;
+    }
+
     let target = env::var("TARGET").expect("cargo did not set TARGET");
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("cargo did not set OUT_DIR"));
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());

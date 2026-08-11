@@ -23,6 +23,13 @@ categories = ["no-std"]
 no-dev-version = true
 tag-name = "{{version}}"
 
+[package.metadata.docs.rs]
+# Also document the `confidential-mpt` API (the `mpt_crypto` re-export and the
+# `confidential` assembly layer). mpt-crypto-sys/build.rs short-circuits native
+# resolution + linking when `DOCS_RS` is set, so this builds in docs.rs's
+# network-isolated sandbox without the native libmpt-crypto library.
+features = ["confidential-mpt"]
+
 [lib]
 name = "xrpl"
 crate-type = ["lib"]
@@ -146,9 +153,12 @@ websocket = [
 core = ["utils"]
 utils = []
 cli = ["dep:clap", "dep:bip39"]
-# Confidential MPT (XLS-0096) support. Requires `std` because mpt-crypto links
-# the native libmpt-crypto library via FFI. Adds the 5 ConfidentialMPT
-# transaction models and the safe-wrapper crypto crate to the public surface.
+# Confidential MPT (XLS-0096) crypto support. Requires `std` because mpt-crypto
+# links the native libmpt-crypto library via FFI. Adds the safe-wrapper crypto
+# crate (`mpt_crypto`) and the `confidential` assembly/prepare layer to the
+# public surface. The 5 ConfidentialMPT transaction *models* are always
+# available with `models` (they carry no native dependency) and do NOT require
+# this feature.
 confidential-mpt = ["std", "models", "dep:mpt-crypto"]
 integration = [] # Enable integration tests (requires network access)
 std = [
