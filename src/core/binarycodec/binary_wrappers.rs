@@ -385,13 +385,13 @@ pub trait Serialization {
     /// use xrpl::core::binarycodec::Serialization;
     ///
     /// let expected: Vec<u8> = [3, 0, 17, 34].to_vec();
-    /// let mut test_bytes: Vec<u8> = [0, 17, 34].to_vec();
+    /// let test_bytes: Vec<u8> = [0, 17, 34].to_vec();
     /// let mut serializer: BinarySerializer = BinarySerializer::new();
     ///
-    /// serializer.write_length_encoded(&mut test_bytes, true);
+    /// serializer.write_length_encoded(&test_bytes, true).unwrap();
     /// assert_eq!(expected, serializer);
     /// ```
-    fn write_length_encoded(&mut self, value: &[u8], encode_value: bool) -> &Self;
+    fn write_length_encoded(&mut self, value: &[u8], encode_value: bool) -> XRPLCoreResult<&Self>;
 
     /// Write field and value to the buffer.
     ///
@@ -424,7 +424,7 @@ pub trait Serialization {
     /// let test_bytes: Vec<u8> = [0, 17, 34].to_vec();
     /// let mut serializer: BinarySerializer = BinarySerializer::new();
     ///
-    /// serializer.write_field_and_value(field_instance, &test_bytes, false);
+    /// serializer.write_field_and_value(field_instance, &test_bytes, false).unwrap();
     /// assert_eq!(expected, serializer);
     /// ```
     fn write_field_and_value(
@@ -432,7 +432,7 @@ pub trait Serialization {
         field: FieldInstance,
         value: &[u8],
         is_unl_modify_workaround: bool,
-    ) -> &Self;
+    ) -> XRPLCoreResult<&Self>;
 }
 
 impl Serialization for BinarySerializer {
@@ -441,19 +441,16 @@ impl Serialization for BinarySerializer {
         self
     }
 
-    fn write_length_encoded(&mut self, value: &[u8], encode_value: bool) -> &Self {
-        let mut byte_object: Vec<u8> = Vec::new();
-        if encode_value {
-            // write value to byte_object
-            byte_object.extend_from_slice(value);
-        }
-        // TODO Handle unwrap better
-        let length_prefix = _encode_variable_length_prefix(&byte_object.len()).unwrap();
+    fn write_length_encoded(&mut self, value: &[u8], encode_value: bool) -> XRPLCoreResult<&Self> {
+        let length = if encode_value { value.len() } else { 0 };
+        let length_prefix = _encode_variable_length_prefix(&length)?;
 
         self.extend_from_slice(&length_prefix);
-        self.extend_from_slice(&byte_object);
+        if encode_value {
+            self.extend_from_slice(value);
+        }
 
-        self
+        Ok(self)
     }
 
     fn write_field_and_value(
@@ -461,16 +458,16 @@ impl Serialization for BinarySerializer {
         field: FieldInstance,
         value: &[u8],
         is_unl_modify_workaround: bool,
-    ) -> &Self {
+    ) -> XRPLCoreResult<&Self> {
         self.extend_from_slice(&field.header.to_bytes());
 
         if field.is_vl_encoded {
-            self.write_length_encoded(value, !is_unl_modify_workaround);
+            self.write_length_encoded(value, !is_unl_modify_workaround)?;
         } else {
             self.extend_from_slice(value);
         }
 
-        self
+        Ok(self)
     }
 }
 
@@ -1112,7 +1109,9 @@ mod test {
         let test_bytes: Vec<u8> = [0, 17, 34].to_vec();
         let mut serializer: BinarySerializer = BinarySerializer::new();
 
-        serializer.write_field_and_value(field_instance, &test_bytes, false);
+        serializer
+            .write_field_and_value(field_instance, &test_bytes, false)
+            .unwrap();
         assert_eq!(expected, serializer);
     }
 
@@ -1199,7 +1198,9 @@ mod test {
             let blob = (0..case).map(|_| "A2").collect::<String>();
             let mut binary_serializer: BinarySerializer = BinarySerializer::new();
 
-            binary_serializer.write_length_encoded(&hex::decode(blob).expect(""), true);
+            binary_serializer
+                .write_length_encoded(&hex::decode(blob).expect("valid hex"), true)
+                .unwrap();
 
             let mut binary_parser: BinaryParser = BinaryParser::from(binary_serializer.as_ref());
             let decoded_length = binary_parser.read_length_prefix();
@@ -1207,5 +1208,25 @@ mod test {
             assert!(decoded_length.is_ok());
             assert_eq!(decoded_length, Ok(case));
         }
+    }
+
+    /// Regression test for #268: `write_length_encoded` must return `Err` when the
+    /// value exceeds `MAX_LENGTH_VALUE` instead of panicking via `.unwrap()`.
+    #[test]
+    fn test_write_length_encoded_too_large_returns_error() {
+        let big = vec![0u8; MAX_LENGTH_VALUE + 1];
+        let mut serializer: BinarySerializer = BinarySerializer::new();
+        let result = serializer.write_length_encoded(&big, true);
+
+        assert!(
+            matches!(
+                result,
+                Err(XRPLCoreException::XRPLBinaryCodecError(
+                    XRPLBinaryCodecException::InvalidVariableLengthTooLarge { max }
+                )) if max == MAX_LENGTH_VALUE
+            ),
+            "Expected InvalidVariableLengthTooLarge error, got: {:?}",
+            result
+        );
     }
 }

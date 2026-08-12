@@ -606,7 +606,7 @@ impl STObject {
                 field_instance.to_owned(),
                 associated_value.as_ref(),
                 is_unl_modify_workaround,
-            );
+            )?;
             if field_instance.associated_type == ST_OBJECT {
                 serializer.append(OBJECT_END_MARKER_BYTES.to_vec().as_mut());
             }
