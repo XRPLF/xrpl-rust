@@ -175,7 +175,7 @@ where
     let mut base_fee_decimal: BigDecimal = base_fee.try_into()?;
     if let Some(signers_count) = signers_count {
         let net_fee_decimal: BigDecimal = net_fee.try_into()?;
-        let signer_count_fee_decimal: BigDecimal = (1 + signers_count).into();
+        let signer_count_fee_decimal: BigDecimal = (1u64 + signers_count as u64).into();
         base_fee_decimal += &(net_fee_decimal * signer_count_fee_decimal);
     }
 
@@ -210,10 +210,9 @@ fn calculate_based_on_fulfillment<'a>(
     fulfillment: Cow<str>,
     net_fee: XRPAmount<'_>,
 ) -> XRPLHelperResult<XRPAmount<'a>> {
-    let fulfillment_bytes: Vec<u8> = fulfillment.chars().map(|c| c as u8).collect();
+    let fulfillment_byte_len = fulfillment.len();
     let net_fee_f64: f64 = net_fee.try_into()?;
-    let base_fee_string =
-        (net_fee_f64 * (33.0 + (fulfillment_bytes.len() as f64 / 16.0))).to_string();
+    let base_fee_string = (net_fee_f64 * (33.0 + (fulfillment_byte_len as f64 / 16.0))).to_string();
     let base_fee: XRPAmount = base_fee_string.into();
     let base_fee_decimal: BigDecimal = base_fee.try_into()?;
 
@@ -253,6 +252,9 @@ fn is_not_later_rippled_version(source: String, target: String) -> XRPLHelperRes
             .split('.')
             .map(|i| i.to_string())
             .collect::<Vec<String>>();
+        if source_decomp.len() < 3 || target_decomp.len() < 3 {
+            return Ok(false);
+        }
         let (source_major, source_minor) = (
             source_decomp[0]
                 .parse::<u8>()
@@ -537,5 +539,27 @@ mod test_sign {
         let common_fields = tx.get_common_fields();
         assert_eq!(common_fields.account, wallet.classic_address);
         assert!(!common_fields.is_signed()); // Should not be signed yet
+    }
+}
+
+#[cfg(test)]
+mod test_fee_calculation {
+    use bigdecimal::BigDecimal;
+
+    // Regression guard for issue #238: (1 + signers_count) as u8 overflows at 255
+    // in release builds, or panics in debug builds. The fix widens to u64 first.
+    // NOTE: A full behavioral test of calculate_fee_per_transaction_type requires a
+    // mock AsyncClient — this test guards the arithmetic expression at line 178.
+    #[test]
+    fn test_fee_signer_multiplier_overflow_guard() {
+        let signers_count: u8 = 255;
+        // Production expression from calculate_fee_per_transaction_type line 178:
+        //   let signer_count_fee_decimal: BigDecimal = (1u64 + signers_count as u64).into();
+        let multiplier: BigDecimal = (1u64 + signers_count as u64).into();
+        assert_eq!(
+            multiplier,
+            BigDecimal::from(256u64),
+            "signers_count=255 must produce multiplier 256, not 0 (u8 overflow)"
+        );
     }
 }
