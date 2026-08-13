@@ -106,77 +106,77 @@ jobs:
                     --name xrpld-service \
                     "${XRPLD_DOCKER_IMAGE}" --standalone
 
-                    - name: Wait for xrpld to be ready
-                      run: |
-                          echo "Waiting for xrpld RPC on localhost:5005..."
-                          for i in $(seq 1 60); do
-                            if curl -sf --max-time 5 -X POST http://localhost:5005/ \
-                                -H 'Content-Type: application/json' \
-                                -d '{"method":"server_info","params":[{}]}' \
-                                | grep -q '"status":"success"'; then
-                              echo "xrpld is ready (attempt $i)"
-                              exit 0
-                            fi
-                            sleep 2
-                          done
-                          echo "xrpld did not become ready in time"
-                          docker logs xrpld-service 2>&1 || true
-                          exit 1
+            - name: Wait for xrpld to be ready
+              run: |
+                  echo "Waiting for xrpld RPC on localhost:5005..."
+                  for i in $(seq 1 60); do
+                    if curl -sf --max-time 5 -X POST http://localhost:5005/ \
+                        -H 'Content-Type: application/json' \
+                        -d '{"method":"server_info","params":[{}]}' \
+                        | grep -q '"status":"success"'; then
+                      echo "xrpld is ready (attempt $i)"
+                      exit 0
+                    fi
+                    sleep 2
+                  done
+                  echo "xrpld did not become ready in time"
+                  docker logs xrpld-service 2>&1 || true
+                  exit 1
 
-                    - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@stable
 
-                    - name: Install cargo-llvm-cov
-                      uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2.79.3
-                      with:
-                          tool: cargo-llvm-cov
+            - name: Install cargo-llvm-cov
+              uses: taiki-e/install-action@65851e10cd6c377f11a60e600abc07cb08643468 # v2.79.3
+              with:
+                  tool: cargo-llvm-cov
 
-                    - name: Cache cargo registry
-                      uses: actions/cache@v4
-                      with:
-                          path: |
-                              ~/.cargo/registry
-                              ~/.cargo/git
-                              target
-                          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
-                          restore-keys: |
-                              ${{ runner.os }}-cargo-integration-
+            - name: Cache cargo registry
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-cargo-integration-
 
-                    - name: Run integration tests under coverage
-                      run: |
-                          cargo llvm-cov --no-report --release \
-                            --features std,json-rpc,helpers,cli,websocket,integration \
-                            --test integration_test \
-                            --test cli_integration \
-                            --test funding \
-                            --test utils \
-                            --test test_utils \
-                            -- --test-threads=1
-                      env:
-                          RUST_BACKTRACE: 1
+            - name: Run integration tests under coverage
+              run: |
+                  cargo llvm-cov --no-report --release \
+                    --features std,json-rpc,helpers,cli,websocket,integration \
+                    --test integration_test \
+                    --test cli_integration \
+                    --test funding \
+                    --test utils \
+                    --test test_utils \
+                    -- --test-threads=1
+              env:
+                  RUST_BACKTRACE: 1
 
-                    - name: Generate lcov report (scoped to integration territory)
-                      run: |
-                          cargo llvm-cov report --release \
-                            --lcov --output-path lcov.info \
-                            --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
+            - name: Generate lcov report (scoped to integration territory)
+              run: |
+                  cargo llvm-cov report --release \
+                    --lcov --output-path lcov.info \
+                    --ignore-filename-regex '${{ env.COVERAGE_IGNORE_REGEX }}'
 
-                    - name: Upload coverage to Codecov
-                      uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
-                      with:
-                          token: ${{ secrets.CODECOV_TOKEN }}
-                          files: lcov.info
-                          flags: integration
-                          fail_ci_if_error: true
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+              with:
+                  token: ${{ secrets.CODECOV_TOKEN }}
+                  files: lcov.info
+                  flags: integration
+                  fail_ci_if_error: true
 
-                    - name: Upload coverage report
-                      if: always()
-                      uses: actions/upload-artifact@v4
-                      with:
-                          name: integration-lcov-report
-                          path: lcov.info
+            - name: Upload coverage report
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: integration-lcov-report
+                  path: lcov.info
 
-                    - name: Dump xrpld logs and stop container
-                      if: always()
-                      run: |
-                          docker logs xrpld-service 2>&1 || echo "::warning::xrpld-service container not present for logs"
-                          docker stop xrpld-service 2>/dev/null || true
+            - name: Dump xrpld logs and stop container
+              if: always()
+              run: |
+                  docker logs xrpld-service 2>&1 || echo "::warning::xrpld-service container not present for logs"
+                  docker stop xrpld-service 2>/dev/null || true
