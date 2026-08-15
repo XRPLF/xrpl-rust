@@ -5,14 +5,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
+    transactions::{vault_common::validate_hash256, CommonTransactionBuilder, Memo, Signer},
     Amount, FlagCollection, IssuedCurrencyAmount, Model, NoFlags, ValidateCurrencies, XRPAmount,
     XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
-
-const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -143,7 +141,7 @@ impl<'a> LoanBrokerCoverClawback<'a> {
             // Amount present without loan_broker_id
             (None, Some(amount)) => self.validate_amount_without_broker(amount),
             (Some(v), _) => {
-                Self::validate_loan_broker_id(v)?;
+                validate_hash256("loan_broker_id", v)?;
 
                 Ok(())
             }
@@ -184,18 +182,6 @@ impl<'a> LoanBrokerCoverClawback<'a> {
             return Err(XRPLModelException::InvalidValue {
                 field: "amount".to_string(),
                 expected: "a positive amount".to_string(),
-                found: value.to_string(),
-            });
-        }
-
-        Ok(())
-    }
-
-    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
-        if value.len() != LOAN_BROKER_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_broker_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
                 found: value.to_string(),
             });
         }

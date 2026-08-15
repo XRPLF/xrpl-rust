@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{vault_common::validate_vault_id, CommonTransactionBuilder, Memo, Signer},
+    transactions::{
+        vault_common::{validate_hash256, validate_vault_id},
+        CommonTransactionBuilder, Memo, Signer,
+    },
     FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
     XRPLModelResult,
 };
@@ -12,7 +15,6 @@ use crate::models::{
 use super::{CommonFields, Transaction, TransactionType};
 
 const MAX_DATA_LENGTH: usize = 512;
-const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -62,7 +64,7 @@ impl Model for LoanBrokerSet<'_> {
         validate_vault_id(&self.vault_id)?;
 
         if let Some(loan_broker_id) = &self.loan_broker_id {
-            Self::validate_loan_broker_id(loan_broker_id)?;
+            validate_hash256("loan_broker_id", loan_broker_id)?;
 
             if self.management_fee_rate.is_some() {
                 return Err(XRPLModelException::InvalidValue {
@@ -280,18 +282,6 @@ impl<'a> LoanBrokerSet<'a> {
     pub fn with_cover_rate_liquidation(mut self, cover_rate_liquidation: u32) -> Self {
         self.cover_rate_liquidation = Some(cover_rate_liquidation);
         self
-    }
-
-    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
-        if value.len() != LOAN_BROKER_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_broker_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
-                found: value.to_string(),
-            });
-        }
-
-        Ok(())
     }
 }
 

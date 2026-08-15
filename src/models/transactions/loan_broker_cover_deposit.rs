@@ -5,13 +5,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
+    transactions::{vault_common::validate_hash256, CommonTransactionBuilder, Memo, Signer},
     Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
-
-const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -65,7 +63,7 @@ impl Model for LoanBrokerCoverDeposit<'_> {
             });
         }
 
-        Self::validate_loan_broker_id(&self.loan_broker_id)?;
+        validate_hash256("loan_broker_id", &self.loan_broker_id)?;
 
         Ok(())
     }
@@ -135,18 +133,6 @@ impl<'a> LoanBrokerCoverDeposit<'a> {
     pub fn with_amount(mut self, amount: Amount<'a>) -> Self {
         self.amount = amount;
         self
-    }
-
-    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
-        if value.len() != LOAN_BROKER_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_broker_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
-                found: value.to_string(),
-            });
-        }
-
-        Ok(())
     }
 }
 

@@ -3,14 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
-    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
-    XRPLModelResult,
+    transactions::{vault_common::validate_hash256, CommonTransactionBuilder, Memo, Signer},
+    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
-
-const LOAN_ID_HEX_LEN: usize = 64;
 
 /// Creates a new Loan ledger entry, representing a loan agreement
 /// between a Loan Broker and Borrower.
@@ -51,13 +48,7 @@ impl Model for LoanDelete<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        if self.loan_id.len() != LOAN_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
-                found: self.loan_id.to_string(),
-            });
-        }
+        validate_hash256("loan_id", &self.loan_id)?;
 
         Ok(())
     }
@@ -123,6 +114,8 @@ impl<'a> LoanDelete<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::models::XRPLModelException;
+
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanDeleter6T5weJ9mZg";

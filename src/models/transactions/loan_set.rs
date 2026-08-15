@@ -6,14 +6,16 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    transactions::{vault_common::validate_hex_blob, CommonTransactionBuilder, Memo, Signer},
+    transactions::{
+        vault_common::{validate_hash256, validate_hex_blob},
+        CommonTransactionBuilder, Memo, Signer,
+    },
     FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
 
 const DEFAULT_PAYMENT_INTERVAL: u32 = 60;
-const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 const MAX_DATA_LENGTH: usize = 512;
 
 #[derive(
@@ -120,7 +122,7 @@ impl Model for LoanSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        Self::validate_loan_broker_id(&self.loan_broker_id)?;
+        validate_hash256("loan_broker_id", &self.loan_broker_id)?;
 
         if let Some(cs) = &self.counterparty_signature {
             let has_single_sig = cs.signing_pub_key.is_some();
@@ -506,18 +508,6 @@ impl<'a> LoanSet<'a> {
     pub fn with_grace_period(mut self, grace_period: u32) -> Self {
         self.grace_period = Some(grace_period);
         self
-    }
-
-    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
-        if value.len() != LOAN_BROKER_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_broker_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
-                found: value.to_string(),
-            });
-        }
-
-        Ok(())
     }
 }
 

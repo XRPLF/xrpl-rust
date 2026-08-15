@@ -3,14 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
-    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
-    XRPLModelResult,
+    transactions::{vault_common::validate_hash256, CommonTransactionBuilder, Memo, Signer},
+    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
-
-const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -40,7 +37,7 @@ impl Model for LoanBrokerDelete<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        Self::validate_loan_broker_id(&self.loan_broker_id)?;
+        validate_hash256("loan_broker_id", &self.loan_broker_id)?;
 
         Ok(())
     }
@@ -108,18 +105,6 @@ impl<'a> LoanBrokerDelete<'a> {
     pub fn with_loan_broker_id(mut self, loan_broker_id: Cow<'a, str>) -> Self {
         self.loan_broker_id = loan_broker_id;
         self
-    }
-
-    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
-        if value.len() != LOAN_BROKER_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_broker_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
-                found: value.to_string(),
-            });
-        }
-
-        Ok(())
     }
 }
 

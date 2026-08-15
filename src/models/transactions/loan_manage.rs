@@ -5,13 +5,11 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
+    transactions::{vault_common::validate_hash256, CommonTransactionBuilder, Memo, Signer},
     FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
-
-const LOAN_ID_HEX_LEN: usize = 64;
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter, Copy,
@@ -66,13 +64,7 @@ impl Model for LoanManage<'_> {
             });
         }
 
-        if self.loan_id.len() != LOAN_ID_HEX_LEN {
-            return Err(XRPLModelException::InvalidValueFormat {
-                field: "loan_id".to_string(),
-                format: "64 hex characters (256-bit hash)".to_string(),
-                found: self.loan_id.to_string(),
-            });
-        }
+        validate_hash256("loan_id", &self.loan_id)?;
 
         Ok(())
     }
