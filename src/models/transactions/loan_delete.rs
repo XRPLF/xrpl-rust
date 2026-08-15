@@ -4,10 +4,13 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{
     transactions::{CommonTransactionBuilder, Memo, Signer},
-    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelResult,
+    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
+    XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
+
+const LOAN_ID_HEX_LEN: usize = 64;
 
 /// Creates a new Loan ledger entry, representing a loan agreement
 /// between a Loan Broker and Borrower.
@@ -46,7 +49,17 @@ pub struct LoanDelete<'a> {
 
 impl Model for LoanDelete<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+
+        if self.loan_id.len() != LOAN_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: self.loan_id.to_string(),
+            });
+        }
+
+        Ok(())
     }
 }
 
@@ -113,7 +126,7 @@ mod tests {
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanDeleter6T5weJ9mZg";
-    const LOAN_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";
+    const LOAN_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
 
     #[test]
     fn test_invalid_data_too_long() {
@@ -127,7 +140,7 @@ mod tests {
             loan_id: LOAN_ID.into(),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanDeleter6T5weJ9mZg","TransactionType":"LoanDelete","Flags":0,"SigningPubKey":"","LoanID":"rDB303FC1C7611B22C09E773B51044F6BE"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanDeleter6T5weJ9mZg","TransactionType":"LoanDelete","Flags":0,"SigningPubKey":"","LoanID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -137,5 +150,23 @@ mod tests {
         let deserilized_tx: LoanDelete = serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_invalid_loan_id() {
+        let tx = LoanDelete {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanDelete,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_id: "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDE".into(),
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
     }
 }

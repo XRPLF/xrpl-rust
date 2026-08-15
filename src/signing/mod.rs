@@ -124,12 +124,16 @@ pub fn sign_loan_set_by_counterparty<'a>(
 
     reject_if_already_signed(transaction, wallet, multisign)?;
 
-    if transaction.get_common_fields().txn_signature.is_none()
-        || transaction.get_common_fields().signing_pub_key.is_none()
-    {
-        Err(XRPLModelException::MissingField(
-            "txn_signature or signing_pub_key is required as first party signing".into(),
-        ))?
+    let cf = transaction.get_common_fields();
+
+    let has_single_sig = cf.txn_signature.is_some() && cf.signing_pub_key.is_some();
+    let has_multi_sig = cf.signers.as_ref().is_some_and(|s| !s.is_empty());
+
+    if !has_single_sig && !has_multi_sig {
+        return Err(XRPLModelException::MissingField(
+            "first-party signature (TxnSignature+SigningPubKey) or Signers is required before counterparty signing".into(),
+        )
+        .into());
     }
 
     if multisign {
@@ -289,7 +293,7 @@ fn reject_if_already_signed<'a>(
     };
 
     match &cs.signers {
-        Some(signers) if !multisign => Err(XRPLSignTransactionException::TransactionSigned(
+        Some(_) if !multisign => Err(XRPLSignTransactionException::TransactionSigned(
             "Transaction already has multisign counterparty signatures; \
              cannot apply a single-sign counterparty signature."
                 .into(),

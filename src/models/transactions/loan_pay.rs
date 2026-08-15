@@ -1,4 +1,6 @@
 use alloc::{borrow::Cow, format, vec::Vec};
+use core::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_with::skip_serializing_none;
@@ -12,22 +14,27 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
+const LOAN_ID_HEX_LEN: usize = 64;
+
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter, Copy,
 )]
 #[repr(u32)]
 pub enum LoanPayFlag {
     /// Indicates that the remaining payment amount should
-    /// be treated as an overpayment..
+    /// be treated as an overpayment.
     TfLoanOverpayment = 0x00010000,
     /// Indicates that the borrower is making a full early repayment.
     TfLoanFullPayment = 0x00020000,
     /// Indicates that the borrower is making a late loan payment.
     TfLoanLatePayment = 0x00040000,
 }
-/// Manages the state of a Loan ledger entry,
-/// including defaulting, impairing, or unimpairing a loan.
-/// Only the LoanBroker ledger entry owner can initiate this transaction.
+
+/// Makes a payment on an active loan.
+/// Only the borrower on the loan can make payments, and
+/// payments must meet the minimum amount required for that period.
+/// A loan payment has four types: Regular Payment, Late Payment, Early Full Payment and Overpayment.
+/// `<https://xrpl.org/docs/references/protocol/transactions/types/loanpay>`
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -58,12 +65,42 @@ impl Model for LoanPay<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
+        if self.loan_id.len() != LOAN_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: self.loan_id.to_string(),
+            });
+        }
+
         let num_flags = self.common_fields.flags.0.len();
         if num_flags > 1 {
             return Err(XRPLModelException::InvalidValue {
                 field: "flags".into(),
-                expected: "Only one flag arrowed".into(),
+                expected: "Only one flag allowed".into(),
                 found: format!("{} flags found", num_flags),
+            });
+        }
+
+        let value = match &self.amount {
+            Amount::MPTAmount(amount) => amount.value.as_ref(),
+            Amount::IssuedCurrencyAmount(amount) => amount.value.as_ref(),
+            Amount::XRPAmount(amount) => amount.0.as_ref(),
+        };
+
+        let parsed = bigdecimal::BigDecimal::from_str(value).map_err(|_| {
+            XRPLModelException::InvalidValueFormat {
+                field: "amount".to_string(),
+                format: "a valid decimal number".to_string(),
+                found: value.to_string(),
+            }
+        })?;
+
+        if parsed <= 0 {
+            return Err(XRPLModelException::InvalidValue {
+                field: "amount".to_string(),
+                expected: "a positive amount".to_string(),
+                found: value.to_string(),
             });
         }
 
@@ -138,7 +175,7 @@ mod tests {
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanPayer6T5weJ9mZg";
-    const LOAN_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";
+    const LOAN_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
 
     #[test]
     fn test_serde() {
@@ -153,7 +190,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount("1000".into())),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanPayer6T5weJ9mZg","TransactionType":"LoanPay","Flags":0,"SigningPubKey":"","LoanID":"rDB303FC1C7611B22C09E773B51044F6BE","Amount":"1000"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanPayer6T5weJ9mZg","TransactionType":"LoanPay","Flags":0,"SigningPubKey":"","LoanID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","Amount":"1000"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -186,6 +223,48 @@ mod tests {
         assert!(matches!(
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_amount() {
+        let tx = LoanPay {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanPay,
+                signing_pub_key: Some("".into()),
+                flags: FlagCollection::default(),
+                ..Default::default()
+            },
+            loan_id: LOAN_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount("0".into())),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_id() {
+        let tx = LoanPay {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanPay,
+                signing_pub_key: Some("".into()),
+                flags: FlagCollection::default(),
+                ..Default::default()
+            },
+            loan_id: "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDE".into(),
+            amount: Amount::XRPAmount(XRPAmount("1000".into())),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
 }

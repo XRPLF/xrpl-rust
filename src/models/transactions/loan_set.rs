@@ -6,11 +6,15 @@ use serde_with::skip_serializing_none;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
+    transactions::{vault_common::validate_hex_blob, CommonTransactionBuilder, Memo, Signer},
     FlagCollection, Model, ValidateCurrencies, XRPAmount, XRPLModelException, XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
+
+const DEFAULT_PAYMENT_INTERVAL: u32 = 60;
+const LOAN_BROKER_ID_HEX_LEN: usize = 64;
+const MAX_DATA_LENGTH: usize = 512;
 
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter, Copy,
@@ -76,7 +80,7 @@ pub struct LoanSet<'a> {
     /// Valid values are between 0 and 100000 inclusive. (0 - 100%)
     pub interest_rate: Option<u32>,
     /// A premium added to the interest rate for late payments in in 1/10th basis points.
-    /// alid values are between 0 and 100000 inclusive. (0 - 100%)
+    /// Valid values are between 0 and 100000 inclusive. (0 - 100%)
     pub late_interest_rate: Option<u32>,
     /// A Fee Rate charged for repaying the Loan early in 1/10th basis points.
     /// Valid values are between 0 and 100000 inclusive. (0 - 100%)
@@ -116,6 +120,8 @@ impl Model for LoanSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
+        Self::validate_loan_broker_id(&self.loan_broker_id)?;
+
         if let Some(cs) = &self.counterparty_signature {
             let has_single_sig = cs.signing_pub_key.is_some();
             let has_txn_sig = cs.txn_signature.is_some();
@@ -149,20 +155,8 @@ impl Model for LoanSet<'_> {
             }
         }
 
-        if self.data.as_ref().is_some_and(|s| s.len() > 256) {
-            return Err(XRPLModelException::ValueTooLong {
-                field: "data".into(),
-                max: 256,
-                found: self.data.as_ref().unwrap().len(),
-            });
-        }
-
-        if self.data.as_ref().is_some_and(|s| s.is_empty()) {
-            return Err(XRPLModelException::ValueTooShort {
-                field: "data".into(),
-                min: 1,
-                found: 0,
-            });
+        if let Some(data) = &self.data {
+            validate_hex_blob("data", data, MAX_DATA_LENGTH)?;
         }
 
         if let Some(Err(e)) = self.data.as_ref().map(|s| hex::decode(s.as_ref())) {
@@ -256,10 +250,10 @@ impl Model for LoanSet<'_> {
             .parse::<BigDecimal>()
             .map_err(XRPLModelException::BigDecimalError)?;
 
-        if pr_decimal < 1 {
+        if pr_decimal <= 0 {
             return Err(XRPLModelException::InvalidValue {
                 field: "principal_requested".into(),
-                expected: "At least one(1)".into(),
+                expected: "More than zero(0)".into(),
                 found: format!("{}", pr_decimal),
             });
         }
@@ -297,29 +291,42 @@ impl Model for LoanSet<'_> {
             });
         }
 
-        if self.payment_interval.is_some_and(|v| v < 60) {
-            return Err(XRPLModelException::ValueTooLow {
-                field: "payment_interval".into(),
-                min: 60,
-                found: self.payment_interval.unwrap(),
-            });
-        }
-
-        if self.grace_period.is_some_and(|v| v < 60) {
-            return Err(XRPLModelException::ValueTooLow {
-                field: "grace_period".into(),
-                min: 60,
-                found: self.grace_period.unwrap(),
-            });
-        }
-
-        if let (Some(gr), Some(pi)) = (self.grace_period, self.payment_interval) {
-            if gr > pi {
-                return Err(XRPLModelException::InvalidValue {
-                    field: "grace_period and payment_interval".into(),
-                    expected: "grace_period should be less than payment_interval".into(),
-                    found: format!("grace_period: {}, payment_interval: {}", gr, pi),
+        if let Some(pi) = self.payment_interval {
+            if pi < DEFAULT_PAYMENT_INTERVAL {
+                return Err(XRPLModelException::ValueTooLow {
+                    field: "payment_interval".into(),
+                    min: DEFAULT_PAYMENT_INTERVAL,
+                    found: pi,
                 });
+            }
+        }
+
+        if let Some(gr) = self.grace_period {
+            if gr < DEFAULT_PAYMENT_INTERVAL {
+                return Err(XRPLModelException::ValueTooLow {
+                    field: "grace_period".into(),
+                    min: DEFAULT_PAYMENT_INTERVAL,
+                    found: self.grace_period.unwrap(),
+                });
+            }
+
+            match self.payment_interval {
+                Some(pi) if gr > pi => {
+                    return Err(XRPLModelException::InvalidValue {
+                        field: "grace_period and payment_interval".into(),
+                        expected: "grace_period should be less than or equal to payment_interval"
+                            .into(),
+                        found: format!("grace_period: {}, payment_interval: {}", gr, pi),
+                    });
+                }
+                None if gr > DEFAULT_PAYMENT_INTERVAL => {
+                    return Err(XRPLModelException::InvalidValue {
+                        field: "grace_period and payment_interval".into(),
+                        expected: "grace_period should be less than or equal to payment_interval (default 60 applies when unset)".into(),
+                        found: format!("grace_period: {}, payment_interval: None (defaults to {})", gr, DEFAULT_PAYMENT_INTERVAL),
+                    });
+                }
+                _ => {}
             }
         }
 
@@ -500,6 +507,18 @@ impl<'a> LoanSet<'a> {
         self.grace_period = Some(grace_period);
         self
     }
+
+    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
+        if value.len() != LOAN_BROKER_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_broker_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: value.to_string(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -507,8 +526,7 @@ mod tests {
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanSetter5weJ9mZg";
-    const VAULT_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";
-    const LOAN_BROKER_ID: &str = "rDB303FC1C76LOANBROKER09E773B51044F6BE";
+    const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
 
     #[test]
     fn test_serde() {
@@ -538,7 +556,7 @@ mod tests {
             grace_period: None,
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanSetter5weJ9mZg","TransactionType":"LoanSet","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C76LOANBROKER09E773B51044F6BE","PrincipalRequested":"1000"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanSetter5weJ9mZg","TransactionType":"LoanSet","Flags":0,"SigningPubKey":"","LoanBrokerID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","PrincipalRequested":"1000"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -560,7 +578,7 @@ mod tests {
                 ..Default::default()
             },
             loan_broker_id: LOAN_BROKER_ID.into(),
-            data: Some("A".repeat(257).into()),
+            data: Some("48656C6C6F".repeat(67).into()),
             counterparty: None,
             counterparty_signature: None,
             loan_origination_fee: None,
@@ -616,7 +634,7 @@ mod tests {
         assert!(tx.get_errors().is_err());
         assert!(matches!(
             tx.get_errors().err(),
-            Some(XRPLModelException::ValueTooShort { .. })
+            Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
 
@@ -651,7 +669,7 @@ mod tests {
         assert!(tx.get_errors().is_err());
         assert!(matches!(
             tx.get_errors().err(),
-            Some(XRPLModelException::FromHexError(..))
+            Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
 
@@ -832,7 +850,7 @@ mod tests {
 
     #[test]
     fn test_invalid_payment_interval_shorter_than_grace_period() {
-        let tx = LoanSet {
+        let mut tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
                 transaction_type: TransactionType::LoanSet,
@@ -857,6 +875,16 @@ mod tests {
             payment_interval: Some(61),
             grace_period: Some(62),
         };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+
+        // grace_period: Some(3600) + payment_interval: None
+        tx.payment_interval = None;
+        tx.grace_period = Some(3600);
 
         assert!(tx.get_errors().is_err());
         assert!(matches!(
@@ -1155,7 +1183,7 @@ mod tests {
         let tx = LoanSet {
             common_fields: CommonFields {
                 account: SOURCE.into(),
-                transaction_type: TransactionType::LoanBrokerSet,
+                transaction_type: TransactionType::LoanSet,
                 signing_pub_key: Some("".into()),
                 ..Default::default()
             },
@@ -1214,5 +1242,40 @@ mod tests {
         };
 
         assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id() {
+        let tx = LoanSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDE".into(),
+            data: None,
+            counterparty: None,
+            counterparty_signature: None,
+            loan_origination_fee: Some("11".into()),
+            loan_service_fee: Some("11".into()),
+            late_payment_fee: Some("11".into()),
+            close_payment_fee: Some("11".into()),
+            overpayment_fee: Some(1000),
+            interest_rate: Some(1000),
+            late_interest_rate: Some(1000),
+            close_interest_rate: Some(1000),
+            overpayment_interest_rate: Some(1000),
+            principal_requested: "1000".into(),
+            payment_total: Some(12),
+            payment_interval: Some(61),
+            grace_period: Some(60),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
     }
 }

@@ -1,4 +1,6 @@
 use alloc::{borrow::Cow, vec::Vec};
+use core::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
@@ -9,6 +11,8 @@ use crate::models::{
 };
 
 use super::{CommonFields, Transaction, TransactionType};
+
+const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -41,13 +45,21 @@ impl Model for LoanBrokerCoverClawback<'_> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        //Amount must not be XRP
-        if let Some(Amount::XRPAmount(..)) = &self.amount {
-            return Err(XRPLModelException::InvalidValue {
-                field: "amount".into(),
-                expected: "IssuedCurrencyAmount(IOU or MPT)".into(),
-                found: "XRPAmount".into(),
-            });
+        match &self.amount {
+            Some(Amount::MPTAmount(amount)) => {
+                Self::validate_positive_amount(amount.value.as_ref())?;
+            }
+            Some(Amount::IssuedCurrencyAmount(amount)) => {
+                Self::validate_positive_amount(amount.value.as_ref())?;
+            }
+            Some(Amount::XRPAmount(_)) => {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "amount".into(),
+                    expected: "IssuedCurrencyAmount(IOU or MPT)".into(),
+                    found: "XRPAmount".into(),
+                });
+            }
+            None => {}
         }
 
         self.validate_field_requirements()
@@ -130,7 +142,11 @@ impl<'a> LoanBrokerCoverClawback<'a> {
         match (&self.loan_broker_id, &self.amount) {
             // Amount present without loan_broker_id
             (None, Some(amount)) => self.validate_amount_without_broker(amount),
-            (Some(_), _) => Ok(()),
+            (Some(v), _) => {
+                Self::validate_loan_broker_id(v)?;
+
+                Ok(())
+            }
             // Neither field is present
             (None, None) => Err(XRPLModelException::MissingField(
                 "'loan_broker_id' and(or) 'amount'".into(),
@@ -154,6 +170,38 @@ impl<'a> LoanBrokerCoverClawback<'a> {
             Amount::XRPAmount(_) => Ok(()),
         }
     }
+
+    fn validate_positive_amount(value: &str) -> Result<(), XRPLModelException> {
+        let parsed = bigdecimal::BigDecimal::from_str(value).map_err(|_| {
+            XRPLModelException::InvalidValueFormat {
+                field: "amount".to_string(),
+                format: "a valid decimal number".to_string(),
+                found: value.to_string(),
+            }
+        })?;
+
+        if parsed <= 0 {
+            return Err(XRPLModelException::InvalidValue {
+                field: "amount".to_string(),
+                expected: "a positive amount".to_string(),
+                found: value.to_string(),
+            });
+        }
+
+        Ok(())
+    }
+
+    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
+        if value.len() != LOAN_BROKER_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_broker_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: value.to_string(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -161,7 +209,7 @@ mod tests {
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanBrokerCoverClawback5weJ9mZgQ";
-    const LOAN_BROKER_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BEA02EF9";
+    const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
 
     #[test]
     fn test_serde() {
@@ -176,7 +224,7 @@ mod tests {
             amount: Some(Amount::XRPAmount(XRPAmount::from("1000000"))),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverClawback5weJ9mZgQ","TransactionType":"LoanBrokerCoverClawback","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C7611B22C09E773B51044F6BEA02EF9","Amount":"1000000"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverClawback5weJ9mZgQ","TransactionType":"LoanBrokerCoverClawback","Flags":0,"SigningPubKey":"","LoanBrokerID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","Amount":"1000000"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -271,5 +319,55 @@ mod tests {
         };
 
         assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_negative_amount() {
+        let tx = LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: Some(LOAN_BROKER_ID.into()),
+            amount: Some(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+                currency: "USD".into(),
+                issuer: LOAN_BROKER_ID.into(),
+                value: "-1000".into(),
+            })),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id() {
+        let tx = LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: Some(
+                "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567".into(),
+            ),
+            amount: Some(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+                currency: "USD".into(),
+                issuer: LOAN_BROKER_ID.into(),
+                value: "1000".into(),
+            })),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
     }
 }

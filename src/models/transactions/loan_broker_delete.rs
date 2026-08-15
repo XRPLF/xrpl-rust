@@ -4,10 +4,13 @@ use serde_with::skip_serializing_none;
 
 use crate::models::{
     transactions::{CommonTransactionBuilder, Memo, Signer},
-    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelResult,
+    FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
+    XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
+
+const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -35,7 +38,11 @@ pub struct LoanBrokerDelete<'a> {
 
 impl Model for LoanBrokerDelete<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.validate_currencies()
+        self.validate_currencies()?;
+
+        Self::validate_loan_broker_id(&self.loan_broker_id)?;
+
+        Ok(())
     }
 }
 
@@ -102,10 +109,24 @@ impl<'a> LoanBrokerDelete<'a> {
         self.loan_broker_id = loan_broker_id;
         self
     }
+
+    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
+        if value.len() != LOAN_BROKER_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_broker_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: value.to_string(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::models::XRPLModelException;
+
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanBrokerDeletter5weJ9mZgQ";
@@ -133,5 +154,24 @@ mod tests {
         let deserilized_tx: LoanBrokerDelete = serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id() {
+        let tx = LoanBrokerDelete {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerDelete,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF123".into(),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
     }
 }

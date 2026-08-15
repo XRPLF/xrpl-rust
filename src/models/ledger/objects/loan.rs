@@ -46,9 +46,10 @@ pub struct Loan<'a> {
     pub owner_node: u64,
     /// Identifies the page where this item
     /// is referenced in the LoanBrokers owner directory.
-    pub loan_broker_node: u64,
+    pub loan_broker_node: Cow<'a, str>,
     /// The ID of the LoanBroker associated
     /// with this Loan Instance.
+    #[serde(rename = "LoanBrokerID")]
     pub loan_broker_id: Cow<'a, str>,
     /// The address of the account that is the borrower.
     pub borrower: Cow<'a, str>,
@@ -66,21 +67,21 @@ pub struct Loan<'a> {
     pub close_payment_fee: Cow<'a, str>,
     /// A fee charged on overpayments in 1/10th
     /// basis points. Valid values are between 0 and 100000 inclusive. (0 - 100%)
-    pub overpayment_fee: Cow<'a, str>,
+    pub overpayment_fee: u32,
     /// Annualized interest rate of the Loan in 1/10th basis points.
-    pub interest_rate: u32,
+    pub interest_rate: Option<u32>,
     /// A premium is added to the interest rate for
     /// late payments in 1/10th basis points.
     /// Valid values are between 0 and 100000 inclusive. (0 - 100%)
-    pub late_interest_rate: u32,
+    pub late_interest_rate: Option<u32>,
     /// An interest rate charged for repaying
     /// the Loan early in 1/10th basis points.
     /// Valid values are between 0 and 100000 inclusive. (0 - 100%)
-    pub close_interest_rate: u32,
+    pub close_interest_rate: Option<u32>,
     /// An interest rate charged on overpayments
     /// in 1/10th basis points. Valid values are between
     /// 0 and 100000 inclusive. (0 - 100%)
-    pub overpayment_interest_rate: u32,
+    pub overpayment_interest_rate: Option<u32>,
     /// The timestamp of when the Loan started
     /// Ripple Epoch.(https://xrpl.org/docs/references/protocol/data-types/basic-data-types/#specifying-time)
     pub start_date: u32,
@@ -93,16 +94,16 @@ pub struct Loan<'a> {
     pub previous_payment_due_date: u32,
     /// The timestamp of when the next payment is due
     /// in Ripple Epoch. (https://xrpl.org/docs/references/protocol/data-types/basic-data-types/#specifying-time)
-    pub next_payment_due_date: u32,
+    pub next_payment_due_date: Option<u32>,
     /// The number of payments remaining on the Loan.
-    pub payment_remaining: u32,
+    pub payment_remaining: Option<u32>,
     /// The total outstanding value of the Loan, including all
     /// fees and interest.
-    pub total_value_outstanding: Cow<'a, str>,
+    pub total_value_outstanding: Option<Cow<'a, str>>,
     /// The principal amount that the Borrower still owes.
-    pub principal_outstanding: Cow<'a, str>,
+    pub principal_outstanding: Option<Cow<'a, str>>,
     /// The remaining Management Fee owed to the LoanBroker.
-    pub management_fee_outstanding: Cow<'a, str>,
+    pub management_fee_outstanding: Option<Cow<'a, str>>,
     /// The calculated periodic payment amount for each payment interval.
     pub periodic_payment: Cow<'a, str>,
     /// The scale factor that ensures all computed amounts are
@@ -128,27 +129,27 @@ impl<'a> Loan<'a> {
         previous_txn_lgr_seq: u32,
         loan_sequence: u32,
         owner_node: u64,
-        loan_broker_node: u64,
+        loan_broker_node: Cow<'a, str>,
         loan_broker_id: Cow<'a, str>,
         borrower: Cow<'a, str>,
         loan_origination_fee: Cow<'a, str>,
         loan_service_fee: Cow<'a, str>,
         late_payment_fee: Cow<'a, str>,
         close_payment_fee: Cow<'a, str>,
-        overpayment_fee: Cow<'a, str>,
-        interest_rate: u32,
-        late_interest_rate: u32,
-        close_interest_rate: u32,
-        overpayment_interest_rate: u32,
+        overpayment_fee: u32,
+        interest_rate: Option<u32>,
+        late_interest_rate: Option<u32>,
+        close_interest_rate: Option<u32>,
+        overpayment_interest_rate: Option<u32>,
         start_date: u32,
         payment_interval: u32,
         grace_period: u32,
         previous_payment_due_date: u32,
-        next_payment_due_date: u32,
-        payment_remaining: u32,
-        total_value_outstanding: Cow<'a, str>,
-        principal_outstanding: Cow<'a, str>,
-        management_fee_outstanding: Cow<'a, str>,
+        next_payment_due_date: Option<u32>,
+        payment_remaining: Option<u32>,
+        total_value_outstanding: Option<Cow<'a, str>>,
+        principal_outstanding: Option<Cow<'a, str>>,
+        management_fee_outstanding: Option<Cow<'a, str>>,
         periodic_payment: Cow<'a, str>,
         loan_scale: Option<i32>,
     ) -> Self {
@@ -205,27 +206,27 @@ mod tests {
             47636435,
             7446366,
             6363252,
-            45372352,
+            "45372352".into(),
             "FA65C9FE1538FD7E398FFFE9D1908DFA4576D8".into(),
             "r75E1D753E5B91627516F6D7097".into(),
             "1".into(),
             "1".into(),
             "2".into(),
             "1".into(),
-            "1".into(),
-            10,
-            12,
-            10,
-            8,
+            1,
+            Some(10),
+            Some(12),
+            Some(10),
+            Some(8),
             177474757,
-            86400,
+            86400u32,
             500,
             1777749474,
-            175747473,
-            453636,
-            "100074".into(),
-            "100000".into(),
-            "1000".into(),
+            Some(175747473),
+            Some(453636),
+            Some("100074".into()),
+            Some("100000".into()),
+            Some("1000".into()),
             "500".into(),
             Some(5),
         );
@@ -234,5 +235,18 @@ mod tests {
         let deserialized: Loan = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(loan, deserialized);
+    }
+
+    #[test]
+    fn test_deserialization() {
+        let default_loan_str = r#"{"LedgerEntryType":"Loan","LedgerIndex":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","Flags":0,"PreviousTxnID":"9A8765B4321CDE987654321CDE987654321CDE987654321CDE987654321CDE98","PreviousTxnLgrSeq":12345678,"LoanSequence":1,"OwnerNode":2,"LoanBrokerNode":"1","LoanBrokerID":"ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890","Borrower":"rEXAMPLE9AbCdEfGhIjKlMnOpQrStUvWxYz","LoanOriginationFee":"100","LoanServiceFee":"10","LatePaymentFee":"5","ClosePaymentFee":"20","OverpaymentFee":5,"InterestRate":500,"LateInterestRate":1000,"CloseInterestRate":200,"OverpaymentInterestRate":5,"StartDate":1234567890,"PaymentInterval":2592000,"GracePeriod":604800,"PreviousPaymentDueDate":1234587890,"NextPaymentDueDate":1234597890,"PaymentRemaining":12,"PrincipalOutstanding":"10000","TotalValueOutstanding":"12000","ManagementFeeOutstanding":"2000","PeriodicPayment":"1000"}"#;
+
+        let object: Loan = serde_json::from_str(default_loan_str).expect("Failed to deserialize");
+        let serialized = serde_json::to_string(&object).unwrap();
+
+        let actual: serde_json::Value = serde_json::from_str(&serialized).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(default_loan_str).unwrap();
+
+        assert_eq!(actual, expected);
     }
 }

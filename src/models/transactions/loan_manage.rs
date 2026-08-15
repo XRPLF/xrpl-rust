@@ -11,6 +11,8 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
+const LOAN_ID_HEX_LEN: usize = 64;
+
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter, Copy,
 )]
@@ -59,8 +61,16 @@ impl Model for LoanManage<'_> {
         if num_flags > 1 {
             return Err(XRPLModelException::InvalidValue {
                 field: "flags".into(),
-                expected: "Only one flag arrowed".into(),
+                expected: "Only one flag allowed".into(),
                 found: format!("{} flags found", num_flags),
+            });
+        }
+
+        if self.loan_id.len() != LOAN_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: self.loan_id.to_string(),
             });
         }
 
@@ -179,6 +189,25 @@ mod tests {
         assert!(matches!(
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_id() {
+        let tx = LoanManage {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanManage,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_id: "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDE".into(),
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
 }

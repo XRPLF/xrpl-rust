@@ -4,12 +4,15 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{CommonTransactionBuilder, Memo, Signer},
+    transactions::{vault_common::validate_vault_id, CommonTransactionBuilder, Memo, Signer},
     FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
     XRPLModelResult,
 };
 
 use super::{CommonFields, Transaction, TransactionType};
+
+const MAX_DATA_LENGTH: usize = 512;
+const LOAN_BROKER_ID_HEX_LEN: usize = 64;
 
 #[skip_serializing_none]
 #[derive(
@@ -56,10 +59,42 @@ impl Model for LoanBrokerSet<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
         self.validate_currencies()?;
 
-        if self.data.as_ref().is_some_and(|s| s.len() > 256) {
+        validate_vault_id(&self.vault_id)?;
+
+        if let Some(loan_broker_id) = &self.loan_broker_id {
+            Self::validate_loan_broker_id(loan_broker_id)?;
+
+            if self.management_fee_rate.is_some() {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "loan_broker_id".into(),
+                    expected: "only values for Flags, Data, or DebtMaximum can be modified when loan_broker_id is set".into(),
+                    found: "management_fee_rate".into(),
+                });
+            }
+            if self.cover_rate_minimum.is_some() {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "loan_broker_id".into(),
+                    expected: "only values for Flags, Data, or DebtMaximum can be modified when loan_broker_id is set".into(),
+                    found: "cover_rate_minimum".into(),
+                });
+            }
+            if self.cover_rate_liquidation.is_some() {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "loan_broker_id".into(),
+                    expected: "only values for Flags, Data, or DebtMaximum can be modified when loan_broker_id is set".into(),
+                    found: "cover_rate_liquidation".into(),
+                });
+            }
+        }
+
+        if self
+            .data
+            .as_ref()
+            .is_some_and(|s| s.len() > MAX_DATA_LENGTH)
+        {
             return Err(XRPLModelException::ValueTooLong {
                 field: "data".into(),
-                max: 256,
+                max: 512,
                 found: self.data.as_ref().unwrap().len(),
             });
         }
@@ -114,8 +149,8 @@ impl Model for LoanBrokerSet<'_> {
             }
         }
 
-        if let (Some(crl), Some(crm)) = (self.cover_rate_liquidation, self.cover_rate_minimum) {
-            if (crl == 0) != (crm == 0) {
+        match (self.cover_rate_liquidation, self.cover_rate_minimum) {
+            (Some(crl), Some(crm)) if (crl == 0) != (crm == 0) => {
                 return Err(XRPLModelException::InvalidValue {
                     field: "cover_rate_liquidation and cover_rate_minimum".into(),
                     expected: "Both should be either None, Zero or Non-Zero".into(),
@@ -125,6 +160,17 @@ impl Model for LoanBrokerSet<'_> {
                     ),
                 });
             }
+            (Some(_), None) | (None, Some(_)) => {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "cover_rate_liquidation and cover_rate_minimum".into(),
+                    expected: "Both should be either None, Zero or Non-Zero".into(),
+                    found: format!(
+                        "cover_rate_liquidation: {:?}, cover_rate_minimum: {:?}",
+                        self.cover_rate_liquidation, self.cover_rate_minimum
+                    ),
+                });
+            }
+            _ => {}
         }
 
         Ok(())
@@ -235,6 +281,18 @@ impl<'a> LoanBrokerSet<'a> {
         self.cover_rate_liquidation = Some(cover_rate_liquidation);
         self
     }
+
+    fn validate_loan_broker_id(value: &str) -> Result<(), XRPLModelException> {
+        if value.len() != LOAN_BROKER_ID_HEX_LEN {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "loan_broker_id".to_string(),
+                format: "64 hex characters (256-bit hash)".to_string(),
+                found: value.to_string(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -242,7 +300,8 @@ mod tests {
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanBrokerSetter5weJ9mZg";
-    const VAULT_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";
+    const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+    const VAULT_ID: &str = "77D6234D074E505024D39C04C3F262997B773719AB29ACFA83119E4210328776";
 
     #[test]
     fn test_invalid_data_too_long() {
@@ -255,7 +314,7 @@ mod tests {
             },
             vault_id: VAULT_ID.into(),
             loan_broker_id: None,
-            data: Some("A".repeat(257).into()),
+            data: Some("48656C6C6F".repeat(67).into()),
             management_fee_rate: None,
             debt_maximum: None,
             cover_rate_liquidation: None,
@@ -469,7 +528,17 @@ mod tests {
         ));
 
         // Swapping values
-        let updated = tx.with_cover_rate_liquidation(1).with_cover_rate_minimum(0);
+        let mut updated = tx.with_cover_rate_liquidation(1).with_cover_rate_minimum(0);
+
+        assert!(updated.get_errors().is_err());
+        assert!(matches!(
+            updated.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+
+        // cover_rate_minimum: Some(500) + cover_rate_liquidation: None
+        updated.cover_rate_liquidation = None;
+        updated.cover_rate_minimum = Some(500);
 
         assert!(updated.get_errors().is_err());
         assert!(matches!(
@@ -496,7 +565,7 @@ mod tests {
             cover_rate_minimum: Some(0),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerSetter5weJ9mZg","TransactionType":"LoanBrokerSet","Flags":0,"SigningPubKey":"","VaultID":"rDB303FC1C7611B22C09E773B51044F6BE","ManagementFeeRate":10,"DebtMaximum":"10000","CoverRateMinimum":0,"CoverRateLiquidation":0}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerSetter5weJ9mZg","TransactionType":"LoanBrokerSet","Flags":0,"SigningPubKey":"","VaultID":"77D6234D074E505024D39C04C3F262997B773719AB29ACFA83119E4210328776","ManagementFeeRate":10,"DebtMaximum":"10000","CoverRateMinimum":0,"CoverRateLiquidation":0}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -506,5 +575,77 @@ mod tests {
         let deserilized_tx: LoanBrokerSet = serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            loan_broker_id: Some("E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF123456".into()),
+            data: None,
+            management_fee_rate: Some(10),
+            debt_maximum: Some("10000".into()),
+            cover_rate_liquidation: Some(0),
+            cover_rate_minimum: Some(0),
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_vault_id() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: "77D6234D074E505024D39C04C3F262997B773719AB29ACFA83119E42103".into(),
+            loan_broker_id: None,
+            data: None,
+            management_fee_rate: None,
+            debt_maximum: None,
+            cover_rate_liquidation: None,
+            cover_rate_minimum: None,
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_management_fee_set() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            loan_broker_id: Some(LOAN_BROKER_ID.into()),
+            data: None,
+            management_fee_rate: Some(10000),
+            debt_maximum: None,
+            cover_rate_liquidation: None,
+            cover_rate_minimum: None,
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
     }
 }
