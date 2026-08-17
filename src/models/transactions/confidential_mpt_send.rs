@@ -329,9 +329,10 @@ mod tests {
         assert_eq!(common.sequence, Some(9));
     }
 
-    // Two valid, distinct classic addresses with known AccountIDs.
-    const ACCT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
-    const DEST: &str = "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK"; // D528B6..705F
+    // Two valid, distinct classic addresses with known AccountIDs:
+    // ACCT -> B5F762..37E8, DEST -> D528B6..705F.
+    const ACCT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    const DEST: &str = "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK";
     // Issuance IDs whose issuer AccountID (bytes 4..24) is ACCT / DEST.
     const ISS_OF_ACCT: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
     const ISS_OF_DEST: &str = "00000001D528B62DC7AF16417C9F44AAD8C04D920A3A705F";

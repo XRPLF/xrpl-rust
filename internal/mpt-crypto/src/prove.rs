@@ -97,7 +97,7 @@ pub struct SendProofParams<'a> {
 }
 
 /// Generates the 946-byte `ConfidentialMPTSend` proof bundle.
-pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
+pub fn send(mut p: SendProofParams<'_>) -> Result<SendProof> {
     // The C side expects a contiguous array of `mpt_confidential_participant`.
     // We build it on the stack — at most 4 entries.
     let mut participants = [sys::mpt_confidential_participant {
@@ -124,10 +124,10 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
     // Holds a copy of the secret balance blinding factor + the plaintext
     // balance. The C struct doesn't implement Zeroize, so wipe those fields
     // ourselves after the call rather than leave them in a freed stack frame.
-    // Note this only scrubs *this* struct's copies: the originals still live in
-    // the caller-owned `p.current_balance` / `p.balance_blinding` (and whatever
-    // the caller decrypted them from). Zeroizing the caller's witnesses is the
-    // caller's responsibility; this just avoids leaving an extra copy behind.
+    // We also wipe the by-value secret scalars this function owns — `p.amount`
+    // (the confidential transfer amount) and `p.current_balance` — below. The
+    // reference-held witnesses (`p.balance_blinding` etc.) point to caller-owned
+    // memory, so scrubbing those remains the caller's responsibility.
     let mut balance_params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
         amount: p.current_balance,
@@ -158,6 +158,8 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
     };
     balance_params.blinding_factor.zeroize();
     balance_params.amount.zeroize();
+    p.amount.zeroize();
+    p.current_balance.zeroize();
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }
@@ -188,8 +190,10 @@ pub struct ConvertBackProofParams<'a> {
 }
 
 /// Generates the 816-byte `ConfidentialMPTConvertBack` proof bundle.
-pub fn convert_back(p: ConvertBackProofParams<'_>) -> Result<ConvertBackProof> {
+pub fn convert_back(mut p: ConvertBackProofParams<'_>) -> Result<ConvertBackProof> {
     // See `send`: wipe the secret blinding + plaintext balance after the call.
+    // (`p.amount` is the publicly revealed withdrawal amount, so it is not a
+    // secret; `p.current_balance` is, and is scrubbed below.)
     let mut params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
         amount: p.current_balance,
@@ -210,6 +214,7 @@ pub fn convert_back(p: ConvertBackProofParams<'_>) -> Result<ConvertBackProof> {
     };
     params.blinding_factor.zeroize();
     params.amount.zeroize();
+    p.current_balance.zeroize();
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }

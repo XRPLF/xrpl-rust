@@ -232,8 +232,9 @@ mod tests {
         assert_eq!(common.sequence, Some(9));
     }
 
-    const ISSUER: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
-    const HOLDER: &str = "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK"; // D528B6..705F
+    // ISSUER's AccountID is B5F762..37E8, HOLDER's is D528B6..705F.
+    const ISSUER: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    const HOLDER: &str = "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK";
     // Issuance whose issuer AccountID (bytes 4..24) is ISSUER.
     const ISS_OF_ISSUER: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
 
