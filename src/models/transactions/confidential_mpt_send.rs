@@ -10,11 +10,13 @@ use crate::models::{
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use crate::core::addresscodec::decode_classic_address;
+
 use super::confidential_mpt_constants::{
     validate_hex_length, CIPHERTEXT_LENGTH, COMMITMENT_LENGTH, SEND_PROOF_LENGTH,
 };
 use super::mptoken_issuance_set::validate_mptoken_issuance_id;
-use super::{CommonFields, CommonTransactionBuilder};
+use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder};
 
 /// A `ConfidentialMPTSend` transaction transfers a confidential MPT amount
 /// from sender to destination, hiding the amount under EC-ElGamal
@@ -89,13 +91,21 @@ impl<'a> Model for ConfidentialMPTSend<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self._get_destination_error()?;
         self._get_field_length_errors()?;
+        validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
 }
 
 impl<'a> ConfidentialMPTSend<'a> {
-    /// rippled rejects a self-send with `temMALFORMED`.
+    /// rippled rejects a malformed destination or a self-send (`temMALFORMED`).
     fn _get_destination_error(&self) -> crate::models::XRPLModelResult<()> {
+        if decode_classic_address(self.destination.as_ref()).is_err() {
+            return Err(XRPLModelException::InvalidValueFormat {
+                field: "destination".into(),
+                format: "classic XRPL address".into(),
+                found: self.destination.as_ref().into(),
+            });
+        }
         if self.destination == self.common_fields.account {
             return Err(XRPLModelException::ValueEqualsValue {
                 field1: "destination".into(),
@@ -260,7 +270,7 @@ mod tests {
     #[test]
     fn test_new_builder_and_accessors() {
         let mut tx = ConfidentialMPTSend::new(
-            "rSenderAccount11111111111111111".into(),
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
             None,
             None,
             None,
@@ -269,7 +279,7 @@ mod tests {
             None,
             None,
             None,
-            "rRecipientAccount111111111111".into(),
+            "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
             None,
             "610F33".repeat(8).into(),
             "AD".repeat(66).into(),

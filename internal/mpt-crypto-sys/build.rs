@@ -18,6 +18,7 @@ use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// Upstream mpt-crypto release tag this crate is built against.
 /// Must match the version whose headers generated `src/bindings.rs`.
@@ -111,6 +112,15 @@ fn resolve_library_dir(
     let cache_dir = out_dir.join("vendor/lib").join(target);
     if !cache_dir.join(archive).exists() {
         download_and_extract(target, &cache_dir, out_dir);
+        // The bundle is expected to contain `<upstream-subdir>/<archive>`; fail
+        // clearly here if extraction didn't produce it (e.g. an unexpected
+        // release layout) rather than at a cryptic linker "cannot find -lmpt-crypto".
+        assert!(
+            cache_dir.join(archive).exists(),
+            "mpt-crypto-sys: extracted bundle for `{target}` did not contain `{archive}` \
+             (expected under `{}/`) — check the {MPT_CRYPTO_VERSION} release layout",
+            rust_to_upstream(target),
+        );
     }
     cache_dir
 }
@@ -124,7 +134,15 @@ fn download_and_extract(target: &str, dest: &Path, out_dir: &Path) {
     let tarball = out_dir.join("mpt-crypto-natives.tar.gz");
 
     println!("cargo:warning=mpt-crypto-sys: downloading {url}");
-    let resp = ureq::get(&url)
+    // Bound the download so a hung connection fails the build instead of
+    // blocking forever: 30s to connect, and a read timeout so a stalled stream
+    // (no bytes) aborts. A healthy multi-MB/s CI download finishes well within.
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(30))
+        .timeout_read(Duration::from_secs(180))
+        .build();
+    let resp = agent
+        .get(&url)
         .call()
         .unwrap_or_else(|e| panic!("mpt-crypto-sys: download failed: {e}"));
     let mut file = fs::File::create(&tarball).unwrap();

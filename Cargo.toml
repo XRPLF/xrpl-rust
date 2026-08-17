@@ -155,10 +155,18 @@ utils = []
 cli = ["dep:clap", "dep:bip39"]
 # Confidential MPT (XLS-0096) crypto support. Requires `std` because mpt-crypto
 # links the native libmpt-crypto library via FFI. Adds the safe-wrapper crypto
-# crate (`mpt_crypto`) and the `confidential` assembly/prepare layer to the
-# public surface. The 5 ConfidentialMPT transaction *models* are always
+# crate (`mpt_crypto`) and the pure `confidential` *assembly* layer (assemble_*)
+# to the public surface. The 5 ConfidentialMPT transaction *models* are always
 # available with `models` (they carry no native dependency) and do NOT require
 # this feature.
+#
+# The client `prepare_confidential_*` layer additionally needs `asynch::account`
+# (`helpers`) + the `XRPLAsyncClient` trait (`json-rpc`/`websocket`) + a runtime
+# (`*-rt`). Those aren't enabled here because `helpers` requires the caller to
+# pick a runtime; instead the `prepare` module is cfg-gated on them (see
+# `src/confidential.rs`), so this feature compiles standalone and the client
+# layer activates once the caller adds their async stack (e.g. `helpers`,
+# `json-rpc`, `tokio-rt`).
 confidential-mpt = ["std", "models", "dep:mpt-crypto"]
 integration = [] # Enable integration tests (requires network access)
 std = [

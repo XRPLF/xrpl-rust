@@ -108,6 +108,10 @@ impl<'a> ConfidentialMPTConvert<'a> {
 
     fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
         validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        // Unlike ConvertBack/Clawback, a zero amount is permitted here on
+        // purpose: rippled allows a zero-amount Convert as the way to register
+        // the holder's ElGamal key and initialize the confidential balance
+        // fields (it does explicit freeze/auth checks precisely for that case).
         validate_mpt_amount("mpt_amount", self.mpt_amount.as_ref(), false)?;
         validate_hex_length(
             "holder_encrypted_amount",

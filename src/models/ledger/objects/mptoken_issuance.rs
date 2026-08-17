@@ -53,6 +53,7 @@ impl TryFrom<u32> for MPTokenIssuanceFlag {
             0x00000010 => Ok(MPTokenIssuanceFlag::LsfMPTCanTrade),
             0x00000020 => Ok(MPTokenIssuanceFlag::LsfMPTCanTransfer),
             0x00000040 => Ok(MPTokenIssuanceFlag::LsfMPTCanClawback),
+            0x00000080 => Ok(MPTokenIssuanceFlag::LsfMPTCanHoldConfidentialBalance),
             _ => Err(()),
         }
     }
@@ -376,7 +377,10 @@ mod tests {
         assert!(MPTokenIssuanceFlag::try_from(0x00000010).is_ok());
         assert!(MPTokenIssuanceFlag::try_from(0x00000020).is_ok());
         assert!(MPTokenIssuanceFlag::try_from(0x00000040).is_ok());
-        assert!(MPTokenIssuanceFlag::try_from(0x00000080).is_err());
+        // XLS-96 CanHoldConfidentialBalance.
+        assert!(MPTokenIssuanceFlag::try_from(0x00000080).is_ok());
+        // An unrecognized flag value still errors.
+        assert!(MPTokenIssuanceFlag::try_from(0x00000100).is_err());
     }
 
     /// Regression: sfImmutableFlags is SoeDefault in xrpld — it may be absent from

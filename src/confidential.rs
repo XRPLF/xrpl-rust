@@ -59,6 +59,16 @@ pub enum ConfidentialAssemblyError {
     /// spending balance / inbox to merge — which rippled would reject).
     #[error("invalid confidential batch: {0}")]
     InvalidBatch(String),
+    /// A Send/ConvertBack spends more than the account's decrypted spending
+    /// balance. The range proof over the remainder could not be built otherwise
+    /// (the balance would go negative), so reject it up front with a clear error.
+    #[error("amount {amount} exceeds confidential spending balance {balance}")]
+    InsufficientBalance {
+        /// The amount being spent.
+        amount: u64,
+        /// The decrypted current spending balance.
+        balance: u64,
+    },
 }
 
 type Result<T> = core::result::Result<T, ConfidentialAssemblyError>;
@@ -226,6 +236,12 @@ pub struct SendParams<'a> {
 
 /// Assemble a `ConfidentialMPTSend` (confidential transfer).
 pub fn assemble_send(p: SendParams<'_>) -> Result<ConfidentialMPTSend<'static>> {
+    if p.amount > p.current_balance {
+        return Err(ConfidentialAssemblyError::InsufficientBalance {
+            amount: p.amount,
+            balance: p.current_balance,
+        });
+    }
     let tx_r = encrypt::random_blinding_factor()?;
     let sender_ct = encrypt::encrypt(p.amount, p.sender_pubkey, &tx_r)?;
     let dest_ct = encrypt::encrypt(p.amount, p.destination_pubkey, &tx_r)?;
@@ -327,6 +343,12 @@ pub struct ConvertBackParams<'a> {
 pub fn assemble_convert_back(
     p: ConvertBackParams<'_>,
 ) -> Result<ConfidentialMPTConvertBack<'static>> {
+    if p.amount > p.current_balance {
+        return Err(ConfidentialAssemblyError::InsufficientBalance {
+            amount: p.amount,
+            balance: p.current_balance,
+        });
+    }
     let r = encrypt::random_blinding_factor()?;
     let holder_ct = encrypt::encrypt(p.amount, p.holder_pubkey, &r)?;
     let issuer_ct = encrypt::encrypt(p.amount, p.issuer_pubkey, &r)?;
@@ -690,11 +712,16 @@ pub fn assemble_batch_chain(p: BatchChainParams<'_>) -> Result<Vec<ConfidentialB
 // balance ciphertext + version, decrypting the current balance), mirroring
 // xrpl-py's `prepare_confidential_*` layer. The fee is left to autofill.
 //
-// Available whenever the `confidential-mpt` feature is on (it implies `std`,
-// which provides the async client).
+// This layer needs `asynch::account` (`helpers`) and the `XRPLAsyncClient` trait
+// in `asynch::clients` (`json-rpc`/`websocket`), plus a runtime for the retry
+// sleeps. Those aren't part of `confidential-mpt` itself (they'd force a runtime
+// choice on the caller), so gate the module on them — the pure `assemble_*`
+// layer above stays usable with `confidential-mpt` alone.
 // ─────────────────────────────────────────────────────────────────────────────
+#[cfg(all(feature = "helpers", any(feature = "json-rpc", feature = "websocket")))]
 pub use prepare::*;
 
+#[cfg(all(feature = "helpers", any(feature = "json-rpc", feature = "websocket")))]
 mod prepare {
     use alloc::format;
     use alloc::string::ToString;
@@ -710,7 +737,7 @@ mod prepare {
     use crate::asynch::account::get_next_valid_seq_number;
     use crate::asynch::clients::XRPLAsyncClient;
     use crate::models::requests::account_objects::{AccountObjectType, AccountObjects};
-    use crate::models::requests::{CommonFields, RequestMethod};
+    use crate::models::requests::{CommonFields, Marker, RequestMethod};
     use crate::models::results::account_objects::AccountObjects as AccountObjectsResult;
     use crate::models::transactions::confidential_mpt_clawback::ConfidentialMPTClawback;
     use crate::models::transactions::confidential_mpt_convert::ConfidentialMPTConvert;
@@ -732,41 +759,51 @@ mod prepare {
         account: &str,
         issuance_id_hex: &str,
     ) -> Result<Value> {
-        let request = AccountObjects {
-            common_fields: CommonFields {
-                command: RequestMethod::AccountObjects,
-                id: None,
-            },
-            account: account.to_string().into(),
-            ledger_lookup: None,
-            r#type: Some(AccountObjectType::Mptoken),
-            deletion_blockers_only: None,
-            limit: None,
-            marker: None,
-        };
-        let response = client.request(request.into()).await.map_err(|e| {
-            ConfidentialAssemblyError::Ledger(format!("account_objects request failed: {e}"))
-        })?;
-        let objects = AccountObjectsResult::try_from(response).map_err(|e| {
-            ConfidentialAssemblyError::Ledger(format!("could not parse account_objects: {e}"))
-        })?;
-        objects
-            .account_objects
-            .iter()
+        // Page through account_objects following `marker`: an account with many
+        // objects returns them across pages, so the MPToken we want may not be
+        // on the first page. Own the marker (into_owned) so it survives past the
+        // response it came from, into the next request.
+        let mut marker: Option<Marker<'static>> = None;
+        loop {
+            let request = AccountObjects {
+                common_fields: CommonFields {
+                    command: RequestMethod::AccountObjects,
+                    id: None,
+                },
+                account: account.to_string().into(),
+                ledger_lookup: None,
+                r#type: Some(AccountObjectType::Mptoken),
+                deletion_blockers_only: None,
+                limit: None,
+                marker,
+            };
+            let response = client.request(request.into()).await.map_err(|e| {
+                ConfidentialAssemblyError::Ledger(format!("account_objects request failed: {e}"))
+            })?;
+            let objects = AccountObjectsResult::try_from(response).map_err(|e| {
+                ConfidentialAssemblyError::Ledger(format!("could not parse account_objects: {e}"))
+            })?;
             // Case-insensitive: the ledger returns uppercase hex, but a caller
             // may pass lowercase (e.g. from `hex::encode`); the rest of this
             // module parses issuance IDs case-insensitively via `hex::decode`.
-            .find(|o| {
+            if let Some(obj) = objects.account_objects.iter().find(|o| {
                 o.get("MPTokenIssuanceID")
                     .and_then(Value::as_str)
                     .is_some_and(|s| s.eq_ignore_ascii_case(issuance_id_hex))
-            })
-            .cloned()
-            .ok_or_else(|| {
-                ConfidentialAssemblyError::Ledger(format!(
-                    "no MPToken for issuance {issuance_id_hex} owned by {account}"
-                ))
-            })
+            }) {
+                return Ok(obj.clone());
+            }
+            match objects.marker {
+                Some(Marker::Str(s)) => marker = Some(Marker::Str(s.into_owned().into())),
+                Some(Marker::Int(i)) => marker = Some(Marker::Int(i)),
+                Some(Marker::Sequence(sq)) => marker = Some(Marker::Sequence(sq)),
+                None => {
+                    return Err(ConfidentialAssemblyError::Ledger(format!(
+                        "no MPToken for issuance {issuance_id_hex} owned by {account}"
+                    )))
+                }
+            }
+        }
     }
 
     fn field_str<'a>(node: &'a Value, field: &str) -> Result<&'a str> {
@@ -1281,5 +1318,36 @@ mod tests {
             }
             _ => panic!("expected ConvertBack second"),
         }
+    }
+
+    #[test]
+    fn assemble_send_rejects_overspend() {
+        let (sk, pk) = keypair::generate().unwrap();
+        let (_dsk, dpk) = keypair::generate().unwrap();
+        // amount (100) > current_balance (50): rejected before any proof work
+        // (the check runs first, so the ciphertext hex is never parsed).
+        let err = assemble_send(SendParams {
+            sender_account: ACCOUNT,
+            destination_account: ACCOUNT,
+            issuance_id_hex: ISSUANCE,
+            sequence: 1,
+            version: 0,
+            amount: 100,
+            current_balance: 50,
+            balance_ciphertext_hex: "",
+            sender_privkey: &sk,
+            sender_pubkey: &pk,
+            destination_pubkey: &dpk,
+            issuer_pubkey: &pk,
+            auditor_pubkey: None,
+        })
+        .unwrap_err();
+        assert!(matches!(
+            err,
+            ConfidentialAssemblyError::InsufficientBalance {
+                amount: 100,
+                balance: 50
+            }
+        ));
     }
 }
