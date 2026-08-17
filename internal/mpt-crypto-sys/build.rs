@@ -5,8 +5,16 @@
 //!
 //! 1. `MPT_CRYPTO_LIB_DIR` env var (offline / custom builds).
 //! 2. `vendor/lib/<rust-target>/` committed in this crate (git-checkout flow).
-//! 3. Downloaded from the upstream GitHub release, verified by SHA-256
-//!    against `BUNDLE_SHA256`, cached in `OUT_DIR`.
+//! 3. Downloaded from the upstream GitHub release, cached in `OUT_DIR`.
+//!
+//! Trust model: tiers 1 and 2 are developer-supplied artifacts already inside
+//! the build tree (an explicit env override, or a file committed to this repo
+//! and reviewed via git) — they are trusted by provenance and are NOT hashed.
+//! `BUNDLE_SHA256` pins the hash of the release *tarball*, so it can only
+//! guard the tier-3 network fetch (a pre-extracted `.a` has a different hash,
+//! and a custom build legitimately would not match the upstream release). The
+//! downloaded tarball is therefore verified against `BUNDLE_SHA256` *before*
+//! extraction; a mismatch aborts the build.
 //!
 //! The archive is STATICALLY linked into the consuming binary, so there is no
 //! shared library to ship or locate at runtime — no rpath, no copy step. The
@@ -143,6 +151,10 @@ fn download_and_extract(target: &str, dest: &Path, out_dir: &Path) {
         .build();
     let resp = agent
         .get(&url)
+        // Overall deadline covering connect + the entire body transfer, so a
+        // server that trickles bytes just under the per-read timeout cannot
+        // stall the build indefinitely.
+        .timeout(Duration::from_secs(300))
         .call()
         .unwrap_or_else(|e| panic!("mpt-crypto-sys: download failed: {e}"));
     let mut file = fs::File::create(&tarball).unwrap();

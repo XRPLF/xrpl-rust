@@ -488,7 +488,10 @@ pub fn predict_confidential_debit_state(
     let balance = ciphertext_from_hex(balance_ciphertext_hex)?;
     let amount = ciphertext_from_hex(encrypted_amount_hex)?;
     let next = crate::mpt_crypto::homomorphic::subtract_ciphertexts(&balance, &amount)?;
-    Ok((version + 1, upper_hex(next.as_bytes())))
+    // `wrapping_add` matches rippled's unsigned `ConfidentialBalanceVersion++`
+    // and avoids a debug-build overflow panic at the (practically unreachable)
+    // u32::MAX boundary.
+    Ok((version.wrapping_add(1), upper_hex(next.as_bytes())))
 }
 
 /// Predict an account's `ConfidentialBalanceSpending`/version after a
@@ -501,7 +504,10 @@ pub fn predict_confidential_merge_state(
     let balance = ciphertext_from_hex(balance_ciphertext_hex)?;
     let inbox = ciphertext_from_hex(inbox_ciphertext_hex)?;
     let next = crate::mpt_crypto::homomorphic::add_ciphertexts(&balance, &inbox)?;
-    Ok((version + 1, upper_hex(next.as_bytes())))
+    // `wrapping_add` matches rippled's unsigned `ConfidentialBalanceVersion++`
+    // and avoids a debug-build overflow panic at the (practically unreachable)
+    // u32::MAX boundary.
+    Ok((version.wrapping_add(1), upper_hex(next.as_bytes())))
 }
 
 /// One confidential operation in a chain over a single `(account, token)`.

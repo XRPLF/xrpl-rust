@@ -11,8 +11,8 @@ use crate::models::{
 use crate::models::{FlagCollection, NoFlags};
 
 use super::confidential_mpt_constants::{
-    validate_hex_length, validate_mpt_amount, BLINDING_FACTOR_LENGTH, CIPHERTEXT_LENGTH,
-    ENCRYPTION_KEY_LENGTH, SCHNORR_PROOF_LENGTH,
+    address_is_issuer, validate_hex_length, validate_mpt_amount, BLINDING_FACTOR_LENGTH,
+    CIPHERTEXT_LENGTH, ENCRYPTION_KEY_LENGTH, SCHNORR_PROOF_LENGTH,
 };
 use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
@@ -81,6 +81,7 @@ impl<'a> Model for ConfidentialMPTConvert<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self._get_registration_error()?;
         self._get_field_length_errors()?;
+        self._get_issuer_role_error()?;
         self.validate_currencies()
     }
 }
@@ -104,6 +105,22 @@ impl<'a> ConfidentialMPTConvert<'a> {
             }),
             _ => Ok(()),
         }
+    }
+
+    /// The issuer converts value through its mirror balances, not a personal
+    /// confidential balance, so it cannot be the `Account` of a Convert
+    /// (`temMALFORMED`, `ConfidentialMPTConvert.cpp` preflight).
+    fn _get_issuer_role_error(&self) -> crate::models::XRPLModelResult<()> {
+        if address_is_issuer(
+            self.mptoken_issuance_id.as_ref(),
+            self.common_fields.account.as_ref(),
+        ) {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "account".into(),
+                field2: "issuer".into(),
+            });
+        }
+        Ok(())
     }
 
     fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
@@ -339,5 +356,64 @@ mod tests {
 
         let round_tripped: ConfidentialMPTConvert = serde_json::from_str(&json).unwrap();
         assert_eq!(round_tripped, tx);
+    }
+
+    const ACCT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
+    // Issuance whose issuer AccountID (bytes 4..24) is ACCT.
+    const ISS_OF_ACCT: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
+
+    fn valid_convert() -> ConfidentialMPTConvert<'static> {
+        ConfidentialMPTConvert {
+            common_fields: CommonFields {
+                account: ACCT.into(),
+                transaction_type: TransactionType::ConfidentialMPTConvert,
+                ..Default::default()
+            },
+            // Arbitrary issuance whose issuer is not ACCT.
+            mptoken_issuance_id: "610F33".repeat(8).into(),
+            mpt_amount: "1000".into(),
+            holder_encrypted_amount: "AD3F".repeat(33).into(),
+            issuer_encrypted_amount: "BC2E".repeat(33).into(),
+            blinding_factor: "EE".repeat(32).into(),
+            holder_encryption_key: None,
+            auditor_encrypted_amount: None,
+            zk_proof: None,
+        }
+    }
+
+    #[test]
+    fn test_valid_convert_passes() {
+        assert!(valid_convert().get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_zero_amount_convert_allowed() {
+        // A zero-amount Convert is the on-purpose key-registration / init path.
+        let mut tx = valid_convert();
+        tx.mpt_amount = "0".into();
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_account_is_issuer_rejected() {
+        let mut tx = valid_convert();
+        tx.mptoken_issuance_id = ISS_OF_ACCT.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_amount_above_mpt_max_rejected() {
+        // 2^63 (i64::MAX + 1) parses as u64 but exceeds the on-ledger MPT cap.
+        let mut tx = valid_convert();
+        tx.mpt_amount = "9223372036854775808".into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_key_without_proof_rejected() {
+        // HolderEncryptionKey and the Schnorr ZKProof are all-or-nothing.
+        let mut tx = valid_convert();
+        tx.holder_encryption_key = Some(("03".to_string() + &"8d".repeat(32)).into());
+        assert!(tx.get_errors().is_err());
     }
 }

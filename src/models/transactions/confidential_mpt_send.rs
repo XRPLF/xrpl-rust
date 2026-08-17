@@ -13,7 +13,7 @@ use crate::models::{FlagCollection, NoFlags};
 use crate::core::addresscodec::decode_classic_address;
 
 use super::confidential_mpt_constants::{
-    validate_hex_length, CIPHERTEXT_LENGTH, COMMITMENT_LENGTH, SEND_PROOF_LENGTH,
+    address_is_issuer, validate_hex_length, CIPHERTEXT_LENGTH, COMMITMENT_LENGTH, SEND_PROOF_LENGTH,
 };
 use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{validate_credential_ids, CommonFields, CommonTransactionBuilder};
@@ -91,6 +91,7 @@ impl<'a> Model for ConfidentialMPTSend<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self._get_destination_error()?;
         self._get_field_length_errors()?;
+        self._get_issuer_role_error()?;
         validate_credential_ids(&self.credential_ids)?;
         self.validate_currencies()
     }
@@ -110,6 +111,27 @@ impl<'a> ConfidentialMPTSend<'a> {
             return Err(XRPLModelException::ValueEqualsValue {
                 field1: "destination".into(),
                 field2: "account".into(),
+            });
+        }
+        Ok(())
+    }
+
+    /// rippled bans the issuer as either party of a confidential send: a
+    /// `ConfidentialMPTSend` only moves value holder↔holder, so `Account` and
+    /// `Destination` must both differ from the issuance's issuer (`temMALFORMED`,
+    /// `ConfidentialMPTSend.cpp` preflight).
+    fn _get_issuer_role_error(&self) -> crate::models::XRPLModelResult<()> {
+        let issuance_id = self.mptoken_issuance_id.as_ref();
+        if address_is_issuer(issuance_id, self.common_fields.account.as_ref()) {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "account".into(),
+                field2: "issuer".into(),
+            });
+        }
+        if address_is_issuer(issuance_id, self.destination.as_ref()) {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "destination".into(),
+                field2: "issuer".into(),
             });
         }
         Ok(())
@@ -305,5 +327,74 @@ mod tests {
         let common =
             <ConfidentialMPTSend as Transaction<'_, NoFlags>>::get_mut_common_fields(&mut tx);
         assert_eq!(common.sequence, Some(9));
+    }
+
+    // Two valid, distinct classic addresses with known AccountIDs.
+    const ACCT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
+    const DEST: &str = "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK"; // D528B6..705F
+    // Issuance IDs whose issuer AccountID (bytes 4..24) is ACCT / DEST.
+    const ISS_OF_ACCT: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
+    const ISS_OF_DEST: &str = "00000001D528B62DC7AF16417C9F44AAD8C04D920A3A705F";
+
+    fn valid_send() -> ConfidentialMPTSend<'static> {
+        ConfidentialMPTSend {
+            common_fields: CommonFields {
+                account: ACCT.into(),
+                transaction_type: TransactionType::ConfidentialMPTSend,
+                ..Default::default()
+            },
+            destination: DEST.into(),
+            destination_tag: None,
+            // Arbitrary issuance whose issuer is neither ACCT nor DEST.
+            mptoken_issuance_id: "610F33".repeat(8).into(),
+            sender_encrypted_amount: "AD".repeat(66).into(),
+            destination_encrypted_amount: "DF".repeat(66).into(),
+            issuer_encrypted_amount: "BC".repeat(66).into(),
+            amount_commitment: "04".repeat(33).into(),
+            balance_commitment: "03".repeat(33).into(),
+            zk_proof: "84".repeat(946).into(),
+            auditor_encrypted_amount: None,
+            credential_ids: None,
+        }
+    }
+
+    #[test]
+    fn test_valid_send_passes() {
+        assert!(valid_send().get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_self_send_rejected() {
+        let mut tx = valid_send();
+        tx.destination = ACCT.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_malformed_destination_rejected() {
+        let mut tx = valid_send();
+        tx.destination = "not_a_classic_address".into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_account_is_issuer_rejected() {
+        let mut tx = valid_send();
+        tx.mptoken_issuance_id = ISS_OF_ACCT.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_destination_is_issuer_rejected() {
+        let mut tx = valid_send();
+        tx.mptoken_issuance_id = ISS_OF_DEST.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_wrong_length_ciphertext_rejected() {
+        let mut tx = valid_send();
+        tx.sender_encrypted_amount = "AD".repeat(10).into();
+        assert!(tx.get_errors().is_err());
     }
 }

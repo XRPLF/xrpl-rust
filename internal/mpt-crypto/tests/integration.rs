@@ -518,6 +518,95 @@ fn send_range_proof_verifies_extracted_subproof() {
         .expect("extracted send range proof failed verification");
 }
 
+/// Negative-path counterpart to [`send_proof_verifies_three_participants`],
+/// and the Send analogue of
+/// [`convert_back_proof_rejects_withdrawal_exceeding_balance`].
+///
+/// The 754-byte aggregated Bulletproof inside a Send proof ranges BOTH the
+/// transferred `amount` and the remainder `balance − amount`. Sending more
+/// than the sender holds makes `balance − amount` wrap near the group order —
+/// outside [0, 2^64). As with ConvertBack, the system may refuse the witness
+/// prover-side or reject it verifier-side; either upholds the no-overdraft
+/// security property, so this asserts at least one fires.
+#[test]
+fn send_proof_rejects_amount_exceeding_balance() {
+    let (sender_sk, sender_pk) = keypair::generate().unwrap();
+    let (_recv_sk, recv_pk) = keypair::generate().unwrap();
+    let (_iss_sk, iss_pk) = keypair::generate().unwrap();
+
+    let balance = 100u64;
+    let amount = 200u64; // strictly greater than balance → negative remainder
+
+    let r_balance = encrypt::random_blinding_factor().unwrap();
+    let sender_balance_ct = encrypt::encrypt(balance, &sender_pk, &r_balance).unwrap();
+    let rho_balance = encrypt::random_blinding_factor().unwrap();
+    let balance_commitment = commit::pedersen(balance, &rho_balance).unwrap();
+
+    let tx_r = encrypt::random_blinding_factor().unwrap();
+    let sender_amount_ct = encrypt::encrypt(amount, &sender_pk, &tx_r).unwrap();
+    let recv_amount_ct = encrypt::encrypt(amount, &recv_pk, &tx_r).unwrap();
+    let iss_amount_ct = encrypt::encrypt(amount, &iss_pk, &tx_r).unwrap();
+    let amount_commitment = commit::pedersen(amount, &tx_r).unwrap();
+
+    let snd_addr = AccountId::new([1; 20]);
+    let dst_addr = AccountId::new([2; 20]);
+    let iss_id = IssuanceId::new([3; 24]);
+    let ctx = context::send(&snd_addr, &iss_id, 1, &dst_addr, 0).unwrap();
+
+    let sender = prove::Participant {
+        pubkey: &sender_pk,
+        ciphertext: &sender_amount_ct,
+    };
+    let destination = prove::Participant {
+        pubkey: &recv_pk,
+        ciphertext: &recv_amount_ct,
+    };
+    let issuer = prove::Participant {
+        pubkey: &iss_pk,
+        ciphertext: &iss_amount_ct,
+    };
+
+    let prove_result = prove::send(prove::SendProofParams {
+        sender_privkey: &sender_sk,
+        sender_pubkey: &sender_pk,
+        amount,
+        current_balance: balance,
+        tx_blinding_factor: &tx_r,
+        context_hash: &ctx,
+        amount_commitment: &amount_commitment,
+        balance_commitment: &balance_commitment,
+        balance_blinding: &rho_balance,
+        balance_ciphertext: &sender_balance_ct,
+        sender,
+        destination,
+        issuer,
+        auditor: None,
+    });
+
+    let proof = match prove_result {
+        // Path 1: prover refused the out-of-range witness. Security upheld.
+        Err(_) => return,
+        Ok(p) => p,
+    };
+
+    // Path 2: prover produced bytes anyway — the verifier MUST reject them.
+    assert!(
+        verify::send(verify::SendVerifyParams {
+            proof: &proof,
+            sender,
+            destination,
+            issuer,
+            auditor: None,
+            sender_spending_ciphertext: &sender_balance_ct,
+            amount_commitment: &amount_commitment,
+            balance_commitment: &balance_commitment,
+            context_hash: &ctx,
+        })
+        .is_err(),
+        "verifier accepted a Send proof where amount > balance"
+    );
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 //  Revealed-amount consistency
 // ─────────────────────────────────────────────────────────────────────────

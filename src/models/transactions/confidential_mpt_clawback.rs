@@ -11,7 +11,7 @@ use crate::models::{
 use crate::models::{FlagCollection, NoFlags};
 
 use super::confidential_mpt_constants::{
-    validate_hex_length, validate_mpt_amount, CLAWBACK_PROOF_LENGTH,
+    address_is_issuer, validate_hex_length, validate_mpt_amount, CLAWBACK_PROOF_LENGTH,
 };
 use super::mptoken_issuance_set::{validate_holder_address, validate_mptoken_issuance_id};
 use super::{CommonFields, CommonTransactionBuilder};
@@ -62,6 +62,7 @@ impl<'a> Model for ConfidentialMPTClawback<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self._get_holder_error()?;
         self._get_field_length_errors()?;
+        self._get_issuer_role_error()?;
         self.validate_currencies()
     }
 }
@@ -74,6 +75,24 @@ impl<'a> ConfidentialMPTClawback<'a> {
             return Err(XRPLModelException::ValueEqualsValue {
                 field1: "holder".into(),
                 field2: "account".into(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Clawback is issuer-only: `Account` MUST be the issuance's issuer,
+    /// otherwise rippled rejects with `temMALFORMED`
+    /// (`ConfidentialMPTClawback.cpp` preflight `account != issuer`). Requires a
+    /// well-formed `MPTokenIssuanceID`, so it is checked after the length pass.
+    fn _get_issuer_role_error(&self) -> crate::models::XRPLModelResult<()> {
+        if !address_is_issuer(
+            self.mptoken_issuance_id.as_ref(),
+            self.common_fields.account.as_ref(),
+        ) {
+            return Err(XRPLModelException::InvalidValue {
+                field: "account".into(),
+                expected: "the issuance's issuer (ConfidentialMPTClawback is issuer-only)".into(),
+                found: self.common_fields.account.as_ref().into(),
             });
         }
         Ok(())
@@ -191,7 +210,9 @@ mod tests {
             None,
             None,
             "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
-            "610F33".repeat(8).into(),
+            // Clawback is issuer-only: the issuance ID must embed the submitting
+            // account (rHb9...) as its issuer — sequence(8 hex) || issuerAccountID.
+            "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8".into(),
             "1000".into(),
             "a1".repeat(64).into(),
         )
@@ -209,5 +230,66 @@ mod tests {
         let common =
             <ConfidentialMPTClawback as Transaction<'_, NoFlags>>::get_mut_common_fields(&mut tx);
         assert_eq!(common.sequence, Some(9));
+    }
+
+    const ISSUER: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
+    const HOLDER: &str = "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK"; // D528B6..705F
+    // Issuance whose issuer AccountID (bytes 4..24) is ISSUER.
+    const ISS_OF_ISSUER: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
+
+    fn valid_clawback() -> ConfidentialMPTClawback<'static> {
+        ConfidentialMPTClawback {
+            common_fields: CommonFields {
+                account: ISSUER.into(),
+                transaction_type: TransactionType::ConfidentialMPTClawback,
+                ..Default::default()
+            },
+            holder: HOLDER.into(),
+            mptoken_issuance_id: ISS_OF_ISSUER.into(),
+            mpt_amount: "1000".into(),
+            zk_proof: "a1".repeat(64).into(),
+        }
+    }
+
+    #[test]
+    fn test_valid_clawback_passes() {
+        assert!(valid_clawback().get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_non_issuer_account_rejected() {
+        // Clawback is issuer-only: an issuance whose issuer is not Account fails.
+        let mut tx = valid_clawback();
+        tx.mptoken_issuance_id = "610F33".repeat(8).into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_self_clawback_rejected() {
+        // holder == account (which is also the issuer here) is still malformed.
+        let mut tx = valid_clawback();
+        tx.holder = ISSUER.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_zero_amount_rejected() {
+        let mut tx = valid_clawback();
+        tx.mpt_amount = "0".into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_amount_above_mpt_max_rejected() {
+        let mut tx = valid_clawback();
+        tx.mpt_amount = "9223372036854775808".into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_malformed_holder_rejected() {
+        let mut tx = valid_clawback();
+        tx.holder = "not_a_classic_address".into();
+        assert!(tx.get_errors().is_err());
     }
 }

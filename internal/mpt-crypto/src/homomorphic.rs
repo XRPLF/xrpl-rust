@@ -94,6 +94,10 @@ fn combine(a: &Ciphertext, b: &Ciphertext, subtract: bool) -> Result<Ciphertext>
             sys::secp256k1_elgamal_add(ctx, &mut out_c1, &mut out_c2, &a_c1, &a_c2, &b_c1, &b_c2)
         }
     };
+    // The secp256k1_elgamal_{add,subtract} entry points follow libsecp256k1's
+    // house convention (`1` = success, `0` = failure), matching every other
+    // `secp256k1_*` call in this crate; treat anything but `1` as failure so a
+    // convention change surfaces as an error rather than a bad ciphertext.
     if rc != 1 {
         return Err(Error::Invariant("homomorphic ciphertext operation failed"));
     }

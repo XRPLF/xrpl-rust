@@ -6,13 +6,13 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, ValidateCurrencies,
+    Model, ValidateCurrencies, XRPLModelException,
 };
 use crate::models::{FlagCollection, NoFlags};
 
 use super::confidential_mpt_constants::{
-    validate_hex_length, validate_mpt_amount, BLINDING_FACTOR_LENGTH, CIPHERTEXT_LENGTH,
-    COMMITMENT_LENGTH, CONVERT_BACK_PROOF_LENGTH,
+    address_is_issuer, validate_hex_length, validate_mpt_amount, BLINDING_FACTOR_LENGTH,
+    CIPHERTEXT_LENGTH, COMMITMENT_LENGTH, CONVERT_BACK_PROOF_LENGTH,
 };
 use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
@@ -73,11 +73,28 @@ pub struct ConfidentialMPTConvertBack<'a> {
 impl<'a> Model for ConfidentialMPTConvertBack<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         self._get_field_length_errors()?;
+        self._get_issuer_role_error()?;
         self.validate_currencies()
     }
 }
 
 impl<'a> ConfidentialMPTConvertBack<'a> {
+    /// The issuer holds value only through its mirror balance, so it cannot be
+    /// the `Account` converting confidential value back to public
+    /// (`temMALFORMED`, `ConfidentialMPTConvertBack.cpp` preflight).
+    fn _get_issuer_role_error(&self) -> crate::models::XRPLModelResult<()> {
+        if address_is_issuer(
+            self.mptoken_issuance_id.as_ref(),
+            self.common_fields.account.as_ref(),
+        ) {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "account".into(),
+                field2: "issuer".into(),
+            });
+        }
+        Ok(())
+    }
+
     fn _get_field_length_errors(&self) -> crate::models::XRPLModelResult<()> {
         validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
         // A zero-amount ConvertBack is a no-op; rippled rejects it.
@@ -254,5 +271,55 @@ mod tests {
                 &mut tx,
             );
         assert_eq!(common.sequence, Some(9));
+    }
+
+    const ACCT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
+    // Issuance whose issuer AccountID (bytes 4..24) is ACCT.
+    const ISS_OF_ACCT: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
+
+    fn valid_convert_back() -> ConfidentialMPTConvertBack<'static> {
+        ConfidentialMPTConvertBack {
+            common_fields: CommonFields {
+                account: ACCT.into(),
+                transaction_type: TransactionType::ConfidentialMPTConvertBack,
+                ..Default::default()
+            },
+            // Arbitrary issuance whose issuer is not ACCT.
+            mptoken_issuance_id: "610F33".repeat(8).into(),
+            mpt_amount: "500".into(),
+            holder_encrypted_amount: "AD".repeat(66).into(),
+            issuer_encrypted_amount: "BC".repeat(66).into(),
+            blinding_factor: "12".repeat(32).into(),
+            balance_commitment: "03".repeat(33).into(),
+            zk_proof: "AB".repeat(816).into(),
+            auditor_encrypted_amount: None,
+        }
+    }
+
+    #[test]
+    fn test_valid_convert_back_passes() {
+        assert!(valid_convert_back().get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_zero_amount_convert_back_rejected() {
+        // Unlike Convert, a zero-amount ConvertBack is a no-op and rejected.
+        let mut tx = valid_convert_back();
+        tx.mpt_amount = "0".into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_account_is_issuer_rejected() {
+        let mut tx = valid_convert_back();
+        tx.mptoken_issuance_id = ISS_OF_ACCT.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_amount_above_mpt_max_rejected() {
+        let mut tx = valid_convert_back();
+        tx.mpt_amount = "9223372036854775808".into();
+        assert!(tx.get_errors().is_err());
     }
 }

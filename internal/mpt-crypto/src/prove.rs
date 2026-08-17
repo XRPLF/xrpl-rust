@@ -124,6 +124,10 @@ pub fn send(p: SendProofParams<'_>) -> Result<SendProof> {
     // Holds a copy of the secret balance blinding factor + the plaintext
     // balance. The C struct doesn't implement Zeroize, so wipe those fields
     // ourselves after the call rather than leave them in a freed stack frame.
+    // Note this only scrubs *this* struct's copies: the originals still live in
+    // the caller-owned `p.current_balance` / `p.balance_blinding` (and whatever
+    // the caller decrypted them from). Zeroizing the caller's witnesses is the
+    // caller's responsibility; this just avoids leaving an extra copy behind.
     let mut balance_params = sys::mpt_pedersen_proof_params {
         pedersen_commitment: *p.balance_commitment.as_bytes(),
         amount: p.current_balance,

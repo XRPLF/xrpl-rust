@@ -43,9 +43,11 @@ const RESTRICTED_NETWORKS: u16 = 1024;
 const REQUIRED_NETWORKID_VERSION: &str = "1.11.0";
 const LEDGER_OFFSET: u8 = 20;
 /// ConfidentialMPT transactions pay 10× the reference base fee, covering the
-/// cost of verifying the transaction's zero-knowledge proof. Mirrors rippled's
-/// cMPT transactors (`Transactor::calculateBaseFee + base ×
-/// kCONFIDENTIAL_FEE_MULTIPLIER`), whose total is `10 × base`.
+/// cost of verifying the transaction's zero-knowledge proof. rippled computes
+/// this *additively* — `base + base × kConfidentialFeeMultiplier` with
+/// `kConfidentialFeeMultiplier = 9`, for a total of `10 × base`. This constant
+/// names that total (10), so it is applied multiplicatively here; the on-ledger
+/// result is identical.
 const CONFIDENTIAL_MPT_FEE_MULTIPLIER: u64 = 10;
 
 pub async fn sign_and_submit<'a, 'b, T, F, C>(

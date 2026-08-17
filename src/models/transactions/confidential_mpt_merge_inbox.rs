@@ -6,10 +6,11 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{
     transactions::{Memo, Signer, Transaction, TransactionType},
-    Model, ValidateCurrencies,
+    Model, ValidateCurrencies, XRPLModelException,
 };
 use crate::models::{FlagCollection, NoFlags};
 
+use super::confidential_mpt_constants::address_is_issuer;
 use super::mptoken_issuance_set::validate_mptoken_issuance_id;
 use super::{CommonFields, CommonTransactionBuilder};
 
@@ -49,6 +50,18 @@ pub struct ConfidentialMPTMergeInbox<'a> {
 impl<'a> Model for ConfidentialMPTMergeInbox<'a> {
     fn get_errors(&self) -> crate::models::XRPLModelResult<()> {
         validate_mptoken_issuance_id(self.mptoken_issuance_id.as_ref())?;
+        // The issuer has no personal confidential balance to merge, so it
+        // cannot be the `Account` of a MergeInbox (`temMALFORMED`,
+        // `ConfidentialMPTMergeInbox.cpp` preflight).
+        if address_is_issuer(
+            self.mptoken_issuance_id.as_ref(),
+            self.common_fields.account.as_ref(),
+        ) {
+            return Err(XRPLModelException::ValueEqualsValue {
+                field1: "account".into(),
+                field2: "issuer".into(),
+            });
+        }
         self.validate_currencies()
     }
 }
@@ -174,5 +187,40 @@ mod tests {
         let common =
             <ConfidentialMPTMergeInbox as Transaction<'_, NoFlags>>::get_mut_common_fields(&mut tx);
         assert_eq!(common.sequence, Some(7));
+    }
+
+    const ACCT: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"; // B5F762..37E8
+    // Issuance whose issuer AccountID (bytes 4..24) is ACCT.
+    const ISS_OF_ACCT: &str = "00000001B5F762798A53D543A014CAF8B297CFF8F2F937E8";
+
+    fn valid_merge_inbox() -> ConfidentialMPTMergeInbox<'static> {
+        ConfidentialMPTMergeInbox {
+            common_fields: CommonFields {
+                account: ACCT.into(),
+                transaction_type: TransactionType::ConfidentialMPTMergeInbox,
+                ..Default::default()
+            },
+            // Arbitrary issuance whose issuer is not ACCT.
+            mptoken_issuance_id: "610F33".repeat(8).into(),
+        }
+    }
+
+    #[test]
+    fn test_valid_merge_inbox_passes() {
+        assert!(valid_merge_inbox().get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_account_is_issuer_rejected() {
+        let mut tx = valid_merge_inbox();
+        tx.mptoken_issuance_id = ISS_OF_ACCT.into();
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_issuance_id_rejected() {
+        let mut tx = valid_merge_inbox();
+        tx.mptoken_issuance_id = "610F33".into(); // too short
+        assert!(tx.get_errors().is_err());
     }
 }
