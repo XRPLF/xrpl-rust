@@ -125,5 +125,6 @@ jobs:
         run: |
           cargo test --release --features confidential-mpt --lib
           cargo test --release -p mpt-crypto
+          cargo test --release -p mpt-crypto-sys
         env:
           RUST_BACKTRACE: 1

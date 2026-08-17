@@ -189,10 +189,11 @@ fn ledger_identifier_sizes() {
 /// to wire format. If they ever drift, every binary-codec round-trip breaks.
 #[test]
 fn transaction_type_ids_match_xls_0096() {
-    // §4.1 of the spec assigns these directly.
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_CONVERT, 85);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_MERGE_INBOX, 86);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_CONVERT_BACK, 87);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_SEND, 88);
-    assert_eq!(sys::ttCONFIDENTIAL_MPT_CLAWBACK, 89);
+    // §4.1 of the spec assigns these directly. mpt-crypto's mpt_protocol.h
+    // names them kCONFIDENTIAL_MPT_* (bindgen keeps the C names).
+    assert_eq!(sys::kCONFIDENTIAL_MPT_CONVERT, 85);
+    assert_eq!(sys::kCONFIDENTIAL_MPT_MERGE_INBOX, 86);
+    assert_eq!(sys::kCONFIDENTIAL_MPT_CONVERT_BACK, 87);
+    assert_eq!(sys::kCONFIDENTIAL_MPT_SEND, 88);
+    assert_eq!(sys::kCONFIDENTIAL_MPT_CLAWBACK, 89);
 }

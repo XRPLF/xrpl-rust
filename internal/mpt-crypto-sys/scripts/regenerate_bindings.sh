@@ -38,7 +38,7 @@ trap 'rm -f "$SHIM"' EXIT
 bindgen \
   --allowlist-function 'secp256k1_.*|mpt_.*|generate_canonical_.*' \
   --allowlist-type     'mpt_.*|secp256k1_.*|account_id' \
-  --allowlist-var      'SECP256K1_.*|kMPT_.*|tt[A-Z].*' \
+  --allowlist-var      'SECP256K1_.*|kMPT_.*|kCONFIDENTIAL_MPT_.*' \
   --output "$OUT" \
   "$SHIM" \
   -- -I"$INCLUDE"
