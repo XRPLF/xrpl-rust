@@ -753,7 +753,14 @@ mod prepare {
         objects
             .account_objects
             .iter()
-            .find(|o| o.get("MPTokenIssuanceID").and_then(Value::as_str) == Some(issuance_id_hex))
+            // Case-insensitive: the ledger returns uppercase hex, but a caller
+            // may pass lowercase (e.g. from `hex::encode`); the rest of this
+            // module parses issuance IDs case-insensitively via `hex::decode`.
+            .find(|o| {
+                o.get("MPTokenIssuanceID")
+                    .and_then(Value::as_str)
+                    .is_some_and(|s| s.eq_ignore_ascii_case(issuance_id_hex))
+            })
             .cloned()
             .ok_or_else(|| {
                 ConfidentialAssemblyError::Ledger(format!(

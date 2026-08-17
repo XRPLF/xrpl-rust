@@ -34,3 +34,13 @@ flags:
   integration:
     paths:
       - src/
+
+# The confidential-mpt assembly layer (`src/confidential.rs`) and the mpt-crypto
+# FFI crates (`internal/`) are feature-gated behind `confidential-mpt` / are
+# separate crates, so they are NOT compiled in the unit coverage run (which uses
+# `std,core,utils,wallet,models`). They are built and unit-tested on every
+# platform in the dedicated `confidential_mpt` CI job instead — so exclude them
+# here rather than counting their lines as uncovered in patch coverage.
+ignore:
+  - "src/confidential.rs"
+  - "internal/"
