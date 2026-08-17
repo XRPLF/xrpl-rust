@@ -199,7 +199,7 @@ mod tests {
                 transaction_type: TransactionType::ConfidentialMPTConvertBack,
                 ..Default::default()
             },
-            mptoken_issuance_id: "610F33".repeat(4).into(),
+            mptoken_issuance_id: "610F33".repeat(8).into(),
             mpt_amount: "500".into(),
             holder_encrypted_amount: "AD".repeat(66).into(),
             issuer_encrypted_amount: "BC".repeat(66).into(),
@@ -215,5 +215,44 @@ mod tests {
 
         let round_tripped: ConfidentialMPTConvertBack = serde_json::from_str(&json).unwrap();
         assert_eq!(round_tripped, tx);
+    }
+
+    #[test]
+    fn test_new_builder_and_accessors() {
+        let mut tx = ConfidentialMPTConvertBack::new(
+            "rUserAccount11111111111111111111".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "610F33".repeat(8).into(),
+            "500".into(),
+            "AD".repeat(66).into(),
+            "BC".repeat(66).into(),
+            "12".repeat(32).into(),
+            "03".repeat(33).into(),
+            "AB".repeat(816).into(),
+            None,
+        )
+        .with_fee(XRPAmount::from("15000"))
+        .with_sequence(9);
+
+        assert_eq!(tx.get_common_fields().sequence, Some(9));
+        assert_eq!(tx.get_common_fields().fee, Some(XRPAmount::from("15000")));
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::ConfidentialMPTConvertBack
+        );
+        assert!(tx.get_errors().is_ok());
+
+        let common =
+            <ConfidentialMPTConvertBack as Transaction<'_, NoFlags>>::get_mut_common_fields(
+                &mut tx,
+            );
+        assert_eq!(common.sequence, Some(9));
     }
 }

@@ -165,7 +165,7 @@ mod tests {
                 ..Default::default()
             },
             holder: "rHolderAccount11111111111111".into(),
-            mptoken_issuance_id: "610F33".repeat(4).into(),
+            mptoken_issuance_id: "610F33".repeat(8).into(),
             mpt_amount: "1000".into(),
             zk_proof: "a1".repeat(64).into(),
         };
@@ -176,5 +176,38 @@ mod tests {
 
         let round_tripped: ConfidentialMPTClawback = serde_json::from_str(&json).unwrap();
         assert_eq!(round_tripped, tx);
+    }
+
+    #[test]
+    fn test_new_builder_and_accessors() {
+        let mut tx = ConfidentialMPTClawback::new(
+            "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "rLSn6Z3T8uCxbcd1oxwfGQN1Fdn5CyGujK".into(),
+            "610F33".repeat(8).into(),
+            "1000".into(),
+            "a1".repeat(64).into(),
+        )
+        .with_fee(XRPAmount::from("15000"))
+        .with_sequence(9);
+
+        assert_eq!(tx.get_common_fields().sequence, Some(9));
+        assert_eq!(tx.get_common_fields().fee, Some(XRPAmount::from("15000")));
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::ConfidentialMPTClawback
+        );
+        assert!(tx.get_errors().is_ok());
+
+        let common =
+            <ConfidentialMPTClawback as Transaction<'_, NoFlags>>::get_mut_common_fields(&mut tx);
+        assert_eq!(common.sequence, Some(9));
     }
 }
