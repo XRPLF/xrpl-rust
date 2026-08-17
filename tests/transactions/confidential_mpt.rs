@@ -1048,37 +1048,12 @@ async fn confidential_mpt_merge_inbox_rejects_locked_issuance() {
     .await;
 }
 
-/// XLS-0096 §9.2.1.2 protocol-level failure #7: the issuer attempting to merge
-/// its own issuance.
-///
-/// The spec frames this as a `tefINTERNAL` invariant, but rippled's preclaim
-/// check for it is an unreachable defensive backstop (marked `LCOV_EXCL_LINE`):
-/// preflight already rejects an issuer-submitted merge with `temMALFORMED`
-/// ("issuer cannot merge"), so `temMALFORMED` is the *observable* result. We
-/// assert the real behavior rather than the unreachable invariant code.
-#[tokio::test]
-async fn confidential_mpt_merge_inbox_rejects_issuer_as_merger() {
-    with_blockchain_lock(|| async {
-        let setup = setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT).await;
-
-        // Account == the issuance's embedded issuer, tripping preflight's
-        // "issuer cannot merge" check before any ledger state is consulted.
-        let mut tx = ConfidentialMPTMergeInbox::new(
-            setup.issuer.classic_address.clone().into(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            setup.issuance_id.clone().into(),
-        );
-        test_transaction_with_result(&mut tx, &setup.issuer, "temMALFORMED").await;
-    })
-    .await;
-}
+// XLS-0096 §9.2.1.2 protocol-level failure #7 (the issuer merging its own
+// issuance) is rejected by `ConfidentialMPTMergeInbox` model validation — the
+// issuer is derived from the embedded `MPTokenIssuanceID` and never reaches the
+// network — so it is covered by the unit test
+// `confidential_mpt_merge_inbox::tests::test_account_is_issuer_rejected`
+// rather than an integration test.
 
 /// `ConfidentialMPTClawback`: the issuer claws back the holder's confidential
 /// balance. After a Convert the issuer's mirror of the holder's balance equals
