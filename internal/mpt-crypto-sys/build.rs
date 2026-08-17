@@ -1,15 +1,18 @@
 //! Build script for mpt-crypto-sys.
 //!
-//! Resolves the native `libmpt-crypto.{so,dylib,dll}` in three tiers:
+//! Resolves the self-contained STATIC archive (`libmpt-crypto.a` /
+//! `mpt-crypto-static.lib`, with secp256k1 + OpenSSL merged in) in three tiers:
 //!
 //! 1. `MPT_CRYPTO_LIB_DIR` env var (offline / custom builds).
 //! 2. `vendor/lib/<rust-target>/` committed in this crate (git-checkout flow).
 //! 3. Downloaded from the upstream GitHub release, verified by SHA-256
 //!    against `BUNDLE_SHA256`, cached in `OUT_DIR`.
 //!
-//! After resolution, emits linker directives, rpath, and copies the shared
-//! library next to the final build artifact so tests and examples find it
-//! at runtime.
+//! The archive is STATICALLY linked into the consuming binary, so there is no
+//! shared library to ship or locate at runtime — no rpath, no copy step. The
+//! archive's own dependencies (the C++ runtime + OpenSSL's OS libraries) are
+//! co-linked as system libraries, read from the `mpt-crypto-static.link-libs.txt`
+//! manifest staged next to the archive (with per-platform fallbacks).
 
 use std::env;
 use std::fs;
@@ -18,13 +21,13 @@ use std::path::{Path, PathBuf};
 
 /// Upstream mpt-crypto release tag this crate is built against.
 /// Must match the version whose headers generated `src/bindings.rs`.
-const MPT_CRYPTO_VERSION: &str = "1.0.2";
+const MPT_CRYPTO_VERSION: &str = "1.0.4";
 
 /// SHA-256 of `mpt-crypto-natives-<MPT_CRYPTO_VERSION>.tar.gz`.
 /// Computed at release time; verified on every download.
 ///
 /// Update via `scripts/fetch_upstream.sh` which prints the new value.
-const BUNDLE_SHA256: &str = "8a765db71473ca4b1034f1f3140743b36ff80b66f3a1ab71769489e8f03231e9";
+const BUNDLE_SHA256: &str = "d1ab71ca8d23028acdc2a877602e7a44e9b14b6a2cc33976888a793533804c9d";
 
 fn main() {
     // docs.rs builds in a network-isolated sandbox with no native
@@ -41,27 +44,29 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("cargo did not set OUT_DIR"));
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
-    let (lib_filename, is_windows) = platform_lib(&target);
-    let lib_dir = resolve_library_dir(&target, &lib_filename, &manifest_dir, &out_dir);
+    let archive = archive_filename(&target);
+    let lib_dir = resolve_library_dir(&target, &archive, &manifest_dir, &out_dir);
 
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
-    println!("cargo:rustc-link-lib=dylib=mpt-crypto");
-
-    emit_rpath(&target);
-    copy_lib_to_output(&lib_dir.join(&lib_filename), &out_dir, is_windows);
+    // Statically link the whole self-contained archive INTO the consumer, then
+    // the system libraries it depends on. Order matters for static linking: the
+    // archive's undefined symbols are resolved by libraries listed AFTER it.
+    println!("cargo:rustc-link-lib=static={}", archive_link_name(&target));
+    for lib in system_libs(&lib_dir, &target) {
+        println!("cargo:rustc-link-lib=dylib={lib}");
+    }
 
     println!("cargo:rerun-if-env-changed=MPT_CRYPTO_LIB_DIR");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/bindings.rs");
 }
 
-fn platform_lib(target: &str) -> (String, bool) {
-    if target.contains("apple-darwin") {
-        ("libmpt-crypto.dylib".into(), false)
-    } else if target.contains("linux") {
-        ("libmpt-crypto.so".into(), false)
+/// The static-archive filename staged per platform.
+fn archive_filename(target: &str) -> String {
+    if target.contains("apple-darwin") || target.contains("linux") {
+        "libmpt-crypto.a".into()
     } else if target.contains("windows") {
-        ("mpt-crypto.dll".into(), true)
+        "mpt-crypto-static.lib".into()
     } else {
         panic!(
             "mpt-crypto-sys: unsupported target `{target}`. \
@@ -70,9 +75,19 @@ fn platform_lib(target: &str) -> (String, bool) {
     }
 }
 
+/// The `cargo:rustc-link-lib=static=<name>` link name — the linker forms
+/// `lib<name>.a` (unix) / `<name>.lib` (MSVC), matching the staged filenames.
+fn archive_link_name(target: &str) -> &'static str {
+    if target.contains("windows") {
+        "mpt-crypto-static"
+    } else {
+        "mpt-crypto"
+    }
+}
+
 fn resolve_library_dir(
     target: &str,
-    lib_filename: &str,
+    archive: &str,
     manifest_dir: &Path,
     out_dir: &Path,
 ) -> PathBuf {
@@ -80,21 +95,21 @@ fn resolve_library_dir(
     if let Ok(custom) = env::var("MPT_CRYPTO_LIB_DIR") {
         let path = PathBuf::from(&custom);
         assert!(
-            path.join(lib_filename).exists(),
-            "MPT_CRYPTO_LIB_DIR=`{custom}` does not contain `{lib_filename}`"
+            path.join(archive).exists(),
+            "MPT_CRYPTO_LIB_DIR=`{custom}` does not contain `{archive}`"
         );
         return path;
     }
 
     // Priority 2: vendored in the repository.
     let vendored = manifest_dir.join("vendor/lib").join(target);
-    if vendored.join(lib_filename).exists() {
+    if vendored.join(archive).exists() {
         return vendored;
     }
 
     // Priority 3: fetch from upstream release.
     let cache_dir = out_dir.join("vendor/lib").join(target);
-    if !cache_dir.join(lib_filename).exists() {
+    if !cache_dir.join(archive).exists() {
         download_and_extract(target, &cache_dir, out_dir);
     }
     cache_dir
@@ -121,6 +136,9 @@ fn download_and_extract(target: &str, dest: &Path, out_dir: &Path) {
     fs::create_dir_all(dest).unwrap();
     let upstream = rust_to_upstream(target);
 
+    // Unpack every file under the platform's subdir — the static archive plus
+    // its `mpt-crypto-static.link-libs.txt` manifest (the shared library in the
+    // bundle is simply ignored on the static path).
     let gz = fs::File::open(&tarball).unwrap();
     let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(gz));
 
@@ -169,54 +187,45 @@ fn rust_to_upstream(target: &str) -> &'static str {
     }
 }
 
-fn emit_rpath(target: &str) {
-    // Three search directories per platform:
-    //   @loader_path     — same directory as the binary
-    //                      (e.g. `target/debug/examples/<ex>` with dylib in `target/debug/examples/`)
-    //   @loader_path/..  — parent directory
-    //                      (e.g. `target/debug/deps/<test>` with dylib in `target/debug/`)
-    //   @loader_path/../lib — installed layout (binaries in bin/, libs in lib/)
-    if target.contains("apple-darwin") {
-        println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path/..");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,@loader_path/../lib");
-    } else if target.contains("linux") {
-        println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/..");
-        println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN/../lib");
-    }
-    // Windows has no rpath concept — DLL must be adjacent to the .exe
-    // (handled by copy_lib_to_output) or on %PATH%.
-}
-
-fn copy_lib_to_output(src: &Path, out_dir: &Path, is_windows: bool) {
-    // OUT_DIR = target/<profile>/build/<crate>-<hash>/out.
-    // Walk up three levels to reach target/<profile>/.
-    let mut target_dir = out_dir.to_path_buf();
-    for _ in 0..3 {
-        target_dir.pop();
-    }
-
-    let filename = src.file_name().expect("library path has no file name");
-    let dst = target_dir.join(filename);
-
-    // Best-effort. Some CI / read-only filesystems can't write here; the
-    // build still succeeds if so, and the rpath will fail at runtime with
-    // a clearer message than a mysterious copy failure.
-    if let Err(e) = fs::copy(src, &dst) {
-        println!(
-            "cargo:warning=mpt-crypto-sys: could not copy {} to {}: {e}",
-            src.display(),
-            dst.display()
-        );
-    }
-
-    // Mirror next to the examples directory on Windows so `cargo run
-    // --example <name>` finds the DLL without mucking with %PATH%.
-    if is_windows {
-        let examples_dir = target_dir.join("examples");
-        if examples_dir.exists() {
-            let _ = fs::copy(src, examples_dir.join(filename));
+/// The system libraries to co-link with the static archive, read from the
+/// `mpt-crypto-static.link-libs.txt` manifest staged next to it (one name per
+/// line, `#` comments and blanks ignored). These are the C++ runtime + OpenSSL's
+/// OS deps the shared library would otherwise leave dynamic. Falls back to
+/// per-platform defaults if the manifest is absent (e.g. an `MPT_CRYPTO_LIB_DIR`
+/// override that stages only the archive).
+fn system_libs(lib_dir: &Path, target: &str) -> Vec<String> {
+    let manifest = lib_dir.join("mpt-crypto-static.link-libs.txt");
+    if let Ok(contents) = fs::read_to_string(&manifest) {
+        let libs: Vec<String> = contents
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .map(String::from)
+            .collect();
+        if !libs.is_empty() {
+            return libs;
         }
     }
+    fallback_system_libs(target)
+}
+
+fn fallback_system_libs(target: &str) -> Vec<String> {
+    let libs: &[&str] = if target.contains("apple-darwin") {
+        &["c++"]
+    } else if target.contains("linux") {
+        &["stdc++", "pthread", "dl", "m"]
+    } else if target.contains("windows") {
+        &[
+            "crypt32",
+            "ws2_32",
+            "advapi32",
+            "user32",
+            "gdi32",
+            "bcrypt",
+            "legacy_stdio_definitions",
+        ]
+    } else {
+        &[]
+    };
+    libs.iter().map(|s| (*s).to_string()).collect()
 }

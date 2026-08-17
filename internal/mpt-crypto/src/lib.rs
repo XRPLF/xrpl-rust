@@ -36,6 +36,7 @@ pub mod commit;
 pub mod context;
 pub mod encrypt;
 pub mod error;
+pub mod homomorphic;
 pub mod keypair;
 pub mod prove;
 pub mod types;
