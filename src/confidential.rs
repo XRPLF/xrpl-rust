@@ -215,6 +215,8 @@ pub struct SendParams<'a> {
     pub sender_account: &'a str,
     /// The receiver's classic address.
     pub destination_account: &'a str,
+    /// Optional `DestinationTag` (e.g. for a hosted/exchange receiver).
+    pub destination_tag: Option<u32>,
     /// 48-char hex `MPTokenIssuanceID`.
     pub issuance_id_hex: &'a str,
     /// The sender's account `Sequence`.
@@ -304,7 +306,7 @@ pub fn assemble_send(p: SendParams<'_>) -> Result<ConfidentialMPTSend<'static>> 
             p.sequence,
         ),
         destination: Cow::Owned(p.destination_account.to_string()),
-        destination_tag: None,
+        destination_tag: p.destination_tag,
         mptoken_issuance_id: Cow::Owned(p.issuance_id_hex.to_string()),
         sender_encrypted_amount: Cow::Owned(upper_hex(sender_ct.as_bytes())),
         destination_encrypted_amount: Cow::Owned(upper_hex(dest_ct.as_bytes())),
@@ -514,6 +516,8 @@ pub enum ConfidentialBatchOp<'a> {
     Send {
         /// The receiver's classic address.
         destination_account: &'a str,
+        /// Optional `DestinationTag` (e.g. for a hosted/exchange receiver).
+        destination_tag: Option<u32>,
         /// The receiver's ElGamal public key.
         destination_pubkey: &'a Pubkey,
         /// The confidential amount to send.
@@ -615,6 +619,7 @@ pub fn assemble_batch_chain(p: BatchChainParams<'_>) -> Result<Vec<ConfidentialB
         match op {
             ConfidentialBatchOp::Send {
                 destination_account,
+                destination_tag,
                 destination_pubkey,
                 amount,
             } => {
@@ -624,6 +629,7 @@ pub fn assemble_batch_chain(p: BatchChainParams<'_>) -> Result<Vec<ConfidentialB
                 let tx = assemble_send(SendParams {
                     sender_account: p.account,
                     destination_account,
+                    destination_tag: *destination_tag,
                     issuance_id_hex: p.issuance_id_hex,
                     sequence,
                     version,
@@ -862,6 +868,7 @@ mod prepare {
         client: &C,
         sender_account: &str,
         destination_account: &str,
+        destination_tag: Option<u32>,
         issuance_id_hex: &str,
         amount: u64,
         max_balance: u64,
@@ -880,6 +887,7 @@ mod prepare {
         assemble_send(SendParams {
             sender_account,
             destination_account,
+            destination_tag,
             issuance_id_hex,
             sequence,
             version,
@@ -1226,6 +1234,7 @@ mod tests {
         // A zero-amount Send is rejected (Python rejects it on the op spec).
         let zero_send = [ConfidentialBatchOp::Send {
             destination_account: ACCOUNT,
+            destination_tag: None,
             destination_pubkey: &pk,
             amount: 0,
         }];
@@ -1284,6 +1293,7 @@ mod tests {
         let ops = [
             ConfidentialBatchOp::Send {
                 destination_account: ACCOUNT,
+                destination_tag: Some(42),
                 destination_pubkey: &dpk,
                 amount: 30,
             },
@@ -1308,7 +1318,9 @@ mod tests {
         assert_eq!(txs.len(), 2);
         match &txs[0] {
             ConfidentialBatchTransaction::Send(s) => {
-                assert_eq!(s.common_fields.sequence, Some(8))
+                assert_eq!(s.common_fields.sequence, Some(8));
+                // The op's DestinationTag threads through to the built tx.
+                assert_eq!(s.destination_tag, Some(42));
             }
             _ => panic!("expected Send first"),
         }
@@ -1329,6 +1341,7 @@ mod tests {
         let err = assemble_send(SendParams {
             sender_account: ACCOUNT,
             destination_account: ACCOUNT,
+            destination_tag: None,
             issuance_id_hex: ISSUANCE,
             sequence: 1,
             version: 0,

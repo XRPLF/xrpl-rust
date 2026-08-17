@@ -593,6 +593,17 @@ fn aggregated_bulletproof_rejects_empty_commitments() {
     );
 }
 
+#[test]
+fn aggregated_bulletproof_rejects_empty_proof() {
+    let ctx = context::convert(&AccountId::new([1; 20]), &IssuanceId::new([2; 24]), 1).unwrap();
+    let commitment = commit::pedersen(1, &encrypt::random_blinding_factor().unwrap()).unwrap();
+    let err = verify::aggregated_bulletproof(&[], &[commitment], &ctx).unwrap_err();
+    assert!(
+        matches!(err, Error::Invariant(_)),
+        "expected an Invariant error for empty proof, got {err:?}"
+    );
+}
+
 // ═════════════════════════════════════════════════════════════════════════
 //  Negative / edge cases mirrored from upstream tests/test_mpt_utility.cpp
 //

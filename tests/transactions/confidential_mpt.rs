@@ -682,6 +682,7 @@ async fn confidential_mpt_prepare_lifecycle() {
             client,
             &holder1.classic_address,
             &holder2.classic_address,
+            None,
             issuance,
             3,
             max_balance,

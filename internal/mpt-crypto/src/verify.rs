@@ -280,12 +280,18 @@ pub fn send_range_proof(
 
 /// Generic verifier for an aggregated Bulletproof over `commitments`.
 ///
-/// Returns [`Error::Invariant`] if `commitments` is empty.
+/// Returns [`Error::Invariant`] if `proof` is empty or `commitments` is empty.
 pub fn aggregated_bulletproof(
     proof: &[u8],
     commitments: &[Commitment],
     context_hash: &ContextHash,
 ) -> Result<()> {
+    // A zero-length proof would reach the C verifier as a valid-but-dangling
+    // pointer with len 0; reject it here rather than rely on the C side to
+    // bounds-check its header.
+    if proof.is_empty() {
+        return Err(Error::Invariant("aggregated bulletproof cannot be empty"));
+    }
     if commitments.is_empty() {
         return Err(Error::Invariant(
             "aggregated bulletproof needs at least one commitment",
