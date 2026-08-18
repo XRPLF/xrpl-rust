@@ -316,7 +316,7 @@ pub fn assemble_send(p: SendParams<'_>) -> Result<ConfidentialMPTSend<'static>> 
         balance_commitment: Cow::Owned(upper_hex(balance_commitment.as_bytes())),
         zk_proof: Cow::Owned(upper_hex(proof.as_bytes())),
         auditor_encrypted_amount: auditor_ct.map(|ct| Cow::Owned(upper_hex(ct.as_bytes()))),
-        credential_ids: p.credential_ids.map(|ids| {
+        credential_ids: p.credential_ids.filter(|ids| !ids.is_empty()).map(|ids| {
             ids.iter()
                 .map(|id| Cow::Owned(id.to_string()))
                 .collect::<Vec<_>>()
@@ -911,6 +911,29 @@ mod tests {
         assert_eq!(got.len(), 2);
         assert_eq!(got[0], cred_a);
         assert_eq!(got[1], cred_b);
+
+        // An empty slice is treated as absent (an empty CredentialIDs list is
+        // rejected on-ledger), so the field is omitted.
+        let empty: [&str; 0] = [];
+        let tx_empty = assemble_send(SendParams {
+            sender_account: ACCOUNT,
+            destination_account: ACCOUNT,
+            destination_tag: None,
+            issuance_id_hex: ISSUANCE,
+            sequence: 1,
+            version: 0,
+            amount: 10,
+            current_balance: 1000,
+            balance_ciphertext_hex: &balance_hex,
+            sender_privkey: &sk,
+            sender_pubkey: &pk,
+            destination_pubkey: &dpk,
+            issuer_pubkey: &ipk,
+            auditor_pubkey: None,
+            credential_ids: Some(&empty),
+        })
+        .unwrap();
+        assert!(tx_empty.credential_ids.is_none());
     }
 
     #[test]
