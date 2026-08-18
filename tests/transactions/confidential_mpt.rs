@@ -691,6 +691,7 @@ async fn confidential_mpt_prepare_lifecycle() {
             &holder2_pk,
             &setup.issuer_elgamal_pk,
             None,
+            None,
         )
         .await
         .expect("prepare send");
