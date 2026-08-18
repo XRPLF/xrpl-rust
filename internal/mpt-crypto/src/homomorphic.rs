@@ -7,11 +7,8 @@
 //! They are the building block for **predicting a confidential balance's next
 //! state client-side** — e.g. the `new CB_S = CB_S ⊖ SenderEncryptedAmount`
 //! update rippled applies to a sender's `ConfidentialBalanceSpending` on a send
-//! (see rippled's `chainAfterSend` / `homomorphicSubtract`). That prediction is
-//! what lets a client chain proofs for multiple same-`(account, token)`
-//! confidential transfers in a single Batch: each subsequent inner transaction's
-//! proof must bind to the balance *after* the previous one applies, not the
-//! stale on-ledger value.
+//! (see rippled's `chainAfterSend` / `homomorphicSubtract`), so a client can
+//! compute the balance a subsequent proof must bind to without decrypting.
 
 use crate::{Error, Result, types::Ciphertext};
 use mpt_crypto_sys as sys;
@@ -121,8 +118,7 @@ pub fn add_ciphertexts(a: &Ciphertext, b: &Ciphertext) -> Result<Ciphertext> {
 ///
 /// This is the rule rippled applies to a sender's `ConfidentialBalanceSpending`
 /// on a send — `new CB_S = CB_S ⊖ SenderEncryptedAmount` (see `chainAfterSend`).
-/// Use it to predict the next spending balance when chaining proofs for multiple
-/// same-`(account, token)` confidential transfers in one Batch.
+/// Use it to predict the next spending balance client-side.
 pub fn subtract_ciphertexts(a: &Ciphertext, b: &Ciphertext) -> Result<Ciphertext> {
     combine(a, b, true)
 }
