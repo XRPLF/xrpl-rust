@@ -42,27 +42,25 @@ pub fn derive_validate_currencies(input: TokenStream) -> TokenStream {
                     // Extract T from Option<T>
                     if let syn::PathArguments::AngleBracketed(angle_bracketed) =
                         &segments[0].arguments
-                    {
-                        if let Some(syn::GenericArgument::Type(Type::Path(inner_type_path))) =
+                        && let Some(syn::GenericArgument::Type(Type::Path(inner_type_path))) =
                             angle_bracketed.args.first()
+                    {
+                        let inner_ident = &inner_type_path.path.segments.last().unwrap().ident;
+                        if [
+                            "Amount",
+                            "XRPAmount",
+                            "IssuedCurrencyAmount",
+                            "Currency",
+                            "XRP",
+                            "IssuedCurrency",
+                        ]
+                        .contains(&inner_ident.to_string().as_str())
                         {
-                            let inner_ident = &inner_type_path.path.segments.last().unwrap().ident;
-                            if [
-                                "Amount",
-                                "XRPAmount",
-                                "IssuedCurrencyAmount",
-                                "Currency",
-                                "XRP",
-                                "IssuedCurrency",
-                            ]
-                            .contains(&inner_ident.to_string().as_str())
-                            {
-                                return Some(quote! {
-                                    if let Some(x) = &self.#ident {
-                                        x.validate()?;
-                                    }
-                                });
-                            }
+                            return Some(quote! {
+                                if let Some(x) = &self.#ident {
+                                    x.validate()?;
+                                }
+                            });
                         }
                     }
                 }

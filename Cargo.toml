@@ -1,3 +1,6 @@
+[workspace]
+members = ["internal/mpt-crypto-sys", "internal/mpt-crypto"]
+
 [package]
 name = "xrpl-rust"
 version = "1.2.0"
@@ -20,12 +23,22 @@ categories = ["no-std"]
 no-dev-version = true
 tag-name = "{{version}}"
 
+[package.metadata.docs.rs]
+# Also document the `confidential-mpt` API (the `mpt_crypto` re-export and the
+# `confidential` assembly layer). mpt-crypto-sys/build.rs short-circuits native
+# resolution + linking when `DOCS_RS` is set, so this builds in docs.rs's
+# network-isolated sandbox without the native libmpt-crypto library.
+features = ["confidential-mpt"]
+
 [lib]
 name = "xrpl"
 crate-type = ["lib"]
 
 [dependencies]
 xrpl-rust-macros = { version = "0.1.0", path = "xrpl-rust-macros" }
+# Optional: enabled by the `confidential-mpt` feature. The mpt-crypto crate
+# is std-only (FFI to the C library), so the feature also pulls in `std`.
+mpt-crypto       = { version = "0.1.0", path = "internal/mpt-crypto", optional = true }
 
 lazy_static = "1.4.0"
 sha2 = { version = "0.10.2", default-features = false }
@@ -140,6 +153,21 @@ websocket = [
 core = ["utils"]
 utils = []
 cli = ["dep:clap", "dep:bip39"]
+# Confidential MPT (XLS-0096) crypto support. Requires `std` because mpt-crypto
+# links the native libmpt-crypto library via FFI. Adds the safe-wrapper crypto
+# crate (`mpt_crypto`) and the pure `confidential` *assembly* layer (assemble_*)
+# to the public surface. The 5 ConfidentialMPT transaction *models* are always
+# available with `models` (they carry no native dependency) and do NOT require
+# this feature.
+#
+# The client `prepare_confidential_*` layer additionally needs `asynch::account`
+# (`helpers`) + the `XRPLAsyncClient` trait (`json-rpc`/`websocket`) + a runtime
+# (`*-rt`). Those aren't enabled here because `helpers` requires the caller to
+# pick a runtime; instead the `prepare` module is cfg-gated on them (see
+# `src/confidential.rs`), so this feature compiles standalone and the client
+# layer activates once the caller adds their async stack (e.g. `helpers`,
+# `json-rpc`, `tokio-rt`).
+confidential-mpt = ["std", "models", "dep:mpt-crypto"]
 integration = [] # Enable integration tests (requires network access)
 std = [
     "rand/std",

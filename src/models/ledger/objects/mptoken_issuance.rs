@@ -36,6 +36,9 @@ pub enum MPTokenIssuanceFlag {
     LsfMPTCanTransfer = 0x00000020,
     /// The issuer can claw back tokens from holders.
     LsfMPTCanClawback = 0x00000040,
+    /// This MPT can hold confidential balances (XLS-0096). Must be set for any
+    /// `ConfidentialMPT*` transaction against this issuance to succeed.
+    LsfMPTCanHoldConfidentialBalance = 0x00000080,
 }
 
 impl TryFrom<u32> for MPTokenIssuanceFlag {
@@ -50,6 +53,7 @@ impl TryFrom<u32> for MPTokenIssuanceFlag {
             0x00000010 => Ok(MPTokenIssuanceFlag::LsfMPTCanTrade),
             0x00000020 => Ok(MPTokenIssuanceFlag::LsfMPTCanTransfer),
             0x00000040 => Ok(MPTokenIssuanceFlag::LsfMPTCanClawback),
+            0x00000080 => Ok(MPTokenIssuanceFlag::LsfMPTCanHoldConfidentialBalance),
             _ => Err(()),
         }
     }
@@ -165,6 +169,19 @@ pub struct MPTokenIssuance<'a> {
     /// mechanisms across all holders. Present only when the TokenEscrow
     /// amendment is active.
     pub locked_amount: Option<Cow<'a, str>>,
+    /// The issuer's 33-byte compressed EC-ElGamal public key, used to mirror
+    /// every holder's confidential balance (XLS-0096). Registered via
+    /// `MPTokenIssuanceSet`; its presence is what enables confidential
+    /// participation for this issuance.
+    pub issuer_encryption_key: Option<Cow<'a, str>>,
+    /// An optional auditor's 33-byte compressed EC-ElGamal public key for
+    /// regulatory oversight. When present, every confidential transaction must
+    /// carry a matching `AuditorEncryptedAmount`.
+    pub auditor_encryption_key: Option<Cow<'a, str>>,
+    /// `COA` — the plaintext total of this issuance currently held in
+    /// confidential form. Maintained in the clear alongside
+    /// `OutstandingAmount`.
+    pub confidential_outstanding_amount: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for MPTokenIssuance<'a> {
@@ -220,6 +237,9 @@ mod tests {
                 MPTokenIssuanceImmutableFlag::LsifMPTTransferFee,
             ])),
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         let serialized = serde_json::to_string(&issuance).unwrap();
@@ -256,6 +276,9 @@ mod tests {
             previous_txn_lgr_seq: 100,
             immutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert_eq!(
@@ -286,6 +309,9 @@ mod tests {
             previous_txn_lgr_seq: 0,
             immutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert!(issuance.validate().is_ok());
@@ -313,6 +339,9 @@ mod tests {
             previous_txn_lgr_seq: 0,
             immutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert!(issuance.validate().is_err());
@@ -348,7 +377,10 @@ mod tests {
         assert!(MPTokenIssuanceFlag::try_from(0x00000010).is_ok());
         assert!(MPTokenIssuanceFlag::try_from(0x00000020).is_ok());
         assert!(MPTokenIssuanceFlag::try_from(0x00000040).is_ok());
-        assert!(MPTokenIssuanceFlag::try_from(0x00000080).is_err());
+        // XLS-96 CanHoldConfidentialBalance.
+        assert!(MPTokenIssuanceFlag::try_from(0x00000080).is_ok());
+        // An unrecognized flag value still errors.
+        assert!(MPTokenIssuanceFlag::try_from(0x00000100).is_err());
     }
 
     /// Regression: sfImmutableFlags is SoeDefault in xrpld — it may be absent from

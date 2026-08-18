@@ -22,6 +22,10 @@ use super::{CommonFields, CommonTransactionBuilder};
 /// 24 bytes (Hash192) = 48 hex chars.
 const MPTOKEN_ISSUANCE_ID_HEX_LEN: usize = 48;
 
+/// Expected length (in hex characters) of an EC-ElGamal encryption key:
+/// 33 bytes (compressed EC point) = 66 hex chars.
+const ENCRYPTION_KEY_HEX_LEN: usize = 66;
+
 /// Transactions of the MPTokenIssuanceSet type support additional values
 /// in the Flags field.
 ///
@@ -149,6 +153,15 @@ pub struct MPTokenIssuanceSet<'a> {
     /// The holder whose tokens to lock/unlock. If omitted, the lock/unlock
     /// applies to the entire issuance.
     pub holder: Option<Cow<'a, str>>,
+    /// The 33-byte EC-ElGamal public key (66-char hex) used for the issuer's
+    /// mirror balances. Registering it enables confidential transfers for the
+    /// issuance (XLS-0096).
+    #[serde(rename = "IssuerEncryptionKey")]
+    pub issuer_encryption_key: Option<Cow<'a, str>>,
+    /// The 33-byte EC-ElGamal public key (66-char hex) used for regulatory
+    /// oversight. Requires `issuer_encryption_key` to also be present.
+    #[serde(rename = "AuditorEncryptionKey")]
+    pub auditor_encryption_key: Option<Cow<'a, str>>,
     /// Domain (Hash256) associated with this issuance, encoded as a 64-char hex string.
     #[serde(rename = "DomainID")]
     pub domain_id: Option<Cow<'a, str>>,
@@ -178,6 +191,7 @@ impl<'a> Model for MPTokenIssuanceSet<'a> {
         self._get_holder_equals_account_error()?;
         self._get_metadata_error()?;
         self._get_transfer_fee_error()?;
+        self._get_encryption_keys_error()?;
         self._get_immutable_flags_error()?;
         self._get_mutation_with_holder_error()?;
         self._get_mutation_with_lock_flags_error()?;
@@ -222,6 +236,16 @@ impl<'a> MPTokenIssuanceSet<'a> {
 
     pub fn with_holder(mut self, holder: Cow<'a, str>) -> Self {
         self.holder = Some(holder);
+        self
+    }
+
+    pub fn with_issuer_encryption_key(mut self, key: Cow<'a, str>) -> Self {
+        self.issuer_encryption_key = Some(key);
+        self
+    }
+
+    pub fn with_auditor_encryption_key(mut self, key: Cow<'a, str>) -> Self {
+        self.auditor_encryption_key = Some(key);
         self
     }
 
@@ -302,6 +326,42 @@ impl<'a> MPTokenIssuanceSet<'a> {
         if let Some(fee) = self.transfer_fee {
             validate_transfer_fee(fee)?;
         }
+        Ok(())
+    }
+
+    /// Validates the confidential encryption keys (XLS-0096): each key must be a
+    /// 66-char hex (33-byte) compressed EC point, an auditor key requires an
+    /// issuer key, and registering keys cannot be combined with a per-holder
+    /// lock/unlock (`holder`). Mirrors rippled `MPTokenIssuanceSet` preflight and
+    /// xrpl-py's validation.
+    fn _get_encryption_keys_error(&self) -> XRPLModelResult<()> {
+        let has_issuer_key = self.issuer_encryption_key.is_some();
+        let has_auditor_key = self.auditor_encryption_key.is_some();
+
+        if let Some(key) = self.issuer_encryption_key.as_deref() {
+            validate_encryption_key("issuer_encryption_key", key)?;
+        }
+        if let Some(key) = self.auditor_encryption_key.as_deref() {
+            validate_encryption_key("auditor_encryption_key", key)?;
+        }
+
+        // An auditor mirror only makes sense alongside an issuer mirror.
+        if has_auditor_key && !has_issuer_key {
+            return Err(XRPLModelException::FieldRequiresField {
+                field1: "auditor_encryption_key".into(),
+                field2: "issuer_encryption_key".into(),
+            });
+        }
+
+        // Registering keys mutates issuance-level state; it cannot be combined
+        // with a per-holder lock/unlock action.
+        if self.holder.is_some() && (has_issuer_key || has_auditor_key) {
+            return Err(XRPLModelException::InvalidFieldCombination {
+                field: "holder",
+                other_fields: &["issuer_encryption_key", "auditor_encryption_key"],
+            });
+        }
+
         Ok(())
     }
 
@@ -429,7 +489,11 @@ impl<'a> MPTokenIssuanceSet<'a> {
             || self.domain_id.is_some()
             || self.mptoken_metadata.is_some()
             || self.transfer_fee.is_some()
-            || self.immutable_flags.is_some();
+            || self.immutable_flags.is_some()
+            // Registering confidential encryption keys (XLS-0096) mutates the
+            // issuance, so it is a valid state change on its own.
+            || self.issuer_encryption_key.is_some()
+            || self.auditor_encryption_key.is_some();
 
         // A Holder field alone (without a lock/unlock flag or mutation) does nothing.
         if !has_any_change {
@@ -453,6 +517,19 @@ pub(crate) fn validate_mptoken_issuance_id(id: &str) -> XRPLModelResult<()> {
             field: "mptoken_issuance_id".into(),
             format: alloc::format!("{MPTOKEN_ISSUANCE_ID_HEX_LEN}-char ASCII hex string"),
             found: id.into(),
+        });
+    }
+    Ok(())
+}
+
+/// Validates that an EC-ElGamal encryption key is a 66-char (33-byte) ASCII hex
+/// string (a compressed EC point).
+pub(crate) fn validate_encryption_key(field: &str, key: &str) -> XRPLModelResult<()> {
+    if key.len() != ENCRYPTION_KEY_HEX_LEN || !key.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(XRPLModelException::InvalidValueFormat {
+            field: field.into(),
+            format: alloc::format!("{ENCRYPTION_KEY_HEX_LEN}-char ASCII hex string (33 bytes)"),
+            found: key.into(),
         });
     }
     Ok(())
@@ -884,6 +961,88 @@ mod tests {
         );
         let roundtrip: MPTokenIssuanceSet = serde_json::from_str(&json).unwrap();
         assert_eq!(txn, roundtrip);
+    }
+
+    const VALID_ENCRYPTION_KEY: &str =
+        "02AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00112233445566778899";
+
+    #[test]
+    fn test_issuer_encryption_key_valid() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
+        .with_issuer_encryption_key(VALID_ENCRYPTION_KEY.into());
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_issuer_and_auditor_encryption_keys_valid() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
+        .with_issuer_encryption_key(VALID_ENCRYPTION_KEY.into())
+        .with_auditor_encryption_key(VALID_ENCRYPTION_KEY.into());
+        assert!(txn.validate().is_ok());
+    }
+
+    #[test]
+    fn test_auditor_key_without_issuer_key_rejected() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
+        .with_auditor_encryption_key(VALID_ENCRYPTION_KEY.into());
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_encryption_key_wrong_length_rejected() {
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
+        // 64 hex chars (32 bytes) — an encryption key must be 66 hex (33 bytes).
+        .with_issuer_encryption_key("AB".repeat(32).into());
+        assert!(txn.validate().is_err());
+    }
+
+    #[test]
+    fn test_encryption_key_with_holder_rejected() {
+        // Registering keys cannot be combined with a per-holder lock/unlock.
+        let txn = MPTokenIssuanceSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_ISSUER.into(),
+                transaction_type: TransactionType::MPTokenIssuanceSet,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_mptoken_issuance_id("00000001A407AF5856CEFBF81F3D4A0000000000A407AF58".into())
+        .with_holder(ACCOUNT_GENESIS.into())
+        .with_issuer_encryption_key(VALID_ENCRYPTION_KEY.into());
+        assert!(txn.validate().is_err());
     }
 
     #[test]

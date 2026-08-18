@@ -45,8 +45,9 @@ pub enum MPTokenIssuanceCreateFlag {
     TfMPTCanTransfer = 0x00000020,
     /// If set, indicates that the issuer can claw back the MPT.
     TfMPTCanClawback = 0x00000040,
-    /// If set, indicates that this MPT can hold confidential balances (requires
-    /// the ConfidentialTransfer amendment — XLS-96).
+    /// If set, indicates that this MPT can hold a confidential (encrypted)
+    /// balance, enabling Confidential MPT (XLS-0096) transfers. Requires the
+    /// ConfidentialTransfer amendment.
     TfMPTCanHoldConfidentialBalance = 0x00000080,
 }
 
@@ -640,11 +641,11 @@ mod tests {
             MPTokenIssuanceCreateFlag::try_from(0x00000040),
             Ok(MPTokenIssuanceCreateFlag::TfMPTCanClawback)
         );
-        assert!(MPTokenIssuanceCreateFlag::try_from(0x00000001).is_err());
         assert_eq!(
             MPTokenIssuanceCreateFlag::try_from(0x00000080),
             Ok(MPTokenIssuanceCreateFlag::TfMPTCanHoldConfidentialBalance)
         );
+        assert!(MPTokenIssuanceCreateFlag::try_from(0x00000001).is_err());
         assert!(MPTokenIssuanceCreateFlag::try_from(0x00000100).is_err());
     }
 
