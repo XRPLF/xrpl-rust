@@ -1523,3 +1523,190 @@ async fn build_send_material(
         zk_proof: uppercase_hex(proof.as_bytes()),
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Negative-path integration coverage for Send / ConvertBack / Clawback: a
+// well-formed transaction (the model validates) that the ledger rejects on
+// account of on-ledger state the client cannot check. Mirrors the MergeInbox
+// rejection tests above.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// `ConfidentialMPTSend` to a destination that is authorized but has never done a
+/// Convert — its MPToken lacks `HolderEncryptionKey` / `ConfidentialBalanceInbox`
+/// / `IssuerEncryptedBalance`, so it cannot receive confidential value. rippled
+/// rejects at preclaim with `tecNO_PERMISSION` (`ConfidentialMPTSend.cpp:243-247`).
+#[tokio::test]
+async fn confidential_mpt_send_rejects_uninitialized_destination() {
+    with_blockchain_lock(|| async {
+        let setup =
+            setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT | TF_MPT_CAN_TRANSFER).await;
+        let client = get_client().await;
+
+        // Sender: convert + merge -> spending balance.
+        let sender_balance: u64 = 100;
+        convert_public_to_confidential(&setup, client, sender_balance).await;
+        merge_confidential_inbox(&setup).await;
+
+        // Destination: authorized (MPToken exists) but NOT initialized for
+        // confidential balances. We still need *a* pubkey to build the send
+        // proof; rippled rejects on the destination's missing confidential
+        // fields before the proof is ever verified.
+        let dest = generate_funded_wallet().await;
+        let (_dest_sk, dest_pk) =
+            xrpl::mpt_crypto::keypair::generate().expect("destination keypair");
+        submit_signed(
+            &dest.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenAuthorize",
+                "Account": dest.classic_address,
+                "MPTokenIssuanceID": setup.issuance_id,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        let amount: u64 = 40;
+        let sequence =
+            get_next_valid_seq_number(setup.holder.classic_address.clone().into(), client, None)
+                .await
+                .expect("fetch sender sequence");
+        let m = build_send_material(
+            &setup,
+            &dest.classic_address,
+            &dest_pk,
+            sequence,
+            amount,
+            sender_balance,
+        )
+        .await;
+
+        let mut tx = ConfidentialMPTSend::new(
+            setup.holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            Some(sequence),
+            None,
+            None,
+            None,
+            dest.classic_address.clone().into(),
+            None,
+            setup.issuance_id.clone().into(),
+            m.sender_encrypted_amount.into(),
+            m.destination_encrypted_amount.into(),
+            m.issuer_encrypted_amount.into(),
+            m.amount_commitment.into(),
+            m.balance_commitment.into(),
+            m.zk_proof.into(),
+            None,
+            None,
+        );
+        test_transaction_with_result(&mut tx, &setup.holder, "tecNO_PERMISSION").await;
+    })
+    .await;
+}
+
+/// `ConfidentialMPTConvertBack` while the holder's MPToken is locked. The proof
+/// is built against the (valid) spending balance first, then the issuer locks the
+/// holder; rippled's `checkFrozen` rejects the withdrawal with `tecLOCKED`
+/// (`ConfidentialMPTConvertBack.cpp:220`).
+#[tokio::test]
+async fn confidential_mpt_convert_back_rejects_locked_holder() {
+    with_blockchain_lock(|| async {
+        let setup =
+            setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT | TF_MPT_CAN_LOCK).await;
+        let client = get_client().await;
+
+        let amount: u64 = 100;
+        convert_public_to_confidential(&setup, client, amount).await;
+        merge_confidential_inbox(&setup).await;
+
+        // Build the proof against the current spending balance BEFORE locking
+        // (locking does not change the confidential balance/version the proof
+        // binds to).
+        let sequence =
+            get_next_valid_seq_number(setup.holder.classic_address.clone().into(), client, None)
+                .await
+                .expect("fetch holder sequence");
+        let m = build_convert_back_material(&setup, sequence, amount, amount).await;
+
+        // Issuer locks the holder's MPToken.
+        submit_signed(
+            &setup.issuer.seed,
+            serde_json::json!({
+                "TransactionType": "MPTokenIssuanceSet",
+                "Account": setup.issuer.classic_address,
+                "MPTokenIssuanceID": setup.issuance_id,
+                "Holder": setup.holder.classic_address,
+                "Flags": TF_MPT_LOCK,
+                "Fee": MPT_TXN_FEE,
+            }),
+        )
+        .await;
+
+        let mut tx = ConfidentialMPTConvertBack::new(
+            setup.holder.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            Some(sequence),
+            None,
+            None,
+            None,
+            setup.issuance_id.clone().into(),
+            amount.to_string().into(),
+            m.holder_encrypted_amount.into(),
+            m.issuer_encrypted_amount.into(),
+            m.blinding_factor.into(),
+            m.balance_commitment.into(),
+            m.zk_proof.into(),
+            None,
+        );
+        test_transaction_with_result(&mut tx, &setup.holder, "tecLOCKED").await;
+    })
+    .await;
+}
+
+/// `ConfidentialMPTClawback` on an issuance created WITHOUT `lsfMPTCanClawback`.
+/// The account is the issuer and the proof is valid, but rippled rejects at
+/// preclaim with `tecNO_PERMISSION` because the issuance is not clawback-enabled
+/// (`ConfidentialMPTClawback.cpp:88-89`).
+#[tokio::test]
+async fn confidential_mpt_clawback_rejects_non_clawbackable_issuance() {
+    with_blockchain_lock(|| async {
+        // No TF_MPT_CAN_CLAWBACK.
+        let setup = setup_confidential_issuance(TF_MPT_CAN_CONFIDENTIAL_AMOUNT).await;
+        let client = get_client().await;
+
+        let amount: u64 = 100;
+        // Convert alone seeds the issuer's mirror (IssuerEncryptedBalance) that
+        // the clawback proof reads — no merge required.
+        convert_public_to_confidential(&setup, client, amount).await;
+
+        let sequence =
+            get_next_valid_seq_number(setup.issuer.classic_address.clone().into(), client, None)
+                .await
+                .expect("fetch issuer sequence");
+        let zk_proof = build_clawback_proof(&setup, sequence, amount).await;
+
+        let mut tx = ConfidentialMPTClawback::new(
+            setup.issuer.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            Some(sequence),
+            None,
+            None,
+            None,
+            setup.holder.classic_address.clone().into(),
+            setup.issuance_id.clone().into(),
+            amount.to_string().into(),
+            zk_proof.into(),
+        );
+        test_transaction_with_result(&mut tx, &setup.issuer, "tecNO_PERMISSION").await;
+    })
+    .await;
+}
