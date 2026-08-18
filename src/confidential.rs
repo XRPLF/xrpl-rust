@@ -230,6 +230,11 @@ pub struct SendParams<'a> {
     pub destination_pubkey: &'a Pubkey,
     pub issuer_pubkey: &'a Pubkey,
     pub auditor_pubkey: Option<&'a Pubkey>,
+    /// XLS-70 `CredentialIDs` presented to satisfy the destination's
+    /// `DepositPreauth` / credential-based authorization, if it requires one.
+    /// Each entry is a credential's 64-char hex ledger index; `None` (or an empty
+    /// slice) omits the field.
+    pub credential_ids: Option<&'a [&'a str]>,
 }
 
 /// Assemble a `ConfidentialMPTSend` (confidential transfer).
@@ -311,7 +316,11 @@ pub fn assemble_send(p: SendParams<'_>) -> Result<ConfidentialMPTSend<'static>> 
         balance_commitment: Cow::Owned(upper_hex(balance_commitment.as_bytes())),
         zk_proof: Cow::Owned(upper_hex(proof.as_bytes())),
         auditor_encrypted_amount: auditor_ct.map(|ct| Cow::Owned(upper_hex(ct.as_bytes()))),
-        credential_ids: None,
+        credential_ids: p.credential_ids.map(|ids| {
+            ids.iter()
+                .map(|id| Cow::Owned(id.to_string()))
+                .collect::<Vec<_>>()
+        }),
     })
 }
 
@@ -624,6 +633,7 @@ mod prepare {
         destination_pubkey: &Pubkey,
         issuer_pubkey: &Pubkey,
         auditor_pubkey: Option<&Pubkey>,
+        credential_ids: Option<&[&str]>,
     ) -> Result<ConfidentialMPTSend<'static>> {
         let sequence = fetch_sequence(client, sender_account).await?;
         let node = read_mptoken(client, sender_account, issuance_id_hex).await?;
@@ -646,6 +656,7 @@ mod prepare {
             destination_pubkey,
             issuer_pubkey,
             auditor_pubkey,
+            credential_ids,
         })
     }
 
@@ -853,6 +864,7 @@ mod tests {
             destination_pubkey: &dpk,
             issuer_pubkey: &pk,
             auditor_pubkey: None,
+            credential_ids: None,
         })
         .unwrap_err();
         assert!(matches!(
@@ -862,5 +874,98 @@ mod tests {
                 balance: 50
             }
         ));
+    }
+
+    #[test]
+    fn send_threads_credential_ids() {
+        // XLS-70 CredentialIDs supplied on SendParams are carried onto the tx.
+        let (sk, pk) = keypair::generate().unwrap();
+        let (_dsk, dpk) = keypair::generate().unwrap();
+        let (_isk, ipk) = keypair::generate().unwrap();
+        let r = encrypt::random_blinding_factor().unwrap();
+        let balance_hex = upper_hex(encrypt::encrypt(1000, &pk, &r).unwrap().as_bytes());
+        let cred_a = "AB".repeat(32); // 64-hex credential ledger index
+        let cred_b = "CD".repeat(32);
+        let creds = [cred_a.as_str(), cred_b.as_str()];
+
+        let tx = assemble_send(SendParams {
+            sender_account: ACCOUNT,
+            destination_account: ACCOUNT,
+            destination_tag: None,
+            issuance_id_hex: ISSUANCE,
+            sequence: 1,
+            version: 0,
+            amount: 10,
+            current_balance: 1000,
+            balance_ciphertext_hex: &balance_hex,
+            sender_privkey: &sk,
+            sender_pubkey: &pk,
+            destination_pubkey: &dpk,
+            issuer_pubkey: &ipk,
+            auditor_pubkey: None,
+            credential_ids: Some(&creds),
+        })
+        .unwrap();
+
+        let got = tx.credential_ids.expect("credential_ids threaded through");
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0], cred_a);
+        assert_eq!(got[1], cred_b);
+    }
+
+    #[test]
+    fn assemble_send_happy_path() {
+        // A fully-formed send: correct field shapes, the destination ciphertext
+        // decrypts to the sent amount, and the assembled model validates.
+        let (sk, pk) = keypair::generate().unwrap();
+        let (dsk, dpk) = keypair::generate().unwrap();
+        let (_isk, ipk) = keypair::generate().unwrap();
+        let r = encrypt::random_blinding_factor().unwrap();
+        let balance_hex = upper_hex(encrypt::encrypt(1000, &pk, &r).unwrap().as_bytes());
+
+        // A second real address, distinct from the sender and from the issuer
+        // embedded in ISSUANCE, so the self-send / issuer-role bans pass.
+        const DESTINATION: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+
+        let tx = assemble_send(SendParams {
+            sender_account: ACCOUNT,
+            destination_account: DESTINATION,
+            destination_tag: Some(42),
+            issuance_id_hex: ISSUANCE,
+            sequence: 7,
+            version: 3,
+            amount: 250,
+            current_balance: 1000,
+            balance_ciphertext_hex: &balance_hex,
+            sender_privkey: &sk,
+            sender_pubkey: &pk,
+            destination_pubkey: &dpk,
+            issuer_pubkey: &ipk,
+            auditor_pubkey: None,
+            credential_ids: None,
+        })
+        .unwrap();
+
+        assert_eq!(tx.destination.as_ref(), DESTINATION);
+        assert_eq!(tx.destination_tag, Some(42));
+        assert_eq!(tx.common_fields.sequence, Some(7));
+        assert_eq!(tx.mptoken_issuance_id.as_ref(), ISSUANCE);
+        // ElGamal ciphertexts are 132 hex chars; Pedersen commitments 66; the
+        // composite Send proof is 946 bytes = 1892 hex chars.
+        assert_eq!(tx.sender_encrypted_amount.len(), 132);
+        assert_eq!(tx.destination_encrypted_amount.len(), 132);
+        assert_eq!(tx.issuer_encrypted_amount.len(), 132);
+        assert_eq!(tx.amount_commitment.len(), 66);
+        assert_eq!(tx.balance_commitment.len(), 66);
+        assert_eq!(tx.zk_proof.len(), 1892);
+        assert!(tx.auditor_encrypted_amount.is_none());
+
+        // The destination ciphertext really encrypts the sent amount.
+        assert_eq!(
+            decrypt_balance(tx.destination_encrypted_amount.as_ref(), &dsk).unwrap(),
+            250
+        );
+        // The assembled transaction is a valid model.
+        assert!(tx.validate().is_ok());
     }
 }
