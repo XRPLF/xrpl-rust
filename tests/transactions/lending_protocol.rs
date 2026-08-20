@@ -224,7 +224,7 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(1)).await.unwrap();
+        autofill(&mut loan_set_tx, client, Some(2)).await.unwrap();
 
         // Loan broker signs the transaction and sends it to the borrower
         // The Loan Issuer signs the transaction setting the SigningPubKey, TxnSignature, Signers, Account, Fee, Sequence fields.
@@ -468,7 +468,7 @@ async fn test_loan_set_txn_counterparty_is_loan_broker_owner() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(0))
+        autofill(&mut loan_set_tx, client, Some(1))
             .await
             .expect("Failed to auto-fill loan set transaction");
 
@@ -836,7 +836,7 @@ async fn test_loan_set_with_combine_loanset_counterparty_signers() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(1))
+        autofill(&mut loan_set_tx, client, Some(2))
             .await
             .expect("Failed to auto-fill loan set transaction");
 
