@@ -10,6 +10,8 @@ pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
 pub mod clawback;
+#[cfg(feature = "confidential-mpt")]
+pub mod confidential_mpt;
 pub mod credential;
 pub mod deposit_preauth;
 pub mod did_delete;

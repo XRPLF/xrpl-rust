@@ -33,6 +33,11 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+      # NOTE: confidential-mpt (which statically links the mpt-crypto native
+      # archive via FFI) is NOT tested here — it runs in the cross-platform
+      # `confidential_mpt` job below, because its build.rs link path differs per
+      # OS (macOS ld / GNU ld / MSVC) and must be exercised on each.
+
       - name: Test for no_std
         run: cargo test --release --no-default-features --features
           embassy-rt,core,utils,wallet,models,helpers,websocket,json-rpc
@@ -78,3 +83,48 @@ jobs:
         with:
           name: lcov-report
           path: lcov.info
+
+  # confidential-mpt statically links the self-contained mpt-crypto archive
+  # (secp256k1 + OpenSSL) via mpt-crypto-sys/build.rs, whose resolve + link path
+  # differs per platform (libmpt-crypto.a with `-lc++` on macOS, `-lstdc++
+  # -lpthread -ldl -lm` on Linux; mpt-crypto-static.lib with the Win32 system
+  # libs under MSVC). The ubuntu-only unit_test job can't catch a macOS/Windows
+  # link regression, so build + test the cMPT models and mpt-crypto wrapper on
+  # every target — mirroring xrpl-py's build_wheels_confidential matrix.
+  confidential_mpt:
+    name: Confidential MPT (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, label: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, label: linux-aarch64 }
+          - { os: macos-14, label: macos-arm64 }
+          - { os: macos-15-intel, label: macos-x86_64 }
+          - { os: windows-2022, label: windows-amd64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.label }}-cargo-cmpt-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.label }}-cargo-cmpt-
+
+      # Exercises the static link (build.rs downloads + verifies the pinned
+      # mpt-crypto natives bundle and links the platform's archive) plus the
+      # cMPT transaction-model unit tests and the mpt-crypto safe-wrapper tests.
+      - name: Build + test confidential-mpt (static link + models + wrapper)
+        run: |
+          cargo test --release --features confidential-mpt --lib
+          cargo test --release -p mpt-crypto
+          cargo test --release -p mpt-crypto-sys
+        env:
+          RUST_BACKTRACE: 1

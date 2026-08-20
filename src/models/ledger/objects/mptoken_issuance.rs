@@ -36,6 +36,9 @@ pub enum MPTokenIssuanceFlag {
     LsfMPTCanTransfer = 0x00000020,
     /// The issuer can claw back tokens from holders.
     LsfMPTCanClawback = 0x00000040,
+    /// This MPT can hold confidential balances (XLS-0096). Must be set for any
+    /// `ConfidentialMPT*` transaction against this issuance to succeed.
+    LsfMPTCanHoldConfidentialBalance = 0x00000080,
 }
 
 impl TryFrom<u32> for MPTokenIssuanceFlag {
@@ -50,51 +53,57 @@ impl TryFrom<u32> for MPTokenIssuanceFlag {
             0x00000010 => Ok(MPTokenIssuanceFlag::LsfMPTCanTrade),
             0x00000020 => Ok(MPTokenIssuanceFlag::LsfMPTCanTransfer),
             0x00000040 => Ok(MPTokenIssuanceFlag::LsfMPTCanClawback),
+            0x00000080 => Ok(MPTokenIssuanceFlag::LsfMPTCanHoldConfidentialBalance),
             _ => Err(()),
         }
     }
 }
 
-/// Mutable-flags bitmask stored in `sfMutableFlags` on an `MPTokenIssuance` ledger object.
-/// These bits indicate which properties the issuer may update after creation.
+/// Immutable-flags bitmask stored in `sfImmutableFlags` on an `MPTokenIssuance` ledger object.
+/// Each bit indicates that the corresponding field or capability flag has been permanently locked
+/// and can no longer be modified via `MPTokenIssuanceSet`. Bits are monotonic — once set they can
+/// never be cleared.
 ///
-/// See MPTokenIssuanceMutable flags (rippled `LedgerFormats.h`).
+/// See MPTokenIssuanceImmutable flags (XLS-94D / rippled `LedgerFormats.h`).
 #[derive(
     Debug, Eq, PartialEq, Clone, Serialize_repr, Deserialize_repr, Display, AsRefStr, EnumIter,
 )]
 #[repr(u32)]
-pub enum MPTokenIssuanceMutableFlag {
-    /// The issuer may toggle the `lsfMPTCanLock` flag after creation.
-    LsmfMPTCanMutateCanLock = 0x00000002,
-    /// The issuer may toggle the `lsfMPTRequireAuth` flag after creation.
-    LsmfMPTCanMutateRequireAuth = 0x00000004,
-    /// The issuer may toggle the `lsfMPTCanEscrow` flag after creation.
-    LsmfMPTCanMutateCanEscrow = 0x00000008,
-    /// The issuer may toggle the `lsfMPTCanTrade` flag after creation.
-    LsmfMPTCanMutateCanTrade = 0x00000010,
-    /// The issuer may toggle the `lsfMPTCanTransfer` flag after creation.
-    LsmfMPTCanMutateCanTransfer = 0x00000020,
-    /// The issuer may toggle the `lsfMPTCanClawback` flag after creation.
-    LsmfMPTCanMutateCanClawback = 0x00000040,
-    /// The issuer may update the `MPTokenMetadata` field after creation.
-    LsmfMPTCanMutateMetadata = 0x00010000,
-    /// The issuer may update the `TransferFee` field after creation.
-    LsmfMPTCanMutateTransferFee = 0x00020000,
+pub enum MPTokenIssuanceImmutableFlag {
+    /// The `lsfMPTCanLock` flag is permanently immutable.
+    LsifMPTCanLock = 0x00000002,
+    /// The `lsfMPTRequireAuth` flag is permanently immutable.
+    LsifMPTRequireAuth = 0x00000004,
+    /// The `lsfMPTCanEscrow` flag is permanently immutable.
+    LsifMPTCanEscrow = 0x00000008,
+    /// The `lsfMPTCanTrade` flag is permanently immutable.
+    LsifMPTCanTrade = 0x00000010,
+    /// The `lsfMPTCanTransfer` flag is permanently immutable.
+    LsifMPTCanTransfer = 0x00000020,
+    /// The `lsfMPTCanClawback` flag is permanently immutable.
+    LsifMPTCanClawback = 0x00000040,
+    /// The `lsfMPTCanHoldConfidentialBalance` flag is permanently immutable (XLS-96).
+    LsifMPTCanHoldConfidentialBalance = 0x00000080,
+    /// The `MPTokenMetadata` field is permanently immutable.
+    LsifMPTMetadata = 0x00010000,
+    /// The `TransferFee` field is permanently immutable.
+    LsifMPTTransferFee = 0x00020000,
 }
 
-impl TryFrom<u32> for MPTokenIssuanceMutableFlag {
+impl TryFrom<u32> for MPTokenIssuanceImmutableFlag {
     type Error = ();
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
-            0x00000002 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateCanLock),
-            0x00000004 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateRequireAuth),
-            0x00000008 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateCanEscrow),
-            0x00000010 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateCanTrade),
-            0x00000020 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateCanTransfer),
-            0x00000040 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateCanClawback),
-            0x00010000 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateMetadata),
-            0x00020000 => Ok(MPTokenIssuanceMutableFlag::LsmfMPTCanMutateTransferFee),
+            0x00000002 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTCanLock),
+            0x00000004 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTRequireAuth),
+            0x00000008 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTCanEscrow),
+            0x00000010 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTCanTrade),
+            0x00000020 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTCanTransfer),
+            0x00000040 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTCanClawback),
+            0x00000080 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTCanHoldConfidentialBalance),
+            0x00010000 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTMetadata),
+            0x00020000 => Ok(MPTokenIssuanceImmutableFlag::LsifMPTTransferFee),
             _ => Err(()),
         }
     }
@@ -146,18 +155,33 @@ pub struct MPTokenIssuance<'a> {
     /// The index of the ledger that contains the transaction that most
     /// recently modified this object.
     pub previous_txn_lgr_seq: u32,
-    /// Bitmask of which fields the issuer may mutate after creation.
-    /// Stored as `sfMutableFlags` on-ledger.
+    /// Bitmask of fields and capability flags that have been permanently locked.
+    /// Stored as `sfImmutableFlags` on-ledger. Absent means nothing is permanently locked.
+    /// Bits are monotonic — once set they can never be cleared.
     #[serde(
         default,
+        rename = "ImmutableFlags",
         with = "opt_lgr_obj_flags",
         skip_serializing_if = "Option::is_none"
     )]
-    pub mutable_flags: Option<FlagCollection<MPTokenIssuanceMutableFlag>>,
+    pub immutable_flags: Option<FlagCollection<MPTokenIssuanceImmutableFlag>>,
     /// The total amount of this MPT currently locked in escrow or by other
     /// mechanisms across all holders. Present only when the TokenEscrow
     /// amendment is active.
     pub locked_amount: Option<Cow<'a, str>>,
+    /// The issuer's 33-byte compressed EC-ElGamal public key, used to mirror
+    /// every holder's confidential balance (XLS-0096). Registered via
+    /// `MPTokenIssuanceSet`; its presence is what enables confidential
+    /// participation for this issuance.
+    pub issuer_encryption_key: Option<Cow<'a, str>>,
+    /// An optional auditor's 33-byte compressed EC-ElGamal public key for
+    /// regulatory oversight. When present, every confidential transaction must
+    /// carry a matching `AuditorEncryptedAmount`.
+    pub auditor_encryption_key: Option<Cow<'a, str>>,
+    /// `COA` — the plaintext total of this issuance currently held in
+    /// confidential form. Maintained in the clear alongside
+    /// `OutstandingAmount`.
+    pub confidential_outstanding_amount: Option<Cow<'a, str>>,
 }
 
 impl<'a> Model for MPTokenIssuance<'a> {
@@ -209,17 +233,20 @@ mod tests {
             previous_txn_id: "E3FE6EA3D48F0C2B639448020EA4F03D4F4F8FFDB243A852A0F59177921B4879"
                 .into(),
             previous_txn_lgr_seq: 654321,
-            mutable_flags: Some(FlagCollection(vec![
-                MPTokenIssuanceMutableFlag::LsmfMPTCanMutateTransferFee,
+            immutable_flags: Some(FlagCollection(vec![
+                MPTokenIssuanceImmutableFlag::LsifMPTTransferFee,
             ])),
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         let serialized = serde_json::to_string(&issuance).unwrap();
-        // MutableFlags must serialize as an integer (rippled format), not an array.
+        // ImmutableFlags must serialize as an integer (rippled format), not an array.
         assert!(
-            serialized.contains("\"MutableFlags\":131072"),
-            "MutableFlags should serialize as integer 131072, got: {serialized}"
+            serialized.contains("\"ImmutableFlags\":131072"),
+            "ImmutableFlags should serialize as integer 131072, got: {serialized}"
         );
         let deserialized: MPTokenIssuance = serde_json::from_str(&serialized).unwrap();
         assert_eq!(issuance, deserialized);
@@ -247,8 +274,11 @@ mod tests {
             previous_txn_id: "E3FE6EA3D48F0C2B639448020EA4F03D4F4F8FFDB243A852A0F59177921B4879"
                 .into(),
             previous_txn_lgr_seq: 100,
-            mutable_flags: None,
+            immutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert_eq!(
@@ -277,8 +307,11 @@ mod tests {
             previous_txn_id: "0000000000000000000000000000000000000000000000000000000000000000"
                 .into(),
             previous_txn_lgr_seq: 0,
-            mutable_flags: None,
+            immutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert!(issuance.validate().is_ok());
@@ -304,31 +337,35 @@ mod tests {
             previous_txn_id: "0000000000000000000000000000000000000000000000000000000000000000"
                 .into(),
             previous_txn_lgr_seq: 0,
-            mutable_flags: None,
+            immutable_flags: None,
             locked_amount: None,
+            issuer_encryption_key: None,
+            auditor_encryption_key: None,
+            confidential_outstanding_amount: None,
         };
 
         assert!(issuance.validate().is_err());
     }
 
     #[test]
-    fn test_mutable_flag_variants() {
+    fn test_immutable_flag_variants() {
         assert!(
-            MPTokenIssuanceMutableFlag::try_from(0x00020000).is_ok(),
-            "LsmfMPTCanMutateTransferFee should parse"
+            MPTokenIssuanceImmutableFlag::try_from(0x00020000).is_ok(),
+            "LsifMPTTransferFee should parse"
         );
         assert!(
-            MPTokenIssuanceMutableFlag::try_from(0x00010000).is_ok(),
-            "LsmfMPTCanMutateMetadata should parse"
+            MPTokenIssuanceImmutableFlag::try_from(0x00010000).is_ok(),
+            "LsifMPTMetadata should parse"
         );
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000001).is_err());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000001).is_err());
         // cover all remaining match arms
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000002).is_ok());
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000004).is_ok());
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000008).is_ok());
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000010).is_ok());
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000020).is_ok());
-        assert!(MPTokenIssuanceMutableFlag::try_from(0x00000040).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000002).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000004).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000008).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000010).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000020).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000040).is_ok());
+        assert!(MPTokenIssuanceImmutableFlag::try_from(0x00000080).is_ok());
     }
 
     #[test]
@@ -340,15 +377,17 @@ mod tests {
         assert!(MPTokenIssuanceFlag::try_from(0x00000010).is_ok());
         assert!(MPTokenIssuanceFlag::try_from(0x00000020).is_ok());
         assert!(MPTokenIssuanceFlag::try_from(0x00000040).is_ok());
-        assert!(MPTokenIssuanceFlag::try_from(0x00000080).is_err());
+        // XLS-96 CanHoldConfidentialBalance.
+        assert!(MPTokenIssuanceFlag::try_from(0x00000080).is_ok());
+        // An unrecognized flag value still errors.
+        assert!(MPTokenIssuanceFlag::try_from(0x00000100).is_err());
     }
 
-    /// Regression: sfMutableFlags is SoeDefault in xrpld — it may be absent from
-    /// server JSON. Previously missing `#[serde(default)]` would cause deserialization
-    /// to fail with "missing field `MutableFlags`" for any on-ledger MPTokenIssuance
-    /// that did not set mutable flags.
+    /// Regression: sfImmutableFlags is SoeDefault in xrpld — it may be absent from
+    /// server JSON. The `#[serde(default)]` attribute ensures deserialization succeeds
+    /// for any on-ledger MPTokenIssuance that has not set any immutable flags.
     #[test]
-    fn test_deserialize_without_mutable_flags() {
+    fn test_deserialize_without_immutable_flags() {
         let json = r#"{
             "Flags": 0,
             "Issuer": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
@@ -361,10 +400,10 @@ mod tests {
             "LedgerEntryType": "MPTokenIssuance"
         }"#;
         let obj: MPTokenIssuance =
-            serde_json::from_str(json).expect("must deserialize without MutableFlags key");
+            serde_json::from_str(json).expect("must deserialize without ImmutableFlags key");
         assert!(
-            obj.mutable_flags.is_none(),
-            "absent MutableFlags should deserialize as None"
+            obj.immutable_flags.is_none(),
+            "absent ImmutableFlags should deserialize as None"
         );
     }
 }

@@ -700,6 +700,7 @@ pub(crate) const BASE10_UINT64_FIELDS: &[&str] = &[
     "OutstandingAmount",
     "MPTAmount",
     "LockedAmount",
+    "ConfidentialOutstandingAmount",
 ];
 
 /// Serialize a JSON transaction to hex-encoded binary.
@@ -1207,5 +1208,22 @@ mod test {
             assert!(decoded_length.is_ok());
             assert_eq!(decoded_length, Ok(case));
         }
+    }
+
+    #[test]
+    fn confidential_outstanding_amount_serializes_base10() {
+        use crate::core::binarycodec::{decode, encode};
+        let binary = "11007E3020000000000001234570232102ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB702C2102ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB";
+        let json = decode(binary).expect("decode");
+        assert_eq!(
+            json["LedgerEntryType"],
+            serde_json::json!("MPTokenIssuance")
+        );
+        assert_eq!(
+            json["ConfidentialOutstandingAmount"],
+            serde_json::json!("74565")
+        );
+        let reencoded = encode(&json).expect("encode");
+        assert_eq!(reencoded.to_uppercase(), binary.to_uppercase());
     }
 }

@@ -80,10 +80,16 @@ pub struct VaultObject<'a> {
 ///
 /// `<https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0065d>`
 #[serde_with::skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VaultInfo<'a> {
     /// The vault object with all on-ledger fields plus the share token.
-    pub vault: Option<VaultObject<'a>>,
+    ///
+    /// Required (not `Option`): a successful `vault_info` result always carries
+    /// a `vault`. Keeping it mandatory stops this variant — inside the untagged
+    /// `XRPLResult` enum — from greedily deserializing arbitrary responses (e.g.
+    /// an errored `submit`) that happen to have no fields in common, which would
+    /// otherwise mask the real result behind `UnexpectedResultType(_, VaultInfo)`.
+    pub vault: VaultObject<'a>,
     /// The ledger sequence number current at request time (open-ledger mode).
     pub ledger_current_index: Option<u32>,
     /// The ledger index of the validated ledger used to retrieve this data.
@@ -129,7 +135,7 @@ mod tests {
         assert_eq!(result.ledger_index, Some(1000));
         assert_eq!(result.validated, Some(true));
 
-        let vault_obj = result.vault.unwrap();
+        let vault_obj = result.vault;
         assert_eq!(vault_obj.vault.owner.as_ref(), "rVaultOwner123");
         assert_eq!(vault_obj.vault.account.as_ref(), "rPseudoAccount456");
         assert_eq!(vault_obj.vault.withdrawal_policy, 1);
@@ -189,7 +195,7 @@ mod tests {
         }"#;
 
         let result: VaultInfo = serde_json::from_str(json).unwrap();
-        let vault_obj = result.vault.unwrap();
+        let vault_obj = result.vault;
         assert!(vault_obj.shares.is_none(), "shares should be absent");
         assert_eq!(vault_obj.vault.owner.as_ref(), "rOwner");
     }

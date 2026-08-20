@@ -176,12 +176,11 @@ mod tests {
         let fee: XRPAmount =
             calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(&txn, None, Some(3))
                 .unwrap();
-        // With 3 signers, the fee should be larger than the no-signer baseline.
-        let baseline: XRPAmount =
-            calculate_fee_per_transaction_type::<_, _, AsyncJsonRpcClient>(&txn, None, None)
-                .unwrap();
-        let fee_drops: u64 = fee.0.parse().unwrap();
-        let baseline_drops: u64 = baseline.0.parse().unwrap();
-        assert!(fee_drops >= baseline_drops);
+        // rippled charges base * (1 + signerCount) for a multisigned reference
+        // transaction (Transactor::calculateBaseFee: `base + signerCount * base`).
+        // With the default base of 10 drops and 3 signers that is 10 * (1 + 3) = 40
+        // — NOT 50 (which the earlier `1 + signers_count` term produced by
+        // double-counting the reference base fee).
+        assert_eq!(fee.0, "40");
     }
 }
