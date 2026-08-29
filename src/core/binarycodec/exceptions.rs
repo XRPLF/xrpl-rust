@@ -24,6 +24,8 @@ pub enum XRPLBinaryCodecException {
     InvalidReadFromBytesValue,
     #[error("Invalid variable length too large: max: {max}")]
     InvalidVariableLengthTooLarge { max: usize },
+    #[error("Max decode depth exceeded: max: {max}")]
+    MaxDecodeDepthExceeded { max: u32 },
     #[error("Invalid hash length (expected: {expected}, found: {found})")]
     InvalidHashLength { expected: usize, found: usize },
     #[error("Invalid path set from value")]
