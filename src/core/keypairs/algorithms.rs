@@ -474,7 +474,11 @@ impl CryptoImplementation for Ed25519 {
                     dsig.try_into().expect("is_valid_message");
                 let converted = &ed25519_dalek::Signature::from(sig);
 
-                value.verify(message, converted).is_ok()
+                // Use `verify_strict` rather than `verify` to reject malleable / non-canonical
+                // encodings and torsion-point edge cases (RFC 8032 §8.4). The permissive
+                // `verify` can accept signatures that rippled rejects (or vice versa); the
+                // strict variant matches rippled's verification semantics. See #283.
+                value.verify_strict(message, converted).is_ok()
             } else {
                 false
             }
