@@ -1,5 +1,5 @@
 use super::exceptions::XRPLWebSocketException;
-use super::{WebSocketClosed, WebSocketOpen};
+use super::{ConnectionStatus, WebSocketClosed, WebSocketOpen};
 use crate::asynch::clients::client::XRPLClient;
 use crate::asynch::clients::exceptions::{XRPLClientException, XRPLClientResult};
 use crate::asynch::clients::websocket::websocket_base::{MessageHandler, WebsocketBase};
@@ -164,9 +164,10 @@ where
 impl<M, Status> AsyncWebSocketClient<M, Status>
 where
     M: RawMutex,
+    Status: ConnectionStatus,
 {
     pub fn is_open(&self) -> bool {
-        core::any::type_name::<Status>() == core::any::type_name::<WebSocketOpen>()
+        Status::IS_OPEN
     }
 }
 
