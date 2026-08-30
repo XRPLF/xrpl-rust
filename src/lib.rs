@@ -84,7 +84,6 @@ mod _serde;
         feature = "tokio-rt",
         feature = "embassy-rt",
         feature = "actix-rt",
-        feature = "async-std-rt",
         feature = "futures-rt",
         feature = "smol-rt"
     ))
@@ -95,6 +94,16 @@ compile_error!("Cannot enable `helpers` without enabling a runtime feature (\"*-
     not(any(feature = "json-rpc", feature = "websocket",))
 ))]
 compile_error!("Cannot enable `helpers` without enabling a client feature (\"json-rpc\", \"websocket\"). This is required for interacting with the XRP Ledger.");
+
+// async-std has been discontinued (RUSTSEC-2025-0052). This guard lives in
+// lib.rs (always compiled) so it fires regardless of which other features are
+// enabled — the guard inside asynch/mod.rs only fires when `models` is also on.
+#[cfg(feature = "async-std-rt")]
+compile_error!(
+    "The async-std-rt feature is deprecated and no longer supported. \
+     async-std has been discontinued (RUSTSEC-2025-0052). \
+     Use the smol-rt feature instead."
+);
 
 #[derive(Debug, Error)]
 pub enum XRPLSerdeJsonError {
