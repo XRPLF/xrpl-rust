@@ -781,6 +781,16 @@ impl crate::models::Model for PriceData {
 /// Maximum allowed value for `AssetPrice`.
 pub const MAX_ORACLE_ASSET_PRICE: u64 = u64::MAX;
 
+/// Validate that an oracle currency code is either a 3-character ISO code (e.g. `XRP`,
+/// `USD`, `BTC`) or a 40-character uppercase hex string.
+///
+/// This mirrors the restriction imposed by [`crate::core::binarycodec::types::currency::Currency::try_from`]:
+/// only 3-char ISO codes and 40-char hex strings can be serialized as a 160-bit Currency
+/// field on the wire.  Arbitrary strings (e.g. `"EURO"`, `"DOGE"`, `"LONGTICKER"`) would
+/// pass a naive non-empty check here but then hard-fail at sign/encode time with
+/// `UnsupportedCurrencyRepresentation`.  xrpl-py applies the same restriction.
+///
+/// If a non-ISO currency identifier is needed, encode it as a 40-char hex string first.
 fn validate_oracle_currency(
     field: &'static str,
     value: &str,
@@ -790,8 +800,9 @@ fn validate_oracle_currency(
     }
     Err(crate::models::XRPLModelException::InvalidValue {
         field: field.into(),
-        expected: "a 3-character ISO currency code (including \"XRP\") or 40-character hex code"
-            .into(),
+        expected:
+            "a 3-character ISO currency code (e.g. \"XRP\", \"USD\") or 40-character hex code"
+                .into(),
         found: value.into(),
     })
 }
