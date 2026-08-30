@@ -9,7 +9,9 @@ use crate::models::{
     XRPLModelException, XRPLModelResult,
 };
 
-use super::{metadata::TransactionMetadata, XRPLResponse, XRPLResult};
+use crate::models::transactions::metadata::TransactionMetadata;
+
+use super::{XRPLResponse, XRPLResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
