@@ -63,4 +63,16 @@ mod tests {
         let result = hex_to_str(Cow::Borrowed("ff"));
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_hex_to_str_invalid_utf8_preserves_detail() {
+        use crate::utils::exceptions::XRPLUtilsException;
+
+        // "41ff" decodes to [0x41, 0xff]: 'A' is valid, 0xff is not, so the
+        // Utf8Error should report `valid_up_to() == 1`.
+        match hex_to_str(Cow::Borrowed("41ff")).unwrap_err() {
+            XRPLUtilsException::Utf8Error(error) => assert_eq!(error.valid_up_to(), 1),
+            other => panic!("expected Utf8Error, got {other:?}"),
+        }
+    }
 }
