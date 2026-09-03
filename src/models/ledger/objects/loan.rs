@@ -194,7 +194,7 @@ impl<'a> Loan<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::borrow::Cow;
+    use alloc::{borrow::Cow, vec};
 
     #[test]
     fn test_serde() {

@@ -133,6 +133,7 @@ impl<'a> LoanManage<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanManager6T5weJ9mZg";
     const LOAN_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";

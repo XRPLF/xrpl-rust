@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::{borrow::Cow, string::ToString, vec::Vec};
 use core::str::FromStr;
 
 use serde::{Deserialize, Serialize};

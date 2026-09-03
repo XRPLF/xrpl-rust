@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, format, vec::Vec};
+use alloc::{borrow::Cow, format, string::ToString, vec::Vec};
 use core::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -165,6 +165,7 @@ impl<'a> LoanPay<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanPayer6T5weJ9mZg";
     const LOAN_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
