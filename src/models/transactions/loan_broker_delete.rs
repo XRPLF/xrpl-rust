@@ -9,6 +9,8 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
+/// Deletes a LoanBroker ledger entry. Only the owner
+/// of the LoanBroker entry can delete it.
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -115,7 +117,19 @@ mod tests {
     use super::*;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanBrokerDeletter5weJ9mZgQ";
-    const LOAN_BROKER_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BEA02EF9";
+    const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+
+    fn base_tx(loan_broker_id: &'static str) -> LoanBrokerDelete<'static> {
+        LoanBrokerDelete {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerDelete,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: loan_broker_id.into(),
+        }
+    }
 
     #[test]
     fn test_serde() {
@@ -129,7 +143,7 @@ mod tests {
             loan_broker_id: LOAN_BROKER_ID.into(),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerDeletter5weJ9mZgQ","TransactionType":"LoanBrokerDelete","Flags":0,"SigningPubKey":"","LoanBrokerID":"rDB303FC1C7611B22C09E773B51044F6BEA02EF9"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerDeletter5weJ9mZgQ","TransactionType":"LoanBrokerDelete","Flags":0,"SigningPubKey":"","LoanBrokerID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -139,6 +153,11 @@ mod tests {
         let deserilized_tx: LoanBrokerDelete = serde_json::from_str(default_json_str).unwrap();
 
         assert_eq!(tx, deserilized_tx);
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_empty() {
+        assert!(base_tx("").get_errors().is_err());
     }
 
     #[test]
@@ -225,6 +244,56 @@ mod tests {
         assert_eq!(tx.common_fields.source_tag, Some(12345));
         assert_eq!(tx.common_fields.ticket_sequence, Some(7));
         assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_too_long() {
+        // 66 hex chars instead of 64
+        let tx = LoanBrokerDelete {
+            loan_broker_id: format!("{}AB", LOAN_BROKER_ID).into(),
+            ..base_tx(LOAN_BROKER_ID)
+        };
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_non_hex() {
+        // Correct length (64) but starts with a non-hex character
+        let tx = base_tx("Z123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD");
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_account_style_hash() {
+        // 40-char value (the one used in test_serde) is not a valid 64-char hash256
+        assert!(base_tx("rDB303FC1C7611B22C09E773B51044F6BEA02EF9")
+            .get_errors()
+            .is_err());
+    }
+
+    #[test]
+    fn test_new_sets_transaction_type_and_id() {
+        let tx = LoanBrokerDelete::new(
+            SOURCE.into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            LOAN_BROKER_ID.into(),
+        );
+
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerDelete
+        );
+        assert_eq!(tx.loan_broker_id, LOAN_BROKER_ID);
         assert!(tx.get_errors().is_ok());
     }
 }

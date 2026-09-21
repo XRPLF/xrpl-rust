@@ -55,16 +55,16 @@ pub struct Loan<'a> {
     pub borrower: Cow<'a, str>,
     /// A nominal funds amount paid to the
     /// LoanBroker.Owner when the Loan is created.
-    pub loan_origination_fee: Cow<'a, str>,
+    pub loan_origination_fee: Option<Cow<'a, str>>,
     /// A nominal funds amount paid to the
     /// LoanBroker.Owner with every Loan payment.
-    pub loan_service_fee: Cow<'a, str>,
+    pub loan_service_fee: Option<Cow<'a, str>>,
     /// A nominal funds amount paid to the
     /// LoanBroker.Owner when a payment is late.
-    pub late_payment_fee: Cow<'a, str>,
+    pub late_payment_fee: Option<Cow<'a, str>>,
     /// A nominal funds amount paid to the
     /// LoanBroker.Owner when a full payment is made.
-    pub close_payment_fee: Cow<'a, str>,
+    pub close_payment_fee: Option<Cow<'a, str>>,
     /// A fee charged on overpayments in 1/10th
     /// basis points. Valid values are between 0 and 100000 inclusive. (0 - 100%)
     pub overpayment_fee: u32,
@@ -91,7 +91,7 @@ pub struct Loan<'a> {
     pub grace_period: u32,
     /// The timestamp of when the previous payment was made
     /// in Ripple Epoch. (https://xrpl.org/docs/references/protocol/data-types/basic-data-types/#specifying-time)
-    pub previous_payment_due_date: u32,
+    pub previous_payment_due_date: Option<u32>,
     /// The timestamp of when the next payment is due
     /// in Ripple Epoch. (https://xrpl.org/docs/references/protocol/data-types/basic-data-types/#specifying-time)
     pub next_payment_due_date: Option<u32>,
@@ -132,10 +132,10 @@ impl<'a> Loan<'a> {
         loan_broker_node: Cow<'a, str>,
         loan_broker_id: Cow<'a, str>,
         borrower: Cow<'a, str>,
-        loan_origination_fee: Cow<'a, str>,
-        loan_service_fee: Cow<'a, str>,
-        late_payment_fee: Cow<'a, str>,
-        close_payment_fee: Cow<'a, str>,
+        loan_origination_fee: Option<Cow<'a, str>>,
+        loan_service_fee: Option<Cow<'a, str>>,
+        late_payment_fee: Option<Cow<'a, str>>,
+        close_payment_fee: Option<Cow<'a, str>>,
         overpayment_fee: u32,
         interest_rate: Option<u32>,
         late_interest_rate: Option<u32>,
@@ -144,7 +144,7 @@ impl<'a> Loan<'a> {
         start_date: u32,
         payment_interval: u32,
         grace_period: u32,
-        previous_payment_due_date: u32,
+        previous_payment_due_date: Option<u32>,
         next_payment_due_date: Option<u32>,
         payment_remaining: Option<u32>,
         total_value_outstanding: Option<Cow<'a, str>>,
@@ -209,10 +209,10 @@ mod tests {
             "45372352".into(),
             "FA65C9FE1538FD7E398FFFE9D1908DFA4576D8".into(),
             "r75E1D753E5B91627516F6D7097".into(),
-            "1".into(),
-            "1".into(),
-            "2".into(),
-            "1".into(),
+            Some("1".into()),
+            Some("1".into()),
+            Some("2".into()),
+            Some("1".into()),
             1,
             Some(10),
             Some(12),
@@ -221,7 +221,7 @@ mod tests {
             177474757,
             86400u32,
             500,
-            1777749474,
+            Some(1777749474),
             Some(175747473),
             Some(453636),
             Some("100074".into()),

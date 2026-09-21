@@ -11,6 +11,12 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
+/// Withdraws first-loss capital from a LoanBroker ledger entry.
+/// Only the owner of the associated LoanBroker entry can
+/// initiate this transaction. If you already hold the asset,
+/// a self-destination withdrawal succeeds regardless of the
+/// issuer's DefaultRipple setting since it is only checked when
+/// a new trust line needs to be created.
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -159,6 +165,40 @@ mod tests {
     const DESTINATION: &str = "rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR";
 
     #[test]
+    fn test_new_and_builder_methods() {
+        let tx = LoanBrokerCoverWithdraw::new(
+            ACCOUNT.into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            LOAN_BROKER_ID.into(),
+            Amount::XRPAmount(XRPAmount::from("1000000")),
+            None,
+            None,
+        );
+
+        assert_eq!(tx.destination, None);
+        assert_eq!(tx.destination_tag, None);
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerCoverWithdraw
+        );
+
+        let tx = tx
+            .with_destination(DESTINATION.into())
+            .with_destination_tag(32);
+
+        assert_eq!(tx.destination, Some(DESTINATION.into()));
+        assert_eq!(tx.destination_tag, Some(32));
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
     fn test_serde() {
         let tx = LoanBrokerCoverWithdraw {
             common_fields: CommonFields {
@@ -246,6 +286,63 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_empty() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: "".into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some(DESTINATION.into()),
+            destination_tag: Some(32),
+        };
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_too_long() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            // 66 hex chars instead of 64
+            loan_broker_id: format!("{}AB", LOAN_BROKER_ID).into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some(DESTINATION.into()),
+            destination_tag: Some(32),
+        };
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_non_hex() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            // Correct length (64), but contains non-hex characters
+            loan_broker_id: "Z123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD"
+                .into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some(DESTINATION.into()),
+            destination_tag: Some(32),
+        };
+
+        assert!(tx.get_errors().is_err());
     }
 
     const MPT_ISSUANCE_ID: &str = "00000012E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1";
@@ -386,5 +483,49 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
+    }
+
+    #[test]
+    fn test_invalid_zero_amount() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("0")),
+            destination: Some(DESTINATION.into()),
+            destination_tag: Some(32),
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_valid_without_optional_fields() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: None,
+            destination_tag: None,
+        };
+
+        assert!(tx.get_errors().is_ok());
+
+        // skip_serializing_none: optional fields must be absent from the JSON
+        let json = serde_json::to_string(&tx).unwrap();
+        assert!(!json.contains("Destination"));
+        assert!(!json.contains("DestinationTag"));
     }
 }

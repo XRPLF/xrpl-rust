@@ -9,17 +9,7 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
-/// Creates a new Loan ledger entry, representing a loan agreement
-/// between a Loan Broker and Borrower.
-/// The LoanSet transaction is a mutual agreement between
-/// the Loan Broker and Borrower, and must be signed by both parties.
-/// The following multi-signature flow can be initiated by either party:
-/// 1. The borrower or loan broker creates the transaction with the
-///     preagreed terms of the loan. They sign the transaction and
-///     set the SigningPubKey, TxnSignature, Signers, Account,
-///     Fee, Sequence, and Counterparty fields.
-/// 2. The counterparty verifies the loan terms and signature
-///     before signing and submitting the transaction.
+/// Deletes a Loan ledger entry. Only the loan broker or borrower can submit this transaction.
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -121,6 +111,48 @@ mod tests {
     const SOURCE: &str = "r9LqNeG6qHxLoanDeleter6T5weJ9mZg";
     const LOAN_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
 
+    fn base_tx(loan_id: &'static str) -> LoanDelete<'static> {
+        LoanDelete {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanDelete,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_id: loan_id.into(),
+        }
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let tx = base_tx(LOAN_ID);
+
+        let json = serde_json::to_string(&tx).unwrap();
+        let roundtripped: LoanDelete = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(tx, roundtripped);
+    }
+
+    #[test]
+    fn test_new_sets_fields() {
+        let tx = LoanDelete::new(
+            SOURCE.into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            LOAN_ID.into(),
+        );
+
+        assert_eq!(tx.get_transaction_type(), &TransactionType::LoanDelete);
+        assert_eq!(tx.loan_id, LOAN_ID);
+        assert!(tx.get_errors().is_ok());
+    }
+
     #[test]
     fn test_invalid_data_too_long() {
         let tx = LoanDelete {
@@ -221,5 +253,29 @@ mod tests {
         assert_eq!(tx.common_fields.ticket_sequence, Some(7));
         assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
         assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_loan_id_empty() {
+        assert!(base_tx("").get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_id_too_long() {
+        // 66 hex chars instead of 64
+        let tx = LoanDelete {
+            loan_id: format!("{}AB", LOAN_ID).into(),
+            ..base_tx(LOAN_ID)
+        };
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_id_non_hex() {
+        // Correct length (64) but starts with a non-hex character
+        let tx = base_tx("Z123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD");
+
+        assert!(tx.get_errors().is_err());
     }
 }

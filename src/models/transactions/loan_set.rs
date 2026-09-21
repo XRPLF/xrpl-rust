@@ -276,7 +276,9 @@ impl Model for LoanSet<'_> {
             if lof_decimal > *pr_decimal {
                 return Err(XRPLModelException::InvalidValue {
                     field: "loan_origination_fee and principal_requested".into(),
-                    expected: "loan_origination_fee should be less than principal_requested".into(),
+                    expected:
+                        "loan_origination_fee should be less than or equal to principal_requested"
+                            .into(),
                     found: format!(
                         "loan_origination_fee: {}, principal_requested: {}",
                         lof_decimal, pr_decimal

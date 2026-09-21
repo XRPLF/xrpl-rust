@@ -16,6 +16,9 @@ use super::{CommonFields, Transaction, TransactionType};
 
 const MAX_DATA_LENGTH: usize = 512;
 
+/// Creates or updates a LoanBroker ledger entry, configuring
+/// protocol parameters and associating it with a Vault.
+///  Only the owner of the associated vault can initiate this transaction.
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -65,6 +68,14 @@ impl Model for LoanBrokerSet<'_> {
 
         if let Some(loan_broker_id) = &self.loan_broker_id {
             validate_hash256("loan_broker_id", loan_broker_id)?;
+
+            if loan_broker_id.bytes().all(|b| b == b'0') {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "loan_broker_id".to_string(),
+                    expected: "nonzero 256-bit hash".to_string(),
+                    found: loan_broker_id.to_string(),
+                });
+            }
 
             if self.management_fee_rate.is_some() {
                 return Err(XRPLModelException::InvalidValue {
@@ -293,6 +304,90 @@ mod tests {
     const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
     const VAULT_ID: &str = "77D6234D074E505024D39C04C3F262997B773719AB29ACFA83119E4210328776";
 
+    fn base_tx() -> LoanBrokerSet<'static> {
+        LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            loan_broker_id: None,
+            data: None,
+            management_fee_rate: None,
+            debt_maximum: None,
+            cover_rate_minimum: None,
+            cover_rate_liquidation: None,
+        }
+    }
+
+    #[test]
+    fn test_valid_minimal() {
+        assert!(base_tx().get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_all_fields_new_broker() {
+        let tx = LoanBrokerSet {
+            data: Some("48656C6C6F".into()),
+            management_fee_rate: Some(10),
+            debt_maximum: Some("10000".into()),
+            cover_rate_minimum: Some(5_000),
+            cover_rate_liquidation: Some(2_500),
+            ..base_tx()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_update_existing_broker() {
+        // Only Data and DebtMaximum may be modified when LoanBrokerID is set
+        let tx = LoanBrokerSet {
+            loan_broker_id: Some(LOAN_BROKER_ID.into()),
+            data: Some("48656C6C6F".into()),
+            debt_maximum: Some("500".into()),
+            ..base_tx()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_rate_upper_bounds() {
+        let tx = LoanBrokerSet {
+            management_fee_rate: Some(10_000),
+            cover_rate_minimum: Some(100_000),
+            cover_rate_liquidation: Some(100_000),
+            ..base_tx()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_cover_rates_both_zero() {
+        let tx = LoanBrokerSet {
+            cover_rate_minimum: Some(0),
+            cover_rate_liquidation: Some(0),
+            ..base_tx()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_data_at_max_length() {
+        // 512 hex chars (the MAX_DATA_LENGTH boundary)
+        let tx = LoanBrokerSet {
+            data: Some("AB".repeat(256).into()),
+            ..base_tx()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
     #[test]
     fn test_invalid_data_too_long() {
         let tx = LoanBrokerSet {
@@ -316,6 +411,21 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::ValueTooLong { .. })
         ));
+    }
+
+    #[test]
+    fn test_serde_roundtrip_all_fields() {
+        let tx = LoanBrokerSet {
+            loan_broker_id: Some(LOAN_BROKER_ID.into()),
+            data: Some("48656C6C6F".into()),
+            debt_maximum: Some("10000".into()),
+            ..base_tx()
+        };
+
+        let json = serde_json::to_string(&tx).unwrap();
+        let roundtripped: LoanBrokerSet = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(tx, roundtripped);
     }
 
     #[test]
@@ -815,5 +925,63 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::BigDecimalError(..))
         ));
+    }
+
+    #[test]
+    fn test_invalid_cover_rate_liquidation_without_minimum() {
+        // Existing test covers (None, Some); this covers (Some, None)
+        let tx = LoanBrokerSet {
+            cover_rate_liquidation: Some(500),
+            cover_rate_minimum: None,
+            ..base_tx()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_vault_id_empty() {
+        let tx = LoanBrokerSet {
+            vault_id: "".into(),
+            ..base_tx()
+        };
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_new_sets_fields() {
+        // Note the parameter order: `data` comes before `vault_id`
+        let tx = LoanBrokerSet::new(
+            SOURCE.into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some("48656C6C6F".into()),
+            VAULT_ID.into(),
+            None,
+            Some(10),
+            Some("10000".into()),
+            Some(0),
+            Some(0),
+        );
+
+        assert_eq!(tx.get_transaction_type(), &TransactionType::LoanBrokerSet);
+        assert_eq!(tx.vault_id, VAULT_ID);
+        assert_eq!(tx.loan_broker_id, None);
+        assert_eq!(tx.data, Some("48656C6C6F".into()));
+        assert_eq!(tx.management_fee_rate, Some(10));
+        assert_eq!(tx.debt_maximum, Some("10000".into()));
+        assert_eq!(tx.cover_rate_minimum, Some(0));
+        assert_eq!(tx.cover_rate_liquidation, Some(0));
+        assert!(tx.get_errors().is_ok());
     }
 }

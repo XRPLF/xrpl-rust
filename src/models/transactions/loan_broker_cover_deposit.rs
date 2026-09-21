@@ -11,6 +11,10 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
+/// Deposits first-loss capital into a LoanBroker ledger
+/// entry to provide protection for vault depositors.
+/// Only the owner of the associated LoanBroker entry
+/// can initiate this transaction.
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -144,6 +148,34 @@ mod tests {
 
     const SOURCE: &str = "rEXAMPLE9AbCdEfGhIjKlMnOpQrStUvWxYz";
     const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+
+    fn base_tx(
+        loan_broker_id: &'static str,
+        amount: Amount<'static>,
+    ) -> LoanBrokerCoverDeposit<'static> {
+        LoanBrokerCoverDeposit {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverDeposit,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: loan_broker_id.into(),
+            amount,
+        }
+    }
+
+    fn xrp(value: &'static str) -> Amount<'static> {
+        Amount::XRPAmount(XRPAmount::from(value))
+    }
+
+    fn usd(value: &'static str) -> Amount<'static> {
+        Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+            currency: "USD".into(),
+            issuer: "rIssuer1234567890abcdef1234567890abcdef".into(),
+            value: value.into(),
+        })
+    }
 
     #[test]
     fn test_serde() {
@@ -347,5 +379,95 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_empty() {
+        let tx = base_tx("", xrp("1000000"));
+        assert!(tx.get_errors().is_err());
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_too_long() {
+        // 66 hex chars instead of 64
+        let tx = LoanBrokerCoverDeposit {
+            loan_broker_id: format!("{}AB", LOAN_BROKER_ID).into(),
+            ..base_tx(LOAN_BROKER_ID, xrp("1000000"))
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_non_hex() {
+        // Correct length (64) but starts with a non-hex character
+        let tx = base_tx(
+            "Z123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD",
+            xrp("1000000"),
+        );
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_zero_amount() {
+        let tx = base_tx(LOAN_BROKER_ID, xrp("0"));
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_valid_xrp_amount() {
+        assert!(base_tx(LOAN_BROKER_ID, xrp("1000000")).get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_valid_issued_currency_amount() {
+        assert!(base_tx(LOAN_BROKER_ID, usd("1000")).get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_new_and_with_amount() {
+        let tx = LoanBrokerCoverDeposit::new(
+            SOURCE.into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            LOAN_BROKER_ID.into(),
+            xrp("0"),
+        );
+
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerCoverDeposit
+        );
+        // Starts invalid (zero amount), then is fixed via the builder method
+        assert!(tx.get_errors().is_err());
+
+        let tx = tx.with_amount(xrp("1000000"));
+
+        assert_eq!(tx.amount, xrp("1000000"));
+        assert!(tx.get_errors().is_ok());
     }
 }

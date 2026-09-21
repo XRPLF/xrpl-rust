@@ -170,6 +170,36 @@ mod tests {
     const SOURCE: &str = "r9LqNeG6qHxLoanPayer6T5weJ9mZg";
     const LOAN_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
 
+    fn base_tx(
+        loan_id: &'static str,
+        amount: Amount<'static>,
+        flags: FlagCollection<LoanPayFlag>,
+    ) -> LoanPay<'static> {
+        LoanPay {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanPay,
+                signing_pub_key: Some("".into()),
+                flags,
+                ..Default::default()
+            },
+            loan_id: loan_id.into(),
+            amount,
+        }
+    }
+
+    fn xrp(value: &'static str) -> Amount<'static> {
+        Amount::XRPAmount(XRPAmount(value.into()))
+    }
+
+    fn usd(value: &'static str) -> Amount<'static> {
+        Amount::IssuedCurrencyAmount(crate::models::IssuedCurrencyAmount {
+            currency: "USD".into(),
+            issuer: "rIssuer1234567890abcdef1234567890abcdef".into(),
+            value: value.into(),
+        })
+    }
+
     #[test]
     fn test_serde() {
         let tx = LoanPay {
@@ -196,6 +226,44 @@ mod tests {
     }
 
     #[test]
+    fn test_flag_serde_roundtrip() {
+        let tx = base_tx(
+            LOAN_ID,
+            xrp("1000"),
+            FlagCollection::new(vec![LoanPayFlag::TfLoanLatePayment]),
+        );
+
+        let json = serde_json::to_string(&tx).unwrap();
+        let roundtripped: LoanPay = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(tx, roundtripped);
+    }
+
+    #[test]
+    fn test_new_sets_fields() {
+        let tx = LoanPay::new(
+            SOURCE.into(),
+            None,
+            None,
+            Some(FlagCollection::new(vec![LoanPayFlag::TfLoanOverpayment])),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            LOAN_ID.into(),
+            xrp("1000"),
+        );
+
+        assert_eq!(tx.get_transaction_type(), &TransactionType::LoanPay);
+        assert_eq!(tx.loan_id, LOAN_ID);
+        assert_eq!(tx.amount, xrp("1000"));
+        assert_eq!(tx.common_fields.flags.0.len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
     fn test_invalid_flags() {
         let tx = LoanPay {
             common_fields: CommonFields {
@@ -217,6 +285,19 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValue { .. })
         ));
+    }
+
+    #[test]
+    fn test_valid_single_flag_each_variant() {
+        for flag in [
+            LoanPayFlag::TfLoanOverpayment,
+            LoanPayFlag::TfLoanFullPayment,
+            LoanPayFlag::TfLoanLatePayment,
+        ] {
+            let tx = base_tx(LOAN_ID, xrp("1000"), FlagCollection::new(vec![flag]));
+
+            assert!(tx.get_errors().is_ok(), "flag {:?} should be valid", flag);
+        }
     }
 
     #[test]

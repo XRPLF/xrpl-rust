@@ -52,28 +52,28 @@ pub struct LoanBroker<'a> {
     ///  A value of 1 is equivalent to 1/10 bps or 0.001%
     pub management_fee_rate: Option<u16>,
     /// The number of active Loans issued by the LoanBroker.
-    pub owner_count: u32,
+    pub owner_count: Option<u32>,
     /// The total asset amount the protocol owes the
     /// Vault, including interest.
-    pub debt_total: Cow<'a, str>,
+    pub debt_total: Option<Cow<'a, str>>,
     /// The maximum amount the protocol can owe the Vault.
     /// The default value of 0 means there is no
     /// limit to the debt.
-    pub debt_maximum: Cow<'a, str>,
+    pub debt_maximum: Option<Cow<'a, str>>,
     /// The total amount of first-loss capital
     /// deposited into the Lending Protocol.
-    pub cover_available: Cow<'a, str>,
+    pub cover_available: Option<Cow<'a, str>>,
     /// The 1/10th basis point of the DebtTotal that the
     /// first-loss capital must cover. Valid values are
     /// between 0 and 100000 inclusive. A value of 1
     /// is equivalent to 1/10 bps or 0.001%.
-    pub cover_rate_minimum: u32,
+    pub cover_rate_minimum: Option<u32>,
     /// The 1/10th basis point of minimum required
     /// first-loss capital that is liquidated to
     /// cover a Loan default. Valid values
     /// are between 0 and 100000 inclusive.
     /// A value of 1 is equivalent to 1/10 bps or 0.001%.
-    pub cover_rate_liquidation: u32,
+    pub cover_rate_liquidation: Option<u32>,
 }
 
 impl<'a> Model for LoanBroker<'a> {}
@@ -99,12 +99,12 @@ impl<'a> LoanBroker<'a> {
         owner: Cow<'a, str>,
         data: Option<Cow<'a, str>>,
         management_fee_rate: Option<u16>,
-        owner_count: u32,
-        debt_total: Cow<'a, str>,
-        debt_maximum: Cow<'a, str>,
-        cover_available: Cow<'a, str>,
-        cover_rate_minimum: u32,
-        cover_rate_liquidation: u32,
+        owner_count: Option<u32>,
+        debt_total: Option<Cow<'a, str>>,
+        debt_maximum: Option<Cow<'a, str>>,
+        cover_available: Option<Cow<'a, str>>,
+        cover_rate_minimum: Option<u32>,
+        cover_rate_liquidation: Option<u32>,
     ) -> Self {
         Self {
             common_fields: CommonFields {
@@ -155,12 +155,12 @@ mod tests {
             Cow::from("56ERHJFVGRGFCVSG747YVGW"),
             None,
             Some(27),
-            245,
-            Cow::from("100000"),
-            Cow::from("10000"),
-            Cow::from("7000"),
-            10,
-            10,
+            Some(245),
+            Some(Cow::from("100000")),
+            Some(Cow::from("10000")),
+            Some(Cow::from("7000")),
+            Some(10),
+            Some(10),
         );
 
         let serialized = serde_json::to_string(&loan_broker).unwrap();
@@ -185,12 +185,12 @@ mod tests {
             Cow::from("56ERHJFVGRGFCVSG747YVGW"),
             None,
             Some(27),
-            245,
-            Cow::from("100000"),
-            Cow::from("10000"),
-            Cow::from("7000"),
-            10,
-            10,
+            Some(245),
+            Some(Cow::from("100000")),
+            Some(Cow::from("10000")),
+            Some(Cow::from("7000")),
+            Some(10),
+            Some(10),
         );
 
         assert_eq!(

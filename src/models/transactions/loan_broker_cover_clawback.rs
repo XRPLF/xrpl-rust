@@ -12,6 +12,12 @@ use crate::models::{
 
 use super::{CommonFields, Transaction, TransactionType};
 
+/// The LoanBrokerCoverClawback transaction claws back first-loss
+/// capital from a LoanBroker ledger entry. The transaction can
+/// only be submitted by the issuer of the asset used in the
+/// lending protocol, and can't clawback an amount that
+/// would cause the available first-loss capital to drop below
+/// the minimum amount defined by the LoanBroker.CoverRateMinimum value.
 #[skip_serializing_none]
 #[derive(
     Debug,
@@ -45,10 +51,10 @@ impl Model for LoanBrokerCoverClawback<'_> {
 
         match &self.amount {
             Some(Amount::MPTAmount(amount)) => {
-                Self::validate_positive_amount(amount.value.as_ref())?;
+                Self::validate_non_zero_negative_amount(amount.value.as_ref())?;
             }
             Some(Amount::IssuedCurrencyAmount(amount)) => {
-                Self::validate_positive_amount(amount.value.as_ref())?;
+                Self::validate_non_zero_negative_amount(amount.value.as_ref())?;
             }
             Some(Amount::XRPAmount(_)) => {
                 return Err(XRPLModelException::InvalidValue {
@@ -169,7 +175,7 @@ impl<'a> LoanBrokerCoverClawback<'a> {
         }
     }
 
-    fn validate_positive_amount(value: &str) -> Result<(), XRPLModelException> {
+    fn validate_non_zero_negative_amount(value: &str) -> Result<(), XRPLModelException> {
         let parsed = bigdecimal::BigDecimal::from_str(value).map_err(|_| {
             XRPLModelException::InvalidValueFormat {
                 field: "amount".to_string(),
@@ -181,7 +187,7 @@ impl<'a> LoanBrokerCoverClawback<'a> {
         if parsed <= 0 {
             return Err(XRPLModelException::InvalidValue {
                 field: "amount".to_string(),
-                expected: "a positive amount".to_string(),
+                expected: "a non-negative/non-zero amount".to_string(),
                 found: value.to_string(),
             });
         }
@@ -196,6 +202,31 @@ mod tests {
 
     const SOURCE: &str = "r9LqNeG6qHxLoanBrokerCoverClawback5weJ9mZgQ";
     const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+
+    fn base_tx(
+        loan_broker_id: Option<&'static str>,
+        amount: Option<Amount<'static>>,
+    ) -> LoanBrokerCoverClawback<'static> {
+        LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: loan_broker_id.map(Into::into),
+            amount,
+        }
+    }
+
+    /// IOU amount whose issuer differs from SOURCE (same issuer value as the existing valid test).
+    fn iou(value: &'static str) -> Amount<'static> {
+        Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+            currency: "USD".into(),
+            issuer: LOAN_BROKER_ID.into(),
+            value: value.into(),
+        })
+    }
 
     #[test]
     fn test_serde() {
@@ -504,5 +535,119 @@ mod tests {
             tx.get_errors().err(),
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_empty() {
+        let tx = base_tx(Some(""), Some(iou("1000")));
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_too_long() {
+        // 66 hex chars instead of 64
+        let tx = LoanBrokerCoverClawback {
+            loan_broker_id: Some(format!("{}AB", LOAN_BROKER_ID).into()),
+            ..base_tx(Some(LOAN_BROKER_ID), Some(iou("1000")))
+        };
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_non_hex() {
+        // Correct length (64) but starts with a non-hex character
+        let tx = base_tx(
+            Some("Z123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD"),
+            Some(iou("1000")),
+        );
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_id_without_amount() {
+        // Broker ID is validated even when Amount is absent
+        let tx = base_tx(Some("E123F4567890ABCDE123F4567"), None);
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_amount_zero() {
+        let tx = base_tx(Some(LOAN_BROKER_ID), Some(iou("0")));
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_valid_broker_id_only() {
+        assert!(base_tx(Some(LOAN_BROKER_ID), None).get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_missing_broker_id_error_is_missing_field() {
+        let tx = base_tx(None, None);
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::MissingField(_))
+        ));
+    }
+
+    #[test]
+    fn test_serde_roundtrip_iou_amount() {
+        let tx = base_tx(Some(LOAN_BROKER_ID), Some(iou("1000")));
+
+        let json = serde_json::to_string(&tx).unwrap();
+        let roundtripped: LoanBrokerCoverClawback = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(tx, roundtripped);
+    }
+
+    #[test]
+    fn test_new_and_builder_methods() {
+        let tx = LoanBrokerCoverClawback::new(
+            SOURCE.into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerCoverClawback
+        );
+        assert_eq!(tx.loan_broker_id, None);
+        assert_eq!(tx.amount, None);
+        // Starts invalid (neither field set), then is fixed via the builder methods
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::MissingField(_))
+        ));
+
+        let tx = tx.with_amount(iou("1000"));
+
+        assert_eq!(tx.amount, Some(iou("1000")));
+        assert!(tx.get_errors().is_ok());
+
+        let tx = tx.with_loan_broker_id(LOAN_BROKER_ID.into());
+
+        assert_eq!(tx.loan_broker_id, Some(LOAN_BROKER_ID.into()));
+        assert!(tx.get_errors().is_ok());
     }
 }

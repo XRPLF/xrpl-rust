@@ -136,7 +136,23 @@ mod tests {
     use alloc::vec;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanManager6T5weJ9mZg";
-    const LOAN_ID: &str = "rDB303FC1C7611B22C09E773B51044F6BE";
+    const LOAN_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+
+    fn base_tx(
+        loan_id: &'static str,
+        flags: FlagCollection<LoanManageFlag>,
+    ) -> LoanManage<'static> {
+        LoanManage {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanManage,
+                signing_pub_key: Some("".into()),
+                flags,
+                ..Default::default()
+            },
+            loan_id: loan_id.into(),
+        }
+    }
 
     #[test]
     fn test_invalid_data_too_long() {
@@ -150,7 +166,7 @@ mod tests {
             loan_id: LOAN_ID.into(),
         };
 
-        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanManager6T5weJ9mZg","TransactionType":"LoanManage","Flags":0,"SigningPubKey":"","LoanID":"rDB303FC1C7611B22C09E773B51044F6BE"}"#;
+        let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanManager6T5weJ9mZg","TransactionType":"LoanManage","Flags":0,"SigningPubKey":"","LoanID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD"}"#;
 
         let default_json_value = serde_json::to_value(default_json_str).unwrap();
         let serialized_tx = serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap();
@@ -264,6 +280,116 @@ mod tests {
         assert_eq!(tx.common_fields.source_tag, Some(12345));
         assert_eq!(tx.common_fields.ticket_sequence, Some(7));
         assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_invalid_loan_id_empty() {
+        assert!(base_tx("", FlagCollection::default()).get_errors().is_err());
+        assert!(matches!(
+            base_tx("", FlagCollection::default()).get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_id_too_long() {
+        // 66 hex chars instead of 64
+        let tx = LoanManage {
+            loan_id: format!("{}AB", LOAN_ID).into(),
+            ..base_tx(LOAN_ID, FlagCollection::default())
+        };
+
+        assert!(tx.get_errors().is_err());
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_loan_id_non_hex() {
+        // Correct length (64) but starts with a non-hex character
+        let tx = base_tx(
+            "Z123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD",
+            FlagCollection::default(),
+        );
+
+        assert!(tx.get_errors().is_err());
+    }
+
+    #[test]
+    fn test_invalid_short_loan_id() {
+        // The 34-char value used in test_serde is not a valid hash256
+        assert!(base_tx(
+            "rDB303FC1C7611B22C09E773B51044F6BE",
+            FlagCollection::default()
+        )
+        .get_errors()
+        .is_err());
+    }
+
+    #[test]
+    fn test_invalid_flags_three() {
+        let tx = base_tx(
+            LOAN_ID,
+            FlagCollection::new(vec![
+                LoanManageFlag::TfLoanDefault,
+                LoanManageFlag::TfLoanImpair,
+                LoanManageFlag::TfLoanUnimpair,
+            ]),
+        );
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_valid_single_flag_each_variant() {
+        for flag in [
+            LoanManageFlag::TfLoanDefault,
+            LoanManageFlag::TfLoanImpair,
+            LoanManageFlag::TfLoanUnimpair,
+        ] {
+            let tx = base_tx(LOAN_ID, FlagCollection::new(vec![flag]));
+
+            assert!(tx.get_errors().is_ok(), "flag {:?} should be valid", flag);
+        }
+    }
+
+    #[test]
+    fn test_flag_serde_roundtrip() {
+        let tx = base_tx(
+            LOAN_ID,
+            FlagCollection::new(vec![LoanManageFlag::TfLoanImpair]),
+        );
+
+        let json = serde_json::to_string(&tx).unwrap();
+        let roundtripped: LoanManage = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(tx, roundtripped);
+    }
+
+    #[test]
+    fn test_new_sets_fields() {
+        let tx = LoanManage::new(
+            SOURCE.into(),
+            None,
+            None,
+            Some(FlagCollection::new(vec![LoanManageFlag::TfLoanUnimpair])),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            LOAN_ID.into(),
+        );
+
+        assert_eq!(tx.get_transaction_type(), &TransactionType::LoanManage);
+        assert_eq!(tx.loan_id, LOAN_ID);
+        assert_eq!(tx.common_fields.flags.0.len(), 1);
         assert!(tx.get_errors().is_ok());
     }
 }
