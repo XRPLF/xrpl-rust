@@ -17,4 +17,6 @@ pub enum XRPLSignTransactionException {
     FeeTooHigh(String),
     #[error("Wallet is required to sign transaction")]
     WalletRequired,
+    #[error("transaction signed: {0}")]
+    TransactionSigned(String),
 }

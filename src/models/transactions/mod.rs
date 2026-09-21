@@ -32,6 +32,15 @@ pub mod escrow_cancel;
 pub mod escrow_create;
 pub mod escrow_finish;
 pub mod exceptions;
+pub mod loan_broker_cover_clawback;
+pub mod loan_broker_cover_deposit;
+pub mod loan_broker_cover_withdraw;
+pub mod loan_broker_delete;
+pub mod loan_broker_set;
+pub mod loan_delete;
+pub mod loan_manage;
+pub mod loan_pay;
+pub mod loan_set;
 pub mod metadata;
 pub mod mptoken_authorize;
 pub mod mptoken_issuance_create;
@@ -221,6 +230,15 @@ pub enum TransactionType {
     EscrowCancel,
     EscrowCreate,
     EscrowFinish,
+    LoanBrokerCoverClawback,
+    LoanBrokerCoverDeposit,
+    LoanBrokerCoverWithdraw,
+    LoanBrokerDelete,
+    LoanBrokerSet,
+    LoanDelete,
+    LoanManage,
+    LoanPay,
+    LoanSet,
     MPTokenAuthorize,
     MPTokenIssuanceCreate,
     MPTokenIssuanceDestroy,

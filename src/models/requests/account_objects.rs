@@ -20,6 +20,8 @@ pub enum AccountObjectType {
     Credential,
     DepositPreauth,
     Escrow,
+    Loan,
+    LoanBroker,
     Offer,
     Oracle,
     PaymentChannel,

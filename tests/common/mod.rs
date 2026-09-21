@@ -2,6 +2,7 @@
 
 pub mod amm;
 pub mod constants;
+pub mod lending_protocol;
 pub mod payment;
 pub mod vault;
 pub mod xchain;

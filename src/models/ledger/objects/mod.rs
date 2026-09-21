@@ -10,6 +10,8 @@ pub mod directory_node;
 pub mod escrow;
 pub mod fee_settings;
 pub mod ledger_hashes;
+pub mod loan;
+pub mod loan_broker;
 pub mod mptoken;
 pub mod mptoken_issuance;
 pub mod negative_unl;
@@ -62,6 +64,8 @@ use xchain_owned_claim_id::XChainOwnedClaimID;
 use xchain_owned_create_account_claim_id::XChainOwnedCreateAccountClaimID;
 
 use crate::_serde::lgr_obj_flags;
+use crate::models::ledger::objects::loan::Loan;
+use crate::models::ledger::objects::loan_broker::LoanBroker;
 use crate::models::{Amount, FlagCollection};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Display, PartialEq, Eq)]
@@ -77,7 +81,9 @@ pub enum LedgerEntryType {
     DirectoryNode = 0x0064,
     Escrow = 0x0075,
     FeeSettings = 0x0073,
+    Loan = 0x0089,
     LedgerHashes = 0x0068,
+    LoanBroker = 0x0088,
     MPToken = 0x007F,
     MPTokenIssuance = 0x007E,
     NegativeUNL = 0x004E,
@@ -109,6 +115,8 @@ pub enum LedgerEntry<'a> {
     Escrow(Escrow<'a>),
     FeeSettings(FeeSettings<'a>),
     LedgerHashes(LedgerHashes<'a>),
+    Loan(Loan<'a>),
+    LoanBroker(LoanBroker<'a>),
     MPToken(MPToken<'a>),
     MPTokenIssuance(MPTokenIssuance<'a>),
     NegativeUNL(NegativeUNL<'a>),
