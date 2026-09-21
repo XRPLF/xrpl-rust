@@ -143,6 +143,7 @@ impl<'a> LoanBrokerCoverDeposit<'a> {
 #[cfg(test)]
 mod tests {
     use crate::models::IssuedCurrencyAmount;
+    use alloc::format;
 
     use super::*;
 

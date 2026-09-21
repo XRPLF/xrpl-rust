@@ -199,6 +199,7 @@ impl<'a> LoanBrokerCoverClawback<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
 
     const SOURCE: &str = "r9LqNeG6qHxLoanBrokerCoverClawback5weJ9mZgQ";
     const LOAN_BROKER_ID: &str = "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";

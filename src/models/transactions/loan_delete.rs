@@ -105,6 +105,7 @@ impl<'a> LoanDelete<'a> {
 #[cfg(test)]
 mod tests {
     use crate::models::XRPLModelException;
+    use alloc::format;
 
     use super::*;
 

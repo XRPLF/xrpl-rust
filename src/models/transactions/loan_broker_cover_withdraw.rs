@@ -158,6 +158,8 @@ impl<'a> LoanBrokerCoverWithdraw<'a> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::format;
+
     use super::*;
 
     const ACCOUNT: &str = "r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9";
