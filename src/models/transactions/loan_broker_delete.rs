@@ -159,4 +159,72 @@ mod tests {
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
+
+    const VALID_LOAN_BROKER_ID: &str =
+        "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+
+    #[test]
+    fn test_new_and_accessors() {
+        let mut tx = LoanBrokerDelete::new(
+            SOURCE.into(),
+            None,
+            Some(XRPAmount::from("10")),
+            Some(7108682),
+            Some(alloc::vec![Memo {
+                memo_data: Some("64656C6574696E67".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            Some(100),
+            None,
+            Some(12345),
+            None,
+            VALID_LOAN_BROKER_ID.into(),
+        );
+
+        assert!(tx.get_errors().is_ok());
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerDelete
+        );
+        assert_eq!(tx.get_common_fields().account, SOURCE);
+        assert_eq!(tx.get_common_fields().sequence, Some(100));
+        assert_eq!(tx.loan_broker_id, VALID_LOAN_BROKER_ID);
+        assert_eq!(
+            Transaction::get_mut_common_fields(&mut tx).source_tag,
+            Some(12345)
+        );
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let tx = LoanBrokerDelete {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerDelete,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_loan_broker_id(VALID_LOAN_BROKER_ID.into())
+        .with_fee("12".into())
+        .with_sequence(100)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_ticket_sequence(7)
+        .with_memo(Memo {
+            memo_data: Some("64656C6574696E67".into()),
+            memo_format: None,
+            memo_type: Some("74657874".into()),
+        });
+
+        assert_eq!(tx.loan_broker_id, VALID_LOAN_BROKER_ID);
+        assert_eq!(tx.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(tx.common_fields.sequence, Some(100));
+        assert_eq!(tx.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(tx.common_fields.source_tag, Some(12345));
+        assert_eq!(tx.common_fields.ticket_sequence, Some(7));
+        assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
 }

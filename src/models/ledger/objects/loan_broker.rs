@@ -168,4 +168,34 @@ mod tests {
 
         assert_eq!(loan_broker, deserialized);
     }
+
+    #[test]
+    fn test_get_ledger_entry_type() {
+        let loan_broker = LoanBroker::new(
+            None,
+            Cow::from("1ESDNBCNSGAFDGCFSGXF563BSGVGV8"),
+            Cow::from(""),
+            1734636,
+            856363,
+            638286,
+            325452,
+            2534267,
+            Cow::from(""),
+            Cow::from("rVALUE463dghsg26473642Ki436ghdghd"),
+            Cow::from("56ERHJFVGRGFCVSG747YVGW"),
+            None,
+            Some(27),
+            245,
+            Cow::from("100000"),
+            Cow::from("10000"),
+            Cow::from("7000"),
+            10,
+            10,
+        );
+
+        assert_eq!(
+            loan_broker.get_ledger_entry_type(),
+            LedgerEntryType::LoanBroker
+        );
+    }
 }

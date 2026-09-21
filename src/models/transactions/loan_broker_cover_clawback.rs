@@ -356,4 +356,153 @@ mod tests {
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
+
+    const MPT_ISSUANCE_ID: &str = "00000012E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1";
+
+    #[test]
+    fn test_new_and_accessors() {
+        let mut tx = LoanBrokerCoverClawback::new(
+            SOURCE.into(),
+            None,
+            Some(XRPAmount::from("12")),
+            Some(7108682),
+            Some(alloc::vec![Memo {
+                memo_data: Some("636C617762616B".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            Some(8),
+            None,
+            Some(12345),
+            None,
+            Some(LOAN_BROKER_ID.into()),
+            Some(Amount::MPTAmount(crate::models::MPTAmount {
+                value: "1000".into(),
+                mpt_issuance_id: MPT_ISSUANCE_ID.into(),
+            })),
+        );
+
+        assert!(tx.get_errors().is_ok());
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerCoverClawback
+        );
+        assert_eq!(tx.get_common_fields().account, SOURCE);
+        assert_eq!(tx.get_common_fields().sequence, Some(8));
+        assert_eq!(tx.loan_broker_id, Some(LOAN_BROKER_ID.into()));
+        assert_eq!(
+            Transaction::get_mut_common_fields(&mut tx).source_tag,
+            Some(12345)
+        );
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let tx = LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+        .with_loan_broker_id(LOAN_BROKER_ID.into())
+        .with_amount(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+            currency: "USD".into(),
+            issuer: "rH5gvkKxGHrFAMAACeu9CB3FMu7pQY7Zh4".into(),
+            value: "1000".into(),
+        }))
+        .with_fee("12".into())
+        .with_sequence(8)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_ticket_sequence(7)
+        .with_memo(Memo {
+            memo_data: Some("636C617762616B".into()),
+            memo_format: None,
+            memo_type: Some("74657874".into()),
+        });
+
+        assert_eq!(tx.loan_broker_id, Some(LOAN_BROKER_ID.into()));
+        assert!(tx.amount.is_some());
+        assert_eq!(tx.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(tx.common_fields.sequence, Some(8));
+        assert_eq!(tx.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(tx.common_fields.source_tag, Some(12345));
+        assert_eq!(tx.common_fields.ticket_sequence, Some(7));
+        assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// Without a `loan_broker_id` the issuer of the clawed-back IOU is the
+    /// broker being drawn from, so an issuer other than the submitter is valid.
+    #[test]
+    fn test_valid_issued_currency_without_loan_broker_id() {
+        let tx = LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: None,
+            amount: Some(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+                currency: "USD".into(),
+                issuer: "rH5gvkKxGHrFAMAACeu9CB3FMu7pQY7Zh4".into(),
+                value: "1000".into(),
+            })),
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// An MPT amount cannot identify the broker on its own, so `loan_broker_id`
+    /// is required alongside it.
+    #[test]
+    fn test_invalid_mpt_amount_without_loan_broker_id() {
+        let tx = LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: None,
+            amount: Some(Amount::MPTAmount(crate::models::MPTAmount {
+                value: "1000".into(),
+                mpt_issuance_id: MPT_ISSUANCE_ID.into(),
+            })),
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::MissingField(..))
+        ));
+    }
+
+    /// `IssuedCurrencyAmount` validates its value with `f64::parse`, which accepts
+    /// `NaN` and the infinities. `BigDecimal` does not, so `validate_positive_amount`
+    /// still has to report a format error for those values.
+    #[test]
+    fn test_unparsable_amount() {
+        let tx = LoanBrokerCoverClawback {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerCoverClawback,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: Some(LOAN_BROKER_ID.into()),
+            amount: Some(Amount::IssuedCurrencyAmount(IssuedCurrencyAmount {
+                currency: "USD".into(),
+                issuer: "rH5gvkKxGHrFAMAACeu9CB3FMu7pQY7Zh4".into(),
+                value: "NaN".into(),
+            })),
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
 }

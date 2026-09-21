@@ -638,4 +638,182 @@ mod tests {
             Some(XRPLModelException::InvalidValue { .. })
         ));
     }
+
+    #[test]
+    fn test_new_and_accessors() {
+        let mut tx = LoanBrokerSet::new(
+            SOURCE.into(),
+            None,
+            Some(XRPAmount::from("12")),
+            Some(7108682),
+            Some(alloc::vec![Memo {
+                memo_data: Some("62726F6B6572".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            Some(8),
+            None,
+            Some(12345),
+            None,
+            Some("48656C6C6F".into()),
+            VAULT_ID.into(),
+            None,
+            Some(1_000),
+            Some("1000000".into()),
+            Some(10_000),
+            Some(20_000),
+        );
+
+        assert!(tx.get_errors().is_ok());
+        assert_eq!(tx.get_transaction_type(), &TransactionType::LoanBrokerSet);
+        assert_eq!(tx.get_common_fields().account, SOURCE);
+        assert_eq!(tx.get_common_fields().sequence, Some(8));
+        assert_eq!(tx.vault_id, VAULT_ID);
+        assert_eq!(tx.management_fee_rate, Some(1_000));
+        assert_eq!(tx.debt_maximum, Some("1000000".into()));
+        assert_eq!(tx.cover_rate_minimum, Some(10_000));
+        assert_eq!(tx.cover_rate_liquidation, Some(20_000));
+        assert_eq!(
+            Transaction::get_mut_common_fields(&mut tx).source_tag,
+            Some(12345)
+        );
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            ..Default::default()
+        }
+        .with_data("48656C6C6F".into())
+        .with_management_fee_rate(1_000)
+        .with_debt_maximum("1000000".into())
+        .with_cover_rate_minimum(10_000)
+        .with_cover_rate_liquidation(20_000)
+        .with_fee("12".into())
+        .with_sequence(8)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_ticket_sequence(7)
+        .with_memo(Memo {
+            memo_data: Some("62726F6B6572".into()),
+            memo_format: None,
+            memo_type: Some("74657874".into()),
+        });
+
+        assert_eq!(tx.data, Some("48656C6C6F".into()));
+        assert_eq!(tx.management_fee_rate, Some(1_000));
+        assert_eq!(tx.debt_maximum, Some("1000000".into()));
+        assert_eq!(tx.cover_rate_minimum, Some(10_000));
+        assert_eq!(tx.cover_rate_liquidation, Some(20_000));
+        assert_eq!(tx.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(tx.common_fields.sequence, Some(8));
+        assert_eq!(tx.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(tx.common_fields.source_tag, Some(12345));
+        assert_eq!(tx.common_fields.ticket_sequence, Some(7));
+        assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// Updating an existing loan broker (`loan_broker_id` set) may only change
+    /// Flags, Data and DebtMaximum — the rates are create-only.
+    #[test]
+    fn test_invalid_loan_broker_id_with_cover_rates_set() {
+        let base = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            loan_broker_id: Some(LOAN_BROKER_ID.into()),
+            ..Default::default()
+        };
+
+        let with_cover_rate_minimum = LoanBrokerSet {
+            cover_rate_minimum: Some(10_000),
+            ..base.clone()
+        };
+        assert!(matches!(
+            with_cover_rate_minimum.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+
+        let with_cover_rate_liquidation = LoanBrokerSet {
+            cover_rate_liquidation: Some(20_000),
+            ..base
+        };
+        assert!(matches!(
+            with_cover_rate_liquidation.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    /// An update that only changes Data and DebtMaximum is allowed alongside
+    /// `loan_broker_id`.
+    #[test]
+    fn test_valid_loan_broker_id_update() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            ..Default::default()
+        }
+        .with_loan_broker_id(LOAN_BROKER_ID.into())
+        .with_data("48656C6C6F".into())
+        .with_debt_maximum("1000000".into());
+
+        assert_eq!(tx.loan_broker_id, Some(LOAN_BROKER_ID.into()));
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// Both cover rates set to zero is the "no first-loss capital" configuration
+    /// and has to pass the both-or-neither check.
+    #[test]
+    fn test_valid_zero_cover_rates() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            cover_rate_minimum: Some(0),
+            cover_rate_liquidation: Some(0),
+            ..Default::default()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_invalid_debt_maximum_not_a_number() {
+        let tx = LoanBrokerSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanBrokerSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            vault_id: VAULT_ID.into(),
+            debt_maximum: Some("not-a-number".into()),
+            ..Default::default()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::BigDecimalError(..))
+        ));
+    }
 }

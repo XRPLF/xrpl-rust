@@ -247,4 +247,144 @@ mod tests {
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
+
+    const MPT_ISSUANCE_ID: &str = "00000012E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1";
+
+    #[test]
+    fn test_new_and_accessors() {
+        let mut tx = LoanBrokerCoverWithdraw::new(
+            ACCOUNT.into(),
+            None,
+            Some(XRPAmount::from("12")),
+            Some(7108682),
+            Some(alloc::vec![Memo {
+                memo_data: Some("7769746864726177".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            Some(8),
+            None,
+            Some(12345),
+            None,
+            LOAN_BROKER_ID.into(),
+            Amount::XRPAmount(XRPAmount::from("1000000")),
+            Some(DESTINATION.into()),
+            Some(32),
+        );
+
+        assert!(tx.get_errors().is_ok());
+        assert_eq!(
+            tx.get_transaction_type(),
+            &TransactionType::LoanBrokerCoverWithdraw
+        );
+        assert_eq!(tx.get_common_fields().account, ACCOUNT);
+        assert_eq!(tx.get_common_fields().sequence, Some(8));
+        assert_eq!(tx.destination, Some(DESTINATION.into()));
+        assert_eq!(tx.destination_tag, Some(32));
+        assert_eq!(
+            Transaction::get_mut_common_fields(&mut tx).source_tag,
+            Some(12345)
+        );
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            ..Default::default()
+        }
+        .with_destination(DESTINATION.into())
+        .with_destination_tag(32)
+        .with_fee("12".into())
+        .with_sequence(8)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_ticket_sequence(7)
+        .with_memo(Memo {
+            memo_data: Some("7769746864726177".into()),
+            memo_format: None,
+            memo_type: Some("74657874".into()),
+        });
+
+        assert_eq!(tx.destination, Some(DESTINATION.into()));
+        assert_eq!(tx.destination_tag, Some(32));
+        assert_eq!(tx.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(tx.common_fields.sequence, Some(8));
+        assert_eq!(tx.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(tx.common_fields.source_tag, Some(12345));
+        assert_eq!(tx.common_fields.ticket_sequence, Some(7));
+        assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// The amount value is read from whichever `Amount` variant is supplied, so
+    /// each variant has to be accepted by `get_errors`.
+    #[test]
+    fn test_valid_issued_currency_and_mpt_amounts() {
+        let base = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+            destination: Some(DESTINATION.into()),
+            destination_tag: None,
+        };
+
+        let issued = LoanBrokerCoverWithdraw {
+            amount: Amount::IssuedCurrencyAmount(crate::models::IssuedCurrencyAmount {
+                currency: "USD".into(),
+                issuer: "rH5gvkKxGHrFAMAACeu9CB3FMu7pQY7Zh4".into(),
+                value: "1000".into(),
+            }),
+            ..base.clone()
+        };
+        assert!(issued.get_errors().is_ok());
+
+        let mpt = LoanBrokerCoverWithdraw {
+            amount: Amount::MPTAmount(crate::models::MPTAmount {
+                value: "1000".into(),
+                mpt_issuance_id: MPT_ISSUANCE_ID.into(),
+            }),
+            ..base
+        };
+        assert!(mpt.get_errors().is_ok());
+    }
+
+    /// `IssuedCurrencyAmount` validates its value with `f64::parse`, which accepts
+    /// `NaN` and the infinities. `BigDecimal` does not, so the amount parse in
+    /// `get_errors` still has to report a format error for those values.
+    #[test]
+    fn test_unparsable_amount() {
+        let tx = LoanBrokerCoverWithdraw {
+            common_fields: CommonFields {
+                account: ACCOUNT.into(),
+                transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            amount: Amount::IssuedCurrencyAmount(crate::models::IssuedCurrencyAmount {
+                currency: "USD".into(),
+                issuer: "rH5gvkKxGHrFAMAACeu9CB3FMu7pQY7Zh4".into(),
+                value: "NaN".into(),
+            }),
+            destination: None,
+            destination_tag: None,
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValueFormat { .. })
+        ));
+    }
 }

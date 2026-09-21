@@ -249,4 +249,14 @@ mod tests {
 
         assert_eq!(actual, expected);
     }
+
+    #[test]
+    fn test_get_ledger_entry_type() {
+        let loan: Loan = serde_json::from_str(
+            r#"{"LedgerEntryType":"Loan","LedgerIndex":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","Flags":0,"PreviousTxnID":"9A8765B4321CDE987654321CDE987654321CDE987654321CDE987654321CDE98","PreviousTxnLgrSeq":12345678,"LoanSequence":1,"OwnerNode":2,"LoanBrokerNode":"1","LoanBrokerID":"ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890","Borrower":"rEXAMPLE9AbCdEfGhIjKlMnOpQrStUvWxYz","LoanOriginationFee":"100","LoanServiceFee":"10","LatePaymentFee":"5","ClosePaymentFee":"20","OverpaymentFee":5,"InterestRate":500,"LateInterestRate":1000,"CloseInterestRate":200,"OverpaymentInterestRate":5,"StartDate":1234567890,"PaymentInterval":2592000,"GracePeriod":604800,"PreviousPaymentDueDate":1234587890,"NextPaymentDueDate":1234597890,"PaymentRemaining":12,"PrincipalOutstanding":"10000","TotalValueOutstanding":"12000","ManagementFeeOutstanding":"2000","PeriodicPayment":"1000"}"#,
+        )
+        .expect("Failed to deserialize");
+
+        assert_eq!(loan.get_ledger_entry_type(), LedgerEntryType::Loan);
+    }
 }

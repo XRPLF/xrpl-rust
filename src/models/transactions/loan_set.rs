@@ -1268,4 +1268,245 @@ mod tests {
             Some(XRPLModelException::InvalidValueFormat { .. })
         ));
     }
+
+    const COUNTERPARTY: &str = "rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR";
+    const PUB_KEY: &str = "ED9434799226374926EDA3B54B1B461B4ABF7237962EAE18528FEA67595397FA32";
+    const SIGNATURE: &str = "3045022100A7CCD11455E47547FF617D5BFC15D120D9053DFD0536B044F10CA3631CD609E502203B61DEE4AC027C5743A1B56AF568D1E2B8E79BB9E9E14744AC87F38375C3C2F1";
+
+    fn valid_loan_set<'a>() -> LoanSet<'a> {
+        LoanSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanSet,
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            principal_requested: "1000".into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_new_and_accessors() {
+        let mut tx = LoanSet::new(
+            SOURCE.into(),
+            None,
+            Some(XRPAmount::from("12")),
+            Some(FlagCollection::new(alloc::vec![
+                LoanSetFlag::TfLoanOverpayment
+            ])),
+            Some(7108682),
+            Some(alloc::vec![Memo {
+                memo_data: Some("6C6F616E".into()),
+                memo_format: None,
+                memo_type: Some("74657874".into()),
+            }]),
+            Some(8),
+            None,
+            Some(12345),
+            None,
+            LOAN_BROKER_ID.into(),
+            Some("48656C6C6F".into()),
+            Some(COUNTERPARTY.into()),
+            None,
+            Some("11".into()),
+            Some("11".into()),
+            Some("11".into()),
+            Some("11".into()),
+            Some(1000),
+            Some(1000),
+            Some(1000),
+            Some(1000),
+            Some(1000),
+            "1000".into(),
+            Some(12),
+            Some(61),
+            Some(60),
+        );
+
+        assert!(tx.get_errors().is_ok());
+        assert_eq!(tx.get_transaction_type(), &TransactionType::LoanSet);
+        assert_eq!(tx.get_common_fields().account, SOURCE);
+        assert_eq!(tx.get_common_fields().sequence, Some(8));
+        assert_eq!(tx.loan_broker_id, LOAN_BROKER_ID);
+        assert_eq!(tx.counterparty, Some(COUNTERPARTY.into()));
+        assert_eq!(tx.principal_requested, "1000");
+        assert_eq!(tx.payment_total, Some(12));
+        assert_eq!(tx.payment_interval, Some(61));
+        assert_eq!(tx.grace_period, Some(60));
+        assert_eq!(
+            Transaction::get_mut_common_fields(&mut tx).source_tag,
+            Some(12345)
+        );
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let tx = LoanSet {
+            common_fields: CommonFields {
+                account: SOURCE.into(),
+                transaction_type: TransactionType::LoanSet,
+                ..Default::default()
+            },
+            loan_broker_id: LOAN_BROKER_ID.into(),
+            principal_requested: "1000".into(),
+            ..Default::default()
+        }
+        .with_data("48656C6C6F".into())
+        .with_counterparty(COUNTERPARTY.into())
+        .with_late_origination_fee("11".into())
+        .with_loan_service_fee("12".into())
+        .with_late_payment_fee("13".into())
+        .with_close_payment_fee("14".into())
+        .with_overpayment_fee(1000)
+        .with_interest_rate(2000)
+        .with_late_interest_rate(3000)
+        .with_close_interest_rate(4000)
+        .with_overpayment_interest_rate(5000)
+        .with_payment_total(12)
+        .with_payment_interval(61)
+        .with_grace_period(60)
+        .with_fee("12".into())
+        .with_sequence(8)
+        .with_last_ledger_sequence(7108682)
+        .with_source_tag(12345)
+        .with_ticket_sequence(7)
+        .with_memo(Memo {
+            memo_data: Some("6C6F616E".into()),
+            memo_format: None,
+            memo_type: Some("74657874".into()),
+        });
+
+        assert_eq!(tx.data, Some("48656C6C6F".into()));
+        assert_eq!(tx.counterparty, Some(COUNTERPARTY.into()));
+        assert_eq!(tx.loan_origination_fee, Some("11".into()));
+        assert_eq!(tx.loan_service_fee, Some("12".into()));
+        assert_eq!(tx.late_payment_fee, Some("13".into()));
+        assert_eq!(tx.close_payment_fee, Some("14".into()));
+        assert_eq!(tx.overpayment_fee, Some(1000));
+        assert_eq!(tx.interest_rate, Some(2000));
+        assert_eq!(tx.late_interest_rate, Some(3000));
+        assert_eq!(tx.close_interest_rate, Some(4000));
+        assert_eq!(tx.overpayment_interest_rate, Some(5000));
+        assert_eq!(tx.payment_total, Some(12));
+        assert_eq!(tx.payment_interval, Some(61));
+        assert_eq!(tx.grace_period, Some(60));
+        assert_eq!(tx.common_fields.fee.as_ref().unwrap().0, "12");
+        assert_eq!(tx.common_fields.sequence, Some(8));
+        assert_eq!(tx.common_fields.last_ledger_sequence, Some(7108682));
+        assert_eq!(tx.common_fields.source_tag, Some(12345));
+        assert_eq!(tx.common_fields.ticket_sequence, Some(7));
+        assert_eq!(tx.common_fields.memos.as_ref().unwrap().len(), 1);
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// A single-signed counterparty signature carries SigningPubKey + TxnSignature.
+    #[test]
+    fn test_valid_counterparty_signature_single_sign() {
+        let tx = LoanSet {
+            counterparty: Some(COUNTERPARTY.into()),
+            counterparty_signature: Some(CounterpartySignature {
+                signing_pub_key: Some(PUB_KEY.into()),
+                txn_signature: Some(SIGNATURE.into()),
+                signers: None,
+            }),
+            ..valid_loan_set()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// A multisigned counterparty signature carries a non-empty Signers list.
+    #[test]
+    fn test_valid_counterparty_signature_multisign() {
+        let tx = LoanSet {
+            counterparty: Some(COUNTERPARTY.into()),
+            counterparty_signature: Some(CounterpartySignature {
+                signing_pub_key: None,
+                txn_signature: None,
+                signers: Some(alloc::vec![Signer {
+                    account: COUNTERPARTY.into(),
+                    signing_pub_key: PUB_KEY.into(),
+                    txn_signature: SIGNATURE.into(),
+                }]),
+            }),
+            ..valid_loan_set()
+        };
+
+        assert!(tx.get_errors().is_ok());
+    }
+
+    /// The two counterparty signing modes are mutually exclusive.
+    #[test]
+    fn test_invalid_counterparty_signature_both_modes() {
+        let tx = LoanSet {
+            counterparty: Some(COUNTERPARTY.into()),
+            counterparty_signature: Some(CounterpartySignature {
+                signing_pub_key: Some(PUB_KEY.into()),
+                txn_signature: Some(SIGNATURE.into()),
+                signers: Some(alloc::vec![Signer {
+                    account: COUNTERPARTY.into(),
+                    signing_pub_key: PUB_KEY.into(),
+                    txn_signature: SIGNATURE.into(),
+                }]),
+            }),
+            ..valid_loan_set()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_counterparty_signature_missing_signing_pub_key() {
+        let tx = LoanSet {
+            counterparty: Some(COUNTERPARTY.into()),
+            counterparty_signature: Some(CounterpartySignature {
+                signing_pub_key: None,
+                txn_signature: Some(SIGNATURE.into()),
+                signers: None,
+            }),
+            ..valid_loan_set()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    /// An empty `Signers` list is not a signature, so neither mode is satisfied.
+    #[test]
+    fn test_invalid_counterparty_signature_empty() {
+        let tx = LoanSet {
+            counterparty: Some(COUNTERPARTY.into()),
+            counterparty_signature: Some(CounterpartySignature {
+                signing_pub_key: Some(PUB_KEY.into()),
+                txn_signature: None,
+                signers: Some(Vec::new()),
+            }),
+            ..valid_loan_set()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
+    }
+
+    #[test]
+    fn test_invalid_payment_total_zero() {
+        let tx = LoanSet {
+            payment_total: Some(0),
+            ..valid_loan_set()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::ValueTooLow { .. })
+        ));
+    }
 }
