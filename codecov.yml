@@ -34,6 +34,15 @@ flags:
   integration:
     paths:
       - src/
+      # Mirrors the `COVERAGE_IGNORE_REGEX` exclusion in
+      # `.github/workflows/integration_test.yml`: `submit_and_wait.rs` and
+      # the transaction-helper exception types it returns are scoped as
+      # unit-territory (their branches and `Display` strings are exercised
+      # by mock-client unit tests, not by the live-rippled integration
+      # tests) so they are not part of the integration flag's coverage
+      # surface.
+      - "!src/asynch/transaction/submit_and_wait.rs"
+      - "!src/asynch/transaction/exceptions.rs"
 
 # The confidential-mpt assembly layer (`src/confidential.rs`) and the mpt-crypto
 # FFI crates (`internal/`) are feature-gated behind `confidential-mpt` / are

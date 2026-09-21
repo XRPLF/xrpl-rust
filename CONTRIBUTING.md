@@ -26,11 +26,33 @@ Getting started with Rust and `xrpl-rust` is easy. To install `rust` and
 
 ### Git `pre-commit` Hooks
 
-To run linting and other checks, `xrpl-rust` uses
-[`pre-commit`](https://pre-commit.com/).
+To run linting and other checks locally before every commit, `xrpl-rust`
+uses [`pre-commit`](https://pre-commit.com/). The hooks mirror the CI
+`Build & Lint` job (`cargo fmt --all -- --check` and
+`cargo clippy --all-features -- -D warnings`) plus a few baseline
+file-hygiene checks.
 
-> This should already be setup thanks to
-> [`cargo-husky`](https://github.com/rhysd/cargo-husky)
+Install `pre-commit` once (see the [official install
+docs](https://pre-commit.com/#install) for other options):
+
+```bash
+pipx install pre-commit
+# or: brew install pre-commit
+# or: pip install --user pre-commit
+```
+
+Then register the hooks in your clone (one-time, per clone):
+
+```bash
+pre-commit install
+```
+
+From that point, every `git commit` runs the hooks against staged files.
+To run them across the whole repository ad-hoc:
+
+```bash
+pre-commit run --all-files
+```
 
 ### Run the Formatter
 

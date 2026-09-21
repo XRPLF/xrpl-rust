@@ -1,0 +1,48 @@
+# Pre-commit hooks for xrpl-rust.
+#
+# Install once per clone (requires https://pre-commit.com):
+#
+#     pre-commit install
+#
+# Hooks mirror the checks that gate CI in `.github/workflows/build_and_lint.yml`
+# so the same failures are caught locally before pushing:
+#
+#   - cargo fmt --all -- --check
+#   - cargo clippy --all-features -- -D warnings
+#
+# The Rust hooks are `local` (system) rather than pulled from a third-party
+# repo so they use each contributor's own project toolchain — matching what
+# CI does with `dtolnay/rust-toolchain@stable`.
+
+repos:
+  # Baseline file-hygiene hooks.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+
+  # Rust hooks — run against the project's own toolchain, not a pinned one.
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        description: Run cargo fmt on all crates and fail if reformatting is needed.
+        entry: cargo fmt --all -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo clippy
+        description: Run cargo clippy with -D warnings against all features.
+        entry: cargo clippy --all-features -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false

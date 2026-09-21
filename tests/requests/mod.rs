@@ -11,6 +11,7 @@ mod channel_verify;
 mod deposit_authorized;
 mod fee;
 mod gateway_balances;
+mod generic_request;
 mod ledger;
 mod ledger_closed;
 mod ledger_current;

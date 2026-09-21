@@ -13,6 +13,7 @@ pub mod channel_verify;
 pub mod deposit_authorize;
 pub mod fee;
 pub mod gateway_balances;
+pub mod generic_request;
 pub mod get_aggregate_price;
 pub mod ledger;
 pub mod ledger_closed;
@@ -120,6 +121,11 @@ pub enum RequestMethod {
 
     // Vault methods (XLS-65 SingleAssetVault)
     VaultInfo,
+
+    // xrpl-rust-specific escape hatch (see requests::generic_request).
+    // Not a real rippled command — `GenericRequest` skips this sentinel during
+    // serialization and emits the caller-supplied command string instead.
+    Generic,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -167,6 +173,7 @@ pub enum XRPLRequest<'a> {
     Ping(ping::Ping<'a>),
     Random(random::Random<'a>),
     VaultInfo(vault_info::VaultInfo<'a>),
+    Generic(generic_request::GenericRequest<'a>),
 }
 
 impl<'a> From<account_channels::AccountChannels<'a>> for XRPLRequest<'a> {
@@ -397,6 +404,12 @@ impl<'a> From<vault_info::VaultInfo<'a>> for XRPLRequest<'a> {
     }
 }
 
+impl<'a> From<generic_request::GenericRequest<'a>> for XRPLRequest<'a> {
+    fn from(request: generic_request::GenericRequest<'a>) -> Self {
+        XRPLRequest::Generic(request)
+    }
+}
+
 impl<'a> Request<'a> for XRPLRequest<'a> {
     fn get_common_fields(&self) -> &CommonFields<'a> {
         match self {
@@ -441,6 +454,7 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::Ping(request) => request.get_common_fields(),
             XRPLRequest::Random(request) => request.get_common_fields(),
             XRPLRequest::VaultInfo(request) => request.get_common_fields(),
+            XRPLRequest::Generic(request) => request.get_common_fields(),
         }
     }
 
@@ -487,6 +501,7 @@ impl<'a> Request<'a> for XRPLRequest<'a> {
             XRPLRequest::Ping(request) => request.get_common_fields_mut(),
             XRPLRequest::Random(request) => request.get_common_fields_mut(),
             XRPLRequest::VaultInfo(request) => request.get_common_fields_mut(),
+            XRPLRequest::Generic(request) => request.get_common_fields_mut(),
         }
     }
 }

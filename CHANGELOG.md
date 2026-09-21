@@ -16,8 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for [XLS-0094D DynamicMPT](https://github.com/XRPLF/XRPL-Standards/pull/583).
 - **XLS-0096 Confidential MPT:** support for the [XLS-0096 ConfidentialTransfer amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0096-confidential-mpt). Adds the vendored `mpt-crypto` native crypto library via the internal `mpt-crypto` (safe Rust wrappers) and `mpt-crypto-sys` (FFI bindings, statically linked) crates.
+- **`GenericRequest`:** an untyped, catch-all request type for XRPL RPC commands that don't have a dedicated typed model yet (e.g. `ledger_accept` on standalone rippled, `server_state`). Accepts a `command` string plus a free-form `params: serde_json::Map<String, Value>` bag; `Serialize` flattens `params` alongside `command`/`id` and strips any collision with those reserved keys. Slots into `XRPLRequest::Generic` and the existing `Request` trait so it flows through `client.request(...)` unchanged.
+
+### Changed
+
+- **Breaking:** `XRPLSubmitAndWaitException::SubmissionFailed` changed from the tuple variant `SubmissionFailed(String)` to the struct variant `SubmissionFailed { result_code: String, message: Option<String> }`. Callers that pattern-matched on `SubmissionFailed(msg)` must now match `SubmissionFailed { result_code, message }` — the code (`temBAD_SIGNATURE`, `tecUNFUNDED_PAYMENT`, `txnNotFound`, ...) is available without substring-parsing the `Display` string. See [#371](https://github.com/XRPLF/xrpl-rust/issues/371) for the follow-up on typing the code itself.
+- Both polling-timeout paths in `wait_for_final_transaction_result` now surface `XRPLSubmitAndWaitException::SubmissionTimeout` (retaining the ledger-sequence context). Previously the retry-cap branch (`c > 20`) returned `SubmissionTimeout` while the after-loop fall-through returned `SubmissionFailed { "submission_timeout" }`; `SubmissionFailed` is now reserved for definite rippled result codes.
 
 ### Fixed
+
+- `SubmissionTimeout` `Display` text no longer claims the validated ledger sequence is "greater than" the `LastLedgerSequence` — the retry-cap path can fire while `validated < last`, and the after-loop path also fires on the equality case. Reworded to focus on the outcome (`Transaction not validated before LastLedgerSequence Y (latest validated ledger: X)`) so both paths render correctly.
 
 ## [[v1.2.0]]
 
