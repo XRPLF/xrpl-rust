@@ -66,11 +66,17 @@ impl Secp256k1 {
     }
 
     /// Determing if the provided secret key is valid.
+    ///
+    /// Valid secp256k1 private keys live in `[1, n-1]` where `n` is the curve order; the
+    /// previous `<= n` check admitted `n` itself, which `SecretKey::from_slice` then rejects
+    /// further down the derivation path, causing a spurious `InvalidSecret` on that one
+    /// candidate. The collision probability is `~1/2^256` per SHA-512Half output so practical
+    /// impact is nil, but the bound is wrong by definition. See #289.
+    ///
     /// TODO Make function constant time
     fn _is_secret_valid(key: [u8; u32::BITS as usize]) -> bool {
         let key_bytes = U256::from_be_bytes(key);
-        key_bytes >= U256::ONE
-            && key_bytes <= U256::from_be_bytes(secp256k1::constants::CURVE_ORDER)
+        key_bytes >= U256::ONE && key_bytes < U256::from_be_bytes(secp256k1::constants::CURVE_ORDER)
     }
 
     /// Concat candidate key.
@@ -543,5 +549,38 @@ mod test {
         let message: &[u8] = TEST_MESSAGE.as_bytes();
 
         assert!(Ed25519.is_valid_message(message, signature, PUBLIC_ED25519));
+    }
+
+    #[test]
+    fn is_secret_valid_rejects_zero_curve_order_and_above() {
+        // Pin the `[1, n-1]` range that `secp256k1::SecretKey::from_slice` enforces. The
+        // previous `<= n` admitted the curve order itself, which would then fail downstream
+        // (#289).
+        let zero = [0u8; 32];
+        assert!(!Secp256k1::_is_secret_valid(zero), "zero must be rejected");
+
+        let one = {
+            let mut k = [0u8; 32];
+            k[31] = 1;
+            k
+        };
+        assert!(Secp256k1::_is_secret_valid(one), "1 must be accepted");
+
+        let n = secp256k1::constants::CURVE_ORDER; // [u8; 32], big-endian
+        assert!(
+            !Secp256k1::_is_secret_valid(n),
+            "the curve order itself must be rejected — SecretKey::from_slice rejects it",
+        );
+
+        let n_minus_one = {
+            let mut k = n;
+            // n is big-endian; subtract 1 from the last byte (n is odd so no borrow).
+            k[31] -= 1;
+            k
+        };
+        assert!(
+            Secp256k1::_is_secret_valid(n_minus_one),
+            "n-1 must be accepted (max valid secret)",
+        );
     }
 }
