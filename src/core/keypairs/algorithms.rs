@@ -272,7 +272,13 @@ impl CryptoImplementation for Secp256k1 {
     fn sign(&self, message_bytes: &[u8], private_key: &str) -> XRPLCoreResult<Vec<u8>> {
         let secp = secp256k1::Secp256k1::<secp256k1::SignOnly>::signing_only();
         let message = Self::_get_message(message_bytes);
-        let trimmed_key = private_key.trim_start_matches(SECP256K1_PREFIX);
+        // XRPL secp256k1 private keys are encoded as a 2-char "00" prefix + 64-char hex.
+        // The previous `trim_start_matches('0')` stripped *every* leading '0' character,
+        // which over-strips for keys whose underlying bytes start with 0x00 (~1-in-256
+        // chance per random key) — the result is too short for `SecretKey::from_str` and
+        // sign() fails on a legitimate key. Strip exactly the 2-char prefix instead.
+        // See #290.
+        let trimmed_key = private_key.strip_prefix("00").unwrap_or(private_key);
         let private = secp256k1::SecretKey::from_str(trimmed_key)
             .map_err(XRPLKeypairsException::SECP256K1Error)?;
         let signature = secp.sign_ecdsa(&message, &private);
@@ -543,5 +549,34 @@ mod test {
         let message: &[u8] = TEST_MESSAGE.as_bytes();
 
         assert!(Ed25519.is_valid_message(message, signature, PUBLIC_ED25519));
+    }
+
+    #[test]
+    fn secp256k1_sign_handles_private_key_with_leading_zero_bytes() {
+        // Regression for #290. With the previous `trim_start_matches('0')` strip, a
+        // legitimate private key whose underlying 32 bytes start with `0x00` (e.g. a small
+        // scalar like 1 — there are ~2^248 such valid keys, ~1-in-256 of random keys)
+        // would have its leading hex zeros over-stripped along with the "00" prefix and
+        // `SecretKey::from_str` would reject the truncated input.
+        //
+        // Use scalar `1` for a deterministic, minimal repro: hex-encoded as "00...01"
+        // (64 chars), prefixed as "00" + "00...01" = "0000...01" (66 chars) — the buggy
+        // strip would remove all 65 leading '0' chars and leave just "1".
+        let private_key = {
+            let mut k = String::from("00"); // SECP256K1_PREFIX
+            for _ in 0..63 {
+                k.push('0');
+            }
+            k.push('1');
+            k
+        };
+        assert_eq!(private_key.len(), SECP256K1_KEY_LENGTH);
+
+        let signed = Secp256k1.sign(b"regression test for #290", &private_key);
+        assert!(
+            signed.is_ok(),
+            "sign() must accept a private key whose underlying bytes start with 0x00; \
+             got: {signed:?}",
+        );
     }
 }
