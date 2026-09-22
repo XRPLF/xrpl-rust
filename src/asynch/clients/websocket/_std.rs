@@ -7,6 +7,7 @@ use crate::asynch::clients::SingleExecutorMutex;
 use crate::models::requests::{Request, XRPLRequest};
 use crate::models::results::XRPLResponse;
 
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use core::marker::PhantomData;
@@ -22,6 +23,15 @@ use url::Url;
 use tokio_tungstenite::connect_async as tokio_tungstenite_connect_async;
 
 type TokioTungsteniteMaybeTlsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
+
+/// Render the reason carried by a WebSocket Close frame so it is preserved in
+/// the surfaced error instead of being discarded.
+fn close_reason(frame: Option<&tungstenite::protocol::CloseFrame<'_>>) -> String {
+    match frame {
+        Some(frame) => format!("code {}: {}", u16::from(frame.code), frame.reason),
+        None => "no close reason provided".to_string(),
+    }
+}
 
 pub struct AsyncWebSocketClient<M = SingleExecutorMutex, Status = WebSocketClosed>
 where
@@ -111,8 +121,14 @@ where
                         };
                         Poll::Ready(Some(Ok(response_string)))
                     }
-                    tungstenite::Message::Close(_) => {
-                        Poll::Ready(Some(Err(XRPLWebSocketException::Disconnected.into())))
+                    tungstenite::Message::Close(frame) => {
+                        // tokio-tungstenite queues the Close echo internally;
+                        // preserve the peer's reason in the surfaced error
+                        // instead of discarding it.
+                        let reason = close_reason(frame.as_ref());
+                        Poll::Ready(Some(Err(
+                            XRPLWebSocketException::ConnectionClosed(reason).into()
+                        )))
                     }
                     _ => Poll::Ready(Some(Err(
                         XRPLWebSocketException::UnexpectedMessageType.into()
@@ -255,8 +271,12 @@ where
                         Err(error) => return Err(error.into()),
                     }
                 }
-                Some(Ok(tungstenite::Message::Close(_))) => {
-                    return Err(XRPLWebSocketException::Disconnected.into());
+                Some(Ok(tungstenite::Message::Close(frame))) => {
+                    let reason = close_reason(frame.as_ref());
+                    // Reply with a Close frame to complete the RFC 6455 closing
+                    // handshake before surfacing the error.
+                    let _ = websocket.send(tungstenite::Message::Close(None)).await;
+                    return Err(XRPLWebSocketException::ConnectionClosed(reason).into());
                 }
                 Some(Ok(_)) => {
                     return Err(XRPLWebSocketException::UnexpectedMessageType.into());
@@ -265,5 +285,26 @@ where
                 None => continue,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tungstenite::protocol::frame::coding::CloseCode;
+    use tungstenite::protocol::CloseFrame;
+
+    #[test]
+    fn close_reason_preserves_peer_detail() {
+        let frame = CloseFrame {
+            code: CloseCode::Normal,
+            reason: "going away".into(),
+        };
+        assert_eq!(close_reason(Some(&frame)), "code 1000: going away");
+    }
+
+    #[test]
+    fn close_reason_handles_missing_frame() {
+        assert_eq!(close_reason(None), "no close reason provided");
     }
 }

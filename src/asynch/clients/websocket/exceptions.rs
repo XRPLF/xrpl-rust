@@ -29,6 +29,8 @@ pub enum XRPLWebSocketException {
     WebSocket(embedded_websocket_embedded_io::Error),
     #[error("Disconnected")]
     Disconnected,
+    #[error("Connection closed by peer: {0}")]
+    ConnectionClosed(String),
     #[error("Read buffer is too small (size: {0:?})")]
     RxBufferTooSmall(usize),
     #[error("Unexpected message type")]
