@@ -62,6 +62,12 @@ pub fn parse_nftoken_id(nft_id: Cow<'_, str>) -> XRPLUtilsResult<NFTokenId<'_>> 
         }
         .into());
     }
+    // A valid NFT ID is 64 ASCII hex characters. Guard against non-ASCII input
+    // so the byte-index slicing below cannot land on a UTF-8 char boundary and
+    // panic on an otherwise 64-byte string.
+    if !nft_id.is_ascii() {
+        return Err(XRPLNFTIdException::InvalidNFTIdEncoding.into());
+    }
     let scrambled_taxon = u64::from_str_radix(&nft_id[48..56], 16)?;
     let sequence = u32::from_str_radix(&nft_id[56..64], 16)?;
     let flags = u32::from_str_radix(&nft_id[0..4], 16)?;
@@ -92,5 +98,20 @@ mod tests {
         assert_eq!(nftoken_id.issuer, "rJoxBSzpXhPtAuqFmqxQtGKjA13jUJWthE");
         assert_eq!(nftoken_id.taxon, 1337);
         assert_eq!(nftoken_id.sequence, 12);
+    }
+
+    #[test]
+    fn test_parse_nftoken_id_non_ascii_returns_err_without_panic() {
+        use alloc::string::String;
+
+        // 47 ASCII chars followed by the 3-byte '€' makes byte index 48 fall in
+        // the middle of a UTF-8 character. The total length is 64 bytes, so the
+        // old byte-index slicing would panic; it must now return an error.
+        let mut nft_id = String::from("a".repeat(47));
+        nft_id.push('€');
+        nft_id.push_str(&"a".repeat(14));
+        assert_eq!(nft_id.len(), 64);
+
+        assert!(parse_nftoken_id(Cow::Owned(nft_id)).is_err());
     }
 }
