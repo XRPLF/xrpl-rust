@@ -10,6 +10,7 @@ use crate::common::{
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
 use xrpl::models::{
+    ledger::objects::{credential::CredentialFlag, LedgerEntry as LedgerObject},
     requests::{
         ledger_data::LedgerData as LedgerDataRequest,
         ledger_entry::{Credential as CredentialSelector, LedgerEntry, VaultIdentifier},
@@ -72,8 +73,6 @@ async fn test_ledger_entry_base() {
 
 // ── credential: provision a Credential then fetch it via ledger_entry selector ─
 
-const LSF_ACCEPTED: u64 = 0x00010000;
-
 #[tokio::test]
 async fn test_ledger_entry_credential() {
     with_blockchain_lock(|| async {
@@ -106,11 +105,16 @@ async fn test_ledger_entry_credential() {
         let node = entry_result
             .node
             .expect("node should be present after CredentialAccept");
-        let flags = node["Flags"].as_u64().expect("Flags field missing");
-        assert!(
-            flags & LSF_ACCEPTED != 0,
-            "lsfAccepted should be set after CredentialAccept, got Flags={flags:#010x}"
-        );
+        match node {
+            LedgerObject::Credential(credential) => {
+                let mut flags = credential.common_fields.flags;
+                assert!(
+                    flags.any(|flag| flag == CredentialFlag::LsfAccepted),
+                    "lsfAccepted should be set after CredentialAccept"
+                );
+            }
+            other => panic!("expected Credential, got {other:?}"),
+        }
     })
     .await;
 }
@@ -161,10 +165,8 @@ async fn test_ledger_entry_vault_by_id() {
             entry_result.node.is_some(),
             "node should be present in ledger_entry response"
         );
-        let node = entry_result.node.unwrap();
-        assert_eq!(
-            node["LedgerEntryType"].as_str(),
-            Some("Vault"),
+        assert!(
+            matches!(entry_result.node.unwrap(), LedgerObject::Vault(_)),
             "expected LedgerEntryType Vault"
         );
         assert_eq!(
