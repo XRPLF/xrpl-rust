@@ -51,10 +51,10 @@ impl Model for LoanBrokerCoverClawback<'_> {
 
         match &self.amount {
             Some(Amount::MPTAmount(amount)) => {
-                Self::validate_non_zero_negative_amount(amount.value.as_ref())?;
+                Self::validate_non_negative_amount(amount.value.as_ref())?;
             }
             Some(Amount::IssuedCurrencyAmount(amount)) => {
-                Self::validate_non_zero_negative_amount(amount.value.as_ref())?;
+                Self::validate_non_negative_amount(amount.value.as_ref())?;
             }
             Some(Amount::XRPAmount(_)) => {
                 return Err(XRPLModelException::InvalidValue {
@@ -171,11 +171,18 @@ impl<'a> LoanBrokerCoverClawback<'a> {
             }
             Amount::MPTAmount(_) => Err(XRPLModelException::MissingField("loan_broker_id".into())),
 
+            // Unreachable in practice: `get_errors` rejects an XRP amount
+            // before this runs, since XRP has no issuer to claw back from.
+            // The arm is kept for exhaustiveness.
             Amount::XRPAmount(_) => Ok(()),
         }
     }
 
-    fn validate_non_zero_negative_amount(value: &str) -> Result<(), XRPLModelException> {
+    /// An `amount` of 0 — or no `amount` at all — means "claw back up to
+    /// `LoanBroker.DebtTotal * LoanBroker.CoverRateMinimum`", so only a
+    /// negative amount is invalid (rippled `LoanBrokerCoverClawback::preflight`
+    /// rejects `*amount < kZero` and treats `kZero` as "unspecified").
+    fn validate_non_negative_amount(value: &str) -> Result<(), XRPLModelException> {
         let parsed = bigdecimal::BigDecimal::from_str(value).map_err(|_| {
             XRPLModelException::InvalidValueFormat {
                 field: "amount".to_string(),
@@ -184,10 +191,10 @@ impl<'a> LoanBrokerCoverClawback<'a> {
             }
         })?;
 
-        if parsed <= 0 {
+        if parsed < 0 {
             return Err(XRPLModelException::InvalidValue {
                 field: "amount".to_string(),
-                expected: "a non-negative/non-zero amount".to_string(),
+                expected: "a non-negative amount".to_string(),
                 found: value.to_string(),
             });
         }
@@ -579,13 +586,14 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_amount_zero() {
+    /// A zero `amount` is the documented way to ask for the maximum clawback
+    /// (`LoanBroker.DebtTotal * LoanBroker.CoverRateMinimum`), so it is valid:
+    /// rippled's preflight only rejects `*amount < kZero` and its doApply
+    /// treats a zero amount the same as an absent one.
+    fn test_valid_amount_zero_means_maximum() {
         let tx = base_tx(Some(LOAN_BROKER_ID), Some(iou("0")));
 
-        assert!(matches!(
-            tx.get_errors().err(),
-            Some(XRPLModelException::InvalidValue { .. })
-        ));
+        assert!(tx.get_errors().is_ok());
     }
 
     #[test]

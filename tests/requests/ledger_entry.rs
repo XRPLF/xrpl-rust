@@ -235,3 +235,100 @@ async fn test_ledger_entry_vault_by_owner_seq() {
     })
     .await;
 }
+
+/// Fetch a `LoanBroker` via `ledger_entry` by object ID and by owner + sequence,
+/// and a `Loan` by broker ID + loan sequence (XLS-66).
+///
+/// rippled reference: `parseLoanBroker` / `parseLoan` in `LedgerEntry.cpp`.
+#[cfg(feature = "integration")]
+#[tokio::test]
+async fn test_ledger_entry_loan_and_loan_broker_selectors() {
+    use crate::transactions::lending_protocol::create_loan_for_ledger_entry_tests;
+    use xrpl::models::requests::ledger_entry::{LoanBrokerIdentifier, LoanIdentifier};
+
+    with_blockchain_lock(|| async {
+        let client = crate::common::get_client().await;
+        let loan = create_loan_for_ledger_entry_tests().await;
+
+        // --- LoanBroker by object ID ---
+        let result: LedgerEntryResult = client
+            .request(
+                LedgerEntry {
+                    loan_broker: Some(LoanBrokerIdentifier::Id(
+                        loan.loan_broker_id.as_str().into(),
+                    )),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .await
+            .expect("ledger_entry loan_broker by ID failed")
+            .try_into()
+            .expect("failed to parse loan_broker result");
+        assert_eq!(
+            result.node.as_ref().unwrap()["LedgerEntryType"].as_str(),
+            Some("LoanBroker")
+        );
+        assert_eq!(result.index.as_ref(), loan.loan_broker_id.as_str());
+
+        // --- The same LoanBroker by owner + creating-transaction sequence ---
+        let result: LedgerEntryResult = client
+            .request(
+                LedgerEntry {
+                    loan_broker: Some(LoanBrokerIdentifier::OwnerSeq {
+                        owner: loan.owner.as_str().into(),
+                        seq: loan.broker_sequence,
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .await
+            .expect("ledger_entry loan_broker by owner+seq failed")
+            .try_into()
+            .expect("failed to parse loan_broker result");
+        assert_eq!(
+            result.index.as_ref(),
+            loan.loan_broker_id.as_str(),
+            "both selectors must resolve to the same object"
+        );
+
+        // --- Loan by broker ID + loan sequence ---
+        let result: LedgerEntryResult = client
+            .request(
+                LedgerEntry {
+                    loan: Some(LoanIdentifier::BrokerSeq {
+                        loan_broker_id: loan.loan_broker_id.as_str().into(),
+                        loan_seq: loan.loan_sequence,
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .await
+            .expect("ledger_entry loan by broker+seq failed")
+            .try_into()
+            .expect("failed to parse loan result");
+        assert_eq!(
+            result.node.as_ref().unwrap()["LedgerEntryType"].as_str(),
+            Some("Loan")
+        );
+        assert_eq!(result.index.as_ref(), loan.loan_id.as_str());
+
+        // --- The same Loan by object ID ---
+        let result: LedgerEntryResult = client
+            .request(
+                LedgerEntry {
+                    loan: Some(LoanIdentifier::Id(loan.loan_id.as_str().into())),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .await
+            .expect("ledger_entry loan by ID failed")
+            .try_into()
+            .expect("failed to parse loan result");
+        assert_eq!(result.index.as_ref(), loan.loan_id.as_str());
+    })
+    .await;
+}

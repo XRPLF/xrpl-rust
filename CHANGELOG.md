@@ -14,6 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **XLS-66 Lending Protocol:** support for the [`LendingProtocol` amendment](https://github.com/XRPLF/XRPL-Standards/pull/192) ([#162](https://github.com/XRPLF/xrpl-rust/pull/162)).
+  - **Transactions:** `LoanBrokerSet`, `LoanBrokerDelete`, `LoanBrokerCoverDeposit`, `LoanBrokerCoverWithdraw`, `LoanBrokerCoverClawback`, `LoanSet`, `LoanPay`, `LoanManage`, `LoanDelete`, with their `LoanSetFlag` / `LoanPayFlag` / `LoanManageFlag` flag sets.
+  - **Ledger objects:** `Loan` and `LoanBroker`, plus the `AccountObjectType::Loan` / `LoanBroker` filters.
+  - **Counterparty signing:** `signing::sign_loan_set_by_counterparty` attaches a `CounterpartySignature` to a `LoanSet`, single-sign or multisign.
+- **XLS-66 Lending Protocol V1_1:** support for the `LendingProtocolV1_1` amendment ([XLS-0058](https://github.com/XRPLF/XRPL-Standards/pull/582), [XLS-0066 V1_1](https://github.com/XRPLF/XRPL-Standards/pull/587)).
+  - **Close-ended vaults:** `VaultCreate` gains `VaultKind`, `SubscriptionDate` and `RedemptionDate`, with a `VaultKind` enum (`Open` / `Closed`) and builders. A close-ended vault requires both dates and an investment period within `[180, 946708560)` seconds; an open-ended vault must carry neither. The `Vault` ledger object gains `LEVersion`, `VaultKind`, `SubscriptionDate` and `RedemptionDate`. Under this amendment a `LoanBroker` can only be attached to a close-ended vault.
+  - **`VaultDelete.MemoData`:** arbitrary hex metadata attached to the deletion, capped at 256 bytes.
+  - **`CredentialIDs` on withdrawals:** `VaultWithdraw` and `LoanBrokerCoverWithdraw` accept `CredentialIDs` (1–8 unique 64-character hashes) to authorize a withdrawal from a domain-gated vault or destination (XLS-70).
+- **`signing::combine_loan_set_counterparty_signers`:** merges the counterparty `Signers` of several independently-signed copies of the same `LoanSet` into one transaction, sorted by decoded account ID. Use it when counterparty signers sign on separate machines; signing repeatedly on one transaction with `sign_loan_set_by_counterparty` still accumulates them directly. Rejects an empty list, copies missing a first-party signature or counterparty `Signers`, duplicate signers, and copies whose terms differ. Mirrors xrpl.js's `combineLoanSetCounterpartySigners`.
+- **`ledger_entry` Loan / LoanBroker selectors:** `LoanIdentifier` (object ID, or `loan_broker_id` + `loan_seq`) and `LoanBrokerIdentifier` (object ID, or `owner` + `seq`), with `LedgerEntry::new_with_loan` / `new_with_loan_broker` constructors — matching rippled's `parseLoan` / `parseLoanBroker`.
+- **`fixCleanup3_4_0` counterparty signing prefixes:** `encode_for_signing_counterparty` (`"CPT\0"`) and `encode_for_multisigning_counterparty` (`"CPM\0"`) in `core::binarycodec`. `signing::sign_loan_set_by_counterparty` now signs under its role prefix, so a counterparty signature cannot be replayed as the transaction's own signature. **A counterparty signature produced by an earlier version is rejected by a `fixCleanup3_4_0` server.**
+
+### Changed
+
+- **`definitions.json` regenerated** from `server_definitions` on rippled 3.4.0-rc1 (`rippleci/xrpld:develop`). Adds the `LendingProtocolV1_1` fields (`VaultKind`, `SubscriptionDate`, `RedemptionDate`, `LEVersion`) and drops the Hooks fields, which rippled no longer supports. No existing field's code, type or signing flag changed.
+- **`.ci-config/xrpld.cfg` replaced with the xrpl.js copy**, enabling `LendingProtocolV1_1`, `Sponsor`, `BatchV1_1` and the `fixCleanup3_1_3` / `3_2_0` / `3_3_0` / `3_4_0` amendments so the integration suite runs against the same amendment set as xrpl.js. `CredentialIDs` on vault/broker withdrawals is gated behind this set — without it rippled returns `temDISABLED`.
+
 - Support for [XLS-0094D DynamicMPT](https://github.com/XRPLF/XRPL-Standards/pull/583).
 - **XLS-0096 Confidential MPT:** support for the [XLS-0096 ConfidentialTransfer amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0096-confidential-mpt). Adds the vendored `mpt-crypto` native crypto library via the internal `mpt-crypto` (safe Rust wrappers) and `mpt-crypto-sys` (FFI bindings, statically linked) crates.
 - **`GenericRequest`:** an untyped, catch-all request type for XRPL RPC commands that don't have a dedicated typed model yet (e.g. `ledger_accept` on standalone rippled, `server_state`). Accepts a `command` string plus a free-form `params: serde_json::Map<String, Value>` bag; `Serialize` flattens `params` alongside `command`/`id` and strips any collision with those reserved keys. Slots into `XRPLRequest::Generic` and the existing `Request` trait so it flows through `client.request(...)` unchanged.

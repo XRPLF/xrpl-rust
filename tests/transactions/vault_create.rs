@@ -169,6 +169,7 @@ mod tests {
                 )),
                 destination: Some(holder.classic_address.clone().into()),
                 destination_tag: Some(10),
+                credential_ids: None,
             };
             test_transaction(&mut vault_withdraw, &holder).await;
 
@@ -202,6 +203,7 @@ mod tests {
                     ..Default::default()
                 },
                 vault_id: vault_id.into(),
+                memo_data: None,
             };
             test_transaction(&mut vault_delete, &vault_owner).await;
 
@@ -326,6 +328,7 @@ mod tests {
                 }),
                 destination: Some(holder.classic_address.clone().into()),
                 destination_tag: None,
+                credential_ids: None,
             };
             test_transaction(&mut vault_withdraw, &holder).await;
             assert_eq!(
@@ -363,6 +366,7 @@ mod tests {
                     ..Default::default()
                 },
                 vault_id: vault_id.into(),
+                memo_data: None,
             };
             test_transaction(&mut vault_delete, &vault_owner).await;
             assert_eq!(

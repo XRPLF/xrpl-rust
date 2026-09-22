@@ -5,11 +5,11 @@ use crate::common::{
     create_transferable_clawbackable_mptoken_issuance, generate_funded_wallet, get_client,
     lending_protocol::{
         account_objects_json, get_loan_broker_cover_available, get_loan_metadata, get_object_id,
-        test_lending_transaction,
+        investment_window, test_lending_transaction,
     },
     test_transaction,
     vault::get_vault_id,
-    with_blockchain_lock,
+    wait_for_ledger_close_time, wait_for_ledger_close_time_with_retries, with_blockchain_lock,
 };
 use xrpl::{
     asynch::transaction::{autofill, sign, sign_and_submit},
@@ -24,13 +24,13 @@ use xrpl::{
             loan_broker_set::LoanBrokerSet,
             loan_delete::LoanDelete,
             loan_manage::{LoanManage, LoanManageFlag},
-            loan_pay::LoanPay,
+            loan_pay::{LoanPay, LoanPayFlag},
             loan_set::LoanSet,
             mptoken_authorize::MPTokenAuthorize,
             payment::Payment,
             signer_list_set::{SignerEntry, SignerListSet},
             trust_set::TrustSet,
-            vault_create::VaultCreate,
+            vault_create::{VaultCreate, VaultKind},
             vault_deposit::VaultDeposit,
             CommonFields, Transaction, TransactionType,
         },
@@ -49,11 +49,14 @@ async fn test_lending_protocol_lifecycle() {
         let depositor_wallet = generate_funded_wallet().await;
         let borrower_wallet = generate_funded_wallet().await;
 
+        let (subscription_date, redemption_date) = investment_window().await;
         let vault_id = create_vault(
             &loan_issuer,
             Currency::XRP(XRP::new()),
             Some("1000"),
             Some(1),
+            subscription_date,
+            redemption_date,
         )
         .await;
 
@@ -72,6 +75,10 @@ async fn test_lending_protocol_lifecycle() {
         // The Loan Broker and Borrower create a Loan object with a LoanSet
         // transaction and the requested principal (excluding fees) is transferred to
         // the Borrower.
+        // LendingProtocolV1_1 only accepts a LoanSet while the close-ended vault is
+        // in its investment phase (subscription_date < close_time < redemption_date).
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
+
         let mut loan_set_tx = LoanSet::new(
             loan_issuer.classic_address.clone().into(),
             None,
@@ -123,12 +130,29 @@ async fn test_lending_protocol_lifecycle() {
             "tecHAS_OBLIGATIONS"
         );
 
+        // Advance the ledger past the loan's first payment due date so the loan
+        // becomes overdue. Under fixCleanup3_4_0 a loan can only be impaired once a
+        // payment is late (parentCloseTime > NextPaymentDueDate), and the
+        // late-payment LoanPay below requires the same; otherwise LoanManage and
+        // LoanPay return tecTOO_SOON. The due date is overshot by a comfortable
+        // margin so the close-time-resolution-rounded parentCloseTime is safely
+        // past it.
+        wait_for_ledger_close_time_with_retries(
+            loan_metadata
+                .next_payment_due_date
+                .expect("loan should have a next payment due date") as u64
+                + 200,
+            400,
+        )
+        .await;
+
         impair_loan(&loan_issuer, &loan_metadata.loan_id).await;
 
         pay_loan(
             &borrower_wallet,
             &loan_metadata.loan_id,
             Amount::XRPAmount(XRPAmount("100".into())),
+            Some(FlagCollection::new(vec![LoanPayFlag::TfLoanLatePayment])),
         )
         .await;
     })
@@ -150,7 +174,14 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
         setup_multisigning(&borrower_wallet, &signer1, &signer2).await;
 
         // Create Vault
-        let vault_object = create_single_asset_vault(&loan_issuer, &mpt_issuer_wallet).await;
+        let (subscription_date, redemption_date) = investment_window().await;
+        let vault_object = create_single_asset_vault(
+            &loan_issuer,
+            &mpt_issuer_wallet,
+            subscription_date,
+            redemption_date,
+        )
+        .await;
 
         // Depositor authorizes to hold MPT, then is funded by the issuer
         authorize_mpt(&depositor_wallet, &vault_object.mpt_issuance_id).await;
@@ -192,6 +223,10 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
         // Create a Loan object.
         // The Loan Issuer creates the transaction from their account setting the
         // pre-agreed terms.
+        // LendingProtocolV1_1 only accepts a LoanSet while the close-ended vault is
+        // in its investment phase (subscription_date < close_time < redemption_date).
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
+
         let mut loan_set_tx = LoanSet::new(
             loan_issuer.classic_address.clone().into(),
             None,
@@ -307,6 +342,22 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
 
         assert_eq!(withdrawcover_available, diff);
 
+        // Advance the ledger past the loan's first payment due date so the loan
+        // becomes overdue. Under fixCleanup3_4_0 a loan can only be impaired once a
+        // payment is late (parentCloseTime > NextPaymentDueDate), and the
+        // late-payment LoanPay below requires the same; otherwise LoanManage and
+        // LoanPay return tecTOO_SOON. The due date is overshot by a comfortable
+        // margin so the close-time-resolution-rounded parentCloseTime is safely
+        // past it.
+        wait_for_ledger_close_time_with_retries(
+            loan_metadata
+                .next_payment_due_date
+                .expect("loan should have a next payment due date") as u64
+                + 200,
+            400,
+        )
+        .await;
+
         impair_loan(&loan_issuer, &loan_metadata.loan_id).await;
 
         // Assert Loan object is impaired
@@ -326,6 +377,7 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
                 value: "100000".into(),
                 mpt_issuance_id: vault_object.mpt_issuance_id.clone().into(),
             }),
+            Some(FlagCollection::new(vec![LoanPayFlag::TfLoanLatePayment])),
         )
         .await;
 
@@ -414,11 +466,14 @@ async fn test_loan_set_txn_counterparty_is_loan_broker_owner() {
         let loan_issuer = generate_funded_wallet().await;
         let depositor_wallet = generate_funded_wallet().await;
 
+        let (subscription_date, redemption_date) = investment_window().await;
         let vault_id = create_vault(
             &loan_issuer,
             Currency::XRP(XRP::new()),
             Some("1000"),
             Some(1),
+            subscription_date,
+            redemption_date,
         )
         .await;
 
@@ -436,6 +491,10 @@ async fn test_loan_set_txn_counterparty_is_loan_broker_owner() {
         // LoanBroker, i.e. loan_issuer account) create a Loan object with a LoanSet
         // transaction and the requested principal (excluding fees) is transferred to
         // the Borrower.
+        // LendingProtocolV1_1 only accepts a LoanSet while the close-ended vault is
+        // in its investment phase (subscription_date < close_time < redemption_date).
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
+
         let mut loan_set_tx = LoanSet::new(
             loan_issuer.classic_address.clone().into(),
             None,
@@ -589,6 +648,7 @@ async fn test_lending_protocol_lifecycle_with_iou_asset() {
 
         test_transaction(&mut payment_tx, &loan_issuer).await;
 
+        let (subscription_date, redemption_date) = investment_window().await;
         let vault_id = create_vault(
             &loan_issuer,
             Currency::IssuedCurrency(IssuedCurrency::new(
@@ -597,6 +657,8 @@ async fn test_lending_protocol_lifecycle_with_iou_asset() {
             )),
             Some("10000"),
             Some(1),
+            subscription_date,
+            redemption_date,
         )
         .await;
 
@@ -617,6 +679,10 @@ async fn test_lending_protocol_lifecycle_with_iou_asset() {
         //  The Loan Broker and Borrower create a Loan object with a LoanSet
         // transaction and the requested principal (excluding fees) is transferred to
         // the Borrower.
+        // LendingProtocolV1_1 only accepts a LoanSet while the close-ended vault is
+        // in its investment phase (subscription_date < close_time < redemption_date).
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
+
         let mut loan_set_tx = LoanSet::new(
             loan_issuer.classic_address.clone().into(),
             None,
@@ -670,6 +736,22 @@ async fn test_lending_protocol_lifecycle_with_iou_asset() {
             "tecHAS_OBLIGATIONS"
         );
 
+        // Advance the ledger past the loan's first payment due date so the loan
+        // becomes overdue. Under fixCleanup3_4_0 a loan can only be impaired once a
+        // payment is late (parentCloseTime > NextPaymentDueDate), and the
+        // late-payment LoanPay below requires the same; otherwise LoanManage and
+        // LoanPay return tecTOO_SOON. The due date is overshot by a comfortable
+        // margin so the close-time-resolution-rounded parentCloseTime is safely
+        // past it.
+        wait_for_ledger_close_time_with_retries(
+            loan_metadata
+                .next_payment_due_date
+                .expect("loan should have a next payment due date") as u64
+                + 200,
+            400,
+        )
+        .await;
+
         impair_loan(&loan_issuer, &loan_metadata.loan_id).await;
 
         pay_loan(
@@ -680,6 +762,7 @@ async fn test_lending_protocol_lifecycle_with_iou_asset() {
                 issuer: loan_issuer.classic_address.clone().into(),
                 value: "100".into(),
             }),
+            Some(FlagCollection::new(vec![LoanPayFlag::TfLoanLatePayment])),
         )
         .await;
     })
@@ -693,11 +776,14 @@ async fn test_loan_set_with_sign_loan_set_by_counterparty() {
         let depositor_wallet = generate_funded_wallet().await;
         let borrower_wallet = generate_funded_wallet().await;
 
+        let (subscription_date, redemption_date) = investment_window().await;
         let vault_id = create_vault(
             &loan_issuer,
             Currency::XRP(XRP::new()),
             Some("1000"),
             Some(1),
+            subscription_date,
+            redemption_date,
         )
         .await;
         let loan_broker_id = create_loan_broker(&loan_issuer, &vault_id, Some("10000")).await;
@@ -709,6 +795,10 @@ async fn test_loan_set_with_sign_loan_set_by_counterparty() {
             Amount::XRPAmount(XRPAmount("100".into())),
         )
         .await;
+
+        // LendingProtocolV1_1 only accepts a LoanSet while the close-ended vault is
+        // in its investment phase (subscription_date < close_time < redemption_date).
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
 
         let mut loan_set_tx = LoanSet::new(
             loan_issuer.classic_address.clone().into(),
@@ -775,7 +865,7 @@ async fn test_loan_set_with_sign_loan_set_by_counterparty() {
 }
 
 #[tokio::test]
-async fn test_loan_set_with_combine_loanset_counterparty_signers() {
+async fn test_loan_set_with_accumulated_counterparty_multisign() {
     with_blockchain_lock(|| async {
         // The Vault Owner and Loan Broker must be on the same account
         let loan_issuer = generate_funded_wallet().await;
@@ -787,11 +877,14 @@ async fn test_loan_set_with_combine_loanset_counterparty_signers() {
         // Setup Multi-Signing
         setup_multisigning(&borrower_wallet, &signer1, &signer2).await;
 
+        let (subscription_date, redemption_date) = investment_window().await;
         let vault_id = create_vault(
             &loan_issuer,
             Currency::XRP(XRP::new()),
             Some("1000"),
             Some(1),
+            subscription_date,
+            redemption_date,
         )
         .await;
         let loan_broker_id = create_loan_broker(&loan_issuer, &vault_id, Some("10000")).await;
@@ -803,6 +896,10 @@ async fn test_loan_set_with_combine_loanset_counterparty_signers() {
             Amount::XRPAmount(XRPAmount("100".into())),
         )
         .await;
+
+        // LendingProtocolV1_1 only accepts a LoanSet while the close-ended vault is
+        // in its investment phase (subscription_date < close_time < redemption_date).
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
 
         let mut loan_set_tx = LoanSet::new(
             loan_issuer.classic_address.clone().into(),
@@ -876,11 +973,19 @@ async fn test_loan_set_with_combine_loanset_counterparty_signers() {
 }
 
 /// Creates a Vault with the given `currency` and returns its vault id.
+/// Creates the vault a LoanBroker will lend from.
+///
+/// Under LendingProtocolV1_1 a LoanBroker can only be attached to a
+/// close-ended vault, so the vault is always created with a `VaultKind` of
+/// `Closed` plus the subscription / redemption window bounding its investment
+/// period.
 async fn create_vault<'a>(
     loan_issuer: &Wallet,
     currency: Currency<'a>,
     assets_maximum: Option<&str>,
     withdrawal_policy: Option<u8>,
+    subscription_date: u32,
+    redemption_date: u32,
 ) -> String {
     let mut vault_create_tx = VaultCreate::new(
         loan_issuer.classic_address.as_str().into(),
@@ -900,7 +1005,10 @@ async fn create_vault<'a>(
         None,
         withdrawal_policy,
         None,
-    );
+    )
+    .with_vault_kind(VaultKind::Closed)
+    .with_subscription_date(subscription_date)
+    .with_redemption_date(redemption_date);
 
     let client = get_client().await;
 
@@ -916,6 +1024,8 @@ async fn create_vault<'a>(
 async fn create_single_asset_vault(
     loan_issuer: &Wallet,
     mpt_issuer_wallet: &Wallet,
+    subscription_date: u32,
+    redemption_date: u32,
 ) -> VaultObject {
     let mpt_issuance_id =
         create_transferable_clawbackable_mptoken_issuance(mpt_issuer_wallet).await;
@@ -925,6 +1035,8 @@ async fn create_single_asset_vault(
         Currency::MPTCurrency(MPTCurrency::new(mpt_issuance_id.clone().into())),
         None,
         None,
+        subscription_date,
+        redemption_date,
     )
     .await;
 
@@ -1003,12 +1115,21 @@ async fn impair_loan(loan_issuer: &Wallet, loan_id: &str) {
 }
 
 /// Makes a payment of `amount` towards the loan identified by `loan_id`.
-async fn pay_loan<'a>(borrower: &Wallet, loan_id: &str, amount: Amount<'a>) {
+///
+/// `flags` carries the payment type: an overdue loan has to be paid with
+/// `TfLoanLatePayment`, otherwise `fixCleanup3_4_0` rejects the payment with
+/// `tecEXPIRED`.
+async fn pay_loan<'a>(
+    borrower: &Wallet,
+    loan_id: &str,
+    amount: Amount<'a>,
+    flags: Option<FlagCollection<LoanPayFlag>>,
+) {
     let mut loan_pay_tx = LoanPay::new(
         borrower.classic_address.clone().into(),
         None,
         None,
-        None,
+        flags,
         None,
         None,
         None,
@@ -1388,5 +1509,115 @@ mod counterparty_signing_rejections {
         });
 
         assert!(sign_loan_set_by_counterparty(&mut tx, &borrower, false).is_err());
+    }
+}
+
+/// A loan created for the `ledger_entry` selector tests, with the identifiers
+/// and sequences those selectors need.
+#[cfg(feature = "integration")]
+pub struct LedgerEntryLoanFixture {
+    pub owner: String,
+    pub loan_broker_id: String,
+    pub loan_id: String,
+    /// Sequence of the `LoanBrokerSet` transaction that created the broker —
+    /// what `keylet::loanBroker(owner, seq)` is derived from.
+    pub broker_sequence: u32,
+    /// The loan's `LoanSequence`, which `keylet::loan(brokerID, seq)` uses.
+    pub loan_sequence: u32,
+}
+
+/// Runs the full happy path — close-ended vault, loan broker, funded vault,
+/// dual-signed `LoanSet` — and returns the identifiers needed to look the
+/// resulting objects up with `ledger_entry`.
+#[cfg(feature = "integration")]
+pub async fn create_loan_for_ledger_entry_tests() -> LedgerEntryLoanFixture {
+    let loan_issuer = generate_funded_wallet().await;
+    let depositor_wallet = generate_funded_wallet().await;
+    let borrower_wallet = generate_funded_wallet().await;
+
+    let (subscription_date, redemption_date) = investment_window().await;
+    let vault_id = create_vault(
+        &loan_issuer,
+        Currency::XRP(XRP::new()),
+        Some("1000"),
+        Some(1),
+        subscription_date,
+        redemption_date,
+    )
+    .await;
+
+    let loan_broker_id = create_loan_broker(&loan_issuer, &vault_id, None).await;
+
+    deposit_into_vault(
+        &depositor_wallet,
+        &vault_id,
+        Amount::XRPAmount(XRPAmount("100".into())),
+    )
+    .await;
+
+    wait_for_ledger_close_time((subscription_date + 1) as u64).await;
+
+    let mut loan_set_tx = LoanSet::new(
+        loan_issuer.classic_address.clone().into(),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        loan_broker_id.clone().into(),
+        None,
+        Some(borrower_wallet.classic_address.as_str().into()),
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        "100".into(),
+        None,
+        None,
+        None,
+    );
+
+    let client = get_client().await;
+    autofill(&mut loan_set_tx, client, Some(1))
+        .await
+        .expect("Failed to auto-fill loan set transaction");
+    sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
+    sign_loan_set_by_counterparty(&mut loan_set_tx, &borrower_wallet, false).unwrap();
+    test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
+
+    // Read the sequences straight off the created objects rather than tracking
+    // transaction sequences.
+    let broker_objects =
+        account_objects_json(&loan_issuer.classic_address, AccountObjectType::LoanBroker).await;
+    let broker_sequence = broker_objects["account_objects"][0]["Sequence"]
+        .as_u64()
+        .expect("LoanBroker.Sequence missing") as u32;
+
+    let loan_objects =
+        account_objects_json(&borrower_wallet.classic_address, AccountObjectType::Loan).await;
+    let loan_id = loan_objects["account_objects"][0]["index"]
+        .as_str()
+        .expect("Loan index missing")
+        .to_string();
+    let loan_sequence = loan_objects["account_objects"][0]["LoanSequence"]
+        .as_u64()
+        .expect("Loan.LoanSequence missing") as u32;
+
+    LedgerEntryLoanFixture {
+        owner: loan_issuer.classic_address.clone(),
+        loan_broker_id,
+        loan_id,
+        broker_sequence,
+        loan_sequence,
     }
 }

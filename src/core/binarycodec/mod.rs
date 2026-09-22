@@ -24,6 +24,7 @@ pub use binary_wrappers::*;
 
 use self::binary_wrappers::{
     decode_ledger_data_inner, decode_st_object, serialize_json, BATCH_PREFIX,
+    COUNTERPARTY_TRANSACTION_MULTISIG_PREFIX, COUNTERPARTY_TRANSACTION_SIGNATURE_PREFIX,
     PAYMENT_CHANNEL_CLAIM_PREFIX, TRANSACTION_MULTISIG_PREFIX, TRANSACTION_SIGNATURE_PREFIX,
 };
 
@@ -64,6 +65,46 @@ where
     serialize_json(
         prepared_transaction,
         Some(TRANSACTION_MULTISIG_PREFIX.as_ref()),
+        Some(signing_account_id.as_ref()),
+        true,
+    )
+}
+
+/// Encode a transaction for signing as the counterparty (prepends the
+/// counterparty signing prefix `"CPT\0"`).
+///
+/// Under `fixCleanup3_4_0` a counterparty signature — the `CounterpartySignature`
+/// inner object of a `LoanSet` — covers its own signing prefix, so it cannot be
+/// replayed as the transaction's own signature.
+pub fn encode_for_signing_counterparty<T>(prepared_transaction: &T) -> XRPLCoreResult<String>
+where
+    T: Serialize,
+{
+    serialize_json(
+        prepared_transaction,
+        Some(COUNTERPARTY_TRANSACTION_SIGNATURE_PREFIX.as_ref()),
+        None,
+        true,
+    )
+}
+
+/// Encode a transaction for multi-signing as the counterparty (prepends the
+/// counterparty multi-sign prefix `"CPM\0"`, appends the signing account ID).
+///
+/// See [`encode_for_signing_counterparty`] for why the counterparty role has its
+/// own prefix.
+pub fn encode_for_multisigning_counterparty<T>(
+    prepared_transaction: &T,
+    signing_account: Cow<'_, str>,
+) -> XRPLCoreResult<String>
+where
+    T: Serialize,
+{
+    let signing_account_id = AccountId::try_from(signing_account.as_ref())?;
+
+    serialize_json(
+        prepared_transaction,
+        Some(COUNTERPARTY_TRANSACTION_MULTISIG_PREFIX.as_ref()),
         Some(signing_account_id.as_ref()),
         true,
     )
@@ -720,6 +761,101 @@ mod test {
             re_encoded_token.to_uppercase(),
             mptoken_binary.to_uppercase(),
             "MPToken re-encode does not match authoritative vector"
+        );
+    }
+
+    // ── Counterparty signing prefixes (fixCleanup3_4_0) ────────────────
+    //
+    // xrpl.js reference: packages/ripple-binary-codec/test/signing-data-encoding.test.ts
+    // (XRPLF/xrpl.js#3462)
+
+    fn counterparty_loan_set<'a>() -> crate::models::transactions::loan_set::LoanSet<'a> {
+        crate::models::transactions::loan_set::LoanSet {
+            common_fields: CommonFields {
+                account: ACCOUNT_GENESIS.into(),
+                transaction_type: TransactionType::LoanSet,
+                fee: Some("10".into()),
+                sequence: Some(1),
+                signing_pub_key: Some("".into()),
+                ..Default::default()
+            },
+            loan_broker_id: "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD"
+                .into(),
+            principal_requested: "1000".into(),
+            ..Default::default()
+        }
+    }
+
+    /// The counterparty role swaps only the 4-byte prefix: `STX\0` -> `CPT\0`.
+    /// The signing payload itself is unchanged, so a counterparty signature
+    /// cannot be replayed as the transaction's own signature.
+    #[test]
+    fn test_encode_for_signing_counterparty_swaps_only_the_prefix() {
+        let txn = counterparty_loan_set();
+
+        let base = encode_for_signing(&txn).expect("encode_for_signing failed");
+        let counterparty =
+            encode_for_signing_counterparty(&txn).expect("encode_for_signing_counterparty failed");
+
+        assert!(base.starts_with("53545800"), "expected STX prefix: {base}");
+        assert!(
+            counterparty.starts_with("43505400"),
+            "expected CPT prefix, got: {}",
+            &counterparty[..core::cmp::min(20, counterparty.len())]
+        );
+        assert_eq!(
+            &counterparty[8..],
+            &base[8..],
+            "only the prefix should differ"
+        );
+    }
+
+    /// The multi-sign counterparty role swaps only the prefix
+    /// (`SMT\0` -> `CPM\0`) and keeps the signing-account suffix.
+    #[test]
+    fn test_encode_for_multisigning_counterparty_swaps_only_the_prefix() {
+        let txn = counterparty_loan_set();
+
+        let base = encode_for_multisigning(&txn, ACCOUNT_ALT.into())
+            .expect("encode_for_multisigning failed");
+        let counterparty = encode_for_multisigning_counterparty(&txn, ACCOUNT_ALT.into())
+            .expect("encode_for_multisigning_counterparty failed");
+
+        assert!(base.starts_with("534D5400"), "expected SMT prefix: {base}");
+        assert!(
+            counterparty.starts_with("43504D00"),
+            "expected CPM prefix, got: {}",
+            &counterparty[..core::cmp::min(20, counterparty.len())]
+        );
+        assert_eq!(
+            &counterparty[8..],
+            &base[8..],
+            "only the prefix should differ"
+        );
+    }
+
+    /// The `CounterpartySignature` inner object is not a signing field, so it
+    /// is excluded from every signing payload — the counterparty signs the same
+    /// terms the first party signed.
+    #[test]
+    fn test_counterparty_signature_excluded_from_signing_payload() {
+        use crate::models::transactions::loan_set::CounterpartySignature;
+
+        let unsigned = counterparty_loan_set();
+        let with_counterparty_signature = crate::models::transactions::loan_set::LoanSet {
+            counterparty_signature: Some(CounterpartySignature {
+                signing_pub_key: Some(
+                    "ED9434799226374926EDA3B54B1B461B4ABF7237962EAE18528FEA67595397FA32".into(),
+                ),
+                txn_signature: Some("DEADBEEF".into()),
+                signers: None,
+            }),
+            ..counterparty_loan_set()
+        };
+
+        assert_eq!(
+            encode_for_signing_counterparty(&unsigned).unwrap(),
+            encode_for_signing_counterparty(&with_counterparty_signature).unwrap(),
         );
     }
 }

@@ -162,28 +162,21 @@ impl Model for LoanBrokerSet<'_> {
             }
         }
 
-        match (self.cover_rate_liquidation, self.cover_rate_minimum) {
-            (Some(crl), Some(crm)) if (crl == 0) != (crm == 0) => {
-                return Err(XRPLModelException::InvalidValue {
-                    field: "cover_rate_liquidation and cover_rate_minimum".into(),
-                    expected: "Both should be either None, Zero or Non-Zero".into(),
-                    found: format!(
-                        "cover_rate_liquidation: {}, cover_rate_minimum: {}",
-                        crl, crm
-                    ),
-                });
-            }
-            (Some(_), None) | (None, Some(_)) => {
-                return Err(XRPLModelException::InvalidValue {
-                    field: "cover_rate_liquidation and cover_rate_minimum".into(),
-                    expected: "Both should be either None, Zero or Non-Zero".into(),
-                    found: format!(
-                        "cover_rate_liquidation: {:?}, cover_rate_minimum: {:?}",
-                        self.cover_rate_liquidation, self.cover_rate_minimum
-                    ),
-                });
-            }
-            _ => {}
+        // Both cover rates must be zero or both non-zero, with an absent rate
+        // counting as zero — matching rippled, which compares
+        // `tx[~sfCoverRateMinimum].value_or(0) == 0` against the same for
+        // `sfCoverRateLiquidation`.
+        let minimum_zero = self.cover_rate_minimum.unwrap_or(0) == 0;
+        let liquidation_zero = self.cover_rate_liquidation.unwrap_or(0) == 0;
+        if minimum_zero != liquidation_zero {
+            return Err(XRPLModelException::InvalidValue {
+                field: "cover_rate_liquidation and cover_rate_minimum".into(),
+                expected: "both zero (or absent) or both non-zero".into(),
+                found: format!(
+                    "cover_rate_liquidation: {:?}, cover_rate_minimum: {:?}",
+                    self.cover_rate_liquidation, self.cover_rate_minimum
+                ),
+            });
         }
 
         Ok(())
@@ -983,5 +976,40 @@ mod tests {
         assert_eq!(tx.cover_rate_minimum, Some(0));
         assert_eq!(tx.cover_rate_liquidation, Some(0));
         assert!(tx.get_errors().is_ok());
+    }
+
+    /// An absent cover rate counts as zero, so pairing an explicit zero with an
+    /// absent rate is the "no first-loss capital" configuration and is valid.
+    #[test]
+    fn test_valid_zero_cover_rate_with_absent_counterpart() {
+        let with_explicit_zero_minimum = LoanBrokerSet {
+            cover_rate_minimum: Some(0),
+            cover_rate_liquidation: None,
+            ..base_tx()
+        };
+        assert!(with_explicit_zero_minimum.get_errors().is_ok());
+
+        let with_explicit_zero_liquidation = LoanBrokerSet {
+            cover_rate_minimum: None,
+            cover_rate_liquidation: Some(0),
+            ..base_tx()
+        };
+        assert!(with_explicit_zero_liquidation.get_errors().is_ok());
+    }
+
+    /// A non-zero rate paired with an absent one is still a mismatch, since the
+    /// absent rate counts as zero.
+    #[test]
+    fn test_invalid_nonzero_cover_rate_with_absent_counterpart() {
+        let tx = LoanBrokerSet {
+            cover_rate_minimum: Some(10_000),
+            cover_rate_liquidation: None,
+            ..base_tx()
+        };
+
+        assert!(matches!(
+            tx.get_errors().err(),
+            Some(XRPLModelException::InvalidValue { .. })
+        ));
     }
 }

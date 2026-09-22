@@ -23,7 +23,10 @@ use strum::IntoEnumIterator;
 use crate::asynch::exceptions::XRPLHelperResult;
 use crate::core::{
     addresscodec::{decode_classic_address, is_valid_xaddress, xaddress_to_classic_address},
-    binarycodec::{encode_for_multisigning, encode_for_signing},
+    binarycodec::{
+        encode_for_multisigning, encode_for_multisigning_counterparty, encode_for_signing,
+        encode_for_signing_counterparty,
+    },
     keypairs::sign as keypairs_sign,
 };
 use crate::models::transactions::loan_set::CounterpartySignature;
@@ -115,6 +118,16 @@ where
 /// already been signed by the first party. The counterparty uses their wallet to
 /// sign the transaction, which is required for multi-party loan agreements on the
 /// XRP Ledger.
+///
+/// # Verify the terms first
+///
+/// The signature commits the counterparty to every signing field of the
+/// transaction — the principal, all fees and rates, the payment schedule and the
+/// broker — so the loan terms cannot change afterwards without invalidating it.
+/// This function only checks that a first-party signature is *present*; it does
+/// not verify it, and it cannot know whether the terms are the ones your user
+/// agreed to. A caller that receives a `LoanSet` from the other party is
+/// responsible for showing the terms to its user before calling this.
 pub fn sign_loan_set_by_counterparty<'a>(
     transaction: &mut LoanSet<'a>,
     wallet: &Wallet,
@@ -141,6 +154,100 @@ pub fn sign_loan_set_by_counterparty<'a>(
     } else {
         sign_single(transaction, wallet)?;
     }
+
+    Ok(())
+}
+
+/// Combines the counterparty signatures of several copies of the same
+/// `LoanSet` into one transaction.
+///
+/// Each input must be the same transaction, signed by the first party, and
+/// carrying exactly the counterparty `Signers` contributed by one counterparty
+/// signer — which is what [`sign_loan_set_by_counterparty`] with
+/// `multisign = true` produces. Use this when the counterparty signers sign
+/// independently (on separate machines, say) and the results have to be merged
+/// before submission; when every signer's wallet is available in one place,
+/// calling [`sign_loan_set_by_counterparty`] once per signer on the same
+/// transaction accumulates them directly.
+///
+/// The combined `Signers` list is sorted by decoded account ID, as rippled
+/// requires.
+pub fn combine_loan_set_counterparty_signers<'a>(
+    transaction: &mut LoanSet<'a>,
+    tx_list: &[LoanSet<'a>],
+) -> XRPLHelperResult<()> {
+    if tx_list.is_empty() {
+        return Err(XRPLSignTransactionException::CombineCounterpartySigners(
+            "there are 0 transactions to combine".into(),
+        )
+        .into());
+    }
+
+    let mut combined_signers: Vec<Signer> = Vec::new();
+    for tx in tx_list {
+        tx.validate()?;
+
+        let cf = tx.get_common_fields();
+        if cf.txn_signature.is_none() || cf.signing_pub_key.is_none() {
+            return Err(XRPLSignTransactionException::CombineCounterpartySigners(
+                "every transaction must first be signed by the first party".into(),
+            )
+            .into());
+        }
+
+        let signers = tx
+            .counterparty_signature
+            .as_ref()
+            .and_then(|cs| cs.signers.as_ref())
+            .filter(|signers| !signers.is_empty())
+            .ok_or_else(|| {
+                XRPLSignTransactionException::CombineCounterpartySigners(
+                    "every transaction must carry counterparty Signers".into(),
+                )
+            })?;
+
+        for signer in signers {
+            if combined_signers
+                .iter()
+                .any(|existing| existing.account == signer.account)
+            {
+                return Err(XRPLSignTransactionException::CombineCounterpartySigners(
+                    "the same counterparty account signed more than once".into(),
+                )
+                .into());
+            }
+            combined_signers.push(signer.clone());
+        }
+    }
+
+    // The transactions have to be otherwise identical, or the signatures cover
+    // different terms. Compare them with the counterparty signature stripped,
+    // which is the only field allowed to differ.
+    let mut reference = tx_list[0].clone();
+    reference.counterparty_signature = None;
+    for tx in &tx_list[1..] {
+        let mut candidate = tx.clone();
+        candidate.counterparty_signature = None;
+        if candidate != reference {
+            return Err(XRPLSignTransactionException::CombineCounterpartySigners(
+                "the transactions to combine are not the same transaction".into(),
+            )
+            .into());
+        }
+    }
+
+    // Fallible sort instead of unwrap()-in-key-fn.
+    let mut keyed = combined_signers
+        .drain(..)
+        .map(|s| decode_classic_address(&s.account).map(|k| (k, s)))
+        .collect::<Result<Vec<_>, _>>()?;
+    keyed.sort_by(|a, b| a.0.cmp(&b.0));
+
+    transaction.counterparty_signature = Some(CounterpartySignature {
+        signing_pub_key: None,
+        txn_signature: None,
+        signers: Some(keyed.into_iter().map(|(_, s)| s).collect()),
+    });
 
     Ok(())
 }
@@ -232,8 +339,10 @@ where
 }
 
 fn sign_single<'a>(transaction: &mut LoanSet<'a>, wallet: &Wallet) -> XRPLHelperResult<()> {
+    // The counterparty role signs under its own `fixCleanup3_4_0` prefix, not the
+    // transaction prefix.
     let txn_signature = crate::core::keypairs::sign(
-        &hex::decode(encode_for_signing(&transaction)?)?,
+        &hex::decode(encode_for_signing_counterparty(&transaction)?)?,
         &wallet.private_key,
     )?;
     transaction.counterparty_signature = Some(CounterpartySignature {
@@ -246,7 +355,7 @@ fn sign_single<'a>(transaction: &mut LoanSet<'a>, wallet: &Wallet) -> XRPLHelper
 
 fn sign_multisign<'a>(transaction: &mut LoanSet<'a>, wallet: &Wallet) -> XRPLHelperResult<()> {
     let txn_signature = crate::core::keypairs::sign(
-        &hex::decode(encode_for_multisigning(
+        &hex::decode(encode_for_multisigning_counterparty(
             &transaction,
             wallet.classic_address.as_str().into(),
         )?)?,
@@ -318,8 +427,9 @@ mod test_sign_loan_set_by_counterparty {
     use alloc::borrow::Cow;
     use alloc::string::ToString;
 
-    use super::{sign, sign_loan_set_by_counterparty};
+    use super::{combine_loan_set_counterparty_signers, sign, sign_loan_set_by_counterparty};
     use crate::models::transactions::loan_set::{CounterpartySignature, LoanSet};
+    use crate::models::transactions::Signer;
     use crate::models::transactions::Transaction;
     use crate::wallet::Wallet;
 
@@ -504,5 +614,153 @@ mod test_sign_loan_set_by_counterparty {
         });
 
         assert!(sign_loan_set_by_counterparty(&mut tx, &borrower, false).is_err());
+    }
+
+    /// Counterparty signers that signed independently can be merged into one
+    /// transaction.
+    ///
+    /// xrpl.js reference: `combineLoanSetCounterpartySigners` in
+    /// `packages/xrpl/src/Wallet/counterpartySigner.ts`.
+    #[test]
+    fn test_combine_counterparty_signers() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let second = second_borrower_wallet();
+
+        let mut base = loan_set(&broker, &borrower);
+        sign(&mut base, &broker, false).unwrap();
+
+        // Each counterparty signs its own copy, as it would on its own machine.
+        let mut first_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        let mut second_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut second_copy, &second, true).unwrap();
+
+        let mut combined = base.clone();
+        combine_loan_set_counterparty_signers(&mut combined, &[first_copy, second_copy]).unwrap();
+
+        let cs = combined.counterparty_signature.as_ref().unwrap();
+        assert!(cs.signing_pub_key.is_none());
+        assert!(cs.txn_signature.is_none());
+
+        let signers = cs.signers.as_ref().unwrap();
+        assert_eq!(signers.len(), 2);
+        let mut sorted = signers.clone();
+        sorted.sort_by_key(|s| {
+            crate::core::addresscodec::decode_classic_address(&s.account).unwrap()
+        });
+        assert_eq!(
+            signers, &sorted,
+            "Signers must be sorted by decoded account id"
+        );
+    }
+
+    #[test]
+    fn test_combine_rejects_empty_list() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let mut combined = loan_set(&broker, &borrower);
+
+        let err = combine_loan_set_counterparty_signers(&mut combined, &[]).unwrap_err();
+        assert!(
+            err.to_string().contains("0 transactions to combine"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// A single-signed counterparty signature carries no `Signers`, so it
+    /// cannot take part in a combine.
+    #[test]
+    fn test_combine_rejects_single_signed_counterparty() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+
+        let mut single = loan_set(&broker, &borrower);
+        sign(&mut single, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(&mut single, &borrower, false).unwrap();
+
+        let mut combined = loan_set(&broker, &borrower);
+        let err = combine_loan_set_counterparty_signers(&mut combined, &[single]).unwrap_err();
+        assert!(
+            err.to_string().contains("must carry counterparty Signers"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_combine_rejects_unsigned_first_party() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+
+        // Counterparty Signers present, but the first party never signed.
+        let mut unsigned = loan_set(&broker, &borrower);
+        unsigned.counterparty_signature = Some(CounterpartySignature {
+            signing_pub_key: None,
+            txn_signature: None,
+            signers: Some(alloc::vec![Signer {
+                account: borrower.classic_address.clone(),
+                signing_pub_key: borrower.public_key.clone(),
+                txn_signature: "DEADBEEF".into(),
+            }]),
+        });
+
+        let mut combined = loan_set(&broker, &borrower);
+        let err = combine_loan_set_counterparty_signers(&mut combined, &[unsigned]).unwrap_err();
+        assert!(
+            err.to_string().contains("signed by the first party"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// The signatures cover the loan terms, so combining copies that disagree
+    /// on those terms would produce a transaction nobody signed.
+    #[test]
+    fn test_combine_rejects_mismatched_transactions() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let second = second_borrower_wallet();
+
+        let mut first_copy = loan_set(&broker, &borrower);
+        sign(&mut first_copy, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+
+        let mut tampered = loan_set(&broker, &borrower);
+        tampered.principal_requested = "999999".into();
+        sign(&mut tampered, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(&mut tampered, &second, true).unwrap();
+
+        let mut combined = loan_set(&broker, &borrower);
+        let err = combine_loan_set_counterparty_signers(&mut combined, &[first_copy, tampered])
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("not the same transaction"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_combine_rejects_duplicate_signer() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+
+        let mut base = loan_set(&broker, &borrower);
+        sign(&mut base, &broker, false).unwrap();
+
+        let mut first_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        let duplicate = first_copy.clone();
+
+        let mut combined = base;
+        let err = combine_loan_set_counterparty_signers(&mut combined, &[first_copy, duplicate])
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("signed more than once"),
+            "unexpected error: {}",
+            err
+        );
     }
 }

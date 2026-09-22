@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::format;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,16 @@ const MAX_VAULT_MPTOKEN_METADATA_HEX_LEN: usize = 2048;
 const MAX_VAULT_SCALE: u8 = 18;
 const FIRST_COME_FIRST_SERVE_POLICY: u8 = 1;
 
+/// Minimum length, in seconds, of a close-ended vault's investment period
+/// (`RedemptionDate - SubscriptionDate`). 180s is the smallest window that can
+/// still fit a minimum-interval loan plus the 60s redemption buffer enforced by
+/// `LoanSet` (rippled `kMinInvestmentPeriod`).
+const MIN_INVESTMENT_PERIOD: i64 = 180;
+
+/// Exclusive upper bound, in seconds, on a close-ended vault's investment
+/// period (30 Gregorian years).
+const MAX_INVESTMENT_PERIOD: i64 = 946708560;
+
 /// Transactions of the VaultCreate type support additional values in the
 /// Flags field. This enum represents those options.
 ///
@@ -41,6 +52,29 @@ pub enum VaultCreateFlag {
     /// Share tokens issued by this vault are non-transferable: holders
     /// cannot send them to other accounts, only redeem via VaultWithdraw.
     TfVaultShareNonTransferable = 0x00020000,
+}
+
+/// The kind of vault, as carried by the `VaultKind` field
+/// (LendingProtocolV1_1).
+///
+/// Serializes as the underlying `UInt8`, so it can be passed straight to
+/// [`VaultCreate::with_vault_kind`].
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Display, AsRefStr, EnumIter)]
+#[repr(u8)]
+pub enum VaultKind {
+    /// An open-ended vault: shares can be redeemed at any time.
+    Open = 0,
+    /// A close-ended vault: deposits and redemptions are restricted to the
+    /// subscription and redemption periods respectively. Under
+    /// LendingProtocolV1_1 a `LoanBroker` can only be attached to a
+    /// close-ended vault.
+    Closed = 1,
+}
+
+impl From<VaultKind> for u8 {
+    fn from(kind: VaultKind) -> Self {
+        kind as u8
+    }
 }
 
 /// Create a new single-asset vault on the XRP Ledger (XLS-65).
@@ -88,6 +122,18 @@ pub struct VaultCreate<'a> {
     /// when converting it into an integer-based number of shares.
     /// Fixed at 0 for XRP and MPT. Configurable 0-18 for IOU (default 6).
     pub scale: Option<u8>,
+    /// (LendingProtocolV1_1) The kind of vault: 0 for an open-ended vault
+    /// (the default) or 1 for a close-ended vault. Can only be set at vault
+    /// creation. See [`VaultKind`].
+    pub vault_kind: Option<u8>,
+    /// (LendingProtocolV1_1, close-ended vaults only) The time, in seconds
+    /// since the Ripple Epoch, up to which deposits into the vault are
+    /// accepted.
+    pub subscription_date: Option<u32>,
+    /// (LendingProtocolV1_1, close-ended vaults only) The time, in seconds
+    /// since the Ripple Epoch, at which shares may begin to be redeemed from
+    /// the vault.
+    pub redemption_date: Option<u32>,
 }
 
 impl Model for VaultCreate<'_> {
@@ -143,6 +189,7 @@ impl Model for VaultCreate<'_> {
                 });
             }
         }
+        self.validate_vault_kind()?;
         Ok(())
     }
 }
@@ -176,6 +223,57 @@ impl<'a> CommonTransactionBuilder<'a, VaultCreateFlag> for VaultCreate<'a> {
 }
 
 impl<'a> VaultCreate<'a> {
+    /// Validate the LendingProtocolV1_1 close-ended vault fields: a
+    /// close-ended vault (`vault_kind` = 1) requires both a subscription and a
+    /// redemption date bounding a valid investment period, and an open-ended
+    /// vault (the default) must not carry either date.
+    fn validate_vault_kind(&self) -> XRPLModelResult<()> {
+        if let Some(kind) = self.vault_kind {
+            if kind != u8::from(VaultKind::Open) && kind != u8::from(VaultKind::Closed) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "vault_kind".into(),
+                    expected: "0 (open-ended) or 1 (close-ended)".into(),
+                    found: kind.to_string(),
+                });
+            }
+        }
+
+        if self.vault_kind == Some(u8::from(VaultKind::Closed)) {
+            let (Some(subscription_date), Some(redemption_date)) =
+                (self.subscription_date, self.redemption_date)
+            else {
+                return Err(XRPLModelException::MissingField(
+                    "subscription_date and redemption_date (both required for a close-ended vault)"
+                        .into(),
+                ));
+            };
+
+            // Widen to i64: a redemption date before the subscription date is a
+            // caller error to report, not a `u32` underflow to panic on.
+            let investment_period = i64::from(redemption_date) - i64::from(subscription_date);
+            if !(MIN_INVESTMENT_PERIOD..MAX_INVESTMENT_PERIOD).contains(&investment_period) {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "redemption_date and subscription_date".into(),
+                    expected: format!(
+                        "an investment period within [{MIN_INVESTMENT_PERIOD}, {MAX_INVESTMENT_PERIOD}) seconds"
+                    ),
+                    found: format!("redemption_date - subscription_date: {investment_period}"),
+                });
+            }
+        } else if self.subscription_date.is_some() || self.redemption_date.is_some() {
+            return Err(XRPLModelException::InvalidValue {
+                field: "subscription_date and redemption_date".into(),
+                expected: "only present when vault_kind is 1 (close-ended)".into(),
+                found: format!(
+                    "subscription_date: {:?}, redemption_date: {:?}",
+                    self.subscription_date, self.redemption_date
+                ),
+            });
+        }
+
+        Ok(())
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         account: Cow<'a, str>,
@@ -220,6 +318,9 @@ impl<'a> VaultCreate<'a> {
             domain_id,
             withdrawal_policy,
             scale,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         }
     }
 
@@ -259,6 +360,26 @@ impl<'a> VaultCreate<'a> {
         self
     }
 
+    /// Set the vault kind (LendingProtocolV1_1).
+    pub fn with_vault_kind(mut self, vault_kind: VaultKind) -> Self {
+        self.vault_kind = Some(vault_kind.into());
+        self
+    }
+
+    /// Set the subscription date, in seconds since the Ripple Epoch
+    /// (LendingProtocolV1_1, close-ended vaults only).
+    pub fn with_subscription_date(mut self, subscription_date: u32) -> Self {
+        self.subscription_date = Some(subscription_date);
+        self
+    }
+
+    /// Set the redemption date, in seconds since the Ripple Epoch
+    /// (LendingProtocolV1_1, close-ended vaults only).
+    pub fn with_redemption_date(mut self, redemption_date: u32) -> Self {
+        self.redemption_date = Some(redemption_date);
+        self
+    }
+
     /// Append a flag to this transaction's flag set.
     pub fn with_flag(mut self, flag: VaultCreateFlag) -> Self {
         self.common_fields.flags.0.push(flag);
@@ -288,6 +409,9 @@ mod tests {
             domain_id: None,
             withdrawal_policy: None,
             scale: None,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         };
 
         let json_str = r#"{"Account":"rVaultCreator123","TransactionType":"VaultCreate","Flags":0,"SigningPubKey":"","Asset":{"currency":"USD","issuer":"rIssuer456"}}"#;
@@ -322,6 +446,9 @@ mod tests {
             ),
             withdrawal_policy: Some(1),
             scale: Some(6),
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         };
 
         let serialized = serde_json::to_string(&vault_create).unwrap();
@@ -906,5 +1033,181 @@ mod tests {
             ..Default::default()
         };
         assert!(vault_create.validate().is_err());
+    }
+
+    /// Close-ended vault validation (LendingProtocolV1_1).
+    ///
+    /// Mirrors `test/models/vaultCreate.test.ts` in xrpl.js. The `NaN` /
+    /// non-integer date cases from that suite have no Rust analogue: the date
+    /// fields are `u32`, so a non-integral or non-finite value cannot be
+    /// constructed.
+    mod close_ended {
+        use super::*;
+
+        fn close_ended(
+            subscription_date: Option<u32>,
+            redemption_date: Option<u32>,
+        ) -> VaultCreate<'static> {
+            VaultCreate {
+                common_fields: CommonFields {
+                    account: "rVaultCreator123".into(),
+                    transaction_type: TransactionType::VaultCreate,
+                    signing_pub_key: Some("".into()),
+                    ..Default::default()
+                },
+                asset: Currency::XRP(XRP::new()),
+                vault_kind: Some(VaultKind::Closed.into()),
+                subscription_date,
+                redemption_date,
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn test_valid_close_ended_vault() {
+            assert!(close_ended(Some(800_000_000), Some(810_000_000))
+                .get_errors()
+                .is_ok());
+        }
+
+        #[test]
+        fn test_valid_open_ended_vault_without_dates() {
+            let tx = VaultCreate {
+                vault_kind: Some(VaultKind::Open.into()),
+                subscription_date: None,
+                redemption_date: None,
+                ..close_ended(None, None)
+            };
+
+            assert!(tx.get_errors().is_ok());
+        }
+
+        #[test]
+        fn test_valid_minimum_investment_period() {
+            assert!(close_ended(Some(800_000_000), Some(800_000_180))
+                .get_errors()
+                .is_ok());
+        }
+
+        #[test]
+        fn test_invalid_close_ended_vault_missing_redemption_date() {
+            assert!(matches!(
+                close_ended(Some(800_000_000), None).get_errors().err(),
+                Some(XRPLModelException::MissingField(..))
+            ));
+        }
+
+        #[test]
+        fn test_invalid_close_ended_vault_missing_subscription_date() {
+            assert!(matches!(
+                close_ended(None, Some(810_000_000)).get_errors().err(),
+                Some(XRPLModelException::MissingField(..))
+            ));
+        }
+
+        /// The dates describe the subscription and redemption windows of a
+        /// close-ended vault, so an open-ended vault must not carry them.
+        #[test]
+        fn test_invalid_dates_on_open_ended_vault() {
+            let tx = VaultCreate {
+                vault_kind: None,
+                ..close_ended(Some(800_000_000), Some(810_000_000))
+            };
+
+            assert!(matches!(
+                tx.get_errors().err(),
+                Some(XRPLModelException::InvalidValue { .. })
+            ));
+        }
+
+        #[test]
+        fn test_invalid_investment_period_below_minimum() {
+            assert!(matches!(
+                close_ended(Some(800_000_000), Some(800_000_179))
+                    .get_errors()
+                    .err(),
+                Some(XRPLModelException::InvalidValue { .. })
+            ));
+        }
+
+        /// A redemption date before the subscription date is a negative
+        /// investment period, which must be reported rather than underflowing.
+        #[test]
+        fn test_invalid_redemption_date_before_subscription_date() {
+            assert!(matches!(
+                close_ended(Some(810_000_000), Some(800_000_000))
+                    .get_errors()
+                    .err(),
+                Some(XRPLModelException::InvalidValue { .. })
+            ));
+        }
+
+        #[test]
+        fn test_invalid_investment_period_at_exclusive_maximum() {
+            assert!(matches!(
+                close_ended(Some(0), Some(946_708_560)).get_errors().err(),
+                Some(XRPLModelException::InvalidValue { .. })
+            ));
+        }
+
+        #[test]
+        fn test_valid_investment_period_just_below_maximum() {
+            assert!(close_ended(Some(0), Some(946_708_559)).get_errors().is_ok());
+        }
+
+        #[test]
+        fn test_invalid_unsupported_vault_kind() {
+            let tx = VaultCreate {
+                vault_kind: Some(2),
+                ..close_ended(Some(800_000_000), Some(810_000_000))
+            };
+
+            assert!(matches!(
+                tx.get_errors().err(),
+                Some(XRPLModelException::InvalidValue { .. })
+            ));
+        }
+
+        #[test]
+        fn test_serde_close_ended_fields() {
+            let tx = close_ended(Some(800_000_000), Some(810_000_000));
+
+            let json_str = r#"{"Account":"rVaultCreator123","TransactionType":"VaultCreate","Flags":0,"SigningPubKey":"","Asset":{"currency":"XRP"},"VaultKind":1,"SubscriptionDate":800000000,"RedemptionDate":810000000}"#;
+
+            assert_eq!(
+                serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap(),
+                serde_json::to_value(json_str).unwrap()
+            );
+
+            let deserialized: VaultCreate = serde_json::from_str(json_str).unwrap();
+            assert_eq!(tx, deserialized);
+        }
+
+        #[test]
+        fn test_builder_sets_close_ended_fields() {
+            let tx = VaultCreate {
+                common_fields: CommonFields {
+                    account: "rVaultCreator123".into(),
+                    transaction_type: TransactionType::VaultCreate,
+                    ..Default::default()
+                },
+                asset: Currency::XRP(XRP::new()),
+                ..Default::default()
+            }
+            .with_vault_kind(VaultKind::Closed)
+            .with_subscription_date(800_000_000)
+            .with_redemption_date(810_000_000);
+
+            assert_eq!(tx.vault_kind, Some(1));
+            assert_eq!(tx.subscription_date, Some(800_000_000));
+            assert_eq!(tx.redemption_date, Some(810_000_000));
+            assert!(tx.get_errors().is_ok());
+        }
+
+        #[test]
+        fn test_vault_kind_values() {
+            assert_eq!(u8::from(VaultKind::Open), 0);
+            assert_eq!(u8::from(VaultKind::Closed), 1);
+        }
     }
 }
