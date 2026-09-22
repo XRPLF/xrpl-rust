@@ -233,7 +233,11 @@ where
     ) -> XRPLClientResult<XRPLResponse<'b>> {
         // setup request future
         self.set_request_id(&mut request);
-        let request_id = request.get_common_fields().id.as_ref().unwrap();
+        let request_id = request
+            .get_common_fields()
+            .id
+            .as_ref()
+            .ok_or(XRPLWebSocketException::InvalidMessage)?;
         let mut websocket_base = self.websocket_base.lock().await;
         websocket_base
             .setup_request_future(request_id.to_string())
