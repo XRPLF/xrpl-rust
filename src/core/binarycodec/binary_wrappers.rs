@@ -498,8 +498,14 @@ impl Parser for BinaryParser {
     }
 
     fn read(&mut self, n: usize) -> XRPLCoreResult<Vec<u8>> {
+        if n > self.0.len() {
+            return Err(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+                max: self.0.len(),
+                found: n,
+            }
+            .into());
+        }
         let first_n_bytes = self.0[..n].to_owned();
-
         self.skip_bytes(n)?;
         Ok(first_n_bytes)
     }
@@ -694,6 +700,11 @@ pub(crate) const TRANSACTION_MULTISIG_PREFIX: [u8; 4] = (0x534D5400u32).to_be_by
 pub(crate) const PAYMENT_CHANNEL_CLAIM_PREFIX: [u8; 4] = (0x434C4D00u32).to_be_bytes();
 pub(crate) const BATCH_PREFIX: [u8; 4] = (0x42434800u32).to_be_bytes();
 
+/// Maximum allowed STObject/STArray nesting depth during binary decoding.
+/// Exceeding this limit returns an error rather than recursing further,
+/// preventing stack exhaustion from crafted deeply-nested payloads.
+const MAX_DECODE_DEPTH: u32 = 32;
+
 /// UInt64 fields that should be encoded/decoded as base-10 strings instead of hex.
 pub(crate) const BASE10_UINT64_FIELDS: &[&str] = &[
     "MaximumAmount",
@@ -733,7 +744,11 @@ where
 
 /// Decode a single field value from a BinaryParser based on the field's type.
 /// Returns the JSON value for the field.
-fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLCoreResult<Value> {
+fn decode_field_value(
+    parser: &mut BinaryParser,
+    field: &FieldInstance,
+    depth: u32,
+) -> XRPLCoreResult<Value> {
     let type_name = field.associated_type.as_str();
 
     // Handle VL prefix for variable-length encoded fields
@@ -836,8 +851,8 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
             );
             Ok(Value::Number(val.into()))
         }
-        "STObject" => decode_st_object(parser),
-        "STArray" => decode_st_array(parser),
+        "STObject" => decode_st_object(parser, depth + 1),
+        "STArray" => decode_st_array(parser, depth + 1),
         "PathSet" => {
             let path_set = PathSet::from_parser(parser, length)?;
             Ok(serde_json::to_value(&path_set).map_err(XRPLSerdeJsonError::from)?)
@@ -878,7 +893,17 @@ fn decode_field_value(parser: &mut BinaryParser, field: &FieldInstance) -> XRPLC
 
 /// Decode an STObject from the parser. Reads fields until ObjectEndMarker (0xE1)
 /// or end of parser data.
-pub(crate) fn decode_st_object(parser: &mut BinaryParser) -> XRPLCoreResult<Value> {
+///
+/// `depth` tracks the current nesting level. Returns an error when `depth`
+/// exceeds `MAX_DECODE_DEPTH` to prevent stack exhaustion from crafted payloads.
+pub(crate) fn decode_st_object(parser: &mut BinaryParser, depth: u32) -> XRPLCoreResult<Value> {
+    if depth > MAX_DECODE_DEPTH {
+        return Err(XRPLBinaryCodecException::MaxDecodeDepthExceeded {
+            max: MAX_DECODE_DEPTH,
+        }
+        .into());
+    }
+
     let mut accumulator = Map::new();
 
     while !parser.is_end(None) {
@@ -888,7 +913,7 @@ pub(crate) fn decode_st_object(parser: &mut BinaryParser) -> XRPLCoreResult<Valu
             break;
         }
 
-        let value = decode_field_value(parser, &field)?;
+        let value = decode_field_value(parser, &field, depth)?;
         accumulator.insert(field.name, value);
     }
 
@@ -897,7 +922,7 @@ pub(crate) fn decode_st_object(parser: &mut BinaryParser) -> XRPLCoreResult<Valu
 
 /// Decode an STArray from the parser. Reads wrapper objects until
 /// ArrayEndMarker (0xF1) or end of parser data.
-fn decode_st_array(parser: &mut BinaryParser) -> XRPLCoreResult<Value> {
+fn decode_st_array(parser: &mut BinaryParser, depth: u32) -> XRPLCoreResult<Value> {
     let mut result: Vec<Value> = Vec::new();
 
     while !parser.is_end(None) {
@@ -907,7 +932,7 @@ fn decode_st_array(parser: &mut BinaryParser) -> XRPLCoreResult<Value> {
             break;
         }
 
-        let inner = decode_st_object(parser)?;
+        let inner = decode_st_object(parser, depth + 1)?;
         let mut wrapper = Map::new();
         wrapper.insert(field.name, inner);
         result.push(Value::Object(wrapper));
@@ -1139,7 +1164,7 @@ mod test {
         let field = FieldInstance::new(&field_info, "FutureField", field_header);
 
         let mut parser = BinaryParser::from(&[0xAB, 0xCD][..]);
-        let result = decode_field_value(&mut parser, &field);
+        let result = decode_field_value(&mut parser, &field, 0);
 
         assert!(
             result.is_err(),
@@ -1181,7 +1206,7 @@ mod test {
 
         // VL prefix 0x03 = 3 bytes, followed by 3 bytes of data
         let mut parser = BinaryParser::from(&[0x03, 0xAA, 0xBB, 0xCC][..]);
-        let result = decode_field_value(&mut parser, &field);
+        let result = decode_field_value(&mut parser, &field, 0);
 
         assert!(result.is_ok(), "VL-encoded unknown type should succeed");
         assert_eq!(
@@ -1189,6 +1214,64 @@ mod test {
             serde_json::Value::String("AABBCC".to_string())
         );
         assert!(parser.0.is_empty(), "Parser should have consumed all bytes");
+    }
+
+    /// Regression test for OOBIDX-001: read() must return Err when n > buffer
+    /// length rather than panicking with an out-of-bounds slice.
+    #[test]
+    fn test_binary_parser_read_truncated_returns_error() {
+        let data = vec![0x01u8, 0x02];
+        let mut parser = BinaryParser::from(data.as_slice());
+        let result = parser.read(10);
+        assert!(
+            result.is_err(),
+            "read() must return Err on truncated input, not panic"
+        );
+        // Confirm it's specifically an overflow error, not a different failure mode.
+        match result.unwrap_err() {
+            XRPLCoreException::XRPLBinaryCodecError(
+                XRPLBinaryCodecException::UnexpectedParserSkipOverflow { max, found },
+            ) => {
+                assert_eq!(max, 2);
+                assert_eq!(found, 10);
+            }
+            e => panic!("expected UnexpectedParserSkipOverflow, got: {:?}", e),
+        }
+    }
+
+    /// Regression test for RECURSEDES-001: deeply nested STObject payloads must
+    /// return Err(MaxDecodeDepthExceeded) rather than causing a stack overflow.
+    ///
+    /// The binary format for an STObject field uses the XRPL type-field header:
+    ///   type_code = 14 (STObject), field_code = 7 (FinalFields) → byte 0xE7
+    /// Each 0xE7 byte triggers a recursive call to decode_st_object. After
+    /// MAX_DECODE_DEPTH+1 levels the guard fires and returns an error.
+    #[test]
+    fn test_decode_st_object_depth_limit() {
+        // FinalFields: type=14 (STObject), nth=7 → (14 << 4) | 7 = 0xE7
+        // ObjectEndMarker: type=14, nth=1 → 0xE1 (terminates each level)
+        let levels = MAX_DECODE_DEPTH + 2;
+        let mut blob = Vec::new();
+        for _ in 0..levels {
+            blob.push(0xE7u8); // FinalFields field header (associated_type = STObject)
+        }
+        for _ in 0..levels {
+            blob.push(0xE1u8); // ObjectEndMarker
+        }
+        let hex_input = hex::encode(&blob);
+        let result = crate::core::binarycodec::decode(&hex_input);
+        match result {
+            Err(XRPLCoreException::XRPLBinaryCodecError(
+                XRPLBinaryCodecException::MaxDecodeDepthExceeded { max },
+            )) => {
+                assert_eq!(
+                    max, MAX_DECODE_DEPTH,
+                    "depth limit value should match constant"
+                );
+            }
+            Err(e) => panic!("expected MaxDecodeDepthExceeded, got: {:?}", e),
+            Ok(_) => panic!("deeply nested STObject must return Err, not Ok"),
+        }
     }
 
     /// This is currently a sanity check for private
