@@ -2,6 +2,7 @@
 name = "xrpl-rust-macros"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 description = "XRPL Rust Macros"
 license = "ISC"
 
@@ -12,3 +13,6 @@ proc-macro = true
 syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"
+
+[lints.rust]
+unsafe_code = "forbid"
