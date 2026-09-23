@@ -187,8 +187,12 @@ pub fn combine_loan_set_counterparty_signers<'a>(
     for tx in tx_list {
         tx.validate()?;
 
+        // The first party may have single-signed or multisigned, the same two
+        // modes `sign_loan_set_by_counterparty` accepts.
         let cf = tx.get_common_fields();
-        if cf.txn_signature.is_none() || cf.signing_pub_key.is_none() {
+        let has_single_sig = cf.txn_signature.is_some() && cf.signing_pub_key.is_some();
+        let has_multi_sig = cf.signers.as_ref().is_some_and(|s| !s.is_empty());
+        if !has_single_sig && !has_multi_sig {
             return Err(XRPLSignTransactionException::CombineCounterpartySigners(
                 "every transaction must first be signed by the first party".into(),
             )
@@ -234,6 +238,18 @@ pub fn combine_loan_set_counterparty_signers<'a>(
             )
             .into());
         }
+    }
+
+    // The destination has to be that same transaction too: attaching these
+    // signatures to a different `LoanSet` would produce a transaction whose
+    // signatures do not cover its own terms.
+    let mut target = transaction.clone();
+    target.counterparty_signature = None;
+    if target != reference {
+        return Err(XRPLSignTransactionException::CombineCounterpartySigners(
+            "the transaction being combined into is not the transaction that was signed".into(),
+        )
+        .into());
     }
 
     // Fallible sort instead of unwrap()-in-key-fn.
@@ -759,6 +775,67 @@ mod test_sign_loan_set_by_counterparty {
             .unwrap_err();
         assert!(
             err.to_string().contains("signed more than once"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// A first party that multisigned is a valid starting point for a combine,
+    /// matching what [`sign_loan_set_by_counterparty`] accepts.
+    #[test]
+    fn test_combine_accepts_multisigned_first_party() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let second = second_borrower_wallet();
+
+        let mut base = loan_set(&broker, &borrower);
+        sign(&mut base, &broker, true).unwrap();
+        assert!(base.get_common_fields().signers.is_some());
+
+        let mut first_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        let mut second_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut second_copy, &second, true).unwrap();
+
+        let mut combined = base.clone();
+        combine_loan_set_counterparty_signers(&mut combined, &[first_copy, second_copy]).unwrap();
+
+        let signers = combined
+            .counterparty_signature
+            .as_ref()
+            .unwrap()
+            .signers
+            .as_ref()
+            .unwrap();
+        assert_eq!(signers.len(), 2);
+    }
+
+    /// Combining into a `LoanSet` with different terms would attach signatures
+    /// that do not cover that transaction.
+    #[test]
+    fn test_combine_rejects_mismatched_destination() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let second = second_borrower_wallet();
+
+        let mut base = loan_set(&broker, &borrower);
+        sign(&mut base, &broker, false).unwrap();
+
+        let mut first_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        let mut second_copy = base.clone();
+        sign_loan_set_by_counterparty(&mut second_copy, &second, true).unwrap();
+
+        let mut other_terms = loan_set(&broker, &borrower);
+        other_terms.principal_requested = "999999".into();
+        sign(&mut other_terms, &broker, false).unwrap();
+
+        let err =
+            combine_loan_set_counterparty_signers(&mut other_terms, &[first_copy, second_copy])
+                .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("not the transaction that was signed"),
             "unexpected error: {}",
             err
         );

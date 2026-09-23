@@ -194,11 +194,14 @@ pub async fn wait_for_ledger_close_time(target: u64) {
 /// say — needs a larger budget than the default.
 #[cfg(feature = "std")]
 pub async fn wait_for_ledger_close_time_with_retries(target: u64, retries: u32) {
+    if get_ledger_close_time().await >= target {
+        return;
+    }
     for _ in 0..retries {
+        ledger_accept().await;
         if get_ledger_close_time().await >= target {
             return;
         }
-        ledger_accept().await;
     }
     panic!("ledger close_time did not advance to {target} after {retries} ledger_accept calls");
 }
