@@ -17,8 +17,14 @@ use crate::{
     },
     core::binarycodec::encode,
     models::{
-        requests::{server_state::ServerState, submit::Submit},
-        results::{server_state::ServerState as ServerStateResult, submit::Submit as SubmitResult},
+        requests::{
+            account_info::AccountInfo, ledger_entry::LedgerEntry, server_state::ServerState,
+            submit::Submit,
+        },
+        results::{
+            ledger_entry::LedgerEntry as LedgerEntryResult,
+            server_state::ServerState as ServerStateResult, submit::Submit as SubmitResult,
+        },
         transactions::{Transaction, TransactionType},
         Model, XRPAmount, XRPLModelException,
     },
@@ -194,6 +200,18 @@ where
         };
     }
     let mut base_fee_decimal: BigDecimal = base_fee.try_into()?;
+    // A `LoanSet` also pays one reference base fee per counterparty signer
+    // (rippled `LoanSet::calculateBaseFee`: `normalCost + signerCount * base`).
+    // `Fee` is a signing field, so it cannot be raised after the first party
+    // signs — it has to be right here, before the transaction is distributed
+    // for counterparty signing.
+    if transaction.get_transaction_type() == &TransactionType::LoanSet {
+        if let Some(client) = client {
+            let counterparty_signers = get_counterparty_signers_count(transaction, client).await?;
+            let net_fee_decimal: BigDecimal = net_fee.clone().try_into()?;
+            base_fee_decimal += &(net_fee_decimal * BigDecimal::from(counterparty_signers));
+        }
+    }
     if let Some(signers_count) = signers_count {
         // rippled charges one extra reference base fee per signer on top of the
         // transaction's own base cost (Transactor::calculateBaseFee:
@@ -208,6 +226,97 @@ where
     Ok(base_fee_decimal
         .with_scale_round(0, RoundingMode::Down)
         .into())
+}
+
+/// The number of counterparty signatures a `LoanSet` will carry, for fee
+/// purposes.
+///
+/// The counterparty is the `Counterparty` account when the transaction names
+/// one; otherwise the loan broker initiated it and the counterparty is the
+/// broker's owner, which is read from the `LoanBroker` ledger entry. An account
+/// with a signer list contributes one signature per signer entry; an account
+/// without one signs once.
+///
+/// Mirrors `fetchCounterPartySignersCount` in xrpl.js's `autofill`.
+async fn get_counterparty_signers_count<'a, T, F, C>(
+    transaction: &T,
+    client: &C,
+) -> XRPLHelperResult<u32>
+where
+    T: Transaction<'a, F>,
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    C: XRPLAsyncClient,
+{
+    fn unquote(value: String) -> String {
+        value.trim_matches('"').to_string()
+    }
+
+    let counterparty = match transaction.get_field_value("Counterparty")? {
+        Some(counterparty) => unquote(counterparty),
+        None => {
+            let loan_broker_id = transaction
+                .get_field_value("LoanBrokerID")?
+                .map(unquote)
+                .ok_or_else(|| {
+                    XRPLModelException::MissingField(
+                        "LoanBrokerID (required to resolve the LoanSet counterparty)".to_string(),
+                    )
+                })?;
+            let response = client
+                .request(
+                    LedgerEntry {
+                        index: Some(loan_broker_id.into()),
+                        ..Default::default()
+                    }
+                    .into(),
+                )
+                .await?;
+            let result: LedgerEntryResult = response.try_into()?;
+            let node = result.node.ok_or_else(|| {
+                XRPLModelException::MissingField("LoanBroker ledger entry".to_string())
+            })?;
+            node["Owner"]
+                .as_str()
+                .ok_or_else(|| XRPLModelException::MissingField("LoanBroker.Owner".to_string()))?
+                .to_string()
+        }
+    };
+
+    let response = client
+        .request(
+            AccountInfo::new(
+                None,
+                counterparty.into(),
+                None,
+                None,
+                None,
+                None,
+                Some(true),
+            )
+            .into(),
+        )
+        .await?;
+    let result = response
+        .raw_result
+        .ok_or_else(|| XRPLModelException::MissingField("account_info result".to_string()))?;
+
+    // `signer_lists` sits at the root of the response under api_version 2 but
+    // nested inside `account_data` under api_version 1, which is what rippled
+    // serves when the request does not ask for a version — so accept either.
+    let signer_lists = result.get("signer_lists").or_else(|| {
+        result
+            .get("account_data")
+            .and_then(|d| d.get("signer_lists"))
+    });
+
+    // An account without a signer list signs once; otherwise it contributes one
+    // signature per signer entry.
+    Ok(signer_lists
+        .and_then(|lists| lists.get(0))
+        .and_then(|list| list.get("SignerEntries"))
+        .and_then(|entries| entries.as_array())
+        .map(|entries| entries.len() as u32)
+        .unwrap_or(1))
 }
 
 async fn get_owner_reserve_from_response(
