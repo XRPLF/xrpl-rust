@@ -37,7 +37,10 @@ use xrpl::{
         Amount, Currency, FlagCollection, IssuedCurrency, IssuedCurrencyAmount, MPTAmount,
         MPTCurrency, XRPAmount, XRP,
     },
-    signing::sign_loan_set_by_counterparty,
+    signing::{
+        combine_loan_set_counterparty_signers, sign_loan_set_by_counterparty,
+        CounterpartySigningMode,
+    },
     wallet::Wallet,
 };
 
@@ -111,13 +114,18 @@ async fn test_lending_protocol_lifecycle() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(1))
+        autofill(&mut loan_set_tx, client, None)
             .await
             .expect("Failed to auto-fill loan set transaction");
 
         sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &borrower_wallet, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &borrower_wallet,
+            CounterpartySigningMode::Single,
+        )
+        .unwrap();
 
         test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
 
@@ -259,7 +267,7 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(2)).await.unwrap();
+        autofill(&mut loan_set_tx, client, None).await.unwrap();
 
         // Loan broker signs the transaction and sends it to the borrower
         // The Loan Issuer signs the transaction setting the SigningPubKey, TxnSignature, Signers, Account, Fee, Sequence fields.
@@ -280,9 +288,19 @@ async fn test_lending_protocol_with_mpt_and_multisigning() {
 
         // Borrower signs the transaction and fills in the CounterpartySignature to confirm the
         // loan terms.
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &signer1, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &signer1,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &signer2, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &signer2,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
         test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
 
@@ -527,13 +545,18 @@ async fn test_loan_set_txn_counterparty_is_loan_broker_owner() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(1))
+        autofill(&mut loan_set_tx, client, None)
             .await
             .expect("Failed to auto-fill loan set transaction");
 
         sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &loan_issuer, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &loan_issuer,
+            CounterpartySigningMode::Single,
+        )
+        .unwrap();
 
         test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
 
@@ -715,13 +738,18 @@ async fn test_lending_protocol_lifecycle_with_iou_asset() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(1))
+        autofill(&mut loan_set_tx, client, None)
             .await
             .expect("Failed to auto-fill loan set transaction");
 
         sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &borrower_wallet, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &borrower_wallet,
+            CounterpartySigningMode::Single,
+        )
+        .unwrap();
 
         test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
 
@@ -832,13 +860,18 @@ async fn test_loan_set_with_sign_loan_set_by_counterparty() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(1))
+        autofill(&mut loan_set_tx, client, None)
             .await
             .expect("Failed to auto-fill loan set transaction");
 
         sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &borrower_wallet, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &borrower_wallet,
+            CounterpartySigningMode::Single,
+        )
+        .unwrap();
 
         assert!(loan_set_tx.counterparty_signature.is_some());
         assert!(loan_set_tx
@@ -933,15 +966,25 @@ async fn test_loan_set_with_accumulated_counterparty_multisign() {
 
         let client = get_client().await;
 
-        autofill(&mut loan_set_tx, client, Some(2))
+        autofill(&mut loan_set_tx, client, None)
             .await
             .expect("Failed to auto-fill loan set transaction");
 
         sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &signer1, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &signer1,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
-        sign_loan_set_by_counterparty(&mut loan_set_tx, &signer2, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut loan_set_tx,
+            &signer2,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
         assert!(loan_set_tx.counterparty_signature.is_some());
         assert!(loan_set_tx
@@ -1351,6 +1394,132 @@ pub async fn setup_multisigning(wallet: &Wallet, signer1: &Wallet, signer2: &Wal
 // decided entirely from the transaction's existing signature fields. They live
 // here, next to the live-rippled counterparty-signing tests, so the whole
 // counterparty signing surface is covered by one suite.
+/// The counterparty signers sign independently, their copies are merged with
+/// `combine_loan_set_counterparty_signers`, and the combined transaction is
+/// submitted to the ledger.
+///
+/// This is the distributed-signing flow the combine API exists for, and the
+/// only test that puts its output on a ledger. xrpl.js reference:
+/// `combineLoanSetCounterpartySigners` in `lendingProtocol.test.ts`.
+#[tokio::test]
+async fn test_loan_set_with_combined_counterparty_signers() {
+    with_blockchain_lock(|| async {
+        let loan_issuer = generate_funded_wallet().await;
+        let depositor_wallet = generate_funded_wallet().await;
+        let borrower_wallet = generate_funded_wallet().await;
+        let signer1 = generate_funded_wallet().await;
+        let signer2 = generate_funded_wallet().await;
+
+        setup_multisigning(&borrower_wallet, &signer1, &signer2).await;
+
+        let (subscription_date, redemption_date) = investment_window().await;
+        let vault_id = create_vault(
+            &loan_issuer,
+            Currency::XRP(XRP::new()),
+            Some("1000"),
+            Some(1),
+            subscription_date,
+            redemption_date,
+        )
+        .await;
+        let loan_broker_id = create_loan_broker(&loan_issuer, &vault_id, Some("10000")).await;
+
+        deposit_into_vault(
+            &depositor_wallet,
+            &vault_id,
+            Amount::XRPAmount(XRPAmount("100".into())),
+        )
+        .await;
+
+        wait_for_ledger_close_time((subscription_date + 1) as u64).await;
+
+        let mut loan_set_tx = LoanSet::new(
+            loan_issuer.classic_address.clone().into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            loan_broker_id.clone().into(),
+            None,
+            Some(borrower_wallet.classic_address.as_str().into()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "100".into(),
+            None,
+            None,
+            None,
+        );
+
+        let client = get_client().await;
+
+        // autofill accounts for the counterparty's signer list, so the Fee
+        // already covers both signatures — it cannot be raised later, since
+        // `Fee` is a signing field.
+        autofill(&mut loan_set_tx, client, None)
+            .await
+            .expect("Failed to auto-fill loan set transaction");
+
+        sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
+
+        // Each signer signs its own copy, as it would on its own machine.
+        let mut signer1_copy = loan_set_tx.clone();
+        sign_loan_set_by_counterparty(
+            &mut signer1_copy,
+            &signer1,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+
+        let mut signer2_copy = loan_set_tx.clone();
+        sign_loan_set_by_counterparty(
+            &mut signer2_copy,
+            &signer2,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+
+        combine_loan_set_counterparty_signers(&mut loan_set_tx, &[signer1_copy, signer2_copy])
+            .unwrap();
+
+        assert_eq!(
+            loan_set_tx
+                .counterparty_signature
+                .as_ref()
+                .unwrap()
+                .signers
+                .as_ref()
+                .unwrap()
+                .len(),
+            2
+        );
+
+        test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
+
+        // The loan exists, so the ledger accepted the combined signatures.
+        let loan_metadata =
+            get_loan_metadata(&borrower_wallet.classic_address, AccountObjectType::Loan).await;
+        assert_eq!(loan_metadata.loan_broker_id, loan_broker_id);
+        assert_eq!(
+            loan_metadata.borrower_address,
+            borrower_wallet.classic_address
+        );
+    })
+    .await
+}
+
 mod counterparty_signing_rejections {
     use xrpl::core::addresscodec::decode_classic_address;
     use xrpl::models::transactions::loan_set::{CounterpartySignature, LoanSet};
@@ -1358,6 +1527,7 @@ mod counterparty_signing_rejections {
     use xrpl::models::transactions::{Transaction, TransactionType};
     use xrpl::signing::{
         combine_loan_set_counterparty_signers, sign, sign_loan_set_by_counterparty,
+        CounterpartySigningMode,
     };
     use xrpl::wallet::Wallet;
 
@@ -1390,7 +1560,9 @@ mod counterparty_signing_rejections {
         let (broker, borrower, _) = wallets();
         let mut tx = loan_set(&broker, &borrower);
 
-        let err = sign_loan_set_by_counterparty(&mut tx, &borrower, false).unwrap_err();
+        let err =
+            sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Single)
+                .unwrap_err();
         assert!(
             err.to_string().contains("first-party signature"),
             "unexpected error: {}",
@@ -1408,7 +1580,7 @@ mod counterparty_signing_rejections {
         sign(&mut tx, &broker, true).unwrap();
         assert!(tx.get_common_fields().signers.is_some());
 
-        sign_loan_set_by_counterparty(&mut tx, &borrower, false).unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Single).unwrap();
         assert!(tx
             .counterparty_signature
             .as_ref()
@@ -1423,9 +1595,11 @@ mod counterparty_signing_rejections {
         let mut tx = loan_set(&broker, &borrower);
 
         sign(&mut tx, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut tx, &borrower, false).unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Single).unwrap();
 
-        let err = sign_loan_set_by_counterparty(&mut tx, &borrower, false).unwrap_err();
+        let err =
+            sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Single)
+                .unwrap_err();
         assert!(
             err.to_string()
                 .contains("already signed by the counterparty"),
@@ -1442,9 +1616,12 @@ mod counterparty_signing_rejections {
         let mut tx = loan_set(&broker, &borrower);
 
         sign(&mut tx, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut tx, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Multisign)
+            .unwrap();
 
-        let err = sign_loan_set_by_counterparty(&mut tx, &borrower, false).unwrap_err();
+        let err =
+            sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Single)
+                .unwrap_err();
         assert!(
             err.to_string()
                 .contains("multisign counterparty signatures"),
@@ -1459,9 +1636,12 @@ mod counterparty_signing_rejections {
         let mut tx = loan_set(&broker, &borrower);
 
         sign(&mut tx, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut tx, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Multisign)
+            .unwrap();
 
-        let err = sign_loan_set_by_counterparty(&mut tx, &borrower, true).unwrap_err();
+        let err =
+            sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Multisign)
+                .unwrap_err();
         assert!(
             err.to_string()
                 .contains("This counterparty account has already signed"),
@@ -1478,8 +1658,10 @@ mod counterparty_signing_rejections {
         let mut tx = loan_set(&broker, &borrower);
 
         sign(&mut tx, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut tx, &borrower, true).unwrap();
-        sign_loan_set_by_counterparty(&mut tx, &second, true).unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Multisign)
+            .unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &second, CounterpartySigningMode::Multisign)
+            .unwrap();
 
         let cs = tx.counterparty_signature.as_ref().unwrap();
         assert!(cs.signing_pub_key.is_none());
@@ -1511,7 +1693,10 @@ mod counterparty_signing_rejections {
             signers: Some(Vec::new()),
         });
 
-        assert!(sign_loan_set_by_counterparty(&mut tx, &borrower, false).is_err());
+        assert!(
+            sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Single)
+                .is_err()
+        );
     }
 
     // ── combine_loan_set_counterparty_signers ──────────────────────────
@@ -1529,9 +1714,19 @@ mod counterparty_signing_rejections {
         sign(&mut base, &broker, false).unwrap();
 
         let mut first_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
         let mut second_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut second_copy, &second, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut second_copy,
+            &second,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
         let mut combined = base.clone();
         combine_loan_set_counterparty_signers(&mut combined, &[first_copy, second_copy]).unwrap();
@@ -1565,9 +1760,19 @@ mod counterparty_signing_rejections {
         assert!(base.get_common_fields().signers.is_some());
 
         let mut first_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
         let mut second_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut second_copy, &second, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut second_copy,
+            &second,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
         let mut combined = base.clone();
         combine_loan_set_counterparty_signers(&mut combined, &[first_copy, second_copy]).unwrap();
@@ -1630,7 +1835,8 @@ mod counterparty_signing_rejections {
 
         let mut single = loan_set(&broker, &borrower);
         sign(&mut single, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut single, &borrower, false).unwrap();
+        sign_loan_set_by_counterparty(&mut single, &borrower, CounterpartySigningMode::Single)
+            .unwrap();
 
         let mut combined = loan_set(&broker, &borrower);
         sign(&mut combined, &broker, false).unwrap();
@@ -1651,7 +1857,12 @@ mod counterparty_signing_rejections {
         sign(&mut base, &broker, false).unwrap();
 
         let mut first_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
         let duplicate = first_copy.clone();
 
         let mut combined = base;
@@ -1672,12 +1883,18 @@ mod counterparty_signing_rejections {
 
         let mut first_copy = loan_set(&broker, &borrower);
         sign(&mut first_copy, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
         let mut tampered = loan_set(&broker, &borrower);
         tampered.principal_requested = "999999".into();
         sign(&mut tampered, &broker, false).unwrap();
-        sign_loan_set_by_counterparty(&mut tampered, &second, true).unwrap();
+        sign_loan_set_by_counterparty(&mut tampered, &second, CounterpartySigningMode::Multisign)
+            .unwrap();
 
         let mut combined = loan_set(&broker, &borrower);
         sign(&mut combined, &broker, false).unwrap();
@@ -1701,9 +1918,19 @@ mod counterparty_signing_rejections {
         sign(&mut base, &broker, false).unwrap();
 
         let mut first_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut first_copy, &borrower, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
         let mut second_copy = base.clone();
-        sign_loan_set_by_counterparty(&mut second_copy, &second, true).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut second_copy,
+            &second,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
 
         // Same signers, but the destination asks for a different principal.
         let mut other_terms = loan_set(&broker, &borrower);
@@ -1718,6 +1945,141 @@ mod counterparty_signing_rejections {
                 .contains("not the transaction that was signed"),
             "unexpected error: {}",
             err
+        );
+    }
+    /// A wallet holding an account's RegularKey can sign on that account's
+    /// behalf: the signature and `Signer.Account` both use the declared
+    /// account, not the wallet's own address.
+    #[test]
+    fn test_multisign_as_another_account() {
+        let (broker, borrower, regular_key) = wallets();
+
+        let mut tx = loan_set(&broker, &borrower);
+        sign(&mut tx, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut tx,
+            &regular_key,
+            CounterpartySigningMode::MultisignAs(borrower.classic_address.clone().into()),
+        )
+        .unwrap();
+
+        let signers = tx
+            .counterparty_signature
+            .as_ref()
+            .unwrap()
+            .signers
+            .as_ref()
+            .unwrap();
+        assert_eq!(signers.len(), 1);
+        assert_eq!(
+            signers[0].account, borrower.classic_address,
+            "Signer.Account must be the declared account, not the signing wallet"
+        );
+        assert_eq!(
+            signers[0].signing_pub_key, regular_key.public_key,
+            "the public key must be the regular key that produced the signature"
+        );
+        // The signature covers the declared account, so it differs from one made
+        // as the wallet's own account.
+        let mut own_account = loan_set(&broker, &borrower);
+        sign(&mut own_account, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut own_account,
+            &regular_key,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+        assert_ne!(
+            signers[0].txn_signature,
+            own_account
+                .counterparty_signature
+                .as_ref()
+                .unwrap()
+                .signers
+                .as_ref()
+                .unwrap()[0]
+                .txn_signature
+        );
+    }
+
+    /// The destination must be free of a counterparty signature — overwriting
+    /// one would silently discard it.
+    #[test]
+    fn test_combine_rejects_already_signed_destination() {
+        let (broker, borrower, second) = wallets();
+
+        let mut base = loan_set(&broker, &borrower);
+        sign(&mut base, &broker, false).unwrap();
+
+        let mut first_copy = base.clone();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+        let mut second_copy = base.clone();
+        sign_loan_set_by_counterparty(
+            &mut second_copy,
+            &second,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+
+        // The destination already carries a single-sign counterparty signature.
+        let mut destination = base.clone();
+        sign_loan_set_by_counterparty(&mut destination, &borrower, CounterpartySigningMode::Single)
+            .unwrap();
+
+        let err =
+            combine_loan_set_counterparty_signers(&mut destination, &[first_copy, second_copy])
+                .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("already carries a counterparty signature"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// Copies that differ only in a non-signing field (the first party's own
+    /// `TxnSignature`) still combine: no signature covers those bytes.
+    #[test]
+    fn test_combine_ignores_non_signing_field_differences() {
+        let (broker, borrower, second) = wallets();
+
+        let mut base = loan_set(&broker, &borrower);
+        sign(&mut base, &broker, false).unwrap();
+
+        let mut first_copy = base.clone();
+        sign_loan_set_by_counterparty(
+            &mut first_copy,
+            &borrower,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+        let mut second_copy = base.clone();
+        sign_loan_set_by_counterparty(
+            &mut second_copy,
+            &second,
+            CounterpartySigningMode::Multisign,
+        )
+        .unwrap();
+        // Same terms, but this copy's first-party signature bytes differ.
+        second_copy.common_fields.txn_signature = Some("DEADBEEF".into());
+
+        let mut combined = base.clone();
+        combine_loan_set_counterparty_signers(&mut combined, &[first_copy, second_copy]).unwrap();
+        assert_eq!(
+            combined
+                .counterparty_signature
+                .as_ref()
+                .unwrap()
+                .signers
+                .as_ref()
+                .unwrap()
+                .len(),
+            2
         );
     }
 }
@@ -1798,11 +2160,16 @@ pub async fn create_loan_for_ledger_entry_tests() -> LedgerEntryLoanFixture {
     );
 
     let client = get_client().await;
-    autofill(&mut loan_set_tx, client, Some(1))
+    autofill(&mut loan_set_tx, client, None)
         .await
         .expect("Failed to auto-fill loan set transaction");
     sign(&mut loan_set_tx, &loan_issuer, false).unwrap();
-    sign_loan_set_by_counterparty(&mut loan_set_tx, &borrower_wallet, false).unwrap();
+    sign_loan_set_by_counterparty(
+        &mut loan_set_tx,
+        &borrower_wallet,
+        CounterpartySigningMode::Single,
+    )
+    .unwrap();
     test_lending_transaction(&mut loan_set_tx, "tesSUCCESS").await;
 
     // Read the sequences straight off the created objects rather than tracking

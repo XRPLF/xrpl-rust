@@ -54,11 +54,11 @@ pub enum VaultCreateFlag {
     TfVaultShareNonTransferable = 0x00020000,
 }
 
-/// The kind of vault, as carried by the `VaultKind` field
-/// (LendingProtocolV1_1).
+/// The kind of vault, for the `VaultKind` field (LendingProtocolV1_1).
 ///
-/// Serializes as the underlying `UInt8`, so it can be passed straight to
-/// [`VaultCreate::with_vault_kind`].
+/// A convenience for [`VaultCreate::with_vault_kind`]: the field itself is an
+/// `Option<u8>` on the transaction, so unknown future kinds still round-trip,
+/// and this enum never reaches the wire.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Display, AsRefStr, EnumIter)]
 #[repr(u8)]
 pub enum VaultKind {

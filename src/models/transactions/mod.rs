@@ -188,6 +188,16 @@ pub fn validate_credential_ids(credential_ids: &Option<Vec<Cow<'_, str>>>) -> XR
                     found: id.as_ref().into(),
                 });
             }
+            // A zero credential ID is not a real ledger object; rippled rejects
+            // it with `temMALFORMED` under `fixCleanup3_4_0`
+            // (`credentials::checkFields`).
+            if id.bytes().all(|b| b == b'0') {
+                return Err(XRPLModelException::InvalidValue {
+                    field: "credential_ids".into(),
+                    expected: "nonzero 256-bit hash".into(),
+                    found: id.as_ref().into(),
+                });
+            }
             // Hex credential IDs are compared case-insensitively: rippled normalizes
             // the raw bytes, so "ABCD" and "abcd" refer to the same credential.
             if ids[..i].iter().any(|prev| prev.eq_ignore_ascii_case(id)) {
