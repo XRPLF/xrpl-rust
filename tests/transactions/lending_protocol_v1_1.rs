@@ -14,7 +14,7 @@
 use crate::common::{
     generate_funded_wallet, get_client, get_ledger_close_time, provision_credential,
     test_transaction,
-    vault::{account_objects_json, get_vault_id},
+    vault::{account_objects_json, first_vault_object, get_vault_id},
     with_blockchain_lock,
 };
 use xrpl::asynch::clients::XRPLAsyncClient;
@@ -67,8 +67,7 @@ async fn test_create_close_ended_vault() {
 
         test_transaction(&mut tx, &vault_owner).await;
 
-        let objects = account_objects_json(&vault_owner.classic_address).await;
-        let vault = &objects["account_objects"][0];
+        let vault = first_vault_object(&vault_owner.classic_address).await;
 
         assert_eq!(
             vault["Owner"].as_str(),
@@ -180,8 +179,12 @@ async fn test_withdraw_from_domain_gated_vault_with_credential_ids() {
             .expect("permissioned_domain account_objects request failed");
         let domain_id = pd_resp
             .raw_result
-            .expect("account_objects response contained no raw_result")["account_objects"][0]
-            ["index"]
+            .expect("account_objects response contained no raw_result")["account_objects"]
+            .as_array()
+            .expect("account_objects array missing")
+            .iter()
+            .find(|object| object["LedgerEntryType"] == "PermissionedDomain")
+            .expect("no PermissionedDomain ledger object found")["index"]
             .as_str()
             .expect("permissioned domain index missing")
             .to_string();
@@ -230,8 +233,7 @@ async fn test_withdraw_from_domain_gated_vault_with_credential_ids() {
         .with_credential_ids(vec![credential_id.clone().into()]);
         test_transaction(&mut withdraw, &depositor).await;
 
-        let objects = account_objects_json(&vault_owner.classic_address).await;
-        let vault = &objects["account_objects"][0];
+        let vault = first_vault_object(&vault_owner.classic_address).await;
         assert_eq!(
             vault["AssetsTotal"].as_str().unwrap_or("0"),
             "500000",

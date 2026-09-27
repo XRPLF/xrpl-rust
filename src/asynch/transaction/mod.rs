@@ -237,7 +237,19 @@ where
 /// with a signer list contributes one signature per signer entry; an account
 /// without one signs once.
 ///
-/// Mirrors `fetchCounterPartySignersCount` in xrpl.js's `autofill`.
+/// This is an upper bound, not the exact count. rippled charges on the
+/// signatures the transaction actually carries
+/// (`max(1, |CounterpartySignature.Signers|)`), but those do not exist yet at
+/// autofill time — the counterparty signs later, possibly on another machine —
+/// so the signer list is the only thing available to size the fee from. A
+/// counterparty that owns a signer list but single-signs therefore overpays by
+/// one base fee per unused signer entry; it never underpays, which would cost a
+/// `telINSUF_FEE_P` and a re-signing round trip, since `Fee` is a signing field.
+/// Callers who know the exact count can set `Fee` themselves before calling
+/// `autofill`, which skips this calculation entirely.
+///
+/// Mirrors `fetchCounterPartySignersCount` in xrpl.js's `autofill`, which sizes
+/// the fee the same way.
 async fn get_counterparty_signers_count<'a, T, F, C>(
     transaction: &T,
     client: &C,
