@@ -10,7 +10,10 @@ use crate::models::{
 };
 
 use super::vault_common::{validate_positive_amount, validate_vault_id};
-use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
+use super::{
+    validate_credential_ids, CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction,
+    TransactionType,
+};
 
 /// Withdraw assets from a vault on the XRP Ledger (XLS-65).
 ///
@@ -47,6 +50,9 @@ pub struct VaultWithdraw<'a> {
     pub destination: Option<Cow<'a, str>>,
     /// Arbitrary tag identifying the reason for the withdrawal to the destination.
     pub destination_tag: Option<u32>,
+    /// The credentials to authorize the withdrawal when the vault is gated by a permissioned domain (XLS-70).
+    #[serde(rename = "CredentialIDs")]
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl Model for VaultWithdraw<'_> {
@@ -63,6 +69,7 @@ impl Model for VaultWithdraw<'_> {
                 });
             }
         }
+        validate_credential_ids(&self.credential_ids)?;
         Ok(())
     }
 }
@@ -128,6 +135,7 @@ impl<'a> VaultWithdraw<'a> {
             amount,
             destination,
             destination_tag,
+            credential_ids: None,
         }
     }
 
@@ -140,6 +148,12 @@ impl<'a> VaultWithdraw<'a> {
     /// Set the destination tag.
     pub fn with_destination_tag(mut self, destination_tag: u32) -> Self {
         self.destination_tag = Some(destination_tag);
+        self
+    }
+
+    /// Set the credentials authorizing this withdrawal.
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 }
@@ -164,6 +178,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
 
         let json_str = r#"{"Account":"rWithdrawer123","TransactionType":"VaultWithdraw","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF","Amount":"1000000"}"#;
@@ -197,6 +212,7 @@ mod tests {
             )),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
 
         let serialized = serde_json::to_string(&vault_withdraw).unwrap();
@@ -216,6 +232,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         }
         .with_fee("12".into())
         .with_sequence(100)
@@ -253,6 +270,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("5000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
 
         assert_eq!(vault_withdraw.common_fields.account, "rWithdrawer789");
@@ -277,6 +295,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("2000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         }
         .with_ticket_sequence(54321)
         .with_fee("12".into());
@@ -301,6 +320,7 @@ mod tests {
             )),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         }
         .with_memo(Memo {
             memo_data: Some("partial withdrawal".into()),
@@ -342,6 +362,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("10000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
 
         assert_eq!(vault_withdraw.common_fields.account, "rNewWithdrawer444");
@@ -365,6 +386,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         }
         .with_destination("rDestAccount789".into())
         .with_destination_tag(42);
@@ -385,6 +407,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some("notanaddress".into()),
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_err());
     }
@@ -401,6 +424,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some("rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into()),
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_ok());
     }
@@ -418,6 +442,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert_eq!(
             *vault_withdraw.get_transaction_type(),
@@ -437,6 +462,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         }
         .with_fee("12".into())
         .with_sequence(300);
@@ -456,6 +482,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("0")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_err());
     }
@@ -476,6 +503,7 @@ mod tests {
             )),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_err());
     }
@@ -492,6 +520,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("bad")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_err());
     }
@@ -512,6 +541,7 @@ mod tests {
             )),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_err());
     }
@@ -532,6 +562,7 @@ mod tests {
             }),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_ok());
     }
@@ -552,7 +583,96 @@ mod tests {
             }),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
         assert!(vault_withdraw.validate().is_err());
+    }
+
+    /// `CredentialIDs` validation (LendingProtocolV1_1).
+    ///
+    /// Mirrors `test/models/vaultWithdraw.test.ts` in xrpl.js. A withdrawal
+    /// from a domain-gated vault carries the credentials that prove the
+    /// withdrawer's domain membership (XLS-70).
+    mod credential_ids {
+        use super::*;
+        use crate::models::XRPLModelException;
+        use alloc::vec;
+
+        const CREDENTIAL_ID: &str =
+            "0F0B70F4F4C5B27E39D62D4D69E9DF3D0BC0AC29B8FE7CD5AF1AC8C15F1D2E3B";
+
+        fn with_credentials(credential_ids: Vec<Cow<'static, str>>) -> VaultWithdraw<'static> {
+            VaultWithdraw {
+                common_fields: CommonFields {
+                    account: "rVaultWithdrawer123".into(),
+                    transaction_type: TransactionType::VaultWithdraw,
+                    signing_pub_key: Some("".into()),
+                    ..Default::default()
+                },
+                vault_id: VAULT_ID.into(),
+                amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+                destination: None,
+                destination_tag: None,
+                credential_ids: Some(credential_ids),
+            }
+        }
+
+        #[test]
+        fn test_valid_credential_ids() {
+            assert!(with_credentials(vec![CREDENTIAL_ID.into()])
+                .get_errors()
+                .is_ok());
+        }
+
+        #[test]
+        fn test_invalid_duplicate_credential_ids() {
+            assert!(matches!(
+                with_credentials(vec![CREDENTIAL_ID.into(), CREDENTIAL_ID.into()])
+                    .get_errors()
+                    .err(),
+                Some(XRPLModelException::ValueEqualsValue { .. })
+            ));
+        }
+
+        #[test]
+        fn test_invalid_empty_credential_ids() {
+            assert!(matches!(
+                with_credentials(vec![]).get_errors().err(),
+                Some(XRPLModelException::ValueTooShort { .. })
+            ));
+        }
+
+        #[test]
+        fn test_serde_credential_ids() {
+            let tx = with_credentials(vec![CREDENTIAL_ID.into()]);
+
+            let json_str = r#"{"Account":"rVaultWithdrawer123","TransactionType":"VaultWithdraw","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF","Amount":"1000000","CredentialIDs":["0F0B70F4F4C5B27E39D62D4D69E9DF3D0BC0AC29B8FE7CD5AF1AC8C15F1D2E3B"]}"#;
+
+            assert_eq!(
+                serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap(),
+                serde_json::to_value(json_str).unwrap()
+            );
+
+            let deserialized: VaultWithdraw = serde_json::from_str(json_str).unwrap();
+            assert_eq!(tx, deserialized);
+        }
+
+        #[test]
+        fn test_builder_sets_credential_ids() {
+            let tx = VaultWithdraw {
+                common_fields: CommonFields {
+                    account: "rVaultWithdrawer123".into(),
+                    transaction_type: TransactionType::VaultWithdraw,
+                    ..Default::default()
+                },
+                vault_id: VAULT_ID.into(),
+                amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+                ..Default::default()
+            }
+            .with_credential_ids(vec![CREDENTIAL_ID.into()]);
+
+            assert_eq!(tx.credential_ids.as_ref().unwrap().len(), 1);
+            assert!(tx.get_errors().is_ok());
+        }
     }
 }

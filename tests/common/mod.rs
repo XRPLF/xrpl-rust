@@ -184,13 +184,26 @@ pub async fn get_ledger_close_time() -> u64 {
 /// stops advancing (e.g. frozen or unresponsive `ledger_accept` requests).
 #[cfg(feature = "std")]
 pub async fn wait_for_ledger_close_time(target: u64) {
-    for _ in 0..60 {
+    wait_for_ledger_close_time_with_retries(target, 60).await
+}
+
+/// [`wait_for_ledger_close_time`] with an explicit retry budget.
+///
+/// Each `ledger_accept` advances `close_time` by one close-time resolution
+/// interval, so jumping a long way forward — past a loan's payment due date,
+/// say — needs a larger budget than the default.
+#[cfg(feature = "std")]
+pub async fn wait_for_ledger_close_time_with_retries(target: u64, retries: u32) {
+    if get_ledger_close_time().await >= target {
+        return;
+    }
+    for _ in 0..retries {
+        ledger_accept().await;
         if get_ledger_close_time().await >= target {
             return;
         }
-        ledger_accept().await;
     }
-    panic!("ledger close_time did not advance to {target} after 60 ledger_accept calls");
+    panic!("ledger close_time did not advance to {target} after {retries} ledger_accept calls");
 }
 
 /// Serialize all blockchain-mutating tests to prevent sequence number conflicts.

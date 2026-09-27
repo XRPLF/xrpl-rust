@@ -19,4 +19,6 @@ pub enum XRPLSignTransactionException {
     WalletRequired,
     #[error("transaction signed: {0}")]
     TransactionSigned(String),
+    #[error("cannot combine counterparty signatures: {0}")]
+    CombineCounterpartySigners(String),
 }

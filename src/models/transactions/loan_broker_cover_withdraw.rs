@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::models::{
-    transactions::{vault_common::validate_hash256, CommonTransactionBuilder, Memo, Signer},
+    transactions::{
+        validate_credential_ids, vault_common::validate_hash256, CommonTransactionBuilder, Memo,
+        Signer,
+    },
     Amount, FlagCollection, Model, NoFlags, ValidateCurrencies, XRPAmount, XRPLModelException,
 };
 
@@ -45,6 +48,9 @@ pub struct LoanBrokerCoverWithdraw<'a> {
     pub destination: Option<Cow<'a, str>>,
     /// Arbitrary tag identifying the reason for the transaction to the destination.
     pub destination_tag: Option<u32>,
+    /// The credentials to authorize the withdrawal when the destination is gated by a permissioned domain (XLS-70).
+    #[serde(rename = "CredentialIDs")]
+    pub credential_ids: Option<Vec<Cow<'a, str>>>,
 }
 
 impl Model for LoanBrokerCoverWithdraw<'_> {
@@ -74,6 +80,8 @@ impl Model for LoanBrokerCoverWithdraw<'_> {
         }
 
         validate_hash256("loan_broker_id", &self.loan_broker_id)?;
+
+        validate_credential_ids(&self.credential_ids)?;
 
         Ok(())
     }
@@ -140,6 +148,7 @@ impl<'a> LoanBrokerCoverWithdraw<'a> {
             amount,
             destination,
             destination_tag,
+            credential_ids: None,
         }
     }
 
@@ -152,6 +161,12 @@ impl<'a> LoanBrokerCoverWithdraw<'a> {
     /// Set the DestinationTag field.
     pub fn with_destination_tag(mut self, destination_tag: u32) -> Self {
         self.destination_tag = Some(destination_tag);
+        self
+    }
+
+    /// Set the credentials authorizing this withdrawal.
+    pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
+        self.credential_ids = Some(credential_ids);
         self
     }
 }
@@ -213,6 +228,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         let default_json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9","TransactionType":"LoanBrokerCoverWithdraw","Flags":0,"SigningPubKey":"","LoanBrokerID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","Amount":"1000000","Destination":"rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR","DestinationTag":32}"#;
@@ -241,6 +257,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_ok())
@@ -259,6 +276,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("0")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_err());
@@ -281,6 +299,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_err());
@@ -303,6 +322,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_err());
@@ -322,6 +342,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_err());
@@ -342,6 +363,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_err());
@@ -437,6 +459,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: Some(DESTINATION.into()),
             destination_tag: None,
+            credential_ids: None,
         };
 
         let issued = LoanBrokerCoverWithdraw {
@@ -479,6 +502,7 @@ mod tests {
             }),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
 
         assert!(matches!(
@@ -500,6 +524,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("0")),
             destination: Some(DESTINATION.into()),
             destination_tag: Some(32),
+            credential_ids: None,
         };
 
         assert!(matches!(
@@ -521,6 +546,7 @@ mod tests {
             amount: Amount::XRPAmount(XRPAmount::from("1000000")),
             destination: None,
             destination_tag: None,
+            credential_ids: None,
         };
 
         assert!(tx.get_errors().is_ok());
@@ -529,5 +555,94 @@ mod tests {
         let json = serde_json::to_string(&tx).unwrap();
         assert!(!json.contains("Destination"));
         assert!(!json.contains("DestinationTag"));
+    }
+
+    /// `CredentialIDs` validation (LendingProtocolV1_1).
+    ///
+    /// Mirrors `test/models/loanBrokerCoverWithdraw.test.ts` in xrpl.js. The
+    /// credentials authorize the withdrawal when the destination is gated by a
+    /// permissioned domain (XLS-70).
+    mod credential_ids {
+        use super::*;
+        use alloc::vec;
+
+        const CREDENTIAL_ID: &str =
+            "0F0B70F4F4C5B27E39D62D4D69E9DF3D0BC0AC29B8FE7CD5AF1AC8C15F1D2E3B";
+
+        fn with_credentials(
+            credential_ids: Vec<Cow<'static, str>>,
+        ) -> LoanBrokerCoverWithdraw<'static> {
+            LoanBrokerCoverWithdraw {
+                common_fields: CommonFields {
+                    account: ACCOUNT.into(),
+                    transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                    signing_pub_key: Some("".into()),
+                    ..Default::default()
+                },
+                loan_broker_id: LOAN_BROKER_ID.into(),
+                amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+                destination: Some(DESTINATION.into()),
+                destination_tag: None,
+                credential_ids: Some(credential_ids),
+            }
+        }
+
+        #[test]
+        fn test_valid_credential_ids() {
+            assert!(with_credentials(vec![CREDENTIAL_ID.into()])
+                .get_errors()
+                .is_ok());
+        }
+
+        #[test]
+        fn test_invalid_duplicate_credential_ids() {
+            assert!(matches!(
+                with_credentials(vec![CREDENTIAL_ID.into(), CREDENTIAL_ID.into()])
+                    .get_errors()
+                    .err(),
+                Some(XRPLModelException::ValueEqualsValue { .. })
+            ));
+        }
+
+        #[test]
+        fn test_invalid_empty_credential_ids() {
+            assert!(matches!(
+                with_credentials(vec![]).get_errors().err(),
+                Some(XRPLModelException::ValueTooShort { .. })
+            ));
+        }
+
+        #[test]
+        fn test_serde_credential_ids() {
+            let tx = with_credentials(vec![CREDENTIAL_ID.into()]);
+
+            let json_str = r#"{"Account":"r9LqNeG6qHxLoanBrokerCoverWithdraw5weJ9","TransactionType":"LoanBrokerCoverWithdraw","Flags":0,"SigningPubKey":"","LoanBrokerID":"E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD","Amount":"1000000","Destination":"rf7HPydP4ihkFkSRHWFq34b4SXRc7GvPCR","CredentialIDs":["0F0B70F4F4C5B27E39D62D4D69E9DF3D0BC0AC29B8FE7CD5AF1AC8C15F1D2E3B"]}"#;
+
+            assert_eq!(
+                serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap(),
+                serde_json::to_value(json_str).unwrap()
+            );
+
+            let deserialized: LoanBrokerCoverWithdraw = serde_json::from_str(json_str).unwrap();
+            assert_eq!(tx, deserialized);
+        }
+
+        #[test]
+        fn test_builder_sets_credential_ids() {
+            let tx = LoanBrokerCoverWithdraw {
+                common_fields: CommonFields {
+                    account: ACCOUNT.into(),
+                    transaction_type: TransactionType::LoanBrokerCoverWithdraw,
+                    ..Default::default()
+                },
+                loan_broker_id: LOAN_BROKER_ID.into(),
+                amount: Amount::XRPAmount(XRPAmount::from("1000000")),
+                ..Default::default()
+            }
+            .with_credential_ids(vec![CREDENTIAL_ID.into()]);
+
+            assert_eq!(tx.credential_ids.as_ref().unwrap().len(), 1);
+            assert!(tx.get_errors().is_ok());
+        }
     }
 }
