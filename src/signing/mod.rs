@@ -476,6 +476,15 @@ fn reject_if_already_signed<'a>(
         return Ok(());
     };
 
+    // Compare against the account this signature will be recorded under, which
+    // is the declared account under `MultisignAs` and the wallet's own address
+    // otherwise — the same account `sign_multisign` writes to `Signer.Account`.
+    // rippled rejects a `Signers` array holding the same account twice.
+    let signer_account: &str = match mode {
+        CounterpartySigningMode::MultisignAs(account) => account.as_ref(),
+        _ => wallet.classic_address.as_str(),
+    };
+
     match &cs.signers {
         Some(_) if !mode.is_multisign() => Err(XRPLSignTransactionException::TransactionSigned(
             "Transaction already has multisign counterparty signatures; \
@@ -483,7 +492,7 @@ fn reject_if_already_signed<'a>(
                 .into(),
         )
         .into()),
-        Some(signers) if signers.iter().any(|s| s.account == wallet.classic_address) => {
+        Some(signers) if signers.iter().any(|s| s.account == signer_account) => {
             Err(XRPLSignTransactionException::TransactionSigned(
                 "This counterparty account has already signed.".into(),
             )
@@ -1100,5 +1109,101 @@ mod test_sign_loan_set_by_counterparty {
                 .len(),
             2
         );
+    }
+
+    /// The duplicate guard has to compare against the account the signature is
+    /// recorded under, which is the declared account under `MultisignAs` — not
+    /// the signing wallet's own address. rippled rejects a `Signers` array
+    /// holding the same account twice.
+    #[test]
+    fn test_rejects_duplicate_multisign_as_same_declared_account() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let regular_key = second_borrower_wallet();
+
+        let mut tx = loan_set(&broker, &borrower);
+        sign(&mut tx, &broker, false).unwrap();
+
+        sign_loan_set_by_counterparty(
+            &mut tx,
+            &regular_key,
+            CounterpartySigningMode::MultisignAs(borrower.classic_address.clone().into()),
+        )
+        .unwrap();
+
+        // The same declared account signing again, with any key.
+        let err = sign_loan_set_by_counterparty(
+            &mut tx,
+            &regular_key,
+            CounterpartySigningMode::MultisignAs(borrower.classic_address.clone().into()),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("This counterparty account has already signed"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// The mirror case: the account already multisigned for itself, so a
+    /// regular-key signature on its behalf is also a duplicate.
+    #[test]
+    fn test_rejects_multisign_as_account_that_already_signed_itself() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let regular_key = second_borrower_wallet();
+
+        let mut tx = loan_set(&broker, &borrower);
+        sign(&mut tx, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(&mut tx, &borrower, CounterpartySigningMode::Multisign)
+            .unwrap();
+
+        let err = sign_loan_set_by_counterparty(
+            &mut tx,
+            &regular_key,
+            CounterpartySigningMode::MultisignAs(borrower.classic_address.clone().into()),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("This counterparty account has already signed"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    /// A different declared account is still allowed to sign.
+    #[test]
+    fn test_multisign_as_distinct_accounts_accumulate() {
+        let broker = broker_wallet();
+        let borrower = borrower_wallet();
+        let second = second_borrower_wallet();
+        let regular_key = broker_wallet();
+
+        let mut tx = loan_set(&broker, &borrower);
+        sign(&mut tx, &broker, false).unwrap();
+        sign_loan_set_by_counterparty(
+            &mut tx,
+            &regular_key,
+            CounterpartySigningMode::MultisignAs(borrower.classic_address.clone().into()),
+        )
+        .unwrap();
+        sign_loan_set_by_counterparty(
+            &mut tx,
+            &regular_key,
+            CounterpartySigningMode::MultisignAs(second.classic_address.clone().into()),
+        )
+        .unwrap();
+
+        let signers = tx
+            .counterparty_signature
+            .as_ref()
+            .unwrap()
+            .signers
+            .as_ref()
+            .unwrap();
+        assert_eq!(signers.len(), 2);
+        assert_ne!(signers[0].account, signers[1].account);
     }
 }
