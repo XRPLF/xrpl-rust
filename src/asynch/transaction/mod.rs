@@ -206,11 +206,16 @@ where
     // signs — it has to be right here, before the transaction is distributed
     // for counterparty signing.
     if transaction.get_transaction_type() == &TransactionType::LoanSet {
-        if let Some(client) = client {
-            let counterparty_signers = get_counterparty_signers_count(transaction, client).await?;
-            let net_fee_decimal: BigDecimal = net_fee.clone().try_into()?;
-            base_fee_decimal += &(net_fee_decimal * BigDecimal::from(counterparty_signers));
-        }
+        // Without a client the counterparty's signer list is unknown, but
+        // rippled always charges for at least one counterparty signature
+        // outside a Batch, so one base fee is the floor — not zero, which would
+        // underestimate and force a re-sign.
+        let counterparty_signers = match client {
+            Some(client) => get_counterparty_signers_count(transaction, client).await?,
+            None => 1,
+        };
+        let net_fee_decimal: BigDecimal = net_fee.clone().try_into()?;
+        base_fee_decimal += &(net_fee_decimal * BigDecimal::from(counterparty_signers));
     }
     if let Some(signers_count) = signers_count {
         // rippled charges one extra reference base fee per signer on top of the
@@ -232,8 +237,9 @@ where
 /// purposes.
 ///
 /// The counterparty is the `Counterparty` account when the transaction names
-/// one; otherwise the loan broker initiated it and the counterparty is the
-/// broker's owner, which is read from the `LoanBroker` ledger entry. An account
+/// one; otherwise the borrower submitted it and the counterparty is the
+/// broker's owner, which is read from the `LoanBroker` ledger entry (rippled
+/// `LoanSet.cpp`: `counterparty = tx[~sfCounterparty].value_or(brokerOwner)`). An account
 /// with a signer list contributes one signature per signer entry; an account
 /// without one signs once.
 ///
