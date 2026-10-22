@@ -171,25 +171,103 @@ mpt_encrypt_amount(
 
 /**
  * @brief Decrypts an MPT amount from a ciphertext pair.
+ *
+ * Uses the Baby-Step Giant-Step solver (secp256k1_elgamal_decrypt_bsgs) with
+ * the default parameters, decrypting amounts in [0, 2^MPT_BSGS_DEFAULT_BITS_TOTAL),
+ * i.e. a 40-bit width.
+ *
+ * @note For amounts that may be 2^40 or more, use
+ *       mpt_decrypt_amount_with_bits_total with a wider width.
+ *       The first call builds the lookup table, so it can be slow. Later calls
+ *       reuse the table.
+ *
+ * @see mpt_decrypt_amount_with_bits_total
+ *
+ * @warning Decryption is not constant-time: it takes longer for larger amounts,
+ *          so its timing reveals the approximate amount. Where a third party can
+ *          observe the timing, such as a server decrypting on request, callers
+ *          must hide it, e.g. by decrypting off the request path and caching
+ *          balances, or by padding responses to a fixed duration.
+ *
  * @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).
  * @param privkey    [in]  The 32-byte private key.
  * @param out_amount [out] Pointer to store the decrypted uint64_t amount.
- * @param range_low  [in]  Lower bound of the search range (inclusive).
- * @param range_high [in]  Upper bound of the search range (inclusive).
- *                         Must satisfy range_low <= range_high and
- *                         range_high != UINT64_MAX.
- * @return 0 on success, -1 on failure, -2 if range_low > range_high or
- *         range_high == UINT64_MAX.
- * @note Performance scales linearly with (range_high - range_low). A range of [0, 1,000,000] takes
- * approximately 3 seconds on Apple Silicon. Do not pass arbitrarily large ranges.
+ * @return 0 on success, -1 on failure (invalid input, wrong key, or an amount
+ *         of 2^40 or more).
  */
 int
 mpt_decrypt_amount(
     uint8_t const ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
     uint8_t const privkey[kMPT_PRIVKEY_SIZE],
-    uint64_t* out_amount,
-    uint64_t range_low,
-    uint64_t range_high);
+    uint64_t* out_amount);
+
+/**
+ * @brief Decrypts an MPT amount in [0, 2^bits_total).
+ *
+ * Like mpt_decrypt_amount, but with a caller-chosen search width instead of
+ * the default 40 bits. A holder's confidential balance never exceeds the
+ * issuance's ConfidentialOutstandingAmount, so the bit width of that ledger
+ * value is sufficient.
+ *
+ * The Baby-Step Giant-Step table is chosen from bits_total and built once per
+ * process for each width. A wider search needs a larger table and more search
+ * steps; near 63 bits the worst case takes hours. A narrower search needs
+ * less memory and fails faster, but each of its steps covers fewer amounts, so
+ * decrypting a given amount can take longer than with mpt_decrypt_amount.
+ *
+ * @note The first call for each width builds its lookup table, so it can be
+ *       slow, and wider widths take longer. Later calls for the same width
+ *       reuse the table.
+ *
+ * @warning Not constant-time; see mpt_decrypt_amount.
+ *
+ * @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).
+ * @param privkey    [in]  The 32-byte private key.
+ * @param bits_total [in]  Search width in bits, in [1, 63].
+ * @param out_amount [out] Pointer to store the decrypted uint64_t amount.
+ * @return 0 on success, -1 on failure (invalid input, wrong key, or an amount
+ *         not below 2^bits_total), -2 if bits_total is outside [1, 63].
+ */
+int
+mpt_decrypt_amount_with_bits_total(
+    uint8_t const ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const privkey[kMPT_PRIVKEY_SIZE],
+    int bits_total,
+    uint64_t* out_amount);
+
+/**
+ * @brief Decrypts an MPT amount in [0, 2^bits_total) with a caller-chosen
+ *        Baby-Step Giant-Step table.
+ *
+ * Like mpt_decrypt_amount_with_bits_total, but the caller also chooses l1, the
+ * baby-step width, instead of having it chosen from bits_total. The table holds
+ * 2^(l1 - 1) entries, so each +1 on l1 doubles its memory and build time and
+ * halves the worst-case number of search steps (2^(bits_total - l1)). Use it to
+ * trade memory for speed, e.g. a larger l1 on a server or a smaller one where
+ * memory is limited.
+ *
+ * @note The first call for each (bits_total, l1) pair builds its lookup table,
+ *       so it can be slow, and a larger l1 takes longer. Later calls with the
+ *       same pair reuse the table.
+ *
+ * @warning Not constant-time; see mpt_decrypt_amount.
+ *
+ * @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).
+ * @param privkey    [in]  The 32-byte private key.
+ * @param bits_total [in]  Search width in bits, in [1, 63].
+ * @param l1         [in]  Baby-step width, in [1, 32] and less than bits_total.
+ * @param out_amount [out] Pointer to store the decrypted uint64_t amount.
+ * @return 0 on success, -1 on failure (invalid input, wrong key, an amount not
+ *         below 2^bits_total, or a table that cannot be allocated), -2 if
+ *         bits_total or l1 is out of range.
+ */
+int
+mpt_decrypt_amount_with_l1_bits_total(
+    uint8_t const ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const privkey[kMPT_PRIVKEY_SIZE],
+    int bits_total,
+    int l1,
+    uint64_t* out_amount);
 
 /* ============================================================================
  * ZKProof Generation

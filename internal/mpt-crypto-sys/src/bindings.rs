@@ -45,6 +45,10 @@ pub const SECP256K1_POK_SK_PROOF_SIZE: u32 = 64;
 pub const SECP256K1_COMPACT_STANDARD_PROOF_SIZE: u32 = 192;
 pub const SECP256K1_COMPACT_CLAWBACK_PROOF_SIZE: u32 = 64;
 pub const SECP256K1_COMPACT_CONVERTBACK_PROOF_SIZE: u32 = 128;
+pub const SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE: u32 = 128;
+pub const SECP256K1_ROTATE_BOTH_MIRRORS_PROOF_SIZE: u32 = 128;
+pub const SECP256K1_ROTATE_HOLDER_ROTATE_PROOF_SIZE: u32 = 224;
+pub const SECP256K1_ROTATE_RECOVERY_KEY_PROOF_SIZE: u32 = 64;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct secp256k1_context_struct {
@@ -631,6 +635,287 @@ unsafe extern "C" {
         context_id: *const ::std::os::raw::c_uchar,
     ) -> ::std::os::raw::c_int;
 }
+unsafe extern "C" {
+    #[doc = " pi_mi - issuer-anchored migration of the issuer mirror.\n Domain tag \"CMPT_KEY_ROTATION_MIRROR_ISSUER_ONLY\".\n Decryption side is the current issuer mirror (E1, E2) under the current\n pk_I; the new issuer mirror (E1', E2') is created under pk_I'. Both pk_I\n and (E1, E2) are resolved entirely from ledger state (XLS-99's fix for\n Finding f:pki): IssuerMirrorEncryptionKey on the holder's MPToken,\n falling back to InitialIssuerEncryptionKey on the MPTokenIssuance. No\n submitter-chosen previous-key transaction field is involved."]
+    pub fn secp256k1_rotate_mirror_issuer_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_I: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_mirror_issuer_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " pi_mh - holder self-migration of the issuer mirror.\n Domain tag \"CMPT_KEY_ROTATION_MIRROR_HOLDER_ONLY\".\n Decryption side is the holder's ConfidentialBalanceSpending (S1, S2) under\n pk_H; the new issuer mirror (E1', E2') is created under pk_I'.\n Ledger precondition, not proven here: ConfidentialBalanceInbox == EncZero."]
+    pub fn secp256k1_rotate_mirror_holder_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_H: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_mirror_holder_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " pi_recbal - issuer completes holder key-loss recovery.\n Domain tag \"CMPT_KEY_ROTATION_RECOVER_BALANCE\".\n Decryption side is the issuer mirror (E1, E2) under the current pk_I; the new\n spending balance (S1', S2') is created under the holder's registered\n RecoveryKey pk_H'.\n Ledger precondition, not proven here: the issuer mirror is already at the\n current issuer key epoch."]
+    pub fn secp256k1_rotate_recover_balance_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_I: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_H_recovery: *const secp256k1_pubkey,
+        S1_new: *const secp256k1_pubkey,
+        S2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_recover_balance_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_H_recovery: *const secp256k1_pubkey,
+        S1_new: *const secp256k1_pubkey,
+        S2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " both-issuer - issuer-anchored AND-composed migration of both mirrors.\n Domain tag \"CMPT_KEY_ROTATION_MIRROR_ISSUER_AND_AUDITOR\".\n Decryption side is the current issuer mirror (E1, E2) under the current\n pk_I; simultaneously re-encrypts to a new issuer mirror (E1', E2') under\n pk_I' and a new auditor mirror (F1', F2') under pk_A', sharing one\n randomness value across both. The verifier unconditionally checks\n E1' == F1' (fix for Finding f:mhaud) -- this is NOT implied by the sigma\n proof and must never be skipped."]
+    pub fn secp256k1_rotate_mirror_both_issuer_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_I: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_mirror_both_issuer_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " both-holder - holder-anchored AND-composed migration of both mirrors.\n Domain tag \"CMPT_KEY_ROTATION_MIRROR_HOLDER_AND_AUDITOR\".\n Decryption side is the holder's ConfidentialBalanceSpending (S1, S2)\n under pk_H; simultaneously re-encrypts to a new issuer mirror (E1', E2')\n under pk_I' and a new auditor mirror (F1', F2') under pk_A', sharing one\n randomness value across both. The verifier unconditionally checks\n E1' == F1' (fix for Finding f:mhaud) -- this is NOT implied by the sigma\n proof and must never be skipped.\n Ledger precondition, not proven here: ConfidentialBalanceInbox == EncZero."]
+    pub fn secp256k1_rotate_mirror_both_holder_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_H: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_mirror_both_holder_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        pk_I_new: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        E1_new: *const secp256k1_pubkey,
+        E2_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " pi_ma - issuer-anchored migration of the auditor mirror.\n Domain tag \"CMPT_KEY_ROTATION_MIRROR_AUDITOR_ONLY\".\n Decryption side is the current issuer mirror (E1, E2) under the current\n pk_I; the new auditor mirror (F1', F2') is created under pk_A'.  Covers\n both auditor rotation (stale auditor mirror) and auditor late registration\n (absent auditor mirror) -- the ledger-state precondition differs, the\n relation does not. No previous-key field is required: the issuer does not\n hold the auditor secret, so the balance necessarily comes from the issuer\n mirror."]
+    pub fn secp256k1_rotate_mirror_auditor_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_I: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_mirror_auditor_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_I: *const secp256k1_pubkey,
+        E1: *const secp256k1_pubkey,
+        E2: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " pi_mha - holder self-migration of the auditor mirror.\n Domain tag \"CMPT_KEY_ROTATION_MIRROR_HOLDER_AUDITOR_ONLY\".\n Decryption side is the holder's ConfidentialBalanceSpending (S1, S2) under\n pk_H; the new auditor mirror (F1', F2') is created under pk_A'.\n Structurally identical to pi_mh with the auditor mirror as re-encryption\n target instead of the issuer mirror; the distinct domain tag keeps the two\n proofs from being interchangeable.\n Ledger precondition, not proven here: ConfidentialBalanceInbox == EncZero."]
+    pub fn secp256k1_rotate_mirror_holder_auditor_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        sk_H: *const ::std::os::raw::c_uchar,
+        r_new: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_mirror_holder_auditor_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        pk_A_new: *const secp256k1_pubkey,
+        F1_new: *const secp256k1_pubkey,
+        F2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " pi_hr - holder voluntary key rotation (spending balance + inbox).\n Domain tag \"CMPT_KEY_ROTATION_HOLDER_ROTATE\".\n Not an instantiation of the shared re-encryption core: it has six nonces\n (not four) and an extra PoK conjunct for the newly rotated-to key pk_H',\n plus a second re-encryption branch binding the new inbox ciphertext\n (I1', I2') under pk_H' -- the branch the proof specification originally\n omitted (a required ledger write left unproven, later folded into the\n spending balance by MergeInbox). sk_H is shared between the CBS and CBIN\n decryption branches; pk_H' is shared as the re-encryption target of both.\n Witness (b, sk_H, r_s', sk_H', b_in, r_i') in Z_q^6."]
+    pub fn secp256k1_rotate_holder_rotate_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        balance: u64,
+        inbox_balance: u64,
+        sk_H: *const ::std::os::raw::c_uchar,
+        r_s_new: *const ::std::os::raw::c_uchar,
+        sk_H_new: *const ::std::os::raw::c_uchar,
+        r_i_new: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        pk_H_new: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        S1_new: *const secp256k1_pubkey,
+        S2_new: *const secp256k1_pubkey,
+        I1: *const secp256k1_pubkey,
+        I2: *const secp256k1_pubkey,
+        I1_new: *const secp256k1_pubkey,
+        I2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_holder_rotate_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_H: *const secp256k1_pubkey,
+        pk_H_new: *const secp256k1_pubkey,
+        S1: *const secp256k1_pubkey,
+        S2: *const secp256k1_pubkey,
+        S1_new: *const secp256k1_pubkey,
+        S2_new: *const secp256k1_pubkey,
+        I1: *const secp256k1_pubkey,
+        I2: *const secp256k1_pubkey,
+        I1_new: *const secp256k1_pubkey,
+        I2_new: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " pi_rec - holder registers a RecoveryKey after losing sk_H.\n Domain tag \"CMPT_KEY_ROTATION_HOLDER_RECOVERY\".\n A bare Schnorr proof of possession of sk_H' for the newly registered\n RecoveryKey pk_H'; it touches no balance and moves no funds.  The balance is\n migrated later by the issuer via secp256k1_rotate_recover_balance_*.\n Same relation as secp256k1_mpt_pok_sk_*, separated only by domain tag, so a\n registration proof cannot be replayed as a recovery-key proof or vice versa.\n Argument order is (sk, pk), consistent with the other secp256k1_rotate_*_prove\n functions, and the reverse of secp256k1_mpt_pok_sk_prove, which takes (pk, sk)."]
+    pub fn secp256k1_rotate_recovery_key_prove(
+        ctx: *const secp256k1_context,
+        proof_out: *mut ::std::os::raw::c_uchar,
+        sk_H_recovery: *const ::std::os::raw::c_uchar,
+        pk_H_recovery: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    pub fn secp256k1_rotate_recovery_key_verify(
+        ctx: *const secp256k1_context,
+        proof: *const ::std::os::raw::c_uchar,
+        pk_H_recovery: *const secp256k1_pubkey,
+        context_id: *const ::std::os::raw::c_uchar,
+    ) -> ::std::os::raw::c_int;
+}
 #[doc = " @brief Represents a unique 24-byte MPT issuance ID."]
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -777,13 +1062,30 @@ unsafe extern "C" {
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {
-    #[doc = " @brief Decrypts an MPT amount from a ciphertext pair.\n @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).\n @param privkey    [in]  The 32-byte private key.\n @param out_amount [out] Pointer to store the decrypted uint64_t amount.\n @param range_low  [in]  Lower bound of the search range (inclusive).\n @param range_high [in]  Upper bound of the search range (inclusive).\n                         Must satisfy range_low <= range_high and\n                         range_high != UINT64_MAX.\n @return 0 on success, -1 on failure, -2 if range_low > range_high or\n         range_high == UINT64_MAX.\n @note Performance scales linearly with (range_high - range_low). A range of [0, 1,000,000] takes\n approximately 3 seconds on Apple Silicon. Do not pass arbitrarily large ranges."]
+    #[doc = " @brief Decrypts an MPT amount from a ciphertext pair.\n\n Uses the Baby-Step Giant-Step solver (secp256k1_elgamal_decrypt_bsgs) with\n the default parameters, decrypting amounts in [0, 2^MPT_BSGS_DEFAULT_BITS_TOTAL),\n i.e. a 40-bit width.\n\n @note For amounts that may be 2^40 or more, use\n       mpt_decrypt_amount_with_bits_total with a wider width.\n       The first call builds the lookup table, so it can be slow. Later calls\n       reuse the table.\n\n @see mpt_decrypt_amount_with_bits_total\n\n @warning Decryption is not constant-time: it takes longer for larger amounts,\n          so its timing reveals the approximate amount. Where a third party can\n          observe the timing, such as a server decrypting on request, callers\n          must hide it, e.g. by decrypting off the request path and caching\n          balances, or by padding responses to a fixed duration.\n\n @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).\n @param privkey    [in]  The 32-byte private key.\n @param out_amount [out] Pointer to store the decrypted uint64_t amount.\n @return 0 on success, -1 on failure (invalid input, wrong key, or an amount\n         of 2^40 or more)."]
     pub fn mpt_decrypt_amount(
         ciphertext: *const u8,
         privkey: *const u8,
         out_amount: *mut u64,
-        range_low: u64,
-        range_high: u64,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " @brief Decrypts an MPT amount in [0, 2^bits_total).\n\n Like mpt_decrypt_amount, but with a caller-chosen search width instead of\n the default 40 bits. A holder's confidential balance never exceeds the\n issuance's ConfidentialOutstandingAmount, so the bit width of that ledger\n value is sufficient.\n\n The Baby-Step Giant-Step table is chosen from bits_total and built once per\n process for each width. A wider search needs a larger table and more search\n steps; near 63 bits the worst case takes hours. A narrower search needs\n less memory and fails faster, but each of its steps covers fewer amounts, so\n decrypting a given amount can take longer than with mpt_decrypt_amount.\n\n @note The first call for each width builds its lookup table, so it can be\n       slow, and wider widths take longer. Later calls for the same width\n       reuse the table.\n\n @warning Not constant-time; see mpt_decrypt_amount.\n\n @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).\n @param privkey    [in]  The 32-byte private key.\n @param bits_total [in]  Search width in bits, in [1, 63].\n @param out_amount [out] Pointer to store the decrypted uint64_t amount.\n @return 0 on success, -1 on failure (invalid input, wrong key, or an amount\n         not below 2^bits_total), -2 if bits_total is outside [1, 63]."]
+    pub fn mpt_decrypt_amount_with_bits_total(
+        ciphertext: *const u8,
+        privkey: *const u8,
+        bits_total: ::std::os::raw::c_int,
+        out_amount: *mut u64,
+    ) -> ::std::os::raw::c_int;
+}
+unsafe extern "C" {
+    #[doc = " @brief Decrypts an MPT amount in [0, 2^bits_total) with a caller-chosen\n        Baby-Step Giant-Step table.\n\n Like mpt_decrypt_amount_with_bits_total, but the caller also chooses l1, the\n baby-step width, instead of having it chosen from bits_total. The table holds\n 2^(l1 - 1) entries, so each +1 on l1 doubles its memory and build time and\n halves the worst-case number of search steps (2^(bits_total - l1)). Use it to\n trade memory for speed, e.g. a larger l1 on a server or a smaller one where\n memory is limited.\n\n @note The first call for each (bits_total, l1) pair builds its lookup table,\n       so it can be slow, and a larger l1 takes longer. Later calls with the\n       same pair reuse the table.\n\n @warning Not constant-time; see mpt_decrypt_amount.\n\n @param ciphertext [in]  A 66-byte buffer containing the two points (C1, C2).\n @param privkey    [in]  The 32-byte private key.\n @param bits_total [in]  Search width in bits, in [1, 63].\n @param l1         [in]  Baby-step width, in [1, 32] and less than bits_total.\n @param out_amount [out] Pointer to store the decrypted uint64_t amount.\n @return 0 on success, -1 on failure (invalid input, wrong key, an amount not\n         below 2^bits_total, or a table that cannot be allocated), -2 if\n         bits_total or l1 is out of range."]
+    pub fn mpt_decrypt_amount_with_l1_bits_total(
+        ciphertext: *const u8,
+        privkey: *const u8,
+        bits_total: ::std::os::raw::c_int,
+        l1: ::std::os::raw::c_int,
+        out_amount: *mut u64,
     ) -> ::std::os::raw::c_int;
 }
 unsafe extern "C" {

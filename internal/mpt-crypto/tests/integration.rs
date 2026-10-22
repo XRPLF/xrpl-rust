@@ -732,6 +732,84 @@ fn encrypt_decrypt_edge_amounts() {
     }
 }
 
+// ── BSGS decrypt widths ──────────────────────────────────────────────────
+
+#[test]
+fn decrypt_recovers_amounts_above_the_old_brute_force_range() {
+    let (sk, pk) = keypair::generate().unwrap();
+    for amount in [1_000_001u64, 123_456_789, (1 << 40) - 1] {
+        let r = encrypt::random_blinding_factor().unwrap();
+        let ct = encrypt::encrypt(amount, &pk, &r).unwrap();
+        assert_eq!(
+            encrypt::decrypt(&ct, &sk).unwrap(),
+            amount,
+            "amount {amount}"
+        );
+    }
+}
+
+#[test]
+fn decrypt_rejects_amounts_at_or_above_the_default_width() {
+    let (sk, pk) = keypair::generate().unwrap();
+    let ct = encrypt::encrypt(1 << 40, &pk, &encrypt::random_blinding_factor().unwrap()).unwrap();
+    assert!(encrypt::decrypt(&ct, &sk).is_err());
+}
+
+#[test]
+fn decrypt_with_bits_covers_widths_beyond_the_default() {
+    let (sk, pk) = keypair::generate().unwrap();
+    let amount = (1u64 << 40) + 7;
+    let ct = encrypt::encrypt(amount, &pk, &encrypt::random_blinding_factor().unwrap()).unwrap();
+    assert_eq!(encrypt::decrypt_with_bits(&ct, &sk, 41).unwrap(), amount);
+}
+
+#[test]
+fn decrypt_with_bits_rejects_amounts_outside_the_width() {
+    let (sk, pk) = keypair::generate().unwrap();
+    let ct = encrypt::encrypt(1 << 10, &pk, &encrypt::random_blinding_factor().unwrap()).unwrap();
+    assert!(encrypt::decrypt_with_bits(&ct, &sk, 10).is_err());
+}
+
+#[test]
+fn decrypt_with_bits_rejects_out_of_range_widths() {
+    let (sk, pk) = keypair::generate().unwrap();
+    let ct = encrypt::encrypt(1, &pk, &encrypt::random_blinding_factor().unwrap()).unwrap();
+    for bits in [0, encrypt::MAX_DECRYPT_BITS + 1, u32::MAX] {
+        assert!(
+            matches!(
+                encrypt::decrypt_with_bits(&ct, &sk, bits),
+                Err(Error::NonZeroRc(-2))
+            ),
+            "bits {bits}"
+        );
+    }
+}
+
+#[test]
+fn decrypt_with_bits_and_l1_uses_the_caller_table() {
+    let (sk, pk) = keypair::generate().unwrap();
+    let ct = encrypt::encrypt(4242, &pk, &encrypt::random_blinding_factor().unwrap()).unwrap();
+    assert_eq!(
+        encrypt::decrypt_with_bits_and_l1(&ct, &sk, 30, 12).unwrap(),
+        4242
+    );
+    // l1 must be below bits.
+    assert!(matches!(
+        encrypt::decrypt_with_bits_and_l1(&ct, &sk, 30, 30),
+        Err(Error::NonZeroRc(-2))
+    ));
+}
+
+#[test]
+fn bits_for_is_the_smallest_covering_width() {
+    assert_eq!(encrypt::bits_for(0), 1);
+    assert_eq!(encrypt::bits_for(1), 1);
+    assert_eq!(encrypt::bits_for(1000), 10);
+    assert_eq!(encrypt::bits_for(1024), 11);
+    assert_eq!(encrypt::bits_for((1 << 40) - 1), 40);
+    assert_eq!(encrypt::bits_for(i64::MAX as u64), 63);
+}
+
 // ── Convert negatives ────────────────────────────────────────────────────
 
 #[test]

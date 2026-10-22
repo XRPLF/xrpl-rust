@@ -112,7 +112,8 @@ fn common(
 }
 
 /// Decrypt an on-ledger ElGamal balance blob (66-byte `c1||c2` hex, e.g.
-/// `ConfidentialBalanceSpending`) with the holder's private key.
+/// `ConfidentialBalanceSpending`) with the holder's private key. Recovers
+/// balances below `2^40`; use [`decrypt_balance_bounded`] for larger supplies.
 pub fn decrypt_balance(ciphertext_hex: &str, privkey: &Privkey) -> Result<u64> {
     Ok(encrypt::decrypt(
         &ciphertext_from_hex(ciphertext_hex)?,
@@ -120,21 +121,25 @@ pub fn decrypt_balance(ciphertext_hex: &str, privkey: &Privkey) -> Result<u64> {
     )?)
 }
 
-/// Decrypt an on-ledger balance blob, bounding the discrete-log search to
-/// `[range_low, range_high]` (cheaper than the unbounded [`decrypt_balance`]
-/// when a tight upper bound — e.g. the issuance's outstanding amount — is known).
-pub fn decrypt_balance_in_range(
+/// Decrypt an on-ledger balance blob known to be at most `max_balance` (e.g.
+/// the issuance's `ConfidentialOutstandingAmount`). The search width is the
+/// smallest that covers `max_balance`, so a tight bound builds a smaller lookup
+/// table and fails faster.
+pub fn decrypt_balance_bounded(
     ciphertext_hex: &str,
     privkey: &Privkey,
-    range_low: u64,
-    range_high: u64,
+    max_balance: u64,
 ) -> Result<u64> {
-    Ok(encrypt::decrypt_in_range(
+    let balance = encrypt::decrypt_with_bits(
         &ciphertext_from_hex(ciphertext_hex)?,
         privkey,
-        range_low,
-        range_high,
-    )?)
+        encrypt::bits_for(max_balance),
+    )?;
+    // The width is a power of two; enforce the exact bound.
+    if balance > max_balance {
+        return Err(crate::mpt_crypto::Error::NonZeroRc(-1).into());
+    }
+    Ok(balance)
 }
 
 /// Inputs for [`assemble_convert`].
@@ -493,7 +498,7 @@ mod prepare {
 
     use super::{
         assemble_clawback, assemble_convert, assemble_convert_back, assemble_merge_inbox,
-        assemble_send, decrypt_balance_in_range, ClawbackParams, ConfidentialAssemblyError,
+        assemble_send, decrypt_balance_bounded, ClawbackParams, ConfidentialAssemblyError,
         ConvertBackParams, ConvertParams, Result, SendParams,
     };
     use crate::asynch::account::get_next_valid_seq_number;
@@ -616,9 +621,9 @@ mod prepare {
     }
 
     /// Prepare a `ConfidentialMPTSend`, fetching the sender's sequence + on-ledger
-    /// spending balance and decrypting it. `max_balance` bounds the decrypt
-    /// discrete-log search (cost is O(max_balance)); pass the issuance's
-    /// outstanding amount or a known upper bound.
+    /// spending balance and decrypting it. `max_balance` is an upper bound on
+    /// that balance (the issuance's `ConfidentialOutstandingAmount` is always
+    /// one); it picks the decrypt search width, see [`decrypt_balance_bounded`].
     #[allow(clippy::too_many_arguments)]
     pub async fn prepare_confidential_send<C: XRPLAsyncClient>(
         client: &C,
@@ -640,7 +645,7 @@ mod prepare {
         let balance_ciphertext_hex = field_str(&node, "ConfidentialBalanceSpending")?.to_string();
         let version = balance_version(&node);
         let current_balance =
-            decrypt_balance_in_range(&balance_ciphertext_hex, sender_privkey, 0, max_balance)?;
+            decrypt_balance_bounded(&balance_ciphertext_hex, sender_privkey, max_balance)?;
         assemble_send(SendParams {
             sender_account,
             destination_account,
@@ -679,7 +684,7 @@ mod prepare {
         let balance_ciphertext_hex = field_str(&node, "ConfidentialBalanceSpending")?.to_string();
         let version = balance_version(&node);
         let current_balance =
-            decrypt_balance_in_range(&balance_ciphertext_hex, holder_privkey, 0, max_balance)?;
+            decrypt_balance_bounded(&balance_ciphertext_hex, holder_privkey, max_balance)?;
         assemble_convert_back(ConvertBackParams {
             account,
             issuance_id_hex,
@@ -751,6 +756,16 @@ mod tests {
             decrypt_balance(&upper_hex(ct.as_bytes()), &sk).unwrap(),
             4242
         );
+    }
+
+    #[test]
+    fn decrypt_balance_bounded_enforces_the_exact_bound() {
+        let (sk, pk) = keypair::generate().unwrap();
+        let r = encrypt::random_blinding_factor().unwrap();
+        let hex = upper_hex(encrypt::encrypt(1001, &pk, &r).unwrap().as_bytes());
+        assert_eq!(decrypt_balance_bounded(&hex, &sk, 1001).unwrap(), 1001);
+        // 1001 fits the 10-bit table that covers a bound of 1000, but exceeds it.
+        assert!(decrypt_balance_bounded(&hex, &sk, 1000).is_err());
     }
 
     #[test]

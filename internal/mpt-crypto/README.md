@@ -59,7 +59,7 @@ Each layer has one job:
 | [`types`]   | Strongly-typed byte-array newtypes | `Privkey`, `Pubkey`, `Ciphertext`, `Commitment`, `ContextHash`, `AccountId`, `IssuanceId`, `BlindingFactor`, the four `*Proof` types |
 | [`error`]   | Error enum + `Result` alias | `Error::NonZeroRc(i32)`, `Error::Invariant(&'static str)` |
 | [`keypair`] | ElGamal/secp256k1 keypair generation | `keypair::generate() -> Result<(Privkey, Pubkey)>` |
-| [`encrypt`] | EC-ElGamal encrypt / decrypt + RNG | `encrypt::{encrypt, decrypt, random_blinding_factor}` |
+| [`encrypt`] | EC-ElGamal encrypt / decrypt (Baby-Step Giant-Step) + RNG | `encrypt::{encrypt, decrypt, decrypt_with_bits, decrypt_with_bits_and_l1, bits_for, random_blinding_factor}` |
 | [`commit`]  | Pedersen commitments | `commit::pedersen(amount, blinding) -> Result<Commitment>`, `commit::convert_back_remainder` |
 | [`context`] | Per-transaction context hashes (replay-binding) | `context::{convert, convert_back, send, clawback}` |
 | [`prove`]   | The four per-transaction proof generators | `prove::{convert, send, convert_back, clawback}` plus `Participant`, `SendProofParams`, `ConvertBackProofParams` |
