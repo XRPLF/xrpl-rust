@@ -793,11 +793,16 @@ fn decrypt_with_bits_and_l1_uses_the_caller_table() {
         encrypt::decrypt_with_bits_and_l1(&ct, &sk, 30, 12).unwrap(),
         4242
     );
-    // l1 must be below bits.
-    assert!(matches!(
-        encrypt::decrypt_with_bits_and_l1(&ct, &sk, 30, 30),
-        Err(Error::NonZeroRc(-2))
-    ));
+    // l1 must be in 1..=32 and below bits.
+    for (bits, l1) in [(30, 30), (30, 0), (40, 33)] {
+        assert!(
+            matches!(
+                encrypt::decrypt_with_bits_and_l1(&ct, &sk, bits, l1),
+                Err(Error::NonZeroRc(-2))
+            ),
+            "bits {bits}, l1 {l1}"
+        );
+    }
 }
 
 #[test]

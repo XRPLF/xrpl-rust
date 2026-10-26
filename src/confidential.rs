@@ -137,7 +137,9 @@ pub fn decrypt_balance_bounded(
     )?;
     // The width is a power of two; enforce the exact bound.
     if balance > max_balance {
-        return Err(crate::mpt_crypto::Error::NonZeroRc(-1).into());
+        return Err(
+            crate::mpt_crypto::Error::Invariant("decrypted balance exceeds max_balance").into(),
+        );
     }
     Ok(balance)
 }
@@ -624,6 +626,11 @@ mod prepare {
     /// spending balance and decrypting it. `max_balance` is an upper bound on
     /// that balance (the issuance's `ConfidentialOutstandingAmount` is always
     /// one); it picks the decrypt search width, see [`decrypt_balance_bounded`].
+    ///
+    /// The decrypt runs synchronously on the calling task: the first call for a
+    /// width builds its lookup table (seconds), and a failed decrypt searches the
+    /// whole width. Pass a tight `max_balance`, and wrap the call in
+    /// `spawn_blocking` where executor responsiveness matters.
     #[allow(clippy::too_many_arguments)]
     pub async fn prepare_confidential_send<C: XRPLAsyncClient>(
         client: &C,
@@ -666,7 +673,8 @@ mod prepare {
     }
 
     /// Prepare a `ConfidentialMPTConvertBack`, fetching + decrypting the holder's
-    /// on-ledger spending balance. See `prepare_confidential_send` re `max_balance`.
+    /// on-ledger spending balance. See `prepare_confidential_send` re `max_balance`
+    /// and the synchronous decrypt.
     #[allow(clippy::too_many_arguments)]
     pub async fn prepare_confidential_convert_back<C: XRPLAsyncClient>(
         client: &C,

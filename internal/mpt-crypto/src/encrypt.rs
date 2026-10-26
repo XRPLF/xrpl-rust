@@ -91,13 +91,15 @@ pub fn decrypt(ciphertext: &Ciphertext, privkey: &Privkey) -> Result<u64> {
 /// `2^bits` or more) searches the whole width before returning. Not
 /// constant-time; see [`decrypt`].
 pub fn decrypt_with_bits(ciphertext: &Ciphertext, privkey: &Privkey, bits: u32) -> Result<u64> {
+    // Out-of-range widths wrap to -1 here; the C side rejects them with -2.
+    let bits = i32::try_from(bits).unwrap_or(-1);
     let mut amount: u64 = 0;
     // SAFETY: pointers are valid for the call; `&mut amount` is exclusive.
     let rc = unsafe {
         sys::mpt_decrypt_amount_with_bits_total(
             ciphertext.as_bytes().as_ptr(),
             privkey.as_bytes().as_ptr(),
-            bits as i32,
+            bits,
             &mut amount,
         )
     };
@@ -120,14 +122,17 @@ pub fn decrypt_with_bits_and_l1(
     bits: u32,
     l1: u32,
 ) -> Result<u64> {
+    // Out-of-range values wrap to -1 here; the C side rejects them with -2.
+    let bits = i32::try_from(bits).unwrap_or(-1);
+    let l1 = i32::try_from(l1).unwrap_or(-1);
     let mut amount: u64 = 0;
     // SAFETY: pointers are valid for the call; `&mut amount` is exclusive.
     let rc = unsafe {
         sys::mpt_decrypt_amount_with_l1_bits_total(
             ciphertext.as_bytes().as_ptr(),
             privkey.as_bytes().as_ptr(),
-            bits as i32,
-            l1 as i32,
+            bits,
+            l1,
             &mut amount,
         )
     };
