@@ -13,4 +13,14 @@ ignore = [
     # optional dep. rust_decimal 1.x pins rkyv `^0.7`, so there is no upgrade
     # path today. Remove this once rust_decimal moves to rkyv >= 0.8.17.
     "RUSTSEC-2026-0235",
+    # RUSTSEC-2026-0387 — crypto-bigint < 0.7.6 timing side channels in
+    # operations intended to be constant-time. No longer a direct dependency
+    # (secp256k1 key validation now uses libsecp256k1). It remains in Cargo.lock
+    # only via reqwless -> embedded-tls -> p256 0.13 -> elliptic-curve 0.13 ->
+    # crypto-bigint 0.5, i.e. TLS for the no_std JSON-RPC client
+    # (`connect_with_tls`). Every link is capped at its 0.x line and the fix only
+    # exists in crypto-bigint 0.7.6+, so there is no upgrade path today. Remove
+    # this once a reqwless release we can use depends on an embedded-tls built
+    # on p256 >= 0.14, or a patched crypto-bigint 0.5.x is published.
+    "RUSTSEC-2026-0387",
 ]
