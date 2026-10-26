@@ -122,19 +122,16 @@ pub fn decrypt_balance(ciphertext_hex: &str, privkey: &Privkey) -> Result<u64> {
 }
 
 /// Decrypt an on-ledger balance blob known to be at most `max_balance` (e.g.
-/// the issuance's `ConfidentialOutstandingAmount`). The search width is the
-/// smallest that covers `max_balance`, so a tight bound builds a smaller lookup
-/// table and fails faster.
+/// the issuance's `ConfidentialOutstandingAmount`). Bounds below `2^40` use
+/// the default width, whose lookup table is kept for the life of the process;
+/// larger bounds use the smallest width that covers `max_balance`.
 pub fn decrypt_balance_bounded(
     ciphertext_hex: &str,
     privkey: &Privkey,
     max_balance: u64,
 ) -> Result<u64> {
-    let balance = encrypt::decrypt_with_bits(
-        &ciphertext_from_hex(ciphertext_hex)?,
-        privkey,
-        encrypt::bits_for(max_balance),
-    )?;
+    let bits = encrypt::bits_for(max_balance).max(encrypt::DEFAULT_DECRYPT_BITS);
+    let balance = encrypt::decrypt_with_bits(&ciphertext_from_hex(ciphertext_hex)?, privkey, bits)?;
     // The width is a power of two; enforce the exact bound.
     if balance > max_balance {
         return Err(
@@ -627,10 +624,9 @@ mod prepare {
     /// that balance (the issuance's `ConfidentialOutstandingAmount` is always
     /// one); it picks the decrypt search width, see [`decrypt_balance_bounded`].
     ///
-    /// The decrypt runs synchronously on the calling task: the first call for a
-    /// width builds its lookup table (seconds), and a failed decrypt searches the
-    /// whole width. Pass a tight `max_balance`, and wrap the call in
-    /// `spawn_blocking` where executor responsiveness matters.
+    /// The decrypt runs synchronously on the calling task: the first call builds
+    /// a lookup table (seconds), and a failed decrypt searches the whole width.
+    /// Wrap the call in `spawn_blocking` where executor responsiveness matters.
     #[allow(clippy::too_many_arguments)]
     pub async fn prepare_confidential_send<C: XRPLAsyncClient>(
         client: &C,
@@ -774,6 +770,15 @@ mod tests {
         assert_eq!(decrypt_balance_bounded(&hex, &sk, 1001).unwrap(), 1001);
         // 1001 fits the 10-bit table that covers a bound of 1000, but exceeds it.
         assert!(decrypt_balance_bounded(&hex, &sk, 1000).is_err());
+    }
+
+    #[test]
+    fn decrypt_balance_bounded_widens_past_the_default_width() {
+        let (sk, pk) = keypair::generate().unwrap();
+        let r = encrypt::random_blinding_factor().unwrap();
+        let amount = (1u64 << 40) + 7;
+        let hex = upper_hex(encrypt::encrypt(amount, &pk, &r).unwrap().as_bytes());
+        assert_eq!(decrypt_balance_bounded(&hex, &sk, amount).unwrap(), amount);
     }
 
     #[test]
