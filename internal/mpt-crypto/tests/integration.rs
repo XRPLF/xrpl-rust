@@ -813,6 +813,9 @@ fn bits_for_is_the_smallest_covering_width() {
     assert_eq!(encrypt::bits_for(1024), 11);
     assert_eq!(encrypt::bits_for((1 << 40) - 1), 40);
     assert_eq!(encrypt::bits_for(i64::MAX as u64), 63);
+    // Bounds above any MPT amount (e.g. u64::MAX as "no bound") use the widest width.
+    assert_eq!(encrypt::bits_for(1 << 63), encrypt::MAX_DECRYPT_BITS);
+    assert_eq!(encrypt::bits_for(u64::MAX), encrypt::MAX_DECRYPT_BITS);
 }
 
 // ── Convert negatives ────────────────────────────────────────────────────

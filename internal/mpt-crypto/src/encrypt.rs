@@ -142,7 +142,8 @@ pub fn decrypt_with_bits_and_l1(
     Ok(amount)
 }
 
-/// Smallest search width whose range `[0, 2^bits)` contains `max_amount`.
+/// Smallest search width whose range `[0, 2^bits)` contains `max_amount`,
+/// capped at [`MAX_DECRYPT_BITS`] since MPT amounts never exceed `2^63 - 1`.
 pub fn bits_for(max_amount: u64) -> u32 {
-    (u64::BITS - max_amount.leading_zeros()).max(1)
+    (u64::BITS - max_amount.leading_zeros()).clamp(1, MAX_DECRYPT_BITS)
 }
