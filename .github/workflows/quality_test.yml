@@ -24,4 +24,10 @@ jobs:
         # RUSTSEC-2026-0235: rkyv 0.7 is an optional dep of rust_decimal that
         # we do not enable (features = ["serde"] only); ignored until
         # rust_decimal ships rkyv 0.8+ support.
-        run: cargo audit --ignore RUSTSEC-2026-0235
+        # RUSTSEC-2026-0387: crypto-bigint 0.5 is no longer a direct dep; it is
+        # only pulled in via reqwless -> embedded-tls -> p256 0.13 ->
+        # elliptic-curve 0.13 (TLS for the no_std JSON-RPC client). Every link
+        # is capped at its 0.x line and the fix is only in crypto-bigint 0.7.6+.
+        # Remove once a reqwless release we can use depends on an embedded-tls
+        # built on p256 0.14+, or a patched crypto-bigint 0.5.x is published.
+        run: cargo audit --ignore RUSTSEC-2026-0235 --ignore RUSTSEC-2026-0387

@@ -12,8 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
-## [[v1.3.0]]
-
 ### Added
 
 - Support for the [`LendingProtocol` amendment (XLS-66)](https://github.com/XRPLF/XRPL-Standards/pull/192): the `LoanBrokerSet`, `LoanBrokerDelete`, `LoanBrokerCoverDeposit`, `LoanBrokerCoverWithdraw`, `LoanBrokerCoverClawback`, `LoanSet`, `LoanPay`, `LoanManage` and `LoanDelete` transactions, the `Loan` and `LoanBroker` ledger objects, and `signing::sign_loan_set_by_counterparty` ([#162](https://github.com/XRPLF/xrpl-rust/pull/162)).
@@ -24,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `signing::CounterpartySigningMode`, the third argument to `sign_loan_set_by_counterparty`: `Single`, `Multisign`, or `MultisignAs(account)` for a wallet signing with that account's RegularKey (parity with xrpl.js's `opts.multisign?: boolean | string`).
 - `autofill` now covers a `LoanSet`'s counterparty signatures in the `Fee`, reading the counterparty's signer list (and resolving the counterparty from `LoanBrokerID` when the borrower submits the transaction). `Fee` is a signing field and so cannot be raised once the first party has signed, which previously made this the caller's problem.
 - `ledger_entry` selectors for `Loan` and `LoanBroker` (`LoanIdentifier` and `LoanBrokerIdentifier`).
-- Support for [XLS-0094D DynamicMPT](https://github.com/XRPLF/XRPL-Standards/pull/583).
-- **XLS-0096 Confidential MPT:** support for the [XLS-0096 ConfidentialTransfer amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0096-confidential-mpt). Adds the vendored `mpt-crypto` native crypto library via the internal `mpt-crypto` (safe Rust wrappers) and `mpt-crypto-sys` (FFI bindings, statically linked) crates.
 - **`GenericRequest`:** an untyped, catch-all request type for XRPL RPC commands that don't have a dedicated typed model yet (e.g. `ledger_accept` on standalone rippled, `server_state`). Accepts a `command` string plus a free-form `params: serde_json::Map<String, Value>` bag; `Serialize` flattens `params` alongside `command`/`id` and strips any collision with those reserved keys. Slots into `XRPLRequest::Generic` and the existing `Request` trait so it flows through `client.request(...)` unchanged.
 
 ### Changed
@@ -37,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `SubmissionTimeout` `Display` text no longer claims the validated ledger sequence is "greater than" the `LastLedgerSequence` — the retry-cap path can fire while `validated < last`, and the after-loop path also fires on the equality case. Reworded to focus on the outcome (`Transaction not validated before LastLedgerSequence Y (latest validated ledger: X)`) so both paths render correctly.
+- secp256k1 secret-key range check now uses libsecp256k1's constant-time `SecretKey::from_byte_array` instead of `crypto-bigint`, and correctly rejects a candidate equal to the curve order. Removes the direct `crypto-bigint` dependency ([RUSTSEC-2026-0387](https://rustsec.org/advisories/RUSTSEC-2026-0387)).
+
+## [[v1.3.0]]
+
+### Added
+
+- Support for [XLS-0094D DynamicMPT](https://github.com/XRPLF/XRPL-Standards/pull/583).
+- **XLS-0096 Confidential MPT:** support for the [XLS-0096 ConfidentialTransfer amendment](https://github.com/XRPLF/XRPL-Standards/tree/master/XLS-0096-confidential-mpt). Adds the vendored `mpt-crypto` native crypto library via the internal `mpt-crypto` (safe Rust wrappers) and `mpt-crypto-sys` (FFI bindings, statically linked) crates.
 
 ## [[v1.2.0]]
 

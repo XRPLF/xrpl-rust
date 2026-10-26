@@ -17,8 +17,6 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 use core::str::FromStr;
-use crypto_bigint::Encoding;
-use crypto_bigint::U256;
 use ed25519_dalek::ed25519::signature::SignerMut;
 use ed25519_dalek::Verifier;
 use ed25519_dalek::SECRET_KEY_LENGTH;
@@ -65,12 +63,11 @@ impl Secp256k1 {
         secp256k1::Message::from_digest(sha512_first_half(message))
     }
 
-    /// Determing if the provided secret key is valid.
-    /// TODO Make function constant time
+    /// Determine if the provided secret key is valid, i.e. in
+    /// the range `[1, CURVE_ORDER)`. libsecp256k1 performs this
+    /// check in constant time.
     fn _is_secret_valid(key: [u8; u32::BITS as usize]) -> bool {
-        let key_bytes = U256::from_be_bytes(key);
-        key_bytes >= U256::ONE
-            && key_bytes <= U256::from_be_bytes(secp256k1::constants::CURVE_ORDER)
+        secp256k1::SecretKey::from_byte_array(&key).is_ok()
     }
 
     /// Concat candidate key.
@@ -515,6 +512,24 @@ mod test {
         let message: &[u8] = TEST_MESSAGE.as_bytes();
 
         assert!(Secp256k1.is_valid_message(message, signature, PUBLIC_SECP256K1));
+    }
+
+    #[test]
+    fn test_secp256k1_is_secret_valid() {
+        let order = secp256k1::constants::CURVE_ORDER;
+        let mut one = [0u8; 32];
+        one[31] = 1;
+        let mut order_minus_one = order;
+        order_minus_one[31] -= 1;
+        let mut order_plus_one = order;
+        order_plus_one[31] += 1;
+
+        assert!(!Secp256k1::_is_secret_valid([0u8; 32]));
+        assert!(Secp256k1::_is_secret_valid(one));
+        assert!(Secp256k1::_is_secret_valid(order_minus_one));
+        assert!(!Secp256k1::_is_secret_valid(order));
+        assert!(!Secp256k1::_is_secret_valid(order_plus_one));
+        assert!(!Secp256k1::_is_secret_valid([0xFFu8; 32]));
     }
 
     #[test]
