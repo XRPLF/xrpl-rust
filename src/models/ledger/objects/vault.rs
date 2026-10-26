@@ -77,6 +77,21 @@ pub struct Vault<'a> {
     /// The index of the ledger that contains the transaction that most recently modified
     /// this object.
     pub previous_txn_lgr_seq: u32,
+    /// (LendingProtocolV1_1) The internal version of the ledger object's
+    /// structure. (SoeDefault)
+    #[serde(rename = "LEVersion")]
+    pub le_version: Option<u8>,
+    /// (LendingProtocolV1_1) The kind of vault: 0 for an open-ended vault or 1
+    /// for a close-ended vault. (SoeDefault)
+    pub vault_kind: Option<u8>,
+    /// (LendingProtocolV1_1, close-ended vaults only) The time, in seconds
+    /// since the Ripple Epoch, up to which deposits into the vault are
+    /// accepted. (SoeOptional)
+    pub subscription_date: Option<u32>,
+    /// (LendingProtocolV1_1, close-ended vaults only) The time, in seconds
+    /// since the Ripple Epoch, at which shares may begin to be redeemed from
+    /// the vault. (SoeOptional)
+    pub redemption_date: Option<u32>,
 }
 
 impl<'a> Model for Vault<'a> {}
@@ -125,6 +140,10 @@ impl<'a> Vault<'a> {
             owner_node,
             previous_txn_id,
             previous_txn_lgr_seq,
+            le_version: None,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         }
     }
 }
@@ -191,6 +210,10 @@ mod test_serde {
             previous_txn_id: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
                 .into(),
             previous_txn_lgr_seq: 12345678,
+            le_version: None,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         };
 
         let serialized = serde_json::to_string(&vault).unwrap();
@@ -246,6 +269,10 @@ mod test_serde {
             previous_txn_id: "FEDCBA0987654321FEDCBA0987654321FEDCBA0987654321FEDCBA0987654321"
                 .into(),
             previous_txn_lgr_seq: 99999999,
+            le_version: None,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         };
 
         let serialized = serde_json::to_string(&vault).unwrap();
@@ -300,6 +327,10 @@ mod test_serde {
             previous_txn_id: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
                 .into(),
             previous_txn_lgr_seq: 1,
+            le_version: None,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         };
         let serialized = serde_json::to_string(&vault).unwrap();
         let deserialized: Vault = serde_json::from_str(&serialized).unwrap();
@@ -336,6 +367,10 @@ mod test_serde {
             previous_txn_id: "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
                 .into(),
             previous_txn_lgr_seq: 100,
+            le_version: None,
+            vault_kind: None,
+            subscription_date: None,
+            redemption_date: None,
         };
 
         let json = serde_json::to_string(&vault).unwrap();
@@ -388,5 +423,79 @@ mod test_serde {
             json.contains("\"LedgerEntryType\":\"Vault\""),
             "missing LedgerEntryType=Vault: {json}"
         );
+    }
+
+    /// A close-ended vault as returned by a LendingProtocolV1_1 server.
+    ///
+    /// The V1_1 fields are `SoeDefault`/`SoeOptional`, so rippled omits them
+    /// for an open-ended vault — they have to round-trip both when present and
+    /// when absent.
+    #[test]
+    fn test_close_ended_vault_fields_deserialize() {
+        let json = r#"{
+            "LedgerEntryType": "Vault",
+            "Flags": 0,
+            "index": "A0000000000000000000000000000000000000000000000000000000DEADBEEF",
+            "Owner": "rVaultOwner123",
+            "Account": "rVaultPseudo456",
+            "Asset": {"currency": "XRP"},
+            "ShareMPTID": "00000012E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1",
+            "WithdrawalPolicy": 1,
+            "Sequence": 8,
+            "OwnerNode": "0",
+            "PreviousTxnID": "9A8765B4321CDE987654321CDE987654321CDE987654321CDE987654321CDE98",
+            "PreviousTxnLgrSeq": 12345678,
+            "LEVersion": 1,
+            "VaultKind": 1,
+            "SubscriptionDate": 800000000,
+            "RedemptionDate": 810000000
+        }"#;
+
+        let vault: Vault = serde_json::from_str(json).expect("failed to deserialize");
+
+        assert_eq!(vault.le_version, Some(1));
+        assert_eq!(vault.vault_kind, Some(1));
+        assert_eq!(vault.subscription_date, Some(800_000_000));
+        assert_eq!(vault.redemption_date, Some(810_000_000));
+
+        let round_tripped: Vault =
+            serde_json::from_str(&serde_json::to_string(&vault).unwrap()).unwrap();
+        assert_eq!(vault, round_tripped);
+    }
+
+    /// An open-ended vault carries none of the V1_1 fields, and they must not
+    /// be serialized back as nulls.
+    #[test]
+    fn test_open_ended_vault_omits_v1_1_fields() {
+        let vault = make_vault(
+            Some("A0000000000000000000000000000000000000000000000000000000DEADBEEF".into()),
+            "rVaultOwner123".into(),
+            "rVaultPseudo456".into(),
+            Currency::IssuedCurrency(IssuedCurrency::new("USD".into(), "rIssuer456".into())),
+            "00000012E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1E1A1".into(),
+            1,
+            8,
+            "0".into(),
+            "9A8765B4321CDE987654321CDE987654321CDE987654321CDE987654321CDE98".into(),
+            12_345_678,
+        );
+
+        assert!(vault.le_version.is_none());
+        assert!(vault.vault_kind.is_none());
+        assert!(vault.subscription_date.is_none());
+        assert!(vault.redemption_date.is_none());
+
+        let serialized = serde_json::to_string(&vault).unwrap();
+        for field in [
+            "LEVersion",
+            "VaultKind",
+            "SubscriptionDate",
+            "RedemptionDate",
+        ] {
+            assert!(
+                !serialized.contains(field),
+                "{field} should be omitted when unset"
+            );
+        }
     }
 }

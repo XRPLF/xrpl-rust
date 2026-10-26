@@ -161,10 +161,6 @@ impl Model for LoanSet<'_> {
             validate_hex_blob("data", data, MAX_DATA_LENGTH)?;
         }
 
-        if let Some(Err(e)) = self.data.as_ref().map(|s| hex::decode(s.as_ref())) {
-            return Err(XRPLModelException::FromHexError(e));
-        }
-
         if let Some(lsf) = &self.loan_service_fee {
             let lsf_decimal = lsf
                 .parse::<BigDecimal>()

@@ -6,8 +6,13 @@ use serde_with::skip_serializing_none;
 use crate::models::amount::XRPAmount;
 use crate::models::{FlagCollection, Model, NoFlags, XRPLModelResult};
 
-use super::vault_common::validate_vault_id;
+use super::vault_common::{validate_hex_blob, validate_vault_id};
 use super::{CommonFields, CommonTransactionBuilder, Memo, Signer, Transaction, TransactionType};
+
+/// Maximum length, in hex characters, of the VaultDelete `MemoData` field.
+/// Per LendingProtocolV1_1, the deletion memo is capped at 256 bytes
+/// = 512 hex chars.
+const MAX_VAULT_MEMO_DATA_HEX_LEN: usize = 512;
 
 /// Delete a vault from the XRP Ledger (XLS-65).
 ///
@@ -29,11 +34,18 @@ pub struct VaultDelete<'a> {
     /// The ID of the vault to delete (256-bit hex string).
     #[serde(rename = "VaultID")]
     pub vault_id: Cow<'a, str>,
+    /// (LendingProtocolV1_1) Arbitrary metadata attached to the deletion, in
+    /// hex format, limited to 256 bytes.
+    pub memo_data: Option<Cow<'a, str>>,
 }
 
 impl Model for VaultDelete<'_> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        validate_vault_id(&self.vault_id)
+        validate_vault_id(&self.vault_id)?;
+        if let Some(memo_data) = self.memo_data.as_deref() {
+            validate_hex_blob("memo_data", memo_data, MAX_VAULT_MEMO_DATA_HEX_LEN)?;
+        }
+        Ok(())
     }
 }
 
@@ -92,7 +104,14 @@ impl<'a> VaultDelete<'a> {
                 None,
             ),
             vault_id,
+            memo_data: None,
         }
+    }
+
+    /// Set the deletion memo (LendingProtocolV1_1).
+    pub fn with_memo_data(mut self, memo_data: Cow<'a, str>) -> Self {
+        self.memo_data = Some(memo_data);
+        self
     }
 }
 
@@ -112,6 +131,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         };
 
         let json_str = r#"{"Account":"rVaultOwner123","TransactionType":"VaultDelete","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF"}"#;
@@ -137,6 +157,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         }
         .with_fee("12".into())
         .with_sequence(100)
@@ -168,6 +189,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         };
 
         assert_eq!(vault_delete.common_fields.account, "rVaultOwner456");
@@ -189,6 +211,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         }
         .with_ticket_sequence(54321)
         .with_fee("12".into());
@@ -206,6 +229,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         }
         .with_memo(Memo {
             memo_data: Some("first memo".into()),
@@ -270,6 +294,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         }
         .with_fee("12".into())
         .with_sequence(300);
@@ -286,6 +311,7 @@ mod tests {
                 ..Default::default()
             },
             vault_id: VAULT_ID.into(),
+            memo_data: None,
         }
         .with_account_txn_id("F1E2D3C4B5A69788".into())
         .with_fee("12".into())
@@ -295,5 +321,92 @@ mod tests {
             vault_delete.common_fields.account_txn_id,
             Some("F1E2D3C4B5A69788".into())
         );
+    }
+
+    /// `MemoData` validation (LendingProtocolV1_1).
+    ///
+    /// Mirrors `test/models/vaultDelete.test.ts` in xrpl.js.
+    mod memo_data {
+        use super::*;
+        use crate::models::XRPLModelException;
+
+        fn with_memo(memo_data: &str) -> VaultDelete<'_> {
+            VaultDelete {
+                common_fields: CommonFields {
+                    account: "rVaultOwner123".into(),
+                    transaction_type: TransactionType::VaultDelete,
+                    signing_pub_key: Some("".into()),
+                    ..Default::default()
+                },
+                vault_id: VAULT_ID.into(),
+                memo_data: Some(memo_data.into()),
+            }
+        }
+
+        #[test]
+        fn test_valid_memo_data_at_maximum() {
+            // 256 bytes, the documented cap.
+            let memo_data = "41".repeat(256);
+            assert!(with_memo(&memo_data).get_errors().is_ok());
+        }
+
+        #[test]
+        fn test_invalid_memo_data_non_hex() {
+            assert!(matches!(
+                with_memo("zznothex").get_errors().err(),
+                Some(XRPLModelException::InvalidValueFormat { .. })
+            ));
+        }
+
+        /// An odd number of hex characters is not a whole number of bytes and
+        /// fails to serialize.
+        #[test]
+        fn test_invalid_memo_data_odd_length() {
+            assert!(matches!(
+                with_memo("ABC").get_errors().err(),
+                Some(XRPLModelException::InvalidValueFormat { .. })
+            ));
+        }
+
+        #[test]
+        fn test_invalid_memo_data_too_long() {
+            let memo_data = "41".repeat(257);
+            assert!(matches!(
+                with_memo(&memo_data).get_errors().err(),
+                Some(XRPLModelException::ValueTooLong { .. })
+            ));
+        }
+
+        #[test]
+        fn test_serde_memo_data() {
+            let tx = with_memo("48656C6C6F");
+
+            let json_str = r#"{"Account":"rVaultOwner123","TransactionType":"VaultDelete","Flags":0,"SigningPubKey":"","VaultID":"A0000000000000000000000000000000000000000000000000000000DEADBEEF","MemoData":"48656C6C6F"}"#;
+
+            assert_eq!(
+                serde_json::to_value(serde_json::to_string(&tx).unwrap()).unwrap(),
+                serde_json::to_value(json_str).unwrap()
+            );
+
+            let deserialized: VaultDelete = serde_json::from_str(json_str).unwrap();
+            assert_eq!(tx, deserialized);
+        }
+
+        #[test]
+        fn test_builder_sets_memo_data() {
+            let tx = VaultDelete {
+                common_fields: CommonFields {
+                    account: "rVaultOwner123".into(),
+                    transaction_type: TransactionType::VaultDelete,
+                    ..Default::default()
+                },
+                vault_id: VAULT_ID.into(),
+                ..Default::default()
+            }
+            .with_memo_data("48656C6C6F".into());
+
+            assert_eq!(tx.memo_data, Some("48656C6C6F".into()));
+            assert!(tx.get_errors().is_ok());
+        }
     }
 }

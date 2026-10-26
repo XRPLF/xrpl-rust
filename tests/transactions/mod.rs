@@ -20,6 +20,7 @@ pub mod escrow_cancel;
 pub mod escrow_create;
 pub mod escrow_finish;
 pub mod lending_protocol;
+pub mod lending_protocol_v1_1;
 pub mod mptoken_authorize;
 pub mod mptoken_issuance_create;
 pub mod mptoken_issuance_destroy;

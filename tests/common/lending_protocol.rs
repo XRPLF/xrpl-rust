@@ -131,6 +131,10 @@ pub async fn get_loan_metadata(owner: &str, ao: AccountObjectType) -> LoanMetada
     let principal = optional_amount_str(object, "PrincipalOutstanding");
 
     let payment_remaining = optional_u32(object, "PaymentRemaining");
+    let next_payment_due_date = object
+        .get("NextPaymentDueDate")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32);
     let is_repaid = object.get("PrincipalOutstanding").is_none();
 
     let flags_num = object["Flags"]
@@ -149,6 +153,7 @@ pub async fn get_loan_metadata(owner: &str, ao: AccountObjectType) -> LoanMetada
         loan_broker_id,
         borrower_address,
         payment_remaining,
+        next_payment_due_date,
         flags,
         is_repaid,
     }
@@ -161,6 +166,9 @@ pub struct LoanMetadata {
     pub loan_broker_id: String,
     pub borrower_address: String,
     pub payment_remaining: u32,
+    /// When the next payment falls due, in seconds since the Ripple Epoch.
+    /// Absent once the loan is fully repaid.
+    pub next_payment_due_date: Option<u32>,
     pub flags: FlagCollection<LoanManageFlag>,
     /// true once the loan has been fully repaid (PrincipalOutstanding /
     /// PaymentRemaining omitted from the ledger object)
@@ -261,4 +269,18 @@ fn optional_amount_str(object: &serde_json::Value, field: &str) -> String {
 /// (e.g. PaymentRemaining after full repayment).
 fn optional_u32(object: &serde_json::Value, field: &str) -> u32 {
     object.get(field).and_then(|v| v.as_u64()).unwrap_or(0) as u32
+}
+
+/// The subscription / redemption window of a close-ended vault
+/// (LendingProtocolV1_1), as `(subscription_date, redemption_date)`.
+///
+/// Under LendingProtocolV1_1 a `LoanBroker` can only be attached to a
+/// close-ended vault, so every lending-protocol test needs a window. The dates
+/// are ledger close times, so they are derived from the latest validated
+/// ledger: the standalone node's clock is not in sync with the local system
+/// clock.
+#[cfg(feature = "std")]
+pub async fn investment_window() -> (u32, u32) {
+    let subscription_date = get_ledger_close_time().await as u32 + 10;
+    (subscription_date, subscription_date + 86_400)
 }

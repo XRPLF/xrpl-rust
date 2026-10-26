@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
 use crate::core::addresscodec::is_valid_classic_address;
-use crate::models::transactions::vault_common::validate_vault_id;
+use crate::models::transactions::vault_common::{validate_hash256, validate_vault_id};
 use crate::models::{
     requests::RequestMethod, transactions::validate_credential_type, Model, XRPLModelException,
     XRPLModelResult,
@@ -169,6 +169,40 @@ pub enum VaultIdentifier<'a> {
     OwnerSeq { owner: Cow<'a, str>, seq: u32 },
 }
 
+/// LoanBroker selector for a `ledger_entry` request (XLS-66 Lending Protocol).
+///
+/// rippled accepts either a direct 256-bit hash object ID or an object
+/// containing the loan broker's owner account and the sequence number of the
+/// `LoanBrokerSet` transaction that created it (`parseLoanBroker` in
+/// rippled's `LedgerEntry.cpp`).
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum LoanBrokerIdentifier<'a> {
+    /// Look up by ledger object ID (64 hex chars, nonzero).
+    Id(Cow<'a, str>),
+    /// Look up by owner account + `LoanBrokerSet` sequence number.
+    OwnerSeq { owner: Cow<'a, str>, seq: u32 },
+}
+
+/// Loan selector for a `ledger_entry` request (XLS-66 Lending Protocol).
+///
+/// rippled accepts either a direct 256-bit hash object ID or an object
+/// containing the loan broker's object ID and the loan's sequence number
+/// (`parseLoan` in rippled's `LedgerEntry.cpp`).
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(untagged)]
+pub enum LoanIdentifier<'a> {
+    /// Look up by ledger object ID (64 hex chars, nonzero).
+    Id(Cow<'a, str>),
+    /// Look up by LoanBroker object ID + loan sequence number.
+    BrokerSeq {
+        #[serde(rename = "loan_broker_id")]
+        loan_broker_id: Cow<'a, str>,
+        #[serde(rename = "loan_seq")]
+        loan_seq: u32,
+    },
+}
+
 /// The ledger_entry method returns a single ledger object
 /// from the XRP Ledger in its raw format. See ledger formats
 /// for information on the different types of objects you can
@@ -199,6 +233,12 @@ pub struct LedgerEntry<'a> {
     /// The unique identifier of a ledger.
     #[serde(flatten)]
     pub ledger_lookup: Option<LookupByLedgerRequest<'a>>,
+    /// Loan selector: either a 256-bit hash ID or a broker ID + loan sequence
+    /// pair (XLS-66).
+    pub loan: Option<LoanIdentifier<'a>>,
+    /// LoanBroker selector: either a 256-bit hash ID or an owner + seq pair
+    /// (XLS-66).
+    pub loan_broker: Option<LoanBrokerIdentifier<'a>>,
     pub offer: Option<Offer<'a>>,
     pub oracle: Option<OracleIdentifier<'a>>,
     pub payment_channel: Option<Cow<'a, str>>,
@@ -217,6 +257,45 @@ impl<'a: 'static> Model for LedgerEntry<'a> {
         }
         if let Some(credential) = &self.credential {
             credential.get_errors()?;
+        }
+        if let Some(loan_broker) = &self.loan_broker {
+            match loan_broker {
+                LoanBrokerIdentifier::Id(id) => validate_hash256("loan_broker", id)?,
+                LoanBrokerIdentifier::OwnerSeq { owner, seq } => {
+                    if !is_valid_classic_address(owner) {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "loan_broker.owner".into(),
+                            expected: "a valid classic account address".into(),
+                            found: owner.as_ref().into(),
+                        });
+                    }
+                    if *seq == 0 {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "loan_broker.seq".into(),
+                            expected: "a positive sequence number (> 0)".into(),
+                            found: seq.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        if let Some(loan) = &self.loan {
+            match loan {
+                LoanIdentifier::Id(id) => validate_hash256("loan", id)?,
+                LoanIdentifier::BrokerSeq {
+                    loan_broker_id,
+                    loan_seq,
+                } => {
+                    validate_hash256("loan.loan_broker_id", loan_broker_id)?;
+                    if *loan_seq == 0 {
+                        return Err(XRPLModelException::InvalidValue {
+                            field: "loan.loan_seq".into(),
+                            expected: "a positive sequence number (> 0)".into(),
+                            found: loan_seq.to_string(),
+                        });
+                    }
+                }
+            }
         }
         if let Some(vault) = &self.vault {
             match vault {
@@ -288,6 +367,12 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
         if self.vault.is_some() {
             signing_methods += 1
         }
+        if self.loan.is_some() {
+            signing_methods += 1
+        }
+        if self.loan_broker.is_some() {
+            signing_methods += 1
+        }
         if signing_methods != 1 {
             Err(XRPLModelException::ExpectedOneOf(&[
                 "index",
@@ -304,6 +389,8 @@ impl<'a> LedgerEntryError for LedgerEntry<'a> {
                 "permissioned_domain",
                 "ticket",
                 "vault",
+                "loan",
+                "loan_broker",
             ]))
         } else {
             Ok(())
@@ -340,6 +427,8 @@ impl<'a> Default for LedgerEntry<'a> {
                 ledger_hash: None,
                 ledger_index: None,
             }),
+            loan: None,
+            loan_broker: None,
             offer: None,
             oracle: None,
             payment_channel: None,
@@ -380,6 +469,8 @@ impl<'a> LedgerEntry<'a> {
             account_root,
             check,
             credential,
+            loan: None,
+            loan_broker: None,
             payment_channel,
             permissioned_domain: None,
             deposit_preauth,
@@ -417,6 +508,8 @@ impl<'a> LedgerEntry<'a> {
             deposit_preauth: None,
             directory: None,
             escrow: None,
+            loan: None,
+            loan_broker: None,
             offer: None,
             oracle: None,
             payment_channel: None,
@@ -429,6 +522,54 @@ impl<'a> LedgerEntry<'a> {
                 ledger_hash,
                 ledger_index,
             }),
+        }
+    }
+}
+
+impl<'a> LedgerEntry<'a> {
+    /// Look up a `Loan` object (XLS-66).
+    pub fn new_with_loan(
+        id: Option<Cow<'a, str>>,
+        binary: Option<bool>,
+        loan: LoanIdentifier<'a>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
+    ) -> Self {
+        Self {
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
+                id,
+            },
+            loan: Some(loan),
+            binary,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
+            ..Default::default()
+        }
+    }
+
+    /// Look up a `LoanBroker` object (XLS-66).
+    pub fn new_with_loan_broker(
+        id: Option<Cow<'a, str>>,
+        binary: Option<bool>,
+        loan_broker: LoanBrokerIdentifier<'a>,
+        ledger_hash: Option<Cow<'a, str>>,
+        ledger_index: Option<LedgerIndex<'a>>,
+    ) -> Self {
+        Self {
+            common_fields: CommonFields {
+                command: RequestMethod::LedgerEntry,
+                id,
+            },
+            loan_broker: Some(loan_broker),
+            binary,
+            ledger_lookup: Some(LookupByLedgerRequest {
+                ledger_hash,
+                ledger_index,
+            }),
+            ..Default::default()
         }
     }
 }
@@ -460,7 +601,7 @@ mod test_ledger_entry_errors {
         };
         assert_eq!(
             ledger_entry.validate().unwrap_err().to_string().as_str(),
-            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, credential, permissioned_domain, ticket, vault"
+            "Expected one of: index, account_root, check, directory, offer, oracle, ripple_state, escrow, payment_channel, deposit_preauth, credential, permissioned_domain, ticket, vault, loan, loan_broker"
         );
     }
 
@@ -732,6 +873,131 @@ mod test_ledger_entry_errors {
             }),
             ..Default::default()
         };
+        assert!(req.validate().is_err());
+    }
+
+    // ── Loan / LoanBroker selectors (XLS-66) ───────────────────────────
+
+    const LOAN_BROKER_OBJECT_ID: &str =
+        "E123F4567890ABCDE123F4567890ABCDEF1234567890ABCDEF1234567890ABCD";
+
+    #[test]
+    fn test_loan_broker_selector_by_id() {
+        let req = LedgerEntry::new_with_loan_broker(
+            None,
+            None,
+            LoanBrokerIdentifier::Id(LOAN_BROKER_OBJECT_ID.into()),
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_ok());
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(
+            json["loan_broker"],
+            serde_json::json!(LOAN_BROKER_OBJECT_ID)
+        );
+    }
+
+    #[test]
+    fn test_loan_broker_selector_by_owner_seq() {
+        let req = LedgerEntry::new_with_loan_broker(
+            None,
+            None,
+            LoanBrokerIdentifier::OwnerSeq {
+                owner: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                seq: 42,
+            },
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_ok());
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(
+            json["loan_broker"],
+            serde_json::json!({"owner": "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn", "seq": 42})
+        );
+    }
+
+    #[test]
+    fn test_loan_selector_by_broker_and_seq() {
+        let req = LedgerEntry::new_with_loan(
+            None,
+            None,
+            LoanIdentifier::BrokerSeq {
+                loan_broker_id: LOAN_BROKER_OBJECT_ID.into(),
+                loan_seq: 1,
+            },
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_ok());
+        let json = serde_json::to_value(&req).unwrap();
+        assert_eq!(
+            json["loan"],
+            serde_json::json!({"loan_broker_id": LOAN_BROKER_OBJECT_ID, "loan_seq": 1})
+        );
+    }
+
+    #[test]
+    fn test_invalid_loan_selector_bad_broker_id() {
+        let req = LedgerEntry::new_with_loan(
+            None,
+            None,
+            LoanIdentifier::BrokerSeq {
+                loan_broker_id: "notahash".into(),
+                loan_seq: 1,
+            },
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_selector_zero_seq() {
+        let req = LedgerEntry::new_with_loan(
+            None,
+            None,
+            LoanIdentifier::BrokerSeq {
+                loan_broker_id: LOAN_BROKER_OBJECT_ID.into(),
+                loan_seq: 0,
+            },
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_invalid_loan_broker_selector_bad_owner() {
+        let req = LedgerEntry::new_with_loan_broker(
+            None,
+            None,
+            LoanBrokerIdentifier::OwnerSeq {
+                owner: "notanaddress".into(),
+                seq: 1,
+            },
+            None,
+            None,
+        );
+
+        assert!(req.validate().is_err());
+    }
+
+    /// The selectors are mutually exclusive with every other lookup.
+    #[test]
+    fn test_loan_and_vault_selectors_are_exclusive() {
+        let req = LedgerEntry {
+            loan: Some(LoanIdentifier::Id(LOAN_BROKER_OBJECT_ID.into())),
+            vault: Some(VaultIdentifier::Id(LOAN_BROKER_OBJECT_ID.into())),
+            ..Default::default()
+        };
+
         assert!(req.validate().is_err());
     }
 }

@@ -409,12 +409,35 @@ mod tests {
         );
     }
 
+    /// An all-zero credential ID is not a real ledger object; rippled rejects
+    /// it with `temMALFORMED` under `fixCleanup3_4_0`
+    /// (`credentials::checkFields`).
+    #[test]
+    fn test_credential_ids_zero_id_error() {
+        let account_delete = AccountDelete {
+            common_fields: CommonFields {
+                account: "rWYkbWkCeg8dP6rXALnjgZSjjLyih5NXm".into(),
+                transaction_type: TransactionType::AccountDelete,
+                ..Default::default()
+            },
+            destination: "rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe".into(),
+            destination_tag: None,
+            credential_ids: Some(alloc::vec![alloc::borrow::Cow::Owned("0".repeat(64))]),
+        };
+
+        assert!(matches!(
+            account_delete.get_errors().unwrap_err(),
+            XRPLModelException::InvalidValue { .. }
+        ));
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(100))]
 
         #[test]
         fn prop_credential_ids_valid_length(count in 1_usize..=8) {
-            let ids: alloc::vec::Vec<alloc::borrow::Cow<'_, str>> = (0..count)
+            // 1..=count, not 0..count: an all-zero credential ID is invalid.
+            let ids: alloc::vec::Vec<alloc::borrow::Cow<'_, str>> = (1..=count)
                 .map(|i| alloc::borrow::Cow::Owned(alloc::format!("{:064X}", i)))
                 .collect();
             let tx = AccountDelete {
@@ -433,7 +456,8 @@ mod tests {
         #[test]
         fn prop_credential_ids_too_many(extra in 1_usize..=20) {
             let count = 8 + extra;
-            let ids: alloc::vec::Vec<alloc::borrow::Cow<'_, str>> = (0..count)
+            // 1..=count, not 0..count: an all-zero credential ID is invalid.
+            let ids: alloc::vec::Vec<alloc::borrow::Cow<'_, str>> = (1..=count)
                 .map(|i| alloc::borrow::Cow::Owned(alloc::format!("{:064X}", i)))
                 .collect();
             let tx = AccountDelete {

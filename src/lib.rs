@@ -20,6 +20,13 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)] // Remove eventually
 #![allow(clippy::result_large_err)]
+// `derive-new` 0.7.0 generates `Self { field: field }` constructors. Since Rust
+// 1.99, clippy reports those expansions as `redundant_field_names`, attributing
+// each one to the struct field it came from — 84 of them across this crate, all
+// macro-generated, none hand-written. There is no newer `derive-new` to upgrade
+// to (0.7.0 is the latest release). Remove this once upstream emits the
+// shorthand form.
+#![allow(clippy::redundant_field_names)]
 
 use ::core::fmt::Display;
 

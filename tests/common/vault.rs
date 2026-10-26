@@ -43,6 +43,24 @@ pub async fn account_objects_json(owner: &str) -> Value {
     )
 }
 
+/// Return the first `Vault` ledger object owned by `owner`.
+///
+/// `account_objects` gives no ordering guarantee, so even though the request
+/// filters `type=vault` server-side this selects by `LedgerEntryType` rather
+/// than trusting index 0.
+#[cfg(feature = "std")]
+pub async fn first_vault_object(owner: &str) -> Value {
+    let resp = account_objects_json(owner).await;
+    let objects = resp["account_objects"]
+        .as_array()
+        .expect("account_objects array missing")
+        .clone();
+    objects
+        .into_iter()
+        .find(|object| object["LedgerEntryType"] == "Vault")
+        .unwrap_or_else(|| panic!("no Vault ledger object found for {owner}"))
+}
+
 /// Return the ledger object ID (`index`) of the first vault owned by `owner`.
 ///
 /// Panics if no vault is found.
