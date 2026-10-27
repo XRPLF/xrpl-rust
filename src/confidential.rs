@@ -33,7 +33,7 @@ use crate::models::transactions::confidential_mpt_send::ConfidentialMPTSend;
 use crate::models::transactions::{CommonFields, TransactionType};
 use crate::models::NoFlags;
 use crate::mpt_crypto::{
-    commit, context, encrypt, prove, AccountId, Ciphertext, IssuanceId, Privkey, Pubkey,
+    commit, context, encrypt, keypair, prove, AccountId, Ciphertext, IssuanceId, Privkey, Pubkey,
 };
 
 /// Errors returned while assembling a Confidential MPT transaction.
@@ -64,6 +64,14 @@ pub enum ConfidentialAssemblyError {
         amount: u64,
         /// The decrypted current spending balance.
         balance: u64,
+    },
+    /// The private key does not match the holder's ElGamal key registered on the
+    /// ledger (`HolderEncryptionKey`), e.g. a key from before a rotation. Checked
+    /// before decrypting, since a wrong key would otherwise search the whole width.
+    #[error("private key does not match the registered HolderEncryptionKey {registered}")]
+    KeyMismatch {
+        /// The `HolderEncryptionKey` on the holder's MPToken (uppercase hex).
+        registered: String,
     },
 }
 
@@ -122,23 +130,47 @@ pub fn decrypt_balance(ciphertext_hex: &str, privkey: &Privkey) -> Result<u64> {
 }
 
 /// Decrypt an on-ledger balance blob known to be at most `max_balance` (e.g.
-/// the issuance's `ConfidentialOutstandingAmount`). Bounds below `2^40` use
-/// the default width, whose lookup table is kept for the life of the process;
-/// larger bounds use the smallest width that covers `max_balance`.
+/// the issuance's `ConfidentialOutstandingAmount`).
+///
+/// Tries the default width first, whose lookup table is kept for the life of
+/// the process, so a balance below `2^40` never builds a wider table however
+/// large `max_balance` is. Only when that misses and `max_balance` is `2^40` or
+/// more does it search the smallest width that covers `max_balance`. A wrong key
+/// misses too, so with a wide bound it pays for that full search; check the key
+/// first (the `prepare_confidential_*` helpers do).
 pub fn decrypt_balance_bounded(
     ciphertext_hex: &str,
     privkey: &Privkey,
     max_balance: u64,
 ) -> Result<u64> {
-    let bits = encrypt::bits_for(max_balance).max(encrypt::DEFAULT_DECRYPT_BITS);
-    let balance = encrypt::decrypt_with_bits(&ciphertext_from_hex(ciphertext_hex)?, privkey, bits)?;
-    // The width is a power of two; enforce the exact bound.
+    let ciphertext = ciphertext_from_hex(ciphertext_hex)?;
+    let balance = match encrypt::decrypt(&ciphertext, privkey) {
+        Ok(balance) => balance,
+        Err(e) if encrypt::bits_for(max_balance) <= encrypt::DEFAULT_DECRYPT_BITS => {
+            return Err(e.into())
+        }
+        Err(_) => encrypt::decrypt_with_bits(&ciphertext, privkey, encrypt::bits_for(max_balance))?,
+    };
+    // The search covers a power-of-two range; enforce the exact bound.
     if balance > max_balance {
         return Err(
             crate::mpt_crypto::Error::Invariant("decrypted balance exceeds max_balance").into(),
         );
     }
     Ok(balance)
+}
+
+/// Check that `privkey` is the private half of `registered_hex`, the holder's
+/// on-ledger `HolderEncryptionKey`, deriving the public key rather than trusting
+/// one supplied alongside it.
+pub fn check_holder_key(privkey: &Privkey, registered_hex: &str) -> Result<()> {
+    let (_, derived) = keypair::from_secret_key(*privkey.as_bytes())?;
+    if !upper_hex(derived.as_bytes()).eq_ignore_ascii_case(registered_hex) {
+        return Err(ConfidentialAssemblyError::KeyMismatch {
+            registered: registered_hex.to_string(),
+        });
+    }
+    Ok(())
 }
 
 /// Inputs for [`assemble_convert`].
@@ -497,8 +529,8 @@ mod prepare {
 
     use super::{
         assemble_clawback, assemble_convert, assemble_convert_back, assemble_merge_inbox,
-        assemble_send, decrypt_balance_bounded, ClawbackParams, ConfidentialAssemblyError,
-        ConvertBackParams, ConvertParams, Result, SendParams,
+        assemble_send, check_holder_key, decrypt_balance_bounded, ClawbackParams,
+        ConfidentialAssemblyError, ConvertBackParams, ConvertParams, Result, SendParams,
     };
     use crate::asynch::account::get_next_valid_seq_number;
     use crate::asynch::clients::XRPLAsyncClient;
@@ -622,11 +654,13 @@ mod prepare {
     /// Prepare a `ConfidentialMPTSend`, fetching the sender's sequence + on-ledger
     /// spending balance and decrypting it. `max_balance` is an upper bound on
     /// that balance (the issuance's `ConfidentialOutstandingAmount` is always
-    /// one); it picks the decrypt search width, see [`decrypt_balance_bounded`].
+    /// one), see [`decrypt_balance_bounded`].
     ///
-    /// The decrypt runs synchronously on the calling task: the first call builds
-    /// a lookup table (seconds), and a failed decrypt searches the whole width.
-    /// Wrap the call in `spawn_blocking` where executor responsiveness matters.
+    /// Fails with [`ConfidentialAssemblyError::KeyMismatch`] before decrypting if
+    /// the private key is not the account's registered `HolderEncryptionKey`.
+    /// The decrypt runs synchronously on the calling task, and its first call
+    /// builds a lookup table (seconds). Wrap the call in `spawn_blocking` where
+    /// executor responsiveness matters.
     #[allow(clippy::too_many_arguments)]
     pub async fn prepare_confidential_send<C: XRPLAsyncClient>(
         client: &C,
@@ -647,6 +681,7 @@ mod prepare {
         let node = read_mptoken(client, sender_account, issuance_id_hex).await?;
         let balance_ciphertext_hex = field_str(&node, "ConfidentialBalanceSpending")?.to_string();
         let version = balance_version(&node);
+        check_holder_key(sender_privkey, field_str(&node, "HolderEncryptionKey")?)?;
         let current_balance =
             decrypt_balance_bounded(&balance_ciphertext_hex, sender_privkey, max_balance)?;
         assemble_send(SendParams {
@@ -669,8 +704,8 @@ mod prepare {
     }
 
     /// Prepare a `ConfidentialMPTConvertBack`, fetching + decrypting the holder's
-    /// on-ledger spending balance. See `prepare_confidential_send` re `max_balance`
-    /// and the synchronous decrypt.
+    /// on-ledger spending balance. See `prepare_confidential_send` re `max_balance`,
+    /// the key check, and the synchronous decrypt.
     #[allow(clippy::too_many_arguments)]
     pub async fn prepare_confidential_convert_back<C: XRPLAsyncClient>(
         client: &C,
@@ -687,6 +722,7 @@ mod prepare {
         let node = read_mptoken(client, account, issuance_id_hex).await?;
         let balance_ciphertext_hex = field_str(&node, "ConfidentialBalanceSpending")?.to_string();
         let version = balance_version(&node);
+        check_holder_key(holder_privkey, field_str(&node, "HolderEncryptionKey")?)?;
         let current_balance =
             decrypt_balance_bounded(&balance_ciphertext_hex, holder_privkey, max_balance)?;
         assemble_convert_back(ConvertBackParams {
@@ -746,7 +782,6 @@ mod prepare {
 mod tests {
     use super::*;
     use crate::models::Model;
-    use crate::mpt_crypto::keypair;
 
     const ACCOUNT: &str = "rsA2LpzuawewSBQXkiju3YQTMzW13pAAdW";
     const ISSUANCE: &str = "0000012FFD9EE5DA93AC614B4DB94D7E0FCE415CA51BED47";
@@ -779,6 +814,39 @@ mod tests {
         let amount = (1u64 << 40) + 7;
         let hex = upper_hex(encrypt::encrypt(amount, &pk, &r).unwrap().as_bytes());
         assert_eq!(decrypt_balance_bounded(&hex, &sk, amount).unwrap(), amount);
+    }
+
+    #[test]
+    fn decrypt_balance_bounded_keeps_small_balances_on_the_default_table() {
+        // A wide bound used to pick a wide width and build its lookup table
+        // (minutes and GBs) even for a tiny balance. It must stay on the default
+        // table, so once that is warm each call takes milliseconds.
+        let (sk, pk) = keypair::generate().unwrap();
+        let r = encrypt::random_blinding_factor().unwrap();
+        let hex = upper_hex(encrypt::encrypt(1234, &pk, &r).unwrap().as_bytes());
+        decrypt_balance_bounded(&hex, &sk, 1000).unwrap_err(); // warms the default table
+        for bound in [1u64 << 46, 1 << 50, u64::MAX] {
+            let start = std::time::Instant::now();
+            assert_eq!(decrypt_balance_bounded(&hex, &sk, bound).unwrap(), 1234);
+            assert!(
+                start.elapsed() < std::time::Duration::from_secs(5),
+                "bound {bound} took {:?}",
+                start.elapsed()
+            );
+        }
+    }
+
+    #[test]
+    fn check_holder_key_accepts_only_the_registered_key() {
+        let (sk, pk) = keypair::generate().unwrap();
+        let (other_sk, _) = keypair::generate().unwrap();
+        let registered = upper_hex(pk.as_bytes());
+        check_holder_key(&sk, &registered).unwrap();
+        check_holder_key(&sk, &registered.to_lowercase()).unwrap();
+        assert!(matches!(
+            check_holder_key(&other_sk, &registered),
+            Err(ConfidentialAssemblyError::KeyMismatch { .. })
+        ));
     }
 
     #[test]

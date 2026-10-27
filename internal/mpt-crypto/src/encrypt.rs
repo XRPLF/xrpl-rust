@@ -89,10 +89,9 @@ pub fn decrypt(ciphertext: &Ciphertext, privkey: &Privkey) -> Result<u64> {
 /// The first call for a width builds its lookup table, and wider widths take
 /// longer to build and to search; a failed decrypt (a valid key that isn't the
 /// recipient's, or an amount of `2^bits` or more) searches the whole width
-/// before returning. Besides the default
-/// width's table, mpt-crypto keeps only the most recently used one, so
-/// alternating between other widths rebuilds it each time. Not constant-time;
-/// see [`decrypt`].
+/// before returning. Besides the default width's table, mpt-crypto keeps only
+/// the most recently used one, so alternating between other widths rebuilds it
+/// each time. Not constant-time; see [`decrypt`].
 pub fn decrypt_with_bits(ciphertext: &Ciphertext, privkey: &Privkey, bits: u32) -> Result<u64> {
     // Out-of-range widths wrap to -1 here; the C side rejects them with -2.
     let bits = i32::try_from(bits).unwrap_or(-1);
