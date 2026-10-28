@@ -58,6 +58,23 @@ typedef struct mpt_pedersen_proof_params
 } mpt_pedersen_proof_params;
 
 /**
+ * @brief A balance re-encrypted from one ElGamal key to another, as used by
+ * holder key rotation.
+ *
+ * - amount: The plaintext balance.
+ * - ciphertext: The 66-byte ciphertext of the balance under the old key.
+ * - new_ciphertext: The 66-byte ciphertext of the balance under the new key.
+ * - blinding_factor: The 32-byte randomness used to produce new_ciphertext.
+ */
+typedef struct mpt_balance_reencryption
+{
+    uint64_t amount;
+    uint8_t ciphertext[kMPT_ELGAMAL_TOTAL_SIZE];
+    uint8_t new_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE];
+    uint8_t blinding_factor[kMPT_BLINDING_FACTOR_SIZE];
+} mpt_balance_reencryption;
+
+/**
  * @brief Returns a globally shared secp256k1 context.
  */
 secp256k1_context*
@@ -107,6 +124,56 @@ mpt_get_clawback_context_hash(
     account_id holder,
     uint8_t out_hash[kMPT_HALF_SHA_SIZE]);
 
+/**
+ * @brief Context Hash for ConfidentialMPTMirrorUpdate.
+ *
+ * In holder mode, counterparty is the submitting account and ver is its
+ * ConfidentialBalanceVersion, since the proof is anchored on the holder's spending balance.
+ *
+ * In issuer mode, counterparty is the holder whose mirrors are migrated and ver is intentionally
+ * 0. The proof is anchored on the issuer mirror, which is itself an input to the proof, so a
+ * proof built against an earlier mirror no longer verifies. Binding the holder's version as well
+ * would also invalidate a pending migration on every unrelated change to the holder's balances,
+ * such as a MergeInbox, which would make migrating many holders impractical.
+ */
+int
+mpt_get_mirror_update_context_hash(
+    account_id acc,
+    mpt_issuance_id iss,
+    uint32_t seq,
+    account_id counterparty,
+    uint32_t ver,
+    uint8_t out_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Context Hash for ConfidentialMPTHolderKeyUpdate.
+ *
+ * In rotation mode, ver is the holder's ConfidentialBalanceVersion, since the proof is anchored
+ * on the holder's spending and inbox balances.
+ *
+ * In recovery mode, ver is intentionally 0. The proof only shows knowledge of the secret key for
+ * the new recovery key and reads no balance, so there is no balance state for the version to
+ * bind.
+ */
+int
+mpt_get_holder_key_update_context_hash(
+    account_id acc,
+    mpt_issuance_id iss,
+    uint32_t seq,
+    uint32_t ver,
+    uint8_t out_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Context Hash for ConfidentialMPTRecoverBalance.
+ */
+int
+mpt_get_recover_balance_context_hash(
+    account_id acc,
+    mpt_issuance_id iss,
+    uint32_t seq,
+    account_id holder,
+    uint8_t out_hash[kMPT_HALF_SHA_SIZE]);
+
 /* ============================================================================
  * Key & Ciphertext Utilities
  * ============================================================================ */
@@ -148,6 +215,15 @@ mpt_generate_keypair(uint8_t* out_privkey, uint8_t* out_pubkey);
 
 /**
  * @brief Generates a 32-byte blinding factor.
+ *
+ * A blinding factor hides the encrypted amount. Use a fresh one for each
+ * transaction and never reuse it across transactions: reusing it reveals the
+ * difference between amounts and links the ciphertexts, and revealing it reveals
+ * the amount. Within one transaction, share a blinding factor between
+ * ciphertexts only where a function requires it (e.g. the recipients of a
+ * Convert, or both mirrors in a MirrorUpdate); otherwise use a separate one for
+ * each ciphertext.
+ *
  * @param out_factor [out] A 32-byte buffer to store the blinding factor.
  * @return 0 on success, -1 on failure.
  */
@@ -209,15 +285,16 @@ mpt_decrypt_amount(
  * issuance's ConfidentialOutstandingAmount, so the bit width of that ledger
  * value is sufficient.
  *
- * The Baby-Step Giant-Step table is chosen from bits_total and built once per
- * process for each width. A wider search needs a larger table and more search
- * steps; near 63 bits the worst case takes hours. A narrower search needs
- * less memory and fails faster, but each of its steps covers fewer amounts, so
- * decrypting a given amount can take longer than with mpt_decrypt_amount.
+ * The Baby-Step Giant-Step table is chosen from bits_total. A wider search
+ * needs a larger table and more search steps; near 63 bits the worst case
+ * takes hours. A narrower search needs less memory and fails faster, but each
+ * of its steps covers fewer amounts, so decrypting a given amount can take
+ * longer than with mpt_decrypt_amount.
  *
- * @note The first call for each width builds its lookup table, so it can be
- *       slow, and wider widths take longer. Later calls for the same width
- *       reuse the table.
+ * @note The first call for a width builds its lookup table, so it can be slow,
+ *       and wider widths take longer. Besides the default table, only the most
+ *       recently used one is kept, so later calls reuse it until a different
+ *       width (or l1) is requested; alternating between widths rebuilds it.
  *
  * @warning Not constant-time; see mpt_decrypt_amount.
  *
@@ -242,13 +319,16 @@ mpt_decrypt_amount_with_bits_total(
  * Like mpt_decrypt_amount_with_bits_total, but the caller also chooses l1, the
  * baby-step width, instead of having it chosen from bits_total. The table holds
  * 2^(l1 - 1) entries, so each +1 on l1 doubles its memory and build time and
- * halves the worst-case number of search steps (2^(bits_total - l1)). Use it to
- * trade memory for speed, e.g. a larger l1 on a server or a smaller one where
- * memory is limited.
+ * halves the worst-case number of search steps (2^(bits_total - l1)). Prefer
+ * mpt_decrypt_amount_with_bits_total, which chooses l1 automatically; use this
+ * function only to trade memory for speed, e.g. a larger l1 on a server or a
+ * smaller one where memory is limited.
  *
- * @note The first call for each (bits_total, l1) pair builds its lookup table,
- *       so it can be slow, and a larger l1 takes longer. Later calls with the
- *       same pair reuse the table.
+ * @note The first call for a (bits_total, l1) pair builds its lookup table, so
+ *       it can be slow, and a larger l1 takes longer. Besides the default
+ *       table, only the most recently used one is kept, so later calls reuse it
+ *       until a different pair is requested; alternating between pairs rebuilds
+ *       it.
  *
  * @warning Not constant-time; see mpt_decrypt_amount.
  *
@@ -392,6 +472,151 @@ mpt_get_clawback_proof(
     uint8_t const ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
     uint8_t out_proof[SECP256K1_COMPACT_CLAWBACK_PROOF_SIZE]);
 
+/**
+ * @brief Generates proof for ConfidentialMPTMirrorUpdate submitted by the issuer.
+ *
+ * Proves that the new issuer and/or auditor mirror ciphertexts encrypt the same balance as the
+ * holder's issuer mirror on the ledger.
+ *
+ * When both targets are given, both new ciphertexts must be encrypted with the same
+ * blinding_factor, so they share their first component.
+ *
+ * @param priv              [in] 32-byte issuer secret key for issuer_pub.
+ * @param issuer_pub        [in] 33-byte issuer key the issuer mirror is currently encrypted under.
+ *                               For a stale mirror this is an earlier key, not the currently
+ *                               registered one.
+ * @param issuer_ciphertext [in] The holder's 66-byte issuer mirror.
+ * @param balance           [in] The plaintext balance the issuer mirror encrypts.
+ * @param blinding_factor   [in] The randomness used for the new ciphertext(s).
+ * @param issuer            [in] New issuer key and new issuer mirror, or NULL.
+ * @param auditor           [in] New auditor key and new auditor mirror, or NULL.
+ * @param context_hash      [in] The 32-byte context hash.
+ * @param out_proof         [out] 128-byte buffer for the proof.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_get_issuer_mirror_update_proof(
+    uint8_t const priv[kMPT_PRIVKEY_SIZE],
+    uint8_t const issuer_pub[kMPT_PUBKEY_SIZE],
+    uint8_t const issuer_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint64_t balance,
+    uint8_t const blinding_factor[kMPT_BLINDING_FACTOR_SIZE],
+    mpt_confidential_participant const* issuer,
+    mpt_confidential_participant const* auditor,
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE],
+    uint8_t out_proof[SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE]);
+
+/**
+ * @brief Generates proof for ConfidentialMPTMirrorUpdate submitted by the holder.
+ *
+ * Proves that the new issuer and/or auditor mirror ciphertexts encrypt the same balance as the
+ * holder's spending balance on the ledger. The holder's inbox must be empty, so that the spending
+ * balance is the full balance the mirrors encode.
+ *
+ * When both targets are given, both new ciphertexts must be encrypted with the same
+ * blinding_factor, so they share their first component.
+ *
+ * @param priv                [in] The holder's 32-byte secret key.
+ * @param holder_pub          [in] The holder's 33-byte public key.
+ * @param spending_ciphertext [in] The holder's 66-byte spending balance.
+ * @param balance             [in] The plaintext balance the spending balance encrypts.
+ * @param blinding_factor     [in] The randomness used for the new ciphertext(s).
+ * @param issuer              [in] New issuer key and new issuer mirror, or NULL.
+ * @param auditor             [in] New auditor key and new auditor mirror, or NULL.
+ * @param context_hash        [in] The 32-byte context hash.
+ * @param out_proof           [out] 128-byte buffer for the proof.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_get_holder_mirror_update_proof(
+    uint8_t const priv[kMPT_PRIVKEY_SIZE],
+    uint8_t const holder_pub[kMPT_PUBKEY_SIZE],
+    uint8_t const spending_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint64_t balance,
+    uint8_t const blinding_factor[kMPT_BLINDING_FACTOR_SIZE],
+    mpt_confidential_participant const* issuer,
+    mpt_confidential_participant const* auditor,
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE],
+    uint8_t out_proof[SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE]);
+
+/**
+ * @brief Generates the rotation-mode proof for ConfidentialMPTHolderKeyUpdate.
+ *
+ * Proves that the new spending and inbox ciphertexts encrypt, under the new holder key, the
+ * same balances as the current ones under the old key, and that the submitter holds the new
+ * secret key.
+ *
+ * @param priv         [in] The holder's current 32-byte secret key.
+ * @param pub          [in] The holder's current 33-byte public key.
+ * @param new_priv     [in] The holder's new 32-byte secret key.
+ * @param new_pub      [in] The holder's new 33-byte public key.
+ * @param spending     [in] The spending balance and its re-encryption.
+ * @param inbox        [in] The inbox balance and its re-encryption. Its blinding factor must
+ *                          differ from the spending one.
+ * @param context_hash [in] The 32-byte context hash.
+ * @param out_proof    [out] 224-byte buffer for the proof.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_get_holder_key_rotation_proof(
+    uint8_t const priv[kMPT_PRIVKEY_SIZE],
+    uint8_t const pub[kMPT_PUBKEY_SIZE],
+    uint8_t const new_priv[kMPT_PRIVKEY_SIZE],
+    uint8_t const new_pub[kMPT_PUBKEY_SIZE],
+    mpt_balance_reencryption const* spending,
+    mpt_balance_reencryption const* inbox,
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE],
+    uint8_t out_proof[SECP256K1_ROTATE_HOLDER_ROTATE_PROOF_SIZE]);
+
+/**
+ * @brief Generates the recovery-mode proof for ConfidentialMPTHolderKeyUpdate.
+ *
+ * Proves knowledge of the secret key for the key being registered as RecoveryKey. This is not
+ * interchangeable with the ConfidentialMPTConvert proof: it uses its own domain separation.
+ *
+ * @param pubkey       [in] 33-byte recovery public key.
+ * @param privkey      [in] 32-byte recovery secret key.
+ * @param context_hash [in] The 32-byte context hash.
+ * @param out_proof    [out] 64-byte buffer for the proof.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_get_holder_key_recovery_proof(
+    uint8_t const pubkey[kMPT_PUBKEY_SIZE],
+    uint8_t const privkey[kMPT_PRIVKEY_SIZE],
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE],
+    uint8_t out_proof[SECP256K1_ROTATE_RECOVERY_KEY_PROOF_SIZE]);
+
+/**
+ * @brief Generates proof for ConfidentialMPTRecoverBalance.
+ *
+ * Proves that the new spending ciphertext encrypts, under the holder's RecoveryKey, the same
+ * balance as the holder's issuer mirror under the issuer key.
+ *
+ * @param priv                    [in] The issuer's 32-byte secret key.
+ * @param pub                     [in] The issuer's 33-byte currently registered public key,
+ *                                     which the issuer mirror must be encrypted under.
+ * @param balance                 [in] The plaintext balance the issuer mirror encrypts.
+ * @param issuer_ciphertext       [in] The holder's 66-byte issuer mirror.
+ * @param recovery_pubkey         [in] The holder's 33-byte RecoveryKey.
+ * @param new_spending_ciphertext [in] The 66-byte new spending balance under recovery_pubkey.
+ * @param blinding_factor         [in] The randomness used for new_spending_ciphertext.
+ * @param context_hash            [in] The 32-byte context hash.
+ * @param out_proof               [out] 128-byte buffer for the proof.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_get_recover_balance_proof(
+    uint8_t const priv[kMPT_PRIVKEY_SIZE],
+    uint8_t const pub[kMPT_PUBKEY_SIZE],
+    uint64_t balance,
+    uint8_t const issuer_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const recovery_pubkey[kMPT_PUBKEY_SIZE],
+    uint8_t const new_spending_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const blinding_factor[kMPT_BLINDING_FACTOR_SIZE],
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE],
+    uint8_t out_proof[SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE]);
+
 /* ============================================================================
  * Non-ZKP Validation
  * ============================================================================ */
@@ -506,6 +731,114 @@ mpt_verify_clawback_proof(
     uint64_t const amount,
     uint8_t const pubkey[kMPT_PUBKEY_SIZE],
     uint8_t const ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Verify proof for ConfidentialMPTMirrorUpdate submitted by the issuer.
+ *
+ * Selects the proof from which targets are given. When both targets are given, their first
+ * ciphertext components must match.
+ *
+ * @param proof             [in] The 128-byte proof.
+ * @param issuer_pub        [in] 33-byte issuer key the issuer mirror is currently encrypted under.
+ *                               For a stale mirror this is an earlier key, not the currently
+ *                               registered one.
+ * @param issuer_ciphertext [in] The holder's 66-byte issuer mirror.
+ * @param issuer            [in] New issuer key and new issuer mirror, or NULL.
+ * @param auditor           [in] New auditor key and new auditor mirror, or NULL.
+ * @param context_hash      [in] The 32-byte context hash.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_verify_issuer_mirror_update_proof(
+    uint8_t const proof[SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE],
+    uint8_t const issuer_pub[kMPT_PUBKEY_SIZE],
+    uint8_t const issuer_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    mpt_confidential_participant const* issuer,
+    mpt_confidential_participant const* auditor,
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Verify proof for ConfidentialMPTMirrorUpdate submitted by the holder.
+ *
+ * Selects the proof from which targets are given. When both targets are given, their first
+ * ciphertext components must match. The caller is responsible for checking that the holder's
+ * inbox is empty.
+ *
+ * @param proof               [in] The 128-byte proof.
+ * @param holder_pub          [in] The holder's 33-byte public key.
+ * @param spending_ciphertext [in] The holder's 66-byte spending balance.
+ * @param issuer              [in] New issuer key and new issuer mirror, or NULL.
+ * @param auditor             [in] New auditor key and new auditor mirror, or NULL.
+ * @param context_hash        [in] The 32-byte context hash.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_verify_holder_mirror_update_proof(
+    uint8_t const proof[SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE],
+    uint8_t const holder_pub[kMPT_PUBKEY_SIZE],
+    uint8_t const spending_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    mpt_confidential_participant const* issuer,
+    mpt_confidential_participant const* auditor,
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Verify the rotation-mode proof for ConfidentialMPTHolderKeyUpdate.
+ *
+ * @param proof                   [in] The 224-byte proof.
+ * @param pub                     [in] The holder's current 33-byte public key.
+ * @param new_pub                 [in] The holder's new 33-byte public key.
+ * @param spending_ciphertext     [in] The current 66-byte spending balance.
+ * @param new_spending_ciphertext [in] The 66-byte spending balance under new_pub.
+ * @param inbox_ciphertext        [in] The current 66-byte inbox balance.
+ * @param new_inbox_ciphertext    [in] The 66-byte inbox balance under new_pub.
+ * @param context_hash            [in] The 32-byte context hash.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_verify_holder_key_rotation_proof(
+    uint8_t const proof[SECP256K1_ROTATE_HOLDER_ROTATE_PROOF_SIZE],
+    uint8_t const pub[kMPT_PUBKEY_SIZE],
+    uint8_t const new_pub[kMPT_PUBKEY_SIZE],
+    uint8_t const spending_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const new_spending_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const inbox_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const new_inbox_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Verify the recovery-mode proof for ConfidentialMPTHolderKeyUpdate.
+ *
+ * @param proof        [in] The 64-byte proof.
+ * @param pubkey       [in] The 33-byte recovery public key.
+ * @param context_hash [in] The 32-byte context hash.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_verify_holder_key_recovery_proof(
+    uint8_t const proof[SECP256K1_ROTATE_RECOVERY_KEY_PROOF_SIZE],
+    uint8_t const pubkey[kMPT_PUBKEY_SIZE],
+    uint8_t const context_hash[kMPT_HALF_SHA_SIZE]);
+
+/**
+ * @brief Verify proof for ConfidentialMPTRecoverBalance.
+ *
+ * @param proof                   [in] The 128-byte proof.
+ * @param pub                     [in] The issuer's 33-byte currently registered public key,
+ *                                     which the issuer mirror must be encrypted under.
+ * @param issuer_ciphertext       [in] The holder's 66-byte issuer mirror.
+ * @param recovery_pubkey         [in] The holder's 33-byte RecoveryKey.
+ * @param new_spending_ciphertext [in] The 66-byte new spending balance under recovery_pubkey.
+ * @param context_hash            [in] The 32-byte context hash.
+ * @return 0 on success, -1 on failure.
+ */
+int
+mpt_verify_recover_balance_proof(
+    uint8_t const proof[SECP256K1_ROTATE_REENCRYPT_PROOF_SIZE],
+    uint8_t const pub[kMPT_PUBKEY_SIZE],
+    uint8_t const issuer_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
+    uint8_t const recovery_pubkey[kMPT_PUBKEY_SIZE],
+    uint8_t const new_spending_ciphertext[kMPT_ELGAMAL_TOTAL_SIZE],
     uint8_t const context_hash[kMPT_HALF_SHA_SIZE]);
 
 /**

@@ -138,6 +138,12 @@ pub fn decrypt_balance(ciphertext_hex: &str, privkey: &Privkey) -> Result<u64> {
 /// more does it search the smallest width that covers `max_balance`. A wrong key
 /// misses too, so with a wide bound it pays for that full search; check the key
 /// first (the `prepare_confidential_*` helpers do).
+///
+/// The wider search is expensive. Its table grows with the width, reaching
+/// about 2 GB at peak and minutes to build from `max_balance >= 2^49`, and a
+/// search that fails near 63 bits takes hours. All wider searches share one
+/// table and one lock, so they run one at a time. Pass the tightest bound you
+/// have, not `u64::MAX`.
 pub fn decrypt_balance_bounded(
     ciphertext_hex: &str,
     privkey: &Privkey,
@@ -803,7 +809,7 @@ mod tests {
         let r = encrypt::random_blinding_factor().unwrap();
         let hex = upper_hex(encrypt::encrypt(1001, &pk, &r).unwrap().as_bytes());
         assert_eq!(decrypt_balance_bounded(&hex, &sk, 1001).unwrap(), 1001);
-        // 1001 fits the 10-bit table that covers a bound of 1000, but exceeds it.
+        // The default table finds 1001; only the exact-bound check rejects it.
         assert!(decrypt_balance_bounded(&hex, &sk, 1000).is_err());
     }
 
@@ -818,9 +824,9 @@ mod tests {
 
     #[test]
     fn decrypt_balance_bounded_keeps_small_balances_on_the_default_table() {
-        // A wide bound used to pick a wide width and build its lookup table
-        // (minutes and GBs) even for a tiny balance. It must stay on the default
-        // table, so once that is warm each call takes milliseconds.
+        // A small balance must decrypt on the default table even with a wide bound.
+        // Building the wide table instead returns the same result but takes a minute
+        // or more, so the time limit is what catches a regression.
         let (sk, pk) = keypair::generate().unwrap();
         let r = encrypt::random_blinding_factor().unwrap();
         let hex = upper_hex(encrypt::encrypt(1234, &pk, &r).unwrap().as_bytes());
