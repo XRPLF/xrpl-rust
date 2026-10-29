@@ -76,7 +76,7 @@ cargo clippy
 
 ### Running Tests
 
-For integration tests, we use an `xrpld` node in standalone mode to test xrpl-rust code against. To set this up, you can either configure and run `xrpld` locally, or set up the Docker container `rippleci/xrpld` by [following these instructions](#integration-tests). The latter will require you to [install Docker](https://docs.docker.com/get-docker/).
+For integration tests, we use an `xrpld` node in standalone mode to test xrpl-rust code against. To set this up, you can either configure and run `xrpld` locally, or set up the Docker container `xrplf/xrpld` by [following these instructions](#integration-tests). The latter will require you to [install Docker](https://docs.docker.com/get-docker/).
 
 #### Unit Tests
 
@@ -97,7 +97,7 @@ From the `xrpl-rust` folder, run the following commands:
 # Sets up the xrpld standalone Docker container — skip if you already have it running
 docker run -p 5005:5005 -p 6006:6006 --rm -it --name xrpld_standalone \
   --volume "$PWD/.ci-config/:/etc/xrpld/" \
-  rippleci/xrpld:develop --standalone
+  xrplf/xrpld:develop --standalone
 cargo test --release \
   --features std,json-rpc,helpers,cli,websocket,integration \
   -- --test-threads=1
@@ -123,12 +123,12 @@ Breaking down the `docker run` command:
 - `-it` keeps stdin open so you can stop the node with Ctrl-C.
 - `--name xrpld_standalone` is an instance name for clarity.
 - `--volume $PWD/.ci-config/:/etc/xrpld/`: bind-mounts the host directory (left side) into the container (right side). `xrpld.cfg` lives in `$PWD/.ci-config/`, and this command is intended to be run from the root of the `xrpl-rust` project. The `xrpld` binary searches for its configuration file inside `/etc/xrpld/`. An absolute path is required, so we use `$PWD` instead of `./`.
-- `rippleci/xrpld` is an image that is regularly updated with the latest `xrpld` releases (the binary formerly known as `rippled`; see xrpl.js PR #3270).
+- `xrplf/xrpld` is the official image, published to Docker Hub from the `xrpld` repository: `xrplf/xrpld:develop` tracks the `develop` branch, and each release is tagged by version (for example `xrplf/xrpld:3.4.1`). `xrpld` is the binary formerly known as `rippled`.
 - `--standalone` starts `xrpld` in standalone mode, where ledgers only close on demand.
 
 **Private xrpld images in CI**
 
-Maintainers can run the CI integration tests against a private xrpld image by committing a version to `.github/xrpld-image.env`. Set `XRPLD_PRIVATE_VERSION` to the version without the `private-` prefix (for example, `XRPLD_PRIVATE_VERSION=3.3.0-rc2`); every workflow run triggered afterwards — including pull request runs — pulls `registry.gitlab.com/ripple/xrpledger/xrpld_package_deploy/xrpld-private:private-<version>`. Leave the value empty to use the default public image `rippleci/xrpld:develop`.
+Maintainers can run the CI integration tests against a private xrpld image by committing a version to `.github/xrpld-image.env`. Set `XRPLD_PRIVATE_VERSION` to the version without the `private-` prefix (for example, `XRPLD_PRIVATE_VERSION=3.3.0-rc2`); every workflow run triggered afterwards — including pull request runs — pulls `registry.gitlab.com/ripple/xrpledger/xrpld_package_deploy/xrpld-private:private-<version>`. Leave the value empty to use the default public image `xrplf/xrpld:develop`.
 
 Private image access requires the repository variable `GITLAB_REGISTRY_USERNAME` and repository secret `GITLAB_REGISTRY_TOKEN`, configured with a GitLab deploy token that has `read_registry` access. These credentials are not exposed to fork pull requests, so a private version must be tested from a branch in this repository; a fork pull request with a private version set will fail fast rather than silently fall back.
 

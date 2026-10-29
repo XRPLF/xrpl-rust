@@ -38,6 +38,7 @@ struct AccountCreateAttestation<'a> {
 }
 
 #[tokio::test]
+#[ignore = "XChainBridge was removed from xrpld (XRPLF/rippled#8255); current xrpld images reject these transactions"]
 async fn test_xchain_add_account_create_attestation_base() {
     with_blockchain_lock(|| async {
         let bridge_setup = setup_bridge().await;
