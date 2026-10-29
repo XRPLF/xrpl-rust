@@ -635,7 +635,7 @@ async fn confidential_mpt_prepare_lifecycle() {
         )
         .await;
 
-        // Bounds the O(range) decrypt search inside the prepare_* helpers.
+        // Upper bound on the balances below; picks the decrypt search width.
         let max_balance: u64 = 1000;
 
         // 1. holder1: convert 10 (registers key) then merge → spending 10.

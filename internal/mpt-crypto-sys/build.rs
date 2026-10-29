@@ -30,13 +30,13 @@ use std::time::Duration;
 
 /// Upstream mpt-crypto release tag this crate is built against.
 /// Must match the version whose headers generated `src/bindings.rs`.
-const MPT_CRYPTO_VERSION: &str = "1.0.4";
+const MPT_CRYPTO_VERSION: &str = "1.1.0-rc1";
 
 /// SHA-256 of `mpt-crypto-natives-<MPT_CRYPTO_VERSION>.tar.gz`.
 /// Computed at release time; verified on every download.
 ///
 /// Update via `scripts/fetch_upstream.sh` which prints the new value.
-const BUNDLE_SHA256: &str = "d1ab71ca8d23028acdc2a877602e7a44e9b14b6a2cc33976888a793533804c9d";
+const BUNDLE_SHA256: &str = "0f3f4b32c7c1f5b0339e655732c83d57f21bae1c6e37e8b8c4037798c3e87442";
 
 fn main() {
     // docs.rs builds in a network-isolated sandbox with no native
