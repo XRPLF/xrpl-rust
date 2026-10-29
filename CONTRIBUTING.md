@@ -262,16 +262,49 @@ match derive_keypair(seed, validator) {
 
 ## Release Process
 
-1. Create a processing branch `process/[VERSION]`
-2. Brach management:
+The workspace publishes three crates to crates.io. They depend on each other in one direction: `mpt-crypto-sys` → `mpt-crypto` → `xrpl-rust` (through its `confidential-mpt` feature). `xrpl-rust-macros` is released separately and only when it changes.
 
-- If this is a new version, increment the version in the `Cargo.toml` and target `main`.
-- If this a patch release, chery-pick commits being released and target `versions/v[major]`.
+### 1. Choose the versions
 
-3. Collect required merge approvals.
-4. Merge release PR.
-5. Tag release.
-6. [TODO automate] Run `cargo publish`.
+Follow [semver](https://semver.org/). A breaking change to `xrpl-rust` bumps its major version. `mpt-crypto` and `mpt-crypto-sys` are below 1.0, so a breaking change to either bumps its minor version (0.1.x → 0.2.0). A crate whose dependency took a breaking bump usually takes one too, since the dependency's types appear in its own API.
+
+### 2. Open a release PR
+
+On a `release-<version>` branch from `main`:
+
+- Bump `version` in the `Cargo.toml` of each crate being released.
+- Update the `version` of every dependency on a released crate: `mpt-crypto-sys` in `internal/mpt-crypto/Cargo.toml` (under both `[dependencies]` and `[dev-dependencies]`), and `mpt-crypto` in the root `Cargo.toml`.
+- In `CHANGELOG.md`, add a `## [[v<version>]]` heading below `## [[Unreleased]]`, so the unreleased entries become that version's notes.
+- Check that every crate packages and builds as it will on crates.io:
+
+  ```bash
+  cargo publish --dry-run --allow-dirty -p mpt-crypto-sys -p mpt-crypto -p xrpl-rust
+  ```
+
+Get an approval and merge the PR before publishing.
+
+### 3. Publish
+
+Publishing needs crates.io ownership of each crate (ask an existing owner to run `cargo owner --add <github-user>`) and an API token with the `publish-update` scope, set up with `cargo login`.
+
+From the merged `main`, publish bottom-up, because each crate needs the previous one to be on crates.io:
+
+```bash
+git checkout main && git pull
+cargo publish -p mpt-crypto-sys
+cargo publish -p mpt-crypto
+cargo publish -p xrpl-rust
+```
+
+Skip any crate whose version didn't change. A published version can't be replaced or deleted, only yanked, so publish only from the merged commit.
+
+### 4. Tag and create GitHub releases
+
+On the merged commit, create one tag and GitHub release per published crate: `v<version>` for `xrpl-rust`, and `mpt-crypto-v<version>` / `mpt-crypto-sys-v<version>` for the others. Use the crate's `CHANGELOG.md` section as the release notes.
+
+```bash
+gh release create v2.0.0 --target <merge-commit-sha> --title v2.0.0 --notes-file <notes.md>
+```
 
 ### Editing the Code
 

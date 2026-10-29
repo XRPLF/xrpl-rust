@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [[Unreleased]]
 
+## [[v2.0.0]]
+
 ### Added
 
 - Support for the [`LendingProtocol` amendment (XLS-66)](https://github.com/XRPLF/XRPL-Standards/pull/192): the `LoanBrokerSet`, `LoanBrokerDelete`, `LoanBrokerCoverDeposit`, `LoanBrokerCoverWithdraw`, `LoanBrokerCoverClawback`, `LoanSet`, `LoanPay`, `LoanManage` and `LoanDelete` transactions, the `Loan` and `LoanBroker` ledger objects, and `signing::sign_loan_set_by_counterparty` ([#162](https://github.com/XRPLF/xrpl-rust/pull/162)).
