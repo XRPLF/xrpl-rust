@@ -831,24 +831,22 @@ fn test_encode_for_signing_claim() {
     assert_eq!(actual, expected);
 }
 
-/// Leading byte 0x20 has MPT flag set but sign bit (0x40) clear → negative.
+/// Leading byte 0x20 has MPT flag set but sign bit (0x40) clear — malformed wire data.
+/// The decoder must reject this rather than silently producing a negative-prefixed string.
 #[test]
 fn test_mpt_amount_negative_sign_bit() {
     use types::{Amount, TryFromParser};
 
-    // 0x20 = MPT flag (0x20) set, sign bit (0x40) NOT set → negative
+    // 0x20 = MPT flag (0x20) set, sign bit (0x40) NOT set — MPT amounts are always positive.
     // amount = 0x0000000000000064 = 100 decimal
     // mpt_issuance_id = 00002403C84A0A28E0190E208E982C352BBD5006600555CF
     let hex = "20000000000000006400002403C84A0A28E0190E208E982C352BBD5006600555CF";
     let bytes = hex::decode(hex).unwrap();
     let mut parser = BinaryParser::from(bytes.as_slice());
     let amount = Amount::from_parser(&mut parser, None).expect("from_parser failed");
-    let json: serde_json::Value = serde_json::to_value(&amount).expect("serialize failed");
-
-    assert_eq!(json["value"], "-100");
-    assert_eq!(
-        json["mpt_issuance_id"],
-        "00002403C84A0A28E0190E208E982C352BBD5006600555CF"
+    assert!(
+        serde_json::to_value(&amount).is_err(),
+        "MPT amount with cleared positive bit must be rejected by the decoder"
     );
 }
 
