@@ -25,11 +25,6 @@ async fn wait_seconds(_seconds: u64) {
         use core::time::Duration;
         actix_rt::time::sleep(Duration::from_secs(_seconds)).await;
     }
-    #[cfg(feature = "async-std-rt")]
-    {
-        use core::time::Duration;
-        async_std::task::sleep(Duration::from_secs(_seconds)).await;
-    }
     #[cfg(feature = "futures-rt")]
     {
         use core::time::Duration;
