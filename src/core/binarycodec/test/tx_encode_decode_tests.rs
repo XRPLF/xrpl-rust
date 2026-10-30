@@ -1041,6 +1041,43 @@ fn test_encode_for_signing_invalid_transaction_type() {
     assert!(encode_for_signing(&tx).is_err());
 }
 
+// ============================================================
+// Issue type: endianness and NO_ACCOUNT collision guard tests
+// ============================================================
+
+/// MPT round-trip with an explicit sequence value, verifying that the sequence
+/// survives the JSON -> binary -> JSON trip unchanged. The sequence is stored
+/// little-endian in the wire buffer and converted back to big-endian for the
+/// mpt_issuance_id output.
+#[test]
+fn test_issue_mpt_sequence_roundtrip_endian() {
+    use types::{Issue, TryFromParser};
+
+    // mpt_issuance_id: 4-byte sequence (BE) = 0x000002DF, followed by 20-byte issuer.
+    // This is the same ID used in the MPToken ledger entry fixture above.
+    let mpt_json = serde_json::json!({
+        "mpt_issuance_id": "000002DF71CAE59C9B7E56587FFF74D4EA5830D9BE3CE0CC"
+    });
+    let issue = Issue::try_from(mpt_json.clone()).expect("Issue::try_from MPT failed");
+
+    // The 4-byte sequence is stored little-endian at offset 40 in the 44-byte
+    // buffer (issuer[0..20] + NO_ACCOUNT[20..40] + sequence_le[40..44]).
+    let buf = issue.as_ref();
+    assert_eq!(buf.len(), 44, "MPT buffer must be exactly 44 bytes");
+    let stored_seq_le: [u8; 4] = buf[40..44].try_into().unwrap();
+    let stored_seq = u32::from_le_bytes(stored_seq_le);
+    assert_eq!(
+        stored_seq, 0x000002DF,
+        "sequence must round-trip correctly (stored LE, value unchanged)"
+    );
+
+    // Full round-trip through from_parser must recover the original JSON.
+    let mut parser = BinaryParser::from(buf);
+    let parsed = Issue::from_parser(&mut parser, None).expect("from_parser failed");
+    let result: serde_json::Value = serde_json::to_value(&parsed).expect("serialize failed");
+    assert_eq!(result, mpt_json);
+}
+
 /// Regression test: IOU amounts with positive exponents (value >= 1e16) must
 /// round-trip correctly. Previously `unsigned_abs()` discarded the exponent sign,
 /// causing values like "12345678901234560" to decode as "123456789012345.6".
