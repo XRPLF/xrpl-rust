@@ -1,4 +1,5 @@
 use crate::models::{Model, XRPLModelException, XRPLModelResult};
+use crate::utils::MAX_DROPS;
 use alloc::{
     borrow::Cow,
     string::{String, ToString},
@@ -13,13 +14,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Represents an amount of XRP in Drops.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct XRPAmount<'a>(pub Cow<'a, str>);
 
 impl<'a> Model for XRPAmount<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self.0.parse::<u32>()?;
-
+        let drops = self.0.parse::<u64>()?;
+        if drops > MAX_DROPS {
+            return Err(XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: alloc::format!("a drop amount <= {} (MAX_DROPS)", MAX_DROPS),
+                found: drops.to_string(),
+            });
+        }
         Ok(())
     }
 }
@@ -102,13 +109,38 @@ impl<'a> TryFrom<Value> for XRPAmount<'a> {
             });
         }
 
-        match serde_json::to_string(&value) {
-            Ok(amount_string) => {
-                let amount_string = amount_string.clone().replace("\"", "");
-                Ok(Self(amount_string.into()))
-            }
-            Err(serde_error) => Err(serde_error.into()),
+        // Extract the string representation directly — no serde_json roundtrip needed.
+        // For JSON strings use as_str(); for JSON numbers use to_string(). The earlier
+        // type guard ensures only these two variants reach this point.
+        let raw = match &value {
+            Value::String(s) => s.clone(),
+            Value::Number(n) => n.to_string(),
+            _ => unreachable!(),
+        };
+
+        // Enforce non-negative integer drops at the deserialization boundary.
+        // u64::parse rejects negatives, fractions, and non-numerics in one step
+        // and produces a canonical decimal string (no trailing zeros, no scientific
+        // notation), ensuring Eq and Ord agree for all TryFrom<Value>-constructed values.
+        // The parsed value is additionally bounded by MAX_DROPS (10^17) to match
+        // the protocol limit enforced by verify_valid_xrp_value elsewhere in the crate.
+        let drops = raw
+            .parse::<u64>()
+            .map_err(|_| XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: "a non-negative integer (XRP drops)".into(),
+                found: raw,
+            })?;
+
+        if drops > MAX_DROPS {
+            return Err(XRPLModelException::InvalidValue {
+                field: "XRPAmount".into(),
+                expected: alloc::format!("a drop amount <= {} (MAX_DROPS)", MAX_DROPS),
+                found: drops.to_string(),
+            });
         }
+
+        Ok(Self(drops.to_string().into()))
     }
 }
 
@@ -156,6 +188,14 @@ impl<'a> XRPAmount<'a> {
     }
 }
 
+impl<'a> PartialEq for XRPAmount<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == core::cmp::Ordering::Equal
+    }
+}
+
+impl<'a> Eq for XRPAmount<'a> {}
+
 impl<'a> PartialOrd for XRPAmount<'a> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
@@ -164,8 +204,21 @@ impl<'a> PartialOrd for XRPAmount<'a> {
 
 impl<'a> Ord for XRPAmount<'a> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.checked_cmp(other)
-            .expect("cannot compare invalid XRPAmount values")
+        // Partition into two groups: parseable u64 drop amounts and everything else.
+        // - Both numeric: compare by integer value (guarantees transitivity).
+        // - One numeric, one non-numeric: numeric < non-numeric (stable partition).
+        // - Both non-numeric: lexicographic (byte) order.
+        //
+        // This ensures a total order with full transitivity even when mixed
+        // numeric/non-numeric values appear in the same collection. PartialEq/Eq
+        // are defined in terms of this method so that a == b ↔ cmp(a, b) == Equal
+        // always holds, including non-canonical inputs such as "0100" vs "100".
+        match (self.0.parse::<u64>(), other.0.parse::<u64>()) {
+            (Ok(a), Ok(b)) => a.cmp(&b),
+            (Ok(_), Err(_)) => core::cmp::Ordering::Less,
+            (Err(_), Ok(_)) => core::cmp::Ordering::Greater,
+            (Err(_), Err(_)) => self.0.cmp(&other.0),
+        }
     }
 }
 
@@ -212,13 +265,138 @@ mod tests {
         assert!(invalid1.checked_cmp(&invalid2).is_err());
     }
 
+    // Regression for #347: cmp must not panic on non-numeric strings constructed
+    // via From<&str> (the deserialization path now rejects them before storage).
     #[test]
-    #[should_panic(expected = "cannot compare invalid XRPAmount values")]
-    fn test_cmp_panics_on_malformed() {
+    fn test_cmp_non_numeric_does_not_panic() {
         let valid = XRPAmount("100".into());
         let malformed = XRPAmount("xyz".into());
-
+        // Must not panic — falls back to lexicographic ordering for non-numeric values
         let _ = valid.cmp(&malformed);
+    }
+
+    // Regression for #347: try_from must reject non-numeric strings, closing
+    // the path that allowed malformed values into Ord::cmp.
+    #[test]
+    fn test_try_from_rejects_non_numeric_string() {
+        let bad = XRPAmount::try_from(serde_json::Value::String("not-a-number".into()));
+        assert!(bad.is_err(), "non-numeric string must be rejected");
+
+        let bad2 = XRPAmount::try_from(serde_json::Value::String("1e2x".into()));
+        assert!(bad2.is_err(), "malformed numeric string must be rejected");
+    }
+
+    // Regression for #349: non-canonical strings normalize to canonical form
+    // so Eq and Ord agree for deserialized values.
+    #[test]
+    fn test_try_from_normalizes_canonical_form() {
+        let a = XRPAmount::try_from(serde_json::Value::String("0100".into())).unwrap();
+        let b = XRPAmount::try_from(serde_json::Value::String("100".into())).unwrap();
+        // After normalization both store "100", so Eq and Ord agree
+        assert_eq!(a, b, "normalized forms must be equal by Eq");
+        assert_eq!(
+            a.cmp(&b),
+            core::cmp::Ordering::Equal,
+            "must be Equal by Ord"
+        );
+    }
+
+    #[test]
+    fn test_try_from_rejects_negative_drops() {
+        let bad = XRPAmount::try_from(serde_json::Value::String("-100".into()));
+        assert!(bad.is_err(), "negative drop amount must be rejected");
+
+        let bad_num = XRPAmount::try_from(serde_json::json!(-100_i64));
+        assert!(bad_num.is_err(), "negative JSON number must be rejected");
+    }
+
+    #[test]
+    fn test_try_from_rejects_fractional_drops() {
+        let bad = XRPAmount::try_from(serde_json::Value::String("1.5".into()));
+        assert!(bad.is_err(), "fractional drop amount must be rejected");
+
+        let bad2 = XRPAmount::try_from(serde_json::Value::String("100.00".into()));
+        assert!(bad2.is_err(), "decimal-formatted drop must be rejected");
+    }
+
+    #[test]
+    fn test_try_from_accepts_zero() {
+        let zero = XRPAmount::try_from(serde_json::json!(0_u64));
+        assert!(zero.is_ok(), "zero drops must be accepted");
+        assert_eq!(zero.unwrap().0.as_ref(), "0");
+    }
+
+    #[test]
+    fn test_try_from_accepts_large_drop_value() {
+        // MAX_DROPS = 10^17 is the protocol-defined upper bound on valid drops.
+        // The boundary value itself must be accepted.
+        use crate::utils::MAX_DROPS;
+        let max = XRPAmount::try_from(serde_json::Value::String(MAX_DROPS.to_string().into()));
+        assert!(max.is_ok(), "MAX_DROPS must be accepted as a valid amount");
+        assert_eq!(max.unwrap().0.as_ref(), MAX_DROPS.to_string());
+    }
+
+    #[test]
+    fn test_try_from_rejects_above_max_drops() {
+        // Values exceeding MAX_DROPS (10^17) must be rejected at deserialization
+        // to stay consistent with verify_valid_xrp_value and the binary codec.
+        use crate::utils::MAX_DROPS;
+        let over = MAX_DROPS + 1;
+        let err = XRPAmount::try_from(serde_json::Value::String(over.to_string().into()));
+        assert!(
+            err.is_err(),
+            "a drop amount above MAX_DROPS must be rejected, got Ok for {}",
+            over
+        );
+    }
+
+    #[test]
+    fn test_ord_fallback_non_numeric_uses_byte_order() {
+        // Non-numeric From<&str>-constructed values fall back to lexicographic ordering
+        // (byte-for-byte), consistent with Eq. This satisfies the Ord contract.
+        let a = XRPAmount("xyz".into());
+        let b = XRPAmount("abc".into());
+        assert_eq!(
+            a.cmp(&b),
+            "xyz".cmp("abc"),
+            "non-numeric cmp must match byte-order (consistent with Eq)"
+        );
+        assert_eq!(
+            b.cmp(&a),
+            "abc".cmp("xyz"),
+            "symmetry of lexicographic fallback"
+        );
+    }
+
+    // Regression for the transitivity counter-example from the review finding:
+    // a="9" (numeric), b="10" (numeric), c="1x" (non-numeric).
+    // The partition-based Ord must place all numerics before all non-numerics,
+    // so all three pairwise comparisons must be Less (a < b < c, a < c).
+    #[test]
+    fn test_ord_transitivity_mixed_numeric_and_non_numeric() {
+        let a = XRPAmount("9".into());
+        let b = XRPAmount("10".into());
+        let c = XRPAmount("1x".into());
+        assert_eq!(a.cmp(&b), Ordering::Less, "9 < 10 (numeric)");
+        assert_eq!(
+            b.cmp(&c),
+            Ordering::Less,
+            "10 < \"1x\" (numeric before non-numeric)"
+        );
+        assert_eq!(
+            a.cmp(&c),
+            Ordering::Less,
+            "9 < \"1x\" (numeric before non-numeric)"
+        );
+    }
+
+    // Verify that custom Eq is consistent with Ord for non-canonical forms.
+    #[test]
+    fn test_eq_consistent_with_ord_for_non_canonical_strings() {
+        let a = XRPAmount("0100".into());
+        let b = XRPAmount("100".into());
+        assert_eq!(a.cmp(&b), Ordering::Equal, "0100 == 100 numerically");
+        assert_eq!(a, b, "Eq must agree with Ord for non-canonical forms");
     }
 
     #[test]
