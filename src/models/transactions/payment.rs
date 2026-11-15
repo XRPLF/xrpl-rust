@@ -100,10 +100,21 @@ pub struct Payment<'a> {
     /// Credential IDs attached to this transaction.
     #[serde(rename = "CredentialIDs")]
     pub credential_ids: Option<Vec<Cow<'a, str>>>,
+    /// The ledger entry ID of a permissioned domain. With it, a cross-currency
+    /// payment uses only offers in that domain's permissioned DEX. The sender
+    /// and the destination must both be in the domain: its owner, or holding
+    /// one of its accepted credentials (rippled checks this against the ledger,
+    /// `tecNO_PERMISSION`). Needs the PermissionedDEX amendment.
+    ///
+    /// See Permissioned DEXes:
+    /// `<https://xrpl.org/docs/concepts/tokens/decentralized-exchange/permissioned-dexes>`
+    #[serde(rename = "DomainID")]
+    pub domain_id: Option<Cow<'a, str>>,
 }
 
 impl<'a: 'static> Model for Payment<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
+        super::permissioned_domain_set::validate_optional_domain_id(&self.domain_id)?;
         self._get_xrp_transaction_error()?;
         self._get_partial_payment_error()?;
         self._get_exchange_error()?;
@@ -257,6 +268,7 @@ impl<'a> Payment<'a> {
             send_max,
             deliver_min,
             credential_ids: None,
+            domain_id: None,
         }
     }
 
@@ -302,6 +314,12 @@ impl<'a> Payment<'a> {
     /// Set credential IDs to attach to this transaction for credential-based authorization checks.
     pub fn with_credential_ids(mut self, credential_ids: Vec<Cow<'a, str>>) -> Self {
         self.credential_ids = Some(credential_ids);
+        self
+    }
+
+    /// Pay through this permissioned domain's DEX only (PermissionedDEX).
+    pub fn with_domain_id(mut self, domain_id: Cow<'a, str>) -> Self {
+        self.domain_id = Some(domain_id);
         self
     }
 
@@ -628,5 +646,89 @@ mod tests {
 
         assert_eq!(payment.paths.as_ref().unwrap().len(), 2);
         assert!(payment.validate().is_ok());
+    }
+
+    #[test]
+    fn test_domain_id_serde_and_validation() {
+        let txn = Payment {
+            common_fields: CommonFields {
+                account: "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
+                transaction_type: TransactionType::Payment,
+                ..Default::default()
+            },
+            amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                "USD".into(),
+                "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
+                "10".into(),
+            )),
+            destination: "rU4EE1FskCPJw5QkLx1iGgdWiJa6HeqYyb".into(),
+            ..Default::default()
+        }
+        .with_domain_id("C6B8F21B5D6B0A8E8C2B1F4E3D2A1908172635445362718293A4B5C6D7E8F901".into());
+        let value = serde_json::to_value(&txn).unwrap();
+        assert_eq!(
+            value["DomainID"],
+            "C6B8F21B5D6B0A8E8C2B1F4E3D2A1908172635445362718293A4B5C6D7E8F901"
+        );
+        let back: Payment = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            back.domain_id.as_deref(),
+            Some("C6B8F21B5D6B0A8E8C2B1F4E3D2A1908172635445362718293A4B5C6D7E8F901")
+        );
+        assert!(txn.get_errors().is_ok());
+
+        let short = txn.clone().with_domain_id("ABCD".into());
+        assert!(short.get_errors().is_err());
+        let not_hex = txn.clone().with_domain_id("Z".repeat(64).into());
+        assert!(not_hex.get_errors().is_err());
+        let zero = txn.clone().with_domain_id("0".repeat(64).into());
+        assert!(zero.get_errors().is_err());
+        // Either case is accepted; any length but 64 is not.
+        let lower = txn.clone().with_domain_id(
+            "c6b8f21b5d6b0a8e8c2b1f4e3d2a1908172635445362718293a4b5c6d7e8f901".into(),
+        );
+        assert!(lower.get_errors().is_ok());
+        let long = txn.clone().with_domain_id(("A".repeat(64) + "0").into());
+        assert!(long.get_errors().is_err());
+        let short63 = txn.clone().with_domain_id("A".repeat(63).into());
+        assert!(short63.get_errors().is_err());
+        let none = {
+            let mut t = txn.clone();
+            t.domain_id = None;
+            t
+        };
+        assert!(none.get_errors().is_ok());
+        assert!(serde_json::to_value(&none)
+            .unwrap()
+            .get("DomainID")
+            .is_none());
+    }
+
+    #[cfg(feature = "core")]
+    #[test]
+    fn test_domain_id_through_the_binary_codec() {
+        use crate::core::binarycodec::{decode, encode};
+        use alloc::string::String;
+        let upper = "C6B8F21B5D6B0A8E8C2B1F4E3D2A1908172635445362718293A4B5C6D7E8F901";
+        let payment = |domain: String| {
+            Payment {
+                common_fields: CommonFields {
+                    account: "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
+                    transaction_type: TransactionType::Payment,
+                    ..Default::default()
+                },
+                amount: Amount::IssuedCurrencyAmount(IssuedCurrencyAmount::new(
+                    "USD".into(),
+                    "rLyttXLh7Ttca9CMUaD3exVoXY2fn2zwj3".into(),
+                    "10".into(),
+                )),
+                destination: "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn".into(),
+                ..Default::default()
+            }
+            .with_domain_id(domain.into())
+        };
+        let hex = encode(&payment(upper.to_string())).unwrap();
+        assert_eq!(hex, encode(&payment(upper.to_lowercase())).unwrap());
+        assert_eq!(decode(&hex).unwrap()["DomainID"], upper);
     }
 }

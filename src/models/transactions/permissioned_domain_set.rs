@@ -104,8 +104,10 @@ pub(crate) fn validate_accepted_credentials(
     Ok(())
 }
 
-/// Validates a DomainID per XLS-80: must be a non-zero 64-character hex string
-/// (the 32-byte hash of the PermissionedDomain ledger entry, serialized as uppercase hex).
+/// Validates a DomainID per XLS-80: a non-zero 64-character hex string, in
+/// either case (the 32-byte ID of the PermissionedDomain ledger entry; the
+/// ledger shows it in upper case, and the binary codec encodes either case
+/// to the same bytes).
 pub(crate) fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelResult<()> {
     if domain_id.len() != 64
         || !domain_id.chars().all(|c| c.is_ascii_hexdigit())
@@ -118,6 +120,17 @@ pub(crate) fn validate_domain_id(domain_id: &str) -> crate::models::XRPLModelRes
         });
     }
     Ok(())
+}
+
+/// Validates an optional `DomainID` field (`OfferCreate`, `Payment`): absent is
+/// fine; present, it must pass [`validate_domain_id`].
+pub(crate) fn validate_optional_domain_id(
+    domain_id: &Option<Cow<'_, str>>,
+) -> crate::models::XRPLModelResult<()> {
+    match domain_id {
+        Some(id) => validate_domain_id(id),
+        None => Ok(()),
+    }
 }
 
 /// Validates a `Credential` entry per XLS-80 / rippled `LedgerFormats.cpp`:
