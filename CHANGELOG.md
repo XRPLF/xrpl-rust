@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Support for the [`TokenEscrow` amendment (XLS-85)](https://xls.xrpl.org/xls/XLS-0085-token-escrow.html) on `EscrowCreate` (part of [#159](https://github.com/XRPLF/xrpl-rust/issues/159)): `EscrowCreate.amount` is an `Amount`, so an escrow can hold XRP, an issued (trust-line) token, or an MPT. A trust-line token's issuer needs `asfAllowTrustLineLocking`, and an MPT issuance needs `lsfMPTCanEscrow`; the ledger checks both.
+- `EscrowCreate::get_errors()` refuses two cases rippled 3.4.1's `EscrowCreate::preflight` refuses, the same for XRP and tokens: no `FinishAfter` and no `CancelAfter` (`temBAD_EXPIRATION`), and no `Condition` without `FinishAfter` (`temMALFORMED`). It also refuses a `Condition` that rippled's decoder (`Condition::deserialize`) would refuse: it must be a DER PREIMAGE-SHA-256 crypto-condition of at most 128 bytes, with a 32-byte fingerprint, a cost of at most 128, and no trailing bytes. The decoder is ported from rippled, with its ISC notice. Previously an empty or malformed condition passed `get_errors()`, was signed, and was only refused by the server. Preflight's amount checks are not repeated here.
 - Support for the [`LendingProtocol` amendment (XLS-66)](https://github.com/XRPLF/XRPL-Standards/pull/192): the `LoanBrokerSet`, `LoanBrokerDelete`, `LoanBrokerCoverDeposit`, `LoanBrokerCoverWithdraw`, `LoanBrokerCoverClawback`, `LoanSet`, `LoanPay`, `LoanManage` and `LoanDelete` transactions, the `Loan` and `LoanBroker` ledger objects, and `signing::sign_loan_set_by_counterparty` ([#162](https://github.com/XRPLF/xrpl-rust/pull/162)).
 - Support for the `LendingProtocolV1_1` amendment ([XLS-0058](https://github.com/XRPLF/XRPL-Standards/pull/582), [XLS-0066 V1_1](https://github.com/XRPLF/XRPL-Standards/pull/587)): close-ended vaults (`VaultKind`, `SubscriptionDate` and `RedemptionDate` on `VaultCreate` and on the `Vault` ledger object) and `VaultDelete.MemoData`.
 - `CredentialIDs` on `VaultWithdraw` and `LoanBrokerCoverWithdraw`, which rippled gates on `Credentials` plus `fixCleanup3_4_0` (`checkExtraFeatures` on both transactors) rather than on `LendingProtocolV1_1`.
@@ -26,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** `EscrowCreate.amount` is now `Amount<'a>` instead of `XRPAmount<'a>`, and `EscrowCreate::new` takes `impl Into<Amount<'a>>`.
+  - `EscrowCreate::new(..)` with a concrete `XRPAmount` compiles unchanged.
+  - A struct literal or a field assignment needs a conversion: `EscrowCreate { amount: xrp.into(), .. }` or `Amount::XRPAmount(xrp)`.
+  - Code that reads the field (for example `escrow.amount.0`) matches on `Amount::XRPAmount(..)`.
+  - An amount whose type was inferred at the call to `new` (`"10000".into()`, `Default::default()`, `.parse()?`) needs the type named, as in `XRPAmount::from("10000")`.
+  - `get_errors()` is stricter at run time: an escrow with no expiry, `CancelAfter` alone without a `Condition`, or a malformed `Condition` is now refused before signing.
 - `definitions.json` regenerated from `server_definitions` on rippled 3.4.0-rc1: adds the `LendingProtocolV1_1` fields (`VaultKind`, `SubscriptionDate`, `RedemptionDate`, `LEVersion`), the smart-contract and confidential-MPT key-epoch fields, six new transaction results, and the `SponsorshipSet` / `EscrowCreate` format updates; drops the Hooks fields, which rippled no longer supports. No existing field's code, type or signing flag changed.
 - **Breaking:** Confidential MPT decryption uses mpt-crypto's Baby-Step Giant-Step solver instead of a brute-force search capped at 1,000,000, so any MPT balance can be decrypted. The range-based `encrypt::decrypt_in_range` and `confidential::decrypt_balance_in_range` are replaced by `encrypt::decrypt_with_bits` and `confidential::decrypt_balance_bounded`. Decryption time now grows with the amount, where the old search always ran its full range.
 - **Breaking:** `mpt-crypto-sys`'s bindings are regenerated from mpt-crypto 1.1.0-rc1: `mpt_decrypt_amount` takes 3 arguments instead of 5, and the release's key rotation, mirror update and balance recovery functions are now bound (not yet wrapped by `mpt-crypto`).
