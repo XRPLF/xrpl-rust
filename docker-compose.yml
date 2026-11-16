@@ -2,7 +2,7 @@ version: "3"
 
 services:
   xrpld:
-    image: rippleci/xrpld:develop
+    image: xrplf/xrpld:develop
     volumes:
       - ./.ci-config:/etc/xrpld
     ports:

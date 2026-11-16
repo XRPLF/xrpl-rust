@@ -9,6 +9,7 @@ use xrpl::models::transactions::xchain_modify_bridge::XChainModifyBridge;
 use xrpl::models::{Amount, XRPAmount};
 
 #[tokio::test]
+#[ignore = "XChainBridge was removed from xrpld (XRPLF/rippled#8255); current xrpld images reject these transactions"]
 async fn test_xchain_modify_bridge_base() {
     with_blockchain_lock(|| async {
         let bridge = setup_bridge().await;

@@ -11,6 +11,7 @@ use xrpl::models::transactions::xchain_create_bridge::XChainCreateBridge;
 use xrpl::models::{Amount, Currency, XChainBridge, XRPAmount, XRP};
 
 #[tokio::test]
+#[ignore = "XChainBridge was removed from xrpld (XRPLF/rippled#8255); current xrpld images reject these transactions"]
 async fn test_xchain_create_bridge_base() {
     with_blockchain_lock(|| async {
         let door_wallet = generate_funded_wallet().await;
