@@ -48,34 +48,24 @@ pub fn encrypt(amount: u64, pubkey: &Pubkey, blinding: &BlindingFactor) -> Resul
     Ok(Ciphertext::new(out))
 }
 
-/// Default upper bound for the discrete-log search performed by [`decrypt`].
+/// Search width, in bits, that [`decrypt`] covers: amounts in `[0, 2^40)`.
 ///
-/// `mpt_decrypt_amount` (mpt-crypto >= 1.0) recovers the amount by searching the
-/// inclusive range `[range_low, range_high]`; cost scales linearly with its
-/// width (~3s for `0..=1_000_000` on Apple Silicon). Matches xrpl-py's
-/// `DEFAULT_DECRYPT_RANGE_HIGH`. Use [`decrypt_in_range`] for other windows.
-pub const DEFAULT_DECRYPT_RANGE_HIGH: u64 = 1_000_000;
+/// Matches upstream's `MPT_BSGS_DEFAULT_BITS_TOTAL`. Use [`decrypt_with_bits`]
+/// for wider (or narrower) widths.
+pub const DEFAULT_DECRYPT_BITS: u32 = 40;
 
-/// Decrypts a ciphertext using the holder's secret key, recovering the original
-/// `u64` amount by searching `0..=DEFAULT_DECRYPT_RANGE_HIGH`.
+/// Largest search width accepted by [`decrypt_with_bits`]; MPT amounts never
+/// exceed `2^63 - 1`.
+pub const MAX_DECRYPT_BITS: u32 = 63;
+
+/// Decrypts a ciphertext using the holder's secret key, recovering amounts in
+/// `[0, 2^DEFAULT_DECRYPT_BITS)`.
 ///
-/// The C implementation uses a discrete-log lookup table for u64 — fast for
-/// small / typical balances, slow over wide ranges. Use [`decrypt_in_range`] to
-/// search a different window.
+/// Uses upstream's Baby-Step Giant-Step solver. The first call builds a ~22 MB
+/// lookup table (several seconds) that later calls reuse for the life of the
+/// process. Decryption is **not constant-time**: it takes longer for larger
+/// amounts, so do not expose its latency to untrusted observers.
 pub fn decrypt(ciphertext: &Ciphertext, privkey: &Privkey) -> Result<u64> {
-    decrypt_in_range(ciphertext, privkey, 0, DEFAULT_DECRYPT_RANGE_HIGH)
-}
-
-/// Decrypts a ciphertext, searching the inclusive range `[range_low, range_high]`.
-///
-/// `range_high` must be `< u64::MAX` and `>= range_low`; otherwise the underlying
-/// call returns `-2`, surfaced here as [`Error::NonZeroRc`].
-pub fn decrypt_in_range(
-    ciphertext: &Ciphertext,
-    privkey: &Privkey,
-    range_low: u64,
-    range_high: u64,
-) -> Result<u64> {
     let mut amount: u64 = 0;
     // SAFETY: pointers are valid for the call; `&mut amount` is exclusive.
     let rc = unsafe {
@@ -83,12 +73,79 @@ pub fn decrypt_in_range(
             ciphertext.as_bytes().as_ptr(),
             privkey.as_bytes().as_ptr(),
             &mut amount,
-            range_low,
-            range_high,
         )
     };
     if rc != 0 {
         return Err(Error::NonZeroRc(rc));
     }
     Ok(amount)
+}
+
+/// Decrypts a ciphertext known to encrypt an amount below `2^bits`.
+///
+/// `bits` must be in `1..=MAX_DECRYPT_BITS`; otherwise the underlying call
+/// returns `-2`, surfaced here as [`Error::NonZeroRc`]. [`bits_for`] derives it
+/// from a known upper bound (e.g. the issuance's `ConfidentialOutstandingAmount`).
+/// The first call for a width builds its lookup table, and wider widths take
+/// longer to build and to search; a failed decrypt (a valid key that isn't the
+/// recipient's, or an amount of `2^bits` or more) searches the whole width
+/// before returning. Besides the default width's table, mpt-crypto keeps only
+/// the most recently used one, so alternating between other widths rebuilds it
+/// each time. Not constant-time; see [`decrypt`].
+pub fn decrypt_with_bits(ciphertext: &Ciphertext, privkey: &Privkey, bits: u32) -> Result<u64> {
+    // Out-of-range widths wrap to -1 here; the C side rejects them with -2.
+    let bits = i32::try_from(bits).unwrap_or(-1);
+    let mut amount: u64 = 0;
+    // SAFETY: pointers are valid for the call; `&mut amount` is exclusive.
+    let rc = unsafe {
+        sys::mpt_decrypt_amount_with_bits_total(
+            ciphertext.as_bytes().as_ptr(),
+            privkey.as_bytes().as_ptr(),
+            bits,
+            &mut amount,
+        )
+    };
+    if rc != 0 {
+        return Err(Error::NonZeroRc(rc));
+    }
+    Ok(amount)
+}
+
+/// Like [`decrypt_with_bits`], but the caller also picks `l1`, the baby-step
+/// width: the lookup table holds `2^(l1 - 1)` entries, so each +1 doubles its
+/// memory and build time and halves the search steps.
+///
+/// `l1` must be in `1..=32` and below `bits`; otherwise the underlying call
+/// returns `-2`. Prefer [`decrypt_with_bits`] unless you need to trade memory
+/// for speed.
+pub fn decrypt_with_bits_and_l1(
+    ciphertext: &Ciphertext,
+    privkey: &Privkey,
+    bits: u32,
+    l1: u32,
+) -> Result<u64> {
+    // Out-of-range values wrap to -1 here; the C side rejects them with -2.
+    let bits = i32::try_from(bits).unwrap_or(-1);
+    let l1 = i32::try_from(l1).unwrap_or(-1);
+    let mut amount: u64 = 0;
+    // SAFETY: pointers are valid for the call; `&mut amount` is exclusive.
+    let rc = unsafe {
+        sys::mpt_decrypt_amount_with_l1_bits_total(
+            ciphertext.as_bytes().as_ptr(),
+            privkey.as_bytes().as_ptr(),
+            bits,
+            l1,
+            &mut amount,
+        )
+    };
+    if rc != 0 {
+        return Err(Error::NonZeroRc(rc));
+    }
+    Ok(amount)
+}
+
+/// Smallest search width whose range `[0, 2^bits)` contains `max_amount`,
+/// capped at [`MAX_DECRYPT_BITS`] since MPT amounts never exceed `2^63 - 1`.
+pub fn bits_for(max_amount: u64) -> u32 {
+    (u64::BITS - max_amount.leading_zeros()).clamp(1, MAX_DECRYPT_BITS)
 }
