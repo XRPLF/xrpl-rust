@@ -1078,3 +1078,86 @@ fn test_iou_positive_exponent_roundtrip() {
         );
     }
 }
+
+/// A path step carrying the MPT bit consumes its full 24-byte issuance id, so the
+/// fields after it decode as the sender wrote them.
+///
+/// The issuance id in this fixture is made of bytes that also happen to be a
+/// valid `Account` encoding, so the test pins the decoded `Account` and the
+/// issuance id explicitly rather than only checking that the blob decodes.
+#[test]
+fn test_mpt_path_step_consumes_its_issuance_id() {
+    const SENDER: &str = "rsjFqp7jgizfFrfJRmAr7TQXY8E78TFFxr";
+    const MPT_ISSUANCE_ID: &str = "00811426A9B47D82B2E45A0C2E087B27967645578F515AE1";
+
+    let blob = "12000024000000016140000000000003E868400000000000000A\
+81141E09A593E4421C83A81448415261EB61DDA33B1E8314B5F762798A53D543A014CAF8B297CF\
+F8F2F937E801124000811426A9B47D82B2E45A0C2E087B27967645578F515AE100";
+
+    let decoded = decode(blob).expect("decode failed");
+
+    assert_eq!(decoded["Account"], SENDER);
+    assert_eq!(decoded["Paths"][0][0]["mpt_issuance_id"], MPT_ISSUANCE_ID);
+    assert_eq!(
+        encode(&decoded).expect("encode failed"),
+        blob.to_uppercase()
+    );
+}
+
+/// A path step type byte carrying a bit `rippled` does not define is rejected
+/// rather than skipped.
+#[test]
+fn test_unknown_path_step_type_bit_is_rejected() {
+    // Same transaction shape, but the path step type byte is 0x02 — undefined.
+    let blob = "12000024000000016140000000000003E868400000000000000A\
+81141E09A593E4421C83A81448415261EB61DDA33B1E8314B5F762798A53D543A014CAF8B297CF\
+F8F2F937E801120200";
+
+    assert!(decode(blob).is_err());
+}
+
+/// A field whose declared length runs past the end of the input is an error.
+#[test]
+fn test_truncated_mpt_path_step_is_rejected() {
+    // Type byte 0x40 declares 24 bytes of issuance id; only 2 are supplied.
+    let blob = "12000024000000016140000000000003E868400000000000000A\
+81141E09A593E4421C83A81448415261EB61DDA33B1E8314B5F762798A53D543A014CAF8B297CF\
+F8F2F937E80112400011";
+
+    assert!(decode(blob).is_err());
+}
+
+/// A bare 0x00 where a path step is expected terminates the path set; it is not a
+/// zero-field step.
+#[test]
+fn test_empty_path_is_rejected() {
+    let blob = "12000024000000016140000000000003E868400000000000000A\
+81141E09A593E4421C83A81448415261EB61DDA33B1E8314B5F762798A53D543A014CAF8B297CF\
+F8F2F937E8011200";
+
+    assert!(decode(blob).is_err());
+}
+
+/// `rippled` accepts a path step carrying both an issuer and an MPT issuance id,
+/// so a transaction containing one can be validated and recorded. This codec must
+/// be able to read it back.
+#[test]
+fn test_issuer_alongside_mpt_path_step_round_trips() {
+    let tx = serde_json::json!({
+        "Account": "rsjFqp7jgizfFrfJRmAr7TQXY8E78TFFxr",
+        "TransactionType": "Payment",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Amount": "1000",
+        "Fee": "10",
+        "Sequence": 1,
+        "Paths": [[{
+            "mpt_issuance_id": "00002403C84A0A28E0190E208E982C352BBD5006600555CF",
+            "issuer": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"
+        }]]
+    });
+
+    let encoded = encode(&tx).expect("encode failed");
+    let decoded = decode(&encoded).expect("decode failed");
+
+    assert_eq!(tx, decoded);
+}
