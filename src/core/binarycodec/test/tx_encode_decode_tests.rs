@@ -1161,3 +1161,44 @@ fn test_issuer_alongside_mpt_path_step_round_trips() {
 
     assert_eq!(tx, decoded);
 }
+
+/// A path step carrying none of the four encodable keys is rejected rather than
+/// encoded.
+#[test]
+fn test_path_step_with_no_fields_is_rejected() {
+    let tx = serde_json::json!({
+        "Account": "rsjFqp7jgizfFrfJRmAr7TQXY8E78TFFxr",
+        "TransactionType": "Payment",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Amount": "1000",
+        "Fee": "10",
+        "Sequence": 1,
+        "Paths": [[
+            {"account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"},
+            {}
+        ]]
+    });
+
+    assert!(encode(&tx).is_err());
+}
+
+/// The same case reached through `XRPLTypes::from_value`: a step made entirely of
+/// keys a path step cannot encode (the shape `path_find` results carry) is
+/// likewise rejected.
+#[test]
+fn test_path_step_of_only_unencodable_keys_is_rejected() {
+    let tx = serde_json::json!({
+        "Account": "rsjFqp7jgizfFrfJRmAr7TQXY8E78TFFxr",
+        "TransactionType": "Payment",
+        "Destination": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh",
+        "Amount": "1000",
+        "Fee": "10",
+        "Sequence": 1,
+        "Paths": [[
+            {"account": "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh"},
+            {"type": "1", "type_hex": "0000000000000001"}
+        ]]
+    });
+
+    assert!(encode(&tx).is_err());
+}

@@ -86,17 +86,25 @@ fn _is_path_set(value: &[Vec<IndexMap<String, String>>]) -> bool {
 /// Reject a path step type byte `rippled` would reject, and no others, matching
 /// `STPathSet`'s deserialising constructor:
 ///
-/// * a bit outside [`_TYPE_ALL`], and
-/// * `Currency` combined with `MPT`, which name the same slot.
+/// * a bit outside [`_TYPE_ALL`],
+/// * `Currency` combined with `MPT`, which name the same slot, and
+/// * `0x00`, which names no fields and is the byte that ends a path set, so a
+///   step with no fields is rejected here on the encode path rather than being
+///   written as a terminator.
 ///
 /// `Issuer` combined with `MPT` is **not** refused: `rippled` accepts a step
 /// carrying both, reading the issuance id followed by the issuer, so this codec
 /// must be able to round-trip the same step.
 ///
-/// Terminator bytes never reach here: [`Path::from_parser`] stops on `0x00` and
-/// `0xFF` before reading a step, as `rippled` checks `TypeNone` and `TypeBoundary`
-/// ahead of its bad-bits test.
+/// On the decode path terminator bytes never reach here: [`Path::from_parser`]
+/// stops on `0x00` and `0xFF` before reading a step, as `rippled` checks
+/// `TypeNone` and `TypeBoundary` ahead of its bad-bits test. The `0x00` check
+/// below is for the encode path, which assembles the byte from the keys present.
 fn _validate_path_step_type(data_type: u8) -> XRPLCoreResult<()> {
+    if data_type == 0 {
+        return Err(XRPLBinaryCodecException::EmptyPathStep.into());
+    }
+
     if data_type & !_TYPE_ALL != 0 {
         return Err(XRPLBinaryCodecException::UnknownPathStepType {
             type_byte: data_type,

@@ -30,6 +30,8 @@ pub enum XRPLBinaryCodecException {
     InvalidPathSetFromValue,
     #[error("Empty path in path set")]
     EmptyPathInPathSet,
+    #[error("Path step with no fields")]
+    EmptyPathStep,
     #[error("Unknown path step type byte: {type_byte:#04X}")]
     UnknownPathStepType { type_byte: u8 },
     #[error("Mutually exclusive path step fields in type byte {type_byte:#04X}: {first} and {second} cannot both be present")]
