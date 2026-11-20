@@ -28,6 +28,18 @@ pub enum XRPLBinaryCodecException {
     InvalidHashLength { expected: usize, found: usize },
     #[error("Invalid path set from value")]
     InvalidPathSetFromValue,
+    #[error("Empty path in path set")]
+    EmptyPathInPathSet,
+    #[error("Path step with no fields")]
+    EmptyPathStep,
+    #[error("Unknown path step type byte: {type_byte:#04X}")]
+    UnknownPathStepType { type_byte: u8 },
+    #[error("Mutually exclusive path step fields in type byte {type_byte:#04X}: {first} and {second} cannot both be present")]
+    MutuallyExclusivePathStepFields {
+        type_byte: u8,
+        first: &'static str,
+        second: &'static str,
+    },
     #[error("Try from slice error")]
     TryFromSliceError,
     #[error("Field has no associated tag")]

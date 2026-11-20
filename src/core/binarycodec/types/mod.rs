@@ -252,8 +252,11 @@ impl XRPLTypes {
                                 .map(|step| {
                                     let mut cleaned_step = Map::new();
                                     for (key, val) in step.iter() {
-                                        // Only keep account, currency, and issuer fields
-                                        if key == "account" || key == "currency" || key == "issuer"
+                                        // Only keep the fields a path step can encode
+                                        if key == "account"
+                                            || key == "currency"
+                                            || key == "issuer"
+                                            || key == "mpt_issuance_id"
                                         {
                                             cleaned_step.insert(key.clone(), val.clone());
                                         }
