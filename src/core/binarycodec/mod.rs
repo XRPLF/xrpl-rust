@@ -188,6 +188,51 @@ pub fn encode_for_signing_batch(flags: u32, tx_ids: &[&str]) -> XRPLCoreResult<S
     Ok(hex::encode_upper(&buf))
 }
 
+/// Encode the BatchV1_1 payload signed by a `BatchSigner` (XLS-56 §2.1.3.2):
+/// `BCH\0 | outer Account | outer Sequence | Flags | count | txIDs.. | BatchSigner Account [| Signer Account]`
+///
+/// `outer_sequence` is `Sequence`, or `TicketSequence` when `Sequence` is 0.
+/// `multisigner_account` is set only for an individual signer inside `BatchSigner.Signers`.
+pub fn encode_for_signing_batch_v1_1(
+    outer_account: &str,
+    outer_sequence: u32,
+    flags: u32,
+    tx_ids: &[&str],
+    batch_signer_account: &str,
+    multisigner_account: Option<&str>,
+) -> XRPLCoreResult<String> {
+    let mut buf = alloc::vec::Vec::with_capacity(4 + 20 + 4 + 4 + 4 + tx_ids.len() * 32 + 40);
+    buf.extend_from_slice(&BATCH_PREFIX);
+    buf.extend_from_slice(AccountId::try_from(outer_account)?.as_ref());
+    buf.extend_from_slice(&outer_sequence.to_be_bytes());
+    buf.extend_from_slice(&flags.to_be_bytes());
+    buf.extend_from_slice(&(tx_ids.len() as u32).to_be_bytes());
+    for tx_id in tx_ids {
+        let id_bytes = hex::decode(tx_id).map_err(|_| {
+            super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+                exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                    expected: 64,
+                    found: tx_id.len(),
+                },
+            )
+        })?;
+        if id_bytes.len() != 32 {
+            return Err(super::exceptions::XRPLCoreException::XRPLBinaryCodecError(
+                exceptions::XRPLBinaryCodecException::InvalidHashLength {
+                    expected: 32,
+                    found: id_bytes.len(),
+                },
+            ));
+        }
+        buf.extend_from_slice(&id_bytes);
+    }
+    buf.extend_from_slice(AccountId::try_from(batch_signer_account)?.as_ref());
+    if let Some(signer) = multisigner_account {
+        buf.extend_from_slice(AccountId::try_from(signer)?.as_ref());
+    }
+    Ok(hex::encode_upper(&buf))
+}
+
 /// Decode a hex-encoded XRPL binary blob into a JSON object.
 ///
 /// This is the inverse of `encode`. It takes a hex string representing

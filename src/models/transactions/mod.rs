@@ -16,6 +16,7 @@ pub mod clawback;
 // FFI-backed crypto (`mpt_crypto`) and the `confidential` assembly layer, so a
 // caller can build / sign / serialize these transactions without linking the
 // native libmpt-crypto library.
+pub mod batch;
 pub mod confidential_mpt_clawback;
 pub mod confidential_mpt_constants;
 pub mod confidential_mpt_convert;
@@ -222,6 +223,7 @@ pub enum TransactionType {
     AMMDeposit,
     AMMVote,
     AMMWithdraw,
+    Batch,
     CheckCancel,
     CheckCash,
     CheckCreate,
@@ -907,6 +909,7 @@ where
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize, Display, AsRefStr)]
 pub enum Flag {
     AccountSet(account_set::AccountSetFlag),
+    Batch(batch::BatchFlag),
     NFTokenCreateOffer(nftoken_create_offer::NFTokenCreateOfferFlag),
     NFTokenMint(nftoken_mint::NFTokenMintFlag),
     OfferCreate(offer_create::OfferCreateFlag),

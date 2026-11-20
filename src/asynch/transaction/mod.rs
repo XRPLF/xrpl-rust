@@ -25,7 +25,10 @@ use crate::{
             ledger_entry::LedgerEntry as LedgerEntryResult,
             server_state::ServerState as ServerStateResult, submit::Submit as SubmitResult,
         },
-        transactions::{Transaction, TransactionType},
+        transactions::{
+            batch::{BatchSigner, RawTransaction},
+            Transaction, TransactionType,
+        },
         Model, XRPAmount, XRPLModelException,
     },
     wallet::Wallet,
@@ -169,6 +172,9 @@ where
             TransactionType::AMMCreate | TransactionType::AccountDelete => {
                 get_owner_reserve_from_response(client).await?
             }
+            TransactionType::Batch => {
+                calculate_base_fee_for_batch(transaction, &net_fee, Some(client)).await?
+            }
             TransactionType::ConfidentialMPTConvert
             | TransactionType::ConfidentialMPTConvertBack
             | TransactionType::ConfidentialMPTSend
@@ -188,6 +194,9 @@ where
             )?,
             TransactionType::AMMCreate | TransactionType::AccountDelete => {
                 XRPAmount::from(OWNER_RESERVE)
+            }
+            TransactionType::Batch => {
+                calculate_base_fee_for_batch(transaction, &net_fee, None::<&C>).await?
             }
             TransactionType::ConfidentialMPTConvert
             | TransactionType::ConfidentialMPTConvertBack
@@ -386,6 +395,72 @@ fn calculate_base_fee_for_confidential_mpt<'a: 'b, 'b>(
     Ok(base_fee_decimal
         .with_scale_round(0, RoundingMode::Down)
         .into())
+}
+
+/// XLS-56 §2.2: `(2 + n) × base + Σ inner base fees`, `n` = signatures in
+/// `BatchSigners` (a multi-signed entry counts each signer). Outer multisign
+/// signers are added by the caller through `signers_count`.
+async fn calculate_base_fee_for_batch<'a, T, F, C>(
+    transaction: &T,
+    net_fee: &XRPAmount<'_>,
+    client: Option<&C>,
+) -> XRPLHelperResult<XRPAmount<'static>>
+where
+    T: Transaction<'a, F>,
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    C: XRPLAsyncClient,
+{
+    let raw_transactions: Vec<RawTransaction> =
+        match transaction.get_field_value("RawTransactions")? {
+            Some(json) => serde_json::from_str(&json).map_err(XRPLModelException::from)?,
+            None => Vec::new(),
+        };
+    let batch_signers: Vec<BatchSigner> = match transaction.get_field_value("BatchSigners")? {
+        Some(json) => serde_json::from_str(&json).map_err(XRPLModelException::from)?,
+        None => Vec::new(),
+    };
+
+    let net: BigDecimal = net_fee.clone().try_into()?;
+    let mut total = &net * BigDecimal::from(2u8);
+    let signatures: usize = batch_signers
+        .iter()
+        .map(|s| s.signers.as_ref().map_or(1, Vec::len))
+        .sum();
+    total += &(&net * BigDecimal::from(signatures as u64));
+
+    let mut owner_reserve: Option<BigDecimal> = None;
+    for raw in &raw_transactions {
+        let inner: BigDecimal = match raw.transaction_type()? {
+            TransactionType::AMMCreate | TransactionType::AccountDelete => {
+                if owner_reserve.is_none() {
+                    let reserve = match client {
+                        Some(client) => get_owner_reserve_from_response(client).await?,
+                        None => XRPAmount::from(OWNER_RESERVE),
+                    };
+                    owner_reserve = Some(reserve.try_into()?);
+                }
+                owner_reserve.clone().unwrap_or_default()
+            }
+            TransactionType::ConfidentialMPTConvert
+            | TransactionType::ConfidentialMPTConvertBack
+            | TransactionType::ConfidentialMPTSend
+            | TransactionType::ConfidentialMPTClawback
+            | TransactionType::ConfidentialMPTMergeInbox => {
+                &net * BigDecimal::from(CONFIDENTIAL_MPT_FEE_MULTIPLIER)
+            }
+            TransactionType::EscrowFinish => calculate_base_fee_for_escrow_finish(
+                net_fee.clone(),
+                raw.as_json()
+                    .get("Fulfillment")
+                    .and_then(|v| v.as_str())
+                    .map(Cow::Borrowed),
+            )?
+            .try_into()?,
+            _ => net.clone(),
+        };
+        total += &inner;
+    }
+    Ok(total.with_scale_round(0, RoundingMode::Down).into())
 }
 
 fn txn_needs_network_id(common_fields: CommonFields<'_>) -> XRPLHelperResult<bool> {
