@@ -6,6 +6,7 @@ pub mod amm_delete;
 pub mod amm_deposit;
 pub mod amm_vote;
 pub mod amm_withdraw;
+pub mod batch;
 pub mod check_cancel;
 pub mod check_cash;
 pub mod check_create;
