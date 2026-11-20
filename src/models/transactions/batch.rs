@@ -55,9 +55,9 @@ pub enum BatchFlag {
 
 fn invalid(field: &str, expected: &str, found: impl Into<String>) -> XRPLModelException {
     XRPLModelException::InvalidValue {
-        field: field.to_string().into(),
-        expected: expected.to_string().into(),
-        found: found.into().into(),
+        field: field.to_string(),
+        expected: expected.to_string(),
+        found: found.into(),
     }
 }
 
@@ -74,7 +74,7 @@ fn sort_by_account_id<T>(items: Vec<T>, account: impl Fn(&T) -> &str) -> XRPLMod
     for item in items {
         keyed.push((account_id_bytes(account(&item))?, item));
     }
-    keyed.sort_by(|a, b| a.0.cmp(&b.0));
+    keyed.sort_by_key(|a| a.0);
     Ok(keyed.into_iter().map(|(_, item)| item).collect())
 }
 
