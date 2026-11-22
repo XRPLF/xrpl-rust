@@ -8,6 +8,7 @@
 //! Re-exported from the legacy locations (`asynch::transaction::sign`,
 //! `transaction::multisign`) for backward compatibility.
 
+pub mod batch_signing;
 pub mod exceptions;
 
 use core::fmt::Debug;

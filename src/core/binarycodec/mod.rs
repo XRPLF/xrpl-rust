@@ -199,7 +199,6 @@ pub fn encode_for_signing_batch_v1_1(
     flags: u32,
     tx_ids: &[&str],
     batch_signer_account: &str,
-    multisigner_account: Option<&str>,
 ) -> XRPLCoreResult<String> {
     let mut buf = alloc::vec::Vec::with_capacity(4 + 20 + 4 + 4 + 4 + tx_ids.len() * 32 + 40);
     buf.extend_from_slice(&BATCH_PREFIX);
@@ -227,9 +226,7 @@ pub fn encode_for_signing_batch_v1_1(
         buf.extend_from_slice(&id_bytes);
     }
     buf.extend_from_slice(AccountId::try_from(batch_signer_account)?.as_ref());
-    if let Some(signer) = multisigner_account {
-        buf.extend_from_slice(AccountId::try_from(signer)?.as_ref());
-    }
+
     Ok(hex::encode_upper(&buf))
 }
 

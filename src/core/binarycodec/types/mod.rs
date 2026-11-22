@@ -238,6 +238,7 @@ impl XRPLTypes {
             }
         } else if let Some(value) = value.as_array() {
             // dbg!("is array");
+
             match name {
                 "STArray" => Ok(Some(XRPLTypes::STArray(STArray::try_from_value(
                     Value::Array(value.to_owned()),

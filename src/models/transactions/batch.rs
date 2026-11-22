@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::fmt::Debug;
 
-use serde::de::Deserializer;
+use serde::de::{DeserializeOwned, Deserializer};
 use serde::ser::{SerializeMap, Serializer};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -19,8 +19,9 @@ use sha2::{Digest, Sha512};
 use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, Display, EnumIter};
 
-use crate::core::binarycodec::{encode, encode_for_signing_batch_v1_1, types::AccountId};
-use crate::models::{Model, XRPLModelException, XRPLModelResult};
+use crate::core::binarycodec::{encode, types::AccountId};
+use crate::models::transactions::TF_INNER_BATCH_TXN;
+use crate::models::{Model, XRPAmount, XRPLModelException, XRPLModelResult};
 
 use super::exceptions::XRPLTransactionException;
 use super::{
@@ -28,8 +29,6 @@ use super::{
     TRANSACTION_HASH_PREFIX,
 };
 
-/// Global flag required on every inner transaction.
-pub const TF_INNER_BATCH_TXN: u32 = 0x4000_0000;
 pub const MIN_RAW_TRANSACTIONS: usize = 2;
 pub const MAX_RAW_TRANSACTIONS: usize = 8;
 pub const MAX_BATCH_SIGNERS: usize = 24;
@@ -51,31 +50,6 @@ pub enum BatchFlag {
     TfUntilFailure = 0x00040000,
     /// Apply every inner transaction regardless of failures.
     TfIndependent = 0x00080000,
-}
-
-fn invalid(field: &str, expected: &str, found: impl Into<String>) -> XRPLModelException {
-    XRPLModelException::InvalidValue {
-        field: field.to_string(),
-        expected: expected.to_string(),
-        found: found.into(),
-    }
-}
-
-fn account_id_bytes(address: &str) -> XRPLModelResult<[u8; 20]> {
-    let id = AccountId::try_from(address)
-        .map_err(|_| invalid("account", "a valid classic address", address))?;
-    let bytes: &[u8] = id.as_ref();
-    <[u8; 20]>::try_from(bytes).map_err(|_| invalid("account", "a 20-byte AccountID", address))
-}
-
-/// Sorts by AccountID bytes (the ledger order), NOT by the base58 string.
-fn sort_by_account_id<T>(items: Vec<T>, account: impl Fn(&T) -> &str) -> XRPLModelResult<Vec<T>> {
-    let mut keyed = Vec::with_capacity(items.len());
-    for item in items {
-        keyed.push((account_id_bytes(account(&item))?, item));
-    }
-    keyed.sort_by_key(|a| a.0);
-    Ok(keyed.into_iter().map(|(_, item)| item).collect())
 }
 
 /// One entry of `RawTransactions`; serializes as `{"RawTransaction": {...}}`.
@@ -101,10 +75,21 @@ impl RawTransaction {
         let Some(object) = json.as_object_mut() else {
             return Err(invalid("raw_transactions", "a JSON object", "non-object"));
         };
+
         if object.get("TransactionType").and_then(Value::as_str) == Some("Batch") {
             return Err(invalid("raw_transactions", "no nested Batch", "Batch"));
         }
-        let flags = object.get("Flags").and_then(Value::as_u64).unwrap_or(0) as u32;
+        let flags = match object.get("Flags") {
+            None => 0,
+            Some(Value::Number(n)) => n
+                .as_u64()
+                .and_then(|n| u32::try_from(n).ok())
+                .ok_or_else(|| invalid("Flags", "UInt32", n.to_string()))?,
+            Some(Value::String(s)) => s
+                .parse::<u32>()
+                .map_err(|_| invalid("Flags", "UInt32", s.clone()))?,
+            Some(v) => return Err(invalid("Flags", "UInt32", v.to_string())),
+        };
         object.insert("Flags".to_string(), Value::from(flags | TF_INNER_BATCH_TXN));
         object.insert("Fee".to_string(), Value::from("0"));
         object.insert("SigningPubKey".to_string(), Value::from(""));
@@ -130,12 +115,27 @@ impl RawTransaction {
             .0
             .get("TransactionType")
             .ok_or_else(|| XRPLModelException::MissingField("TransactionType".to_string()))?;
+
         Ok(serde_json::from_value(value.clone())?)
+    }
+
+    pub fn get_field<T: DeserializeOwned>(&self, field: &str) -> XRPLModelResult<Option<T>> {
+        let value = self
+            .0
+            .get(field)
+            .map(|v| serde_json::from_value::<T>(v.clone()))
+            .transpose()?;
+
+        Ok(value)
+    }
+
+    pub fn set_field<T: Serialize>(&mut self, field: &str, value: &T) {
+        self.0[field] = serde_json::json!(value);
     }
 
     /// Transaction ID of the inner transaction (SHA-512Half of `TXN\0 || blob`).
     /// `Transaction::get_hash` can't be used: it refuses unsigned transactions.
-    pub fn transaction_id(&self) -> XRPLModelResult<String> {
+    pub fn transaction_hash(&self) -> XRPLModelResult<String> {
         let encoded = encode(&self.0).map_err(XRPLTransactionException::XRPLCoreError)?;
         let mut bytes = TRANSACTION_HASH_PREFIX.to_be_bytes().to_vec();
         bytes.extend(hex::decode(encoded)?);
@@ -143,43 +143,79 @@ impl RawTransaction {
         Ok(hex::encode_upper(&hash[..32]))
     }
 
-    fn validate(&self, index: usize) -> XRPLModelResult<()> {
-        let field = format!("raw_transactions[{index}]");
+    pub(crate) fn validate(&self, idx: usize) -> XRPLModelResult<()> {
+        let field = format!("raw_transactions[{}].{}", idx, self.transaction_type()?);
         let Some(object) = self.0.as_object() else {
             return Err(invalid(&field, "a JSON object", "non-object"));
         };
+
         if object.get("Account").and_then(Value::as_str).is_none() {
             return Err(XRPLModelException::MissingField(format!("{field}.Account")));
         }
+
         if self.transaction_type()? == TransactionType::Batch {
             return Err(invalid(&field, "no nested Batch", "Batch")); // temINVALID_INNER_BATCH
         }
-        let flags = object.get("Flags").and_then(Value::as_u64).unwrap_or(0);
-        if (flags & TF_INNER_BATCH_TXN as u64) == 0 {
+
+        let flags = match object.get("Flags") {
+            None => 0,
+            Some(value) => json_u32(Some(value))
+                .ok_or_else(|| invalid(&field, "Flags as UInt32", value.to_string()))?,
+        };
+
+        if flags & TF_INNER_BATCH_TXN == 0 {
             return Err(invalid(&field, "tfInnerBatchTxn set", "flag missing")); // temINVALID_FLAG
         }
-        if object.get("Fee").and_then(Value::as_str) != Some("0") {
-            return Err(invalid(&field, "Fee \"0\"", "non-zero or missing Fee"));
-            // temBAD_FEE
+
+        match object.get("Fee") {
+            Some(Value::String(s)) if s == "0" => {}
+            Some(Value::Number(n)) if n.as_u64() == Some(0) => {}
+            None | Some(Value::Null) => {
+                return Err(invalid(&field, "Fee \"0\"", "missing Fee")); // temBAD_FEE
+            }
+            Some(other) => {
+                return Err(invalid(&field, "Fee \"0\"", other.to_string())); // temBAD_FEE
+            }
         }
+
         if object.contains_key("TxnSignature") {
             return Err(invalid(&field, "no TxnSignature", "TxnSignature")); // temBAD_SIGNATURE
         }
+
         if object.get("SigningPubKey").and_then(Value::as_str) != Some("") {
             return Err(invalid(&field, "empty SigningPubKey", "non-empty")); // temBAD_REGKEY
         }
+
         if object.contains_key("Signers") {
             return Err(invalid(&field, "no Signers", "Signers")); // temBAD_SIGNER
         }
-        let sequence = object.get("Sequence").and_then(Value::as_u64).unwrap_or(0);
-        let ticketed = object.contains_key("TicketSequence");
-        if ticketed != (sequence == 0) {
+
+        fn json_u32(value: Option<&Value>) -> Option<u32> {
+            match value? {
+                Value::Number(n) => n.as_u64().and_then(|n| u32::try_from(n).ok()),
+                Value::String(s) => s.parse().ok(),
+                _ => None,
+            }
+        }
+
+        let sequence = json_u32(object.get("Sequence"));
+        let ticket = json_u32(object.get("TicketSequence"));
+        let has_ticket_key = object.contains_key("TicketSequence");
+
+        // Either a nonzero Sequence with no ticket key, or Sequence 0 with a ticket.
+        let ok = match sequence {
+            Some(0) => ticket.is_some(),
+            Some(_) => !has_ticket_key,
+            None => false,
+        };
+        if !ok {
             return Err(invalid(
                 &field,
                 "Sequence XOR TicketSequence (ticketed: Sequence 0)", // temSEQ_AND_TICKET
-                format!("Sequence={sequence}, ticketed={ticketed}"),
+                format!("Sequence={sequence:?}, TicketSequence={ticket:?}"),
             ));
         }
+
         Ok(())
     }
 }
@@ -250,7 +286,7 @@ impl BatchSigner {
         let single = self.signing_pub_key.is_some() && self.txn_signature.is_some();
         let partial = self.signing_pub_key.is_some() != self.txn_signature.is_some();
         let multi = self.signers.as_ref().is_some_and(|s| !s.is_empty());
-        if partial || single == multi {
+        if partial || single == multi || self.signers.as_ref().is_some_and(Vec::is_empty) {
             return Err(invalid(
                 &field,
                 "either SigningPubKey + TxnSignature, or Signers", // temBAD_SIGNER
@@ -339,11 +375,11 @@ pub struct Batch<'a> {
     pub batch_signers: Option<Vec<BatchSigner>>,
 }
 
-impl<'a: 'static> Model for Batch<'a> {
+impl<'a> Model for Batch<'a> {
     fn get_errors(&self) -> XRPLModelResult<()> {
-        self._get_mode_error()?;
-        self._get_raw_transactions_error()?;
-        self._get_batch_signers_error()
+        self.get_flag_error()?;
+        self.get_raw_transactions_error()?;
+        self.get_batch_signers_error()
     }
 }
 
@@ -363,6 +399,10 @@ impl<'a> Transaction<'a, BatchFlag> for Batch<'a> {
     fn get_mut_common_fields(&mut self) -> &mut CommonFields<'a, BatchFlag> {
         self.common_fields.get_mut_common_fields()
     }
+
+    fn raw_transactions_mut(&mut self) -> Option<&mut Vec<RawTransaction>> {
+        Some(&mut self.raw_transactions)
+    }
 }
 
 impl<'a> CommonTransactionBuilder<'a, BatchFlag> for Batch<'a> {
@@ -378,21 +418,33 @@ impl<'a> CommonTransactionBuilder<'a, BatchFlag> for Batch<'a> {
 impl<'a> Batch<'a> {
     pub fn new(
         account: impl Into<Cow<'a, str>>,
-        mode: BatchFlag,
+        flag: BatchFlag,
         raw_transactions: Vec<RawTransaction>,
+        batch_signers: Option<Vec<BatchSigner>>,
     ) -> Self {
         Self {
             common_fields: CommonFields::from_account(account)
                 .with_transaction_type(TransactionType::Batch)
-                .with_flag(mode),
+                .with_flag(flag),
             raw_transactions,
-            batch_signers: None,
+            batch_signers,
         }
     }
 
     /// Replace the batch mode.
-    pub fn with_mode(mut self, mode: BatchFlag) -> Self {
+    pub fn with_flag(mut self, mode: BatchFlag) -> Self {
         self.common_fields.flags = alloc::vec![mode].into();
+        self
+    }
+
+    pub fn with_sequence(mut self, sequence: u32) -> Self {
+        self.common_fields.sequence = Some(sequence);
+        self
+    }
+
+    pub fn with_fee(mut self, amount: impl Into<XRPAmount<'static>>) -> Self {
+        self.common_fields.fee = Some(amount.into());
+
         self
     }
 
@@ -414,28 +466,24 @@ impl<'a> Batch<'a> {
         self.with_batch_signers(signers)
     }
 
-    /// Transaction IDs of the inner transactions, in order. Use these to look up
-    /// each inner result: the outer result is `tesSUCCESS` even if inners fail.
-    pub fn inner_transaction_ids(&self) -> XRPLModelResult<Vec<String>> {
-        self.raw_transactions
-            .iter()
-            .map(RawTransaction::transaction_id)
-            .collect()
-    }
-
     /// `Sequence`, or `TicketSequence` when `Sequence` is 0 (XLS-56 §2.1.3.2).
     pub fn outer_sequence(&self) -> XRPLModelResult<u32> {
         match (
             self.common_fields.sequence,
             self.common_fields.ticket_sequence,
         ) {
-            (Some(sequence), _) if sequence != 0 => Ok(sequence),
-            (_, Some(ticket)) => Ok(ticket),
+            (Some(sequence), None) if sequence != 0 => Ok(sequence),
+            (Some(0), Some(ticket)) => Ok(ticket),
+            (Some(sequence), Some(ticket)) if sequence != 0 => Err(invalid(
+                "sequence",
+                "Sequence XOR TicketSequence (ticketed: Sequence 0)",
+                format!("Sequence={sequence}, TicketSequence={ticket}"),
+            )),
             _ => Err(XRPLModelException::MissingField("sequence".to_string())),
         }
     }
 
-    fn mode_flags(&self) -> u32 {
+    pub(crate) fn mode_flags(&self) -> u32 {
         self.common_fields
             .flags
             .0
@@ -443,28 +491,7 @@ impl<'a> Batch<'a> {
             .fold(0u32, |acc, flag| acc | *flag as u32)
     }
 
-    /// Hex payload a BatchSigner signs. `batch_account` is the `BatchSigner.Account`;
-    /// `multisigner_account` is the individual signer for multi-signed entries.
-    /// Requires the outer `Sequence`/`TicketSequence` and flags to be final.
-    pub fn batch_signing_data(
-        &self,
-        batch_account: &str,
-        multisigner_account: Option<&str>,
-    ) -> XRPLModelResult<String> {
-        let ids = self.inner_transaction_ids()?;
-        let id_refs: Vec<&str> = ids.iter().map(String::as_str).collect();
-        Ok(encode_for_signing_batch_v1_1(
-            &self.common_fields.account,
-            self.outer_sequence()?,
-            self.mode_flags(),
-            &id_refs,
-            batch_account,
-            multisigner_account,
-        )
-        .map_err(XRPLTransactionException::XRPLCoreError)?)
-    }
-
-    fn _get_mode_error(&self) -> XRPLModelResult<()> {
+    fn get_flag_error(&self) -> XRPLModelResult<()> {
         let selected = [
             BatchFlag::TfAllOrNothing,
             BatchFlag::TfOnlyOne,
@@ -484,7 +511,7 @@ impl<'a> Batch<'a> {
         Ok(())
     }
 
-    fn _get_raw_transactions_error(&self) -> XRPLModelResult<()> {
+    fn get_raw_transactions_error(&self) -> XRPLModelResult<()> {
         let count = self.raw_transactions.len();
         if !(MIN_RAW_TRANSACTIONS..=MAX_RAW_TRANSACTIONS).contains(&count) {
             return Err(invalid(
@@ -493,20 +520,15 @@ impl<'a> Batch<'a> {
                 format!("{count} transactions"),
             ));
         }
-        for (i, raw) in self.raw_transactions.iter().enumerate() {
-            raw.validate(i)?;
-            if self.raw_transactions[..i].contains(raw) {
-                return Err(invalid(
-                    &format!("raw_transactions[{i}]"),
-                    "no duplicate transactions", // temREDUNDANT
-                    "duplicate",
-                ));
-            }
+
+        for (idx, raw) in self.raw_transactions.iter().enumerate() {
+            raw.validate(idx)?;
         }
+
         Ok(())
     }
 
-    fn _get_batch_signers_error(&self) -> XRPLModelResult<()> {
+    fn get_batch_signers_error(&self) -> XRPLModelResult<()> {
         let Some(signers) = &self.batch_signers else {
             return Ok(());
         };
@@ -539,47 +561,140 @@ impl<'a> Batch<'a> {
         }
         Ok(())
     }
+
+    /// Accounts involved in the inner transactions, de-duplicated, outer account
+    /// included if it appears. Per inner transaction: its `Delegate` if present,
+    /// else its `Account`; its `Counterparty`; and its `Sponsor` only when a
+    /// `SponsorSignature` placeholder selects the co-signed path.
+    pub fn involved_accounts(&self) -> Vec<String> {
+        let mut accounts: Vec<String> = Vec::new();
+        let mut add = |address: &str| {
+            if !accounts.iter().any(|a| a == address) {
+                accounts.push(address.to_string());
+            }
+        };
+
+        for raw in &self.raw_transactions {
+            let json = raw.as_json();
+            if let Some(a) = str_field(json, "Delegate").or_else(|| str_field(json, "Account")) {
+                add(a);
+            }
+
+            if let Some(c) = str_field(json, "Counterparty") {
+                add(c);
+            }
+
+            let has_placeholder = json.get("SponsorSignature").is_some_and(|v| !v.is_null());
+            if let (Some(s), true) = (str_field(json, "Sponsor"), has_placeholder) {
+                add(s);
+            }
+        }
+
+        accounts
+    }
+
+    /// Accounts that must appear in `BatchSigners`: involved accounts minus the
+    /// outer account, in AccountID order.
+    pub fn required_batch_signer_accounts(&self) -> XRPLModelResult<Vec<String>> {
+        let outer: &str = &self.common_fields.account;
+
+        let accounts = self
+            .involved_accounts()
+            .into_iter()
+            .filter(|a| a != outer)
+            .collect();
+
+        sort_by_account_id(accounts, |a: &String| a.as_str())
+    }
+
+    /// Best-effort, opt-in check that `BatchSigners` covers exactly the accounts
+    /// that must authorize the inner transactions.
+    ///
+    /// Not called by `validate`, the signing helpers, or `combine_batch_signers`:
+    /// a batch with no or partial `BatchSigners` is a valid draft, and a single
+    /// signer's fragment is intentionally incomplete. Call this yourself after
+    /// merging all signatures, right before submitting.
+    ///
+    /// Checks that every account in
+    /// [`required_batch_signer_accounts`](Self::required_batch_signer_accounts)
+    /// has an entry, and that no entry exists for any other account. It does not
+    /// verify signatures or ledger-side authorization.
+    ///
+    /// The required set is derived client-side by
+    /// [`involved_accounts`](Self::involved_accounts), so it can disagree with the
+    /// ledger if the rules change. rippled's preflight is authoritative (an
+    /// incomplete batch is rejected with a `tem` code and no fee is charged).
+    ///
+    /// # Errors
+    ///
+    /// [`XRPLModelException::InvalidValue`] on `batch_signers`, naming the first
+    /// missing or unexpected account.
+    pub fn validate_batch_signers(&self) -> XRPLModelResult<()> {
+        let required = self.required_batch_signer_accounts()?;
+        let declared: Vec<&str> = self
+            .batch_signers
+            .iter()
+            .flatten()
+            .map(|s| s.account.as_str())
+            .collect();
+
+        if let Some(missing) = required.iter().find(|r| !declared.contains(&r.as_str())) {
+            return Err(invalid(
+                "batch_signers",
+                "a signer for every inner account",
+                format!("missing {missing}"),
+            ));
+        }
+        if let Some(extra) = declared.iter().find(|d| !required.iter().any(|r| r == **d)) {
+            return Err(invalid(
+                "batch_signers",
+                "only accounts that authorize an inner transaction",
+                (*extra).to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
-#[cfg(feature = "wallet")]
-impl<'a> Batch<'a> {
-    /// Single-key BatchSigner entry authorizing `account` (the account whose
-    /// inner transactions are being approved; `wallet` holds its master or regular key).
-    pub fn sign_as_batch_signer(
-        &self,
-        account: &str,
-        wallet: &crate::wallet::Wallet,
-    ) -> crate::asynch::exceptions::XRPLHelperResult<BatchSigner> {
-        let payload = hex::decode(self.batch_signing_data(account, None)?)?;
-        let signature = crate::core::keypairs::sign(&payload, &wallet.private_key)?;
-        Ok(BatchSigner::single(
-            account,
-            wallet.public_key.clone(),
-            signature,
-        ))
+pub(crate) fn invalid(field: &str, expected: &str, found: impl Into<String>) -> XRPLModelException {
+    XRPLModelException::InvalidValue {
+        field: field.to_string(),
+        expected: expected.to_string(),
+        found: found.into(),
     }
+}
 
-    /// One signer's contribution to a multi-signed BatchSigner of `batch_account`.
-    /// Collect these and wrap with `BatchSigner::multi`.
-    pub fn sign_as_batch_multisigner(
-        &self,
-        batch_account: &str,
-        wallet: &crate::wallet::Wallet,
-    ) -> crate::asynch::exceptions::XRPLHelperResult<Signer> {
-        let payload =
-            hex::decode(self.batch_signing_data(batch_account, Some(&wallet.classic_address))?)?;
-        let signature = crate::core::keypairs::sign(&payload, &wallet.private_key)?;
-        Ok(Signer::new(
-            wallet.classic_address.clone(),
-            signature,
-            wallet.public_key.clone(),
-        ))
+pub fn account_id_bytes(address: &str) -> XRPLModelResult<[u8; 20]> {
+    let id = AccountId::try_from(address)
+        .map_err(|_| invalid("account", "a valid classic address", address))?;
+
+    let bytes: &[u8] = id.as_ref();
+
+    <[u8; 20]>::try_from(bytes).map_err(|_| invalid("account", "a 20-byte AccountID", address))
+}
+
+/// Sorts by AccountID bytes (the ledger order), NOT by the base58 string.
+pub(crate) fn sort_by_account_id<T>(
+    items: Vec<T>,
+    account: impl Fn(&T) -> &str,
+) -> XRPLModelResult<Vec<T>> {
+    let mut keyed = Vec::with_capacity(items.len());
+    for item in items {
+        keyed.push((account_id_bytes(account(&item))?, item));
     }
+    keyed.sort_by_key(|a| a.0);
+    Ok(keyed.into_iter().map(|(_, item)| item).collect())
+}
+
+fn str_field<'v>(json: &'v Value, key: &str) -> Option<&'v str> {
+    json.get(key).and_then(Value::as_str)
 }
 
 #[cfg(test)]
 mod tests {
     use alloc::vec;
+
+    use serde_json::json;
 
     use super::*;
     use crate::models::amount::Amount;
@@ -590,10 +705,16 @@ mod tests {
     const OTHER_A: &str = "rf1BiGeXwwQoi8Z2ueFYTEXSwuJYfV2Jpn";
     const OTHER_B: &str = "ra5nK24KXen9AHvsdFTKHSANinZseWnPcX";
 
-    fn payment(sequence: u32) -> RawTransaction {
+    type Fields = serde_json::Map<String, Value>;
+
+    // -----------------------------------------------------------------------
+    // Fixtures and assertion helpers
+    // -----------------------------------------------------------------------
+
+    fn payment_from(account: &str, sequence: u32) -> RawTransaction {
         let payment = Payment {
             common_fields: CommonFields {
-                account: OUTER.into(),
+                account: account.into(),
                 transaction_type: TransactionType::Payment,
                 ..Default::default()
             },
@@ -602,130 +723,531 @@ mod tests {
             ..Default::default()
         }
         .with_sequence(sequence);
+
         RawTransaction::from_transaction(&payment).unwrap()
     }
 
+    /// Inner payment from the outer account.
+    fn payment(sequence: u32) -> RawTransaction {
+        payment_from(OUTER, sequence)
+    }
+
+    /// Normalized inner transaction built from raw JSON.
+    fn raw(json: Value) -> RawTransaction {
+        RawTransaction::from_json(json).unwrap()
+    }
+
+    fn signer(account: &str) -> Signer {
+        Signer::new(account.to_string(), "BB".to_string(), "02AA".to_string())
+    }
+
+    fn single(account: &str) -> BatchSigner {
+        BatchSigner::single(account, "02AA", "BB")
+    }
+
+    fn batch_of(raw_transactions: Vec<RawTransaction>) -> Batch<'static> {
+        Batch::new(OUTER, BatchFlag::TfAllOrNothing, raw_transactions, None)
+            .with_sequence(3)
+            .with_fee("40")
+    }
+
+    /// Two inner payments from the outer account, all-or-nothing, no signers.
     fn batch() -> Batch<'static> {
-        Batch::new(
-            OUTER,
-            BatchFlag::TfAllOrNothing,
-            vec![payment(4), payment(5)],
-        )
-        .with_sequence(3)
-        .with_fee("40".into())
+        batch_of(vec![payment(4), payment(5)])
     }
 
-    #[test]
-    fn test_flag_values() {
-        assert_eq!(BatchFlag::TfAllOrNothing as u32, 0x00010000);
-        assert_eq!(BatchFlag::TfOnlyOne as u32, 0x00020000);
-        assert_eq!(BatchFlag::TfUntilFailure as u32, 0x00040000);
-        assert_eq!(BatchFlag::TfIndependent as u32, 0x00080000);
+    /// `InvalidValue` naming exactly `expected_field`, so a test can't pass
+    /// because some other rule fired.
+    macro_rules! assert_invalid {
+        ($result:expr, $field:expr $(,)?) => {
+            match $result {
+                Err(XRPLModelException::InvalidValue { field, .. }) => {
+                    assert_eq!(field, $field)
+                }
+                other => panic!("expected InvalidValue on `{}`, got {:?}", $field, other),
+            }
+        };
     }
 
+    macro_rules! assert_missing {
+        ($result:expr, $field:expr $(,)?) => {
+            match $result {
+                Err(XRPLModelException::MissingField(field)) => assert_eq!(field, $field),
+                other => panic!("expected MissingField `{}`, got {:?}", $field, other),
+            }
+        };
+    }
+
+    /// Validation result of `batch()` after mutating its second inner transaction.
+    fn inner_errors(mutate: impl FnOnce(&mut Fields)) -> XRPLModelResult<()> {
+        let mut batch = batch();
+        mutate(batch.raw_transactions[1].0.as_object_mut().unwrap());
+
+        batch.get_errors()
+    }
+
+    fn assert_inner_rejected(mutate: impl FnOnce(&mut Fields), tx_type: &str) {
+        let field = format!("raw_transactions[1].{}", tx_type);
+        assert_invalid!(inner_errors(mutate), field);
+    }
+
+    fn assert_inner_accepted(mutate: impl FnOnce(&mut Fields)) {
+        assert!(inner_errors(mutate).is_ok());
+    }
+
+    // RawTransaction: construction
+
     #[test]
-    fn test_inner_normalization() {
+    fn test_from_transaction_normalizes_inner() {
         let raw = payment(4);
         let json = raw.as_json();
+
         assert_eq!(json["Fee"], "0");
         assert_eq!(json["SigningPubKey"], "");
-        assert_eq!(json["Flags"], 1073741824u32);
+        assert_eq!(json["Flags"], TF_INNER_BATCH_TXN);
+        assert_eq!(json["Sequence"], 4);
         assert!(json.get("TxnSignature").is_none());
+        assert!(json.get("Signers").is_none());
     }
+
+    #[test]
+    fn test_from_json_rejects_malformed_input() {
+        assert!(RawTransaction::from_json(Value::from("nope")).is_err());
+        assert!(RawTransaction::from_json(json!({"TransactionType": "Batch"})).is_err());
+
+        let with_flags = |flags: Value| {
+            json!({
+                "TransactionType": "Payment", "Account": OUTER, "Sequence": 4, "Flags": flags
+            })
+        };
+        assert!(RawTransaction::from_json(with_flags(Value::from("not-a-number"))).is_err());
+        assert!(
+            RawTransaction::from_json(with_flags(Value::from(u64::from(u32::MAX) + 1))).is_err()
+        );
+        assert!(RawTransaction::from_json(with_flags(Value::from(-1))).is_err());
+        assert!(RawTransaction::from_json(with_flags(Value::Bool(true))).is_err());
+        assert!(RawTransaction::from_json(with_flags(Value::Null)).is_err());
+    }
+
+    #[test]
+    fn test_from_json_preserves_and_forces_fields() {
+        let with_flags = |flags: Value| {
+            json!({
+                "TransactionType": "Payment", "Account": OUTER, "Sequence": 4, "Flags": flags
+            })
+        };
+
+        // Existing flags (number and decimal string) are kept, with the inner bit added.
+        for flags in [Value::from(2u32), Value::from("2")] {
+            let raw = RawTransaction::from_json(with_flags(flags)).unwrap();
+            assert_eq!(raw.as_json()["Flags"], Value::from(2 | TF_INNER_BATCH_TXN));
+        }
+
+        // Missing Flags default to just tfInnerBatchTxn; signature fields are stripped
+        // and Fee / SigningPubKey are forced.
+        let raw = raw(json!({
+            "TransactionType": "Payment", "Account": OUTER, "Sequence": 4,
+            "Fee": "12", "SigningPubKey": "02AA", "TxnSignature": "AA", "Signers": []
+        }));
+        let json = raw.as_json();
+        assert_eq!(json["Flags"], Value::from(TF_INNER_BATCH_TXN));
+        assert_eq!(json["Fee"], "0");
+        assert_eq!(json["SigningPubKey"], "");
+        assert!(json.get("TxnSignature").is_none());
+        assert!(json.get("Signers").is_none());
+    }
+
+    #[test]
+    fn test_from_json_ticketed_gets_explicit_sequence_zero() {
+        let ticketed = raw(json!({
+            "TransactionType": "Payment", "Account": OUTER, "TicketSequence": 9
+        }));
+        assert_eq!(ticketed.as_json()["Sequence"], Value::from(0u32));
+
+        // An explicit Sequence is left alone.
+        let explicit = raw(json!({
+            "TransactionType": "Payment", "Account": OUTER, "Sequence": 5, "TicketSequence": 9
+        }));
+
+        assert_eq!(explicit.as_json()["Sequence"], Value::from(5u32));
+    }
+
+    // RawTransaction: accessors and hashing
+    #[test]
+    fn test_raw_transaction_accessors() {
+        let raw = payment(4);
+        assert_eq!(raw.account(), Some(OUTER));
+        assert_eq!(raw.transaction_type().unwrap(), TransactionType::Payment);
+
+        let missing = RawTransaction(json!({"Account": OUTER}));
+        assert_missing!(missing.transaction_type(), "TransactionType");
+        assert_eq!(RawTransaction(Value::Null).account(), None);
+    }
+
+    #[test]
+    fn test_raw_transaction_get_and_set_field() {
+        let mut raw = payment(4);
+
+        assert_eq!(
+            raw.get_field::<String>("Destination").unwrap(),
+            Some(DEST.to_string())
+        );
+        assert_eq!(raw.get_field::<String>("Memos").unwrap(), None);
+        assert!(raw.get_field::<u32>("Destination").is_err(), "wrong type");
+
+        raw.set_field("DestinationTag", &7u32);
+        assert_eq!(raw.get_field::<u32>("DestinationTag").unwrap(), Some(7));
+    }
+
+    #[test]
+    fn test_transaction_hash() {
+        let hash = payment(4).transaction_hash().unwrap();
+
+        assert_eq!(hash.len(), 64);
+        assert!(hash
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_lowercase()));
+
+        // Deterministic, and sensitive to the content.
+        assert_eq!(hash, payment(4).transaction_hash().unwrap());
+        assert_ne!(hash, payment(5).transaction_hash().unwrap());
+
+        let mut changed = payment(4);
+        changed.set_field("DestinationTag", &1u32);
+        assert_ne!(hash, changed.transaction_hash().unwrap());
+    }
+
+    #[test]
+    fn test_raw_transaction_serde_shape_and_roundtrip() {
+        let raw = payment(4);
+        let value = serde_json::to_value(&raw).unwrap();
+        assert_eq!(value["RawTransaction"], *raw.as_json());
+
+        let back: RawTransaction = serde_json::from_value(value).unwrap();
+        assert_eq!(back, raw);
+    }
+
+    // RawTransaction: validation
+    #[test]
+    fn test_raw_transaction_validate_requires_object_and_account() {
+        assert_invalid!(
+            RawTransaction(serde_json::json!({"Account": OUTER, "TransactionType": "Payment"}))
+                .validate(0),
+            "raw_transactions[0].Payment",
+        );
+
+        let mut raw = payment(4);
+        raw.0.as_object_mut().unwrap().remove("Account");
+        assert_missing!(raw.validate(0), "raw_transactions[0].Payment.Account");
+    }
+
+    #[test]
+    fn test_inner_rejects_nested_batch() {
+        assert_inner_rejected(
+            |o| {
+                o.insert("TransactionType".into(), "Batch".into());
+            },
+            "Batch",
+        );
+    }
+
+    #[test]
+    fn test_inner_flag_rules() {
+        assert_inner_rejected(
+            |o| {
+                o.insert("Flags".into(), 0.into());
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("Flags".into(), "not-a-number".into());
+            },
+            "Payment",
+        );
+        assert_inner_accepted(|o| {
+            o.insert("Flags".into(), TF_INNER_BATCH_TXN.to_string().into());
+        });
+    }
+
+    #[test]
+    fn test_inner_fee_rules() {
+        assert_inner_rejected(
+            |o| {
+                o.remove("Fee");
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("Fee".into(), Value::Null);
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("Fee".into(), "10".into());
+            },
+            "Payment",
+        );
+        assert_inner_accepted(|o| {
+            o.insert("Fee".into(), 0.into());
+        });
+    }
+
+    #[test]
+    fn test_inner_signature_rules() {
+        assert_inner_rejected(
+            |o| {
+                o.insert("TxnSignature".into(), "AA".into());
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("SigningPubKey".into(), "02AA".into());
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.remove("SigningPubKey");
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("Signers".into(), Value::Array(vec![]));
+            },
+            "Payment",
+        );
+    }
+
+    #[test]
+    fn test_inner_sequence_rules() {
+        // Sequence is required.
+        assert_inner_rejected(
+            |o| {
+                o.remove("Sequence");
+            },
+            "Payment",
+        );
+        // Sequence 0 needs a ticket.
+        assert_inner_rejected(
+            |o| {
+                o.insert("Sequence".into(), 0.into());
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("Sequence".into(), 0.into());
+                o.insert("TicketSequence".into(), Value::Null);
+            },
+            "Payment",
+        );
+        // A nonzero Sequence can't come with a ticket key.
+        assert_inner_rejected(
+            |o| {
+                o.insert("TicketSequence".into(), 9.into());
+            },
+            "Payment",
+        );
+        assert_inner_rejected(
+            |o| {
+                o.insert("TicketSequence".into(), Value::Null);
+            },
+            "Payment",
+        );
+        // Ticketed: Sequence 0 + TicketSequence.
+        assert_inner_accepted(|o| {
+            o.insert("Sequence".into(), 0.into());
+            o.insert("TicketSequence".into(), 9.into());
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // BatchSigner
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_batch_signer_single_roundtrip() {
+        let entry = single(OTHER_A);
+        let json = serde_json::to_value(&entry).unwrap();
+
+        assert_eq!(json["BatchSigner"]["Account"], OTHER_A);
+        assert!(json["BatchSigner"].get("Signers").is_none());
+
+        let back: BatchSigner = serde_json::from_value(json).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn test_batch_signer_multi_sorts_and_roundtrips() {
+        let entry = BatchSigner::multi(OTHER_A, vec![signer(OTHER_B), signer(DEST)]).unwrap();
+        let signers = entry.signers.as_ref().unwrap();
+
+        assert!(
+            account_id_bytes(&signers[0].account).unwrap()
+                < account_id_bytes(&signers[1].account).unwrap()
+        );
+        assert!(entry.signing_pub_key.is_none() && entry.txn_signature.is_none());
+        assert!(entry.validate(0).is_ok());
+
+        let json = serde_json::to_value(&entry).unwrap();
+        assert!(json["BatchSigner"]["Signers"].is_array());
+        assert!(json["BatchSigner"].get("SigningPubKey").is_none());
+
+        let text = serde_json::to_string(&entry).unwrap();
+        let back: BatchSigner = serde_json::from_str(&text).unwrap();
+        assert_eq!(back, entry);
+    }
+
+    #[test]
+    fn test_batch_signer_multi_rejects_bad_address() {
+        assert_invalid!(
+            BatchSigner::multi(OTHER_A, vec![signer("bogus")]),
+            "account",
+        );
+    }
+
+    #[test]
+    fn test_batch_signer_validate() {
+        let ok = single(OTHER_A);
+        assert!(ok.validate(0).is_ok());
+
+        let mut pub_key_only = ok.clone();
+        pub_key_only.txn_signature = None;
+        assert_invalid!(pub_key_only.validate(2), "batch_signers[2]");
+
+        let mut sig_only = ok.clone();
+        sig_only.signing_pub_key = None;
+        assert_invalid!(sig_only.validate(0), "batch_signers[0]");
+
+        let neither = BatchSigner {
+            account: OTHER_A.into(),
+            ..Default::default()
+        };
+        assert_invalid!(neither.validate(0), "batch_signers[0]");
+
+        let mut both = ok.clone();
+        both.signers = Some(vec![signer(OTHER_B)]);
+        assert_invalid!(both.validate(0), "batch_signers[0]");
+
+        let mut empty_multi = ok.clone();
+        empty_multi.signing_pub_key = None;
+        empty_multi.txn_signature = None;
+        empty_multi.signers = Some(vec![]);
+        assert_invalid!(empty_multi.validate(0), "batch_signers[0]");
+
+        let mut single_with_empty = ok;
+        single_with_empty.signers = Some(vec![]);
+        assert_invalid!(single_with_empty.validate(0), "batch_signers[0]");
+    }
+
+    // Batch: construction and builders
+    #[test]
+    fn test_new_sets_type_account_and_mode() {
+        let b = batch();
+
+        assert_eq!(b.get_transaction_type(), &TransactionType::Batch);
+        assert_eq!(&*b.common_fields.account, OUTER);
+        assert!(b.has_flag(&BatchFlag::TfAllOrNothing));
+        assert_eq!(b.raw_transactions.len(), 2);
+        assert!(b.batch_signers.is_none());
+    }
+
+    #[test]
+    fn test_sequence_and_fee_builders() {
+        let b = batch();
+
+        assert_eq!(b.common_fields.sequence, Some(3));
+        assert!(b.common_fields.fee.is_some());
+    }
+
+    #[test]
+    fn test_with_flag_replaces_mode() {
+        let b = batch().with_flag(BatchFlag::TfIndependent);
+
+        assert!(b.has_flag(&BatchFlag::TfIndependent));
+        assert!(!b.has_flag(&BatchFlag::TfAllOrNothing));
+        assert!(b.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_with_raw_transaction_appends() {
+        let b = batch().with_raw_transaction(payment(6));
+
+        assert_eq!(b.raw_transactions.len(), 3);
+        assert!(b.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_with_batch_signers_sorts_by_account_id() {
+        let b = batch()
+            .with_batch_signers(vec![single(OTHER_B), single(OTHER_A)])
+            .unwrap();
+        let signers = b.batch_signers.as_ref().unwrap();
+
+        assert!(
+            account_id_bytes(&signers[0].account).unwrap()
+                < account_id_bytes(&signers[1].account).unwrap()
+        );
+        assert!(b.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_add_batch_signer_keeps_order() {
+        let b = batch()
+            .add_batch_signer(single(OTHER_A))
+            .unwrap()
+            .add_batch_signer(single(OTHER_B))
+            .unwrap();
+        let signers = b.batch_signers.as_ref().unwrap();
+
+        assert_eq!(signers.len(), 2);
+        assert!(
+            account_id_bytes(&signers[0].account).unwrap()
+                < account_id_bytes(&signers[1].account).unwrap()
+        );
+        assert!(b.get_errors().is_ok());
+    }
+
+    #[test]
+    fn test_with_batch_signers_rejects_bad_address() {
+        assert_invalid!(
+            batch().with_batch_signers(vec![single("not-an-address")]),
+            "account",
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch: serialization and binary codec
+    // -----------------------------------------------------------------------
 
     #[test]
     fn test_serde_shape_and_roundtrip() {
         let batch = batch();
         let json = serde_json::to_value(&batch).unwrap();
+
         assert_eq!(json["TransactionType"], "Batch");
         assert_eq!(json["Flags"], 65536);
         assert_eq!(json["RawTransactions"][0]["RawTransaction"]["Fee"], "0");
         assert!(json.get("BatchSigners").is_none());
+
         let back: Batch = serde_json::from_value(json).unwrap();
         assert_eq!(back, batch);
     }
 
     #[test]
-    fn test_validation() {
-        assert!(batch().validate().is_ok());
+    fn test_serde_roundtrip_with_batch_signers() {
+        let batch = batch().with_batch_signers(vec![single(OTHER_A)]).unwrap();
+        let json = serde_json::to_value(&batch).unwrap();
 
-        let mut b = batch();
-        b.common_fields.flags = vec![].into();
-        assert!(b.validate().is_err(), "no mode");
-        let b = batch().with_flag_extra();
-        assert!(b.validate().is_err(), "two modes");
+        assert_eq!(json["BatchSigners"][0]["BatchSigner"]["Account"], OTHER_A);
 
-        let mut b = batch();
-        b.raw_transactions.pop();
-        assert!(b.validate().is_err(), "fewer than 2");
-
-        let mut b = batch();
-        b.raw_transactions = (4..13).map(payment).collect();
-        assert!(b.validate().is_err(), "more than 8");
-
-        let mut b = batch();
-        b.raw_transactions[1] = b.raw_transactions[0].clone();
-        assert!(b.validate().is_err(), "duplicate");
-
-        let mut b = batch();
-        b.raw_transactions[0].0["Fee"] = Value::from("10");
-        assert!(b.validate().is_err(), "inner fee");
-
-        let mut b = batch();
-        b.raw_transactions[0].0["TxnSignature"] = Value::from("AA");
-        assert!(b.validate().is_err(), "inner signature");
-
-        let mut b = batch();
-        b.raw_transactions[0].0["Sequence"] = Value::from(0u32);
-        assert!(b.validate().is_err(), "sequence 0 without ticket");
-    }
-
-    impl Batch<'static> {
-        fn with_flag_extra(mut self) -> Self {
-            self.common_fields.flags.0.push(BatchFlag::TfOnlyOne);
-            self
-        }
-    }
-
-    #[test]
-    fn test_batch_signer_order() {
-        let a = BatchSigner::single(OTHER_A, "02AA", "BB");
-        let b = BatchSigner::single(OTHER_B, "02AA", "BB");
-        let sorted = batch()
-            .with_batch_signers(vec![a.clone(), b.clone()])
-            .unwrap();
-        assert!(sorted.validate().is_ok());
-
-        let mut reversed = sorted.clone();
-        reversed.batch_signers.as_mut().unwrap().reverse();
-        assert!(reversed.validate().is_err());
-
-        let mut dup = sorted.clone();
-        dup.batch_signers = Some(vec![a.clone(), a]);
-        assert!(dup.validate().is_err());
-
-        let mut outer = batch();
-        outer.batch_signers = Some(vec![BatchSigner::single(OUTER, "02AA", "BB")]);
-        assert!(outer.validate().is_err());
-    }
-
-    #[test]
-    fn test_signing_payload_layout() {
-        let batch = batch();
-        let single = batch.batch_signing_data(OTHER_A, None).unwrap();
-        assert!(single.starts_with("42434800")); // BCH\0
-        assert_eq!(single.len() / 2, 4 + 20 + 4 + 4 + 4 + 2 * 32 + 20);
-        let multi = batch.batch_signing_data(OTHER_A, Some(OTHER_B)).unwrap();
-        assert_eq!(multi.len() / 2, single.len() / 2 + 20);
-        // Outer sequence is bound into the payload.
-        assert_ne!(
-            single,
-            batch
-                .clone()
-                .with_sequence(9)
-                .batch_signing_data(OTHER_A, None)
-                .unwrap()
-        );
+        let back: Batch = serde_json::from_value(json).unwrap();
+        assert_eq!(back, batch);
     }
 
     /// Fails if the vendored definitions.json predates Batch.
@@ -734,6 +1256,7 @@ mod tests {
         use crate::core::binarycodec::definitions::{
             get_field_instance, get_transaction_type_code,
         };
+
         assert_eq!(get_transaction_type_code("Batch"), Some(&71));
         for field in [
             "RawTransactions",
@@ -749,11 +1272,274 @@ mod tests {
     fn test_encode_decode() {
         let hex = crate::core::binarycodec::encode(&batch()).unwrap();
         let decoded = crate::core::binarycodec::decode(&hex).unwrap();
+
         assert_eq!(decoded["TransactionType"], "Batch");
         assert_eq!(decoded["RawTransactions"].as_array().unwrap().len(), 2);
         assert_eq!(
             decoded["RawTransactions"][0]["RawTransaction"]["TransactionType"],
             "Payment"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch: validation (TS: validateBatch)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_valid_batch_passes() {
+        assert!(batch().get_errors().is_ok());
+        assert!(batch().validate().is_ok());
+    }
+
+    #[test]
+    fn test_mode_flags_value() {
+        assert_eq!(batch().mode_flags(), 0x00010000);
+        assert_eq!(
+            batch().with_flag(BatchFlag::TfIndependent).mode_flags(),
+            0x00080000
+        );
+
+        let mut two = batch();
+        two.common_fields.flags.0.push(BatchFlag::TfOnlyOne);
+        assert_eq!(two.mode_flags(), 0x00030000, "modes are OR-ed together");
+    }
+
+    #[test]
+    fn test_exactly_one_mode_required() {
+        for mode in BatchFlag::iter() {
+            assert!(batch().with_flag(mode).get_errors().is_ok(), "{mode}");
+        }
+
+        let mut none = batch();
+        none.common_fields.flags = vec![].into();
+        assert_invalid!(none.get_errors(), "flags");
+
+        let mut two = batch();
+        two.common_fields.flags.0.push(BatchFlag::TfOnlyOne);
+        assert_invalid!(two.get_errors(), "flags");
+    }
+
+    #[test]
+    fn test_raw_transactions_count_bounds() {
+        let with_count = |count: u32| batch_of((4..4 + count).map(payment).collect());
+
+        assert_invalid!(with_count(0).get_errors(), "raw_transactions");
+        assert_invalid!(with_count(1).get_errors(), "raw_transactions");
+        assert!(with_count(MIN_RAW_TRANSACTIONS as u32).get_errors().is_ok());
+        assert!(with_count(MAX_RAW_TRANSACTIONS as u32).get_errors().is_ok());
+        assert_invalid!(with_count(9).get_errors(), "raw_transactions");
+    }
+
+    #[test]
+    fn test_inner_error_reports_its_index() {
+        // `assert_inner_rejected` mutates index 1, so the index in the error matters.
+        let mut b = batch();
+        b.raw_transactions[0]
+            .0
+            .as_object_mut()
+            .unwrap()
+            .insert("Fee".into(), "10".into());
+
+        assert_invalid!(b.get_errors(), "raw_transactions[0].Payment");
+    }
+
+    #[test]
+    fn test_batch_signers_must_be_ascending_and_unique() {
+        let sorted = batch()
+            .with_batch_signers(vec![single(OTHER_A), single(OTHER_B)])
+            .unwrap();
+        assert!(sorted.get_errors().is_ok());
+
+        let mut reversed = sorted.clone();
+        reversed.batch_signers.as_mut().unwrap().reverse();
+        assert_invalid!(reversed.get_errors(), "batch_signers[1]");
+
+        let mut duplicate = sorted;
+        duplicate.batch_signers = Some(vec![single(OTHER_A), single(OTHER_A)]);
+        assert_invalid!(duplicate.get_errors(), "batch_signers[1]");
+    }
+
+    #[test]
+    fn test_batch_signers_reject_outer_account() {
+        let mut b = batch();
+        b.batch_signers = Some(vec![single(OUTER)]);
+
+        assert_invalid!(b.get_errors(), "batch_signers[0]");
+    }
+
+    #[test]
+    fn test_batch_signers_reject_malformed_entries() {
+        let mut partial = batch();
+        let mut entry = single(OTHER_A);
+        entry.txn_signature = None;
+        partial.batch_signers = Some(vec![entry]);
+        assert_invalid!(partial.get_errors(), "batch_signers[0]");
+
+        let mut bad_address = batch();
+        bad_address.batch_signers = Some(vec![single("not-an-address")]);
+        assert_invalid!(bad_address.get_errors(), "account");
+    }
+
+    #[test]
+    fn test_too_many_batch_signers() {
+        let mut b = batch();
+        b.batch_signers = Some(vec![single(OTHER_A); MAX_BATCH_SIGNERS + 1]);
+
+        assert_invalid!(b.get_errors(), "batch_signers");
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch: outer sequence
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_outer_sequence_variants() {
+        assert_eq!(batch().outer_sequence().unwrap(), 3);
+
+        let mut ticketed = batch();
+        ticketed.common_fields.sequence = Some(0);
+        ticketed.common_fields.ticket_sequence = Some(7);
+        assert_eq!(ticketed.outer_sequence().unwrap(), 7);
+
+        let mut both = batch();
+        both.common_fields.ticket_sequence = Some(7); // Sequence stays 3
+        assert_invalid!(both.outer_sequence(), "sequence");
+
+        let mut unset = batch();
+        unset.common_fields.sequence = None;
+        assert_missing!(unset.outer_sequence(), "sequence");
+        unset.common_fields.ticket_sequence = Some(7);
+        assert_missing!(unset.outer_sequence(), "sequence"); // ticket needs explicit Sequence 0
+
+        let mut zero = batch();
+        zero.common_fields.sequence = Some(0);
+        assert_missing!(zero.outer_sequence(), "sequence"); // Sequence 0 needs a ticket
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch: involved and required signers
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_involved_accounts_delegate_counterparty_and_dedup() {
+        let b = batch_of(vec![
+            raw(json!({"TransactionType": "Payment", "Account": OUTER, "Sequence": 4})),
+            // The delegate authorizes, not the account holder.
+            raw(json!({
+                "TransactionType": "Payment", "Account": OTHER_A, "Delegate": OTHER_B, "Sequence": 1
+            })),
+            // Same account again is de-duplicated; the counterparty is added.
+            raw(json!({
+                "TransactionType": "Payment", "Account": OUTER, "Counterparty": DEST, "Sequence": 5
+            })),
+        ]);
+
+        assert_eq!(b.involved_accounts(), vec![OUTER, OTHER_B, DEST]);
+    }
+
+    #[test]
+    fn test_involved_accounts_sponsor_needs_signature_placeholder() {
+        let sponsored = |sponsor_signature: Value| {
+            batch_of(vec![
+                payment(4),
+                raw(json!({
+                    "TransactionType": "Payment", "Account": OTHER_A, "Sequence": 1,
+                    "Sponsor": OTHER_B, "SponsorSignature": sponsor_signature
+                })),
+            ])
+        };
+
+        // The empty placeholder selects the co-signed path: the sponsor must sign.
+        assert_eq!(
+            sponsored(json!({})).involved_accounts(),
+            vec![OUTER, OTHER_A, OTHER_B]
+        );
+        // Pre-funded sponsorship: the sponsor stays out.
+        assert_eq!(
+            sponsored(Value::Null).involved_accounts(),
+            vec![OUTER, OTHER_A]
+        );
+    }
+
+    #[test]
+    fn test_required_signers_exclude_outer_and_are_ordered() {
+        assert!(batch().required_batch_signer_accounts().unwrap().is_empty());
+
+        let b = batch_of(vec![
+            payment(4),
+            payment_from(OTHER_B, 1),
+            payment_from(OTHER_A, 1),
+        ]);
+        let required = b.required_batch_signer_accounts().unwrap();
+
+        assert_eq!(required.len(), 2);
+        assert!(!required.iter().any(|a| a == OUTER));
+
+        let ids: Vec<_> = required
+            .iter()
+            .map(|a| account_id_bytes(a).unwrap())
+            .collect();
+        assert!(ids.windows(2).all(|w| w[0] < w[1]), "AccountID order");
+    }
+
+    #[test]
+    fn test_validate_batch_signers() {
+        // Nobody but the outer account is involved: nothing to sign.
+        assert!(batch().validate_batch_signers().is_ok());
+
+        let b = batch_of(vec![
+            payment(4),
+            payment_from(OTHER_A, 1),
+            payment_from(OTHER_A, 2),
+        ]);
+        assert_eq!(
+            b.required_batch_signer_accounts().unwrap(),
+            vec![OTHER_A.to_string()]
+        );
+
+        // A draft is a valid Batch, but not submittable until the signer is present.
+        assert!(b.get_errors().is_ok());
+        assert_invalid!(b.validate_batch_signers(), "batch_signers");
+
+        let signed = b.add_batch_signer(single(OTHER_A)).unwrap();
+        assert!(signed.validate_batch_signers().is_ok());
+
+        let extra = signed.add_batch_signer(single(OTHER_B)).unwrap();
+        assert_invalid!(extra.validate_batch_signers(), "batch_signers");
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_account_id_bytes() {
+        assert_eq!(account_id_bytes(OUTER).unwrap().len(), 20);
+        assert_ne!(
+            account_id_bytes(OUTER).unwrap(),
+            account_id_bytes(OTHER_A).unwrap()
+        );
+        assert_invalid!(account_id_bytes("not-an-address"), "account");
+    }
+
+    #[test]
+    fn test_sort_by_account_id_orders_by_bytes() {
+        let accounts: Vec<String> = [OTHER_B, OTHER_A, DEST, OUTER]
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+        let sorted = sort_by_account_id(accounts, |a: &String| a.as_str()).unwrap();
+
+        assert_eq!(sorted.len(), 4);
+        let ids: Vec<_> = sorted
+            .iter()
+            .map(|a| account_id_bytes(a).unwrap())
+            .collect();
+        assert!(ids.windows(2).all(|w| w[0] < w[1]));
+
+        assert_invalid!(
+            sort_by_account_id(vec!["bogus".to_string()], |a: &String| a.as_str()),
+            "account",
         );
     }
 }

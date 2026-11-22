@@ -34,10 +34,10 @@ use crate::{
     wallet::Wallet,
 };
 
-use alloc::borrow::Cow;
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use alloc::{borrow::Cow, collections::btree_map::BTreeMap};
 use core::convert::TryInto;
 use core::fmt::Debug;
 use exceptions::XRPLTransactionHelperException;
@@ -79,6 +79,7 @@ where
         }
         sign(transaction, wallet, false)?;
     }
+
     submit(transaction, client).await
 }
 
@@ -106,12 +107,112 @@ where
         txn_common_fields.fee =
             Some(calculate_fee_per_transaction_type(&txn, Some(client), signers_count).await?);
     }
+
     if txn_common_fields.last_ledger_sequence.is_none() {
         let ledger_sequence = get_latest_validated_ledger_sequence(client).await?;
         txn_common_fields.last_ledger_sequence = Some(ledger_sequence + LEDGER_OFFSET as u32);
     }
 
+    if matches!(transaction.get_transaction_type(), TransactionType::Batch) {
+        autofill_raw_transactions(transaction, client).await?;
+    }
+
     Ok(())
+}
+
+pub async fn autofill_raw_transactions<'a, F, T, C>(
+    transaction: &mut T,
+    client: &C,
+) -> XRPLHelperResult<()>
+where
+    T: Transaction<'a, F>,
+    F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    C: XRPLAsyncClient,
+{
+    let outer_account = transaction.get_common_fields().account.to_string();
+
+    let outer_sequence = transaction
+        .get_common_fields()
+        .sequence
+        .ok_or_else(|| XRPLModelException::MissingField("batch `sequence`".into()))?;
+
+    let raw_txs = transaction
+        .raw_transactions_mut()
+        .ok_or_else(|| XRPLModelException::MissingField("RawTransactions".into()))?;
+
+    // Next sequence to hand out, per account.
+    let mut next_sequence: BTreeMap<String, u32> = BTreeMap::new();
+    next_sequence.insert(
+        outer_account.to_string(),
+        checked_next(outer_sequence, "sequence")?,
+    );
+
+    let mut filled = Vec::with_capacity(raw_txs.len());
+
+    for raw in raw_txs.iter_mut() {
+        let tx_type = raw.transaction_type()?;
+
+        if tx_type == TransactionType::Batch {
+            Err(XRPLModelException::InvalidValue {
+                field: "raw_transactions".into(),
+                expected: "no nested Batch".into(),
+                found: "Batch".into(),
+            })?;
+        }
+
+        let account = raw
+            .get_field::<String>("Account")?
+            .ok_or_else(|| XRPLModelException::MissingField(format!("{}.Account", tx_type)))?;
+
+        if raw.get_field::<u32>("Sequence")?.is_none()
+            && raw.get_field::<u32>("TicketSequence")?.is_none()
+        {
+            let sequence = match next_sequence.get(&account).copied() {
+                Some(sequence) => sequence,
+                None => get_next_valid_seq_number(account.as_str().into(), client, None).await?,
+            };
+
+            next_sequence.insert(account, checked_next(sequence, "Sequence")?);
+
+            raw.set_field("Sequence", &sequence);
+        }
+
+        raw.set_field("Fee", &"0");
+        raw.set_field("SigningPubKey", &"");
+
+        if raw.get_field::<u32>("LastLedgerSequence")?.is_some() {
+            Err(XRPLModelException::InvalidValue {
+                field: format!("{}.LastLedgerSequence", tx_type),
+                expected: "no LastLedgerSequence".into(),
+                found: "LastLedgerSequence".into(),
+            })?
+        }
+
+        let common_fields = client.get_common_fields().await?;
+        if raw.get_field::<u32>("NetworkID")?.is_none()
+            && txn_needs_network_id(common_fields.clone())?
+        {
+            raw.set_field("NetworkID", &common_fields.network_id);
+        }
+
+        filled.push(raw.clone());
+    }
+
+    *raw_txs = filled;
+
+    Ok(())
+}
+
+fn checked_next(sequence: u32, field: &str) -> XRPLHelperResult<u32> {
+    let r = sequence
+        .checked_add(1)
+        .ok_or_else(|| XRPLModelException::InvalidValue {
+            field: field.to_string(),
+            expected: "a sequence below u32::MAX".to_string(),
+            found: sequence.to_string(),
+        })?;
+
+    Ok(r)
 }
 
 pub async fn autofill_and_sign<'a, 'b, T, F, C>(
@@ -128,7 +229,9 @@ where
     if check_fee {
         check_txn_fee(transaction, client).await?;
     }
+
     autofill(transaction, client, None).await?;
+
     sign(transaction, wallet, false)?;
 
     Ok(())
@@ -352,7 +455,7 @@ async fn get_owner_reserve_from_response(
     let owner_reserve_response = client.request(ServerState::new(None).into()).await?;
     let result: ServerStateResult = owner_reserve_response.try_into()?;
     match result.state.validated_ledger {
-        Some(validated_ledger) => Ok(validated_ledger.reserve_base),
+        Some(validated_ledger) => Ok(validated_ledger.reserve_inc),
         None => Err(XRPLModelException::MissingField("validated_ledger".to_string()).into()),
     }
 }
@@ -421,6 +524,33 @@ where
     };
 
     let net: BigDecimal = net_fee.clone().try_into()?;
+    // server_state exposes the open-ledger escalation and reference factors;
+    // scale XRP reserve-based inner fees by their ratio, matching net_fee.
+    let has_reserve_fee = raw_transactions.iter().any(|raw| {
+        matches!(
+            raw.transaction_type(),
+            Ok(TransactionType::AMMCreate | TransactionType::AccountDelete)
+        )
+    });
+    let load_scale = if has_reserve_fee {
+        if let Some(client) = client {
+            let response = client.request(ServerState::new(None).into()).await?;
+            let result: ServerStateResult = response.try_into()?;
+            match (
+                result.state.load_factor_fee_escalation,
+                result.state.load_factor_fee_reference,
+            ) {
+                (Some(escalation), Some(reference)) if reference != 0 => {
+                    BigDecimal::from(escalation) / BigDecimal::from(reference)
+                }
+                _ => BigDecimal::from(1u8),
+            }
+        } else {
+            BigDecimal::from(1u8)
+        }
+    } else {
+        BigDecimal::from(1u8)
+    };
     let mut total = &net * BigDecimal::from(2u8);
     let signatures: usize = batch_signers
         .iter()
@@ -439,7 +569,7 @@ where
                     };
                     owner_reserve = Some(reserve.try_into()?);
                 }
-                owner_reserve.clone().unwrap_or_default()
+                owner_reserve.clone().unwrap_or_default() * &load_scale
             }
             TransactionType::ConfidentialMPTConvert
             | TransactionType::ConfidentialMPTConvertBack

@@ -86,6 +86,7 @@ pub mod xchain_modify_bridge;
 use super::{FlagCollection, XRPLModelException, XRPLModelResult};
 use crate::core::binarycodec::encode;
 use crate::models::amount::XRPAmount;
+use crate::models::transactions::batch::RawTransaction;
 use crate::{_serde::txn_flags, serde_with_tag};
 use alloc::borrow::Cow;
 use alloc::format;
@@ -104,6 +105,8 @@ use strum::IntoEnumIterator;
 use strum_macros::{AsRefStr, Display};
 
 const TRANSACTION_HASH_PREFIX: u32 = 0x54584E00;
+/// Global flag required on every inner transaction.
+pub const TF_INNER_BATCH_TXN: u32 = 0x4000_0000;
 
 fn is_hex(value: &str) -> bool {
     value.chars().all(|c| c.is_ascii_hexdigit())
@@ -903,6 +906,10 @@ where
         let result = hex_string[..64].to_string();
 
         Ok(result.into())
+    }
+
+    fn raw_transactions_mut(&mut self) -> Option<&mut Vec<RawTransaction>> {
+        None
     }
 }
 
