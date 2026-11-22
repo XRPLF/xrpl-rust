@@ -1,6 +1,8 @@
 pub mod exceptions;
 mod submit_and_wait;
 
+use alloc::format;
+
 use bigdecimal::{BigDecimal, RoundingMode};
 pub use submit_and_wait::*;
 
