@@ -199,6 +199,7 @@ pub fn encode_for_signing_batch_v1_1(
     flags: u32,
     tx_ids: &[&str],
     batch_signer_account: &str,
+    multisign_address: Option<&str>,
 ) -> XRPLCoreResult<String> {
     let mut buf = alloc::vec::Vec::with_capacity(4 + 20 + 4 + 4 + 4 + tx_ids.len() * 32 + 40);
     buf.extend_from_slice(&BATCH_PREFIX);
@@ -226,6 +227,10 @@ pub fn encode_for_signing_batch_v1_1(
         buf.extend_from_slice(&id_bytes);
     }
     buf.extend_from_slice(AccountId::try_from(batch_signer_account)?.as_ref());
+
+    if let Some(multisign) = multisign_address {
+        buf.extend_from_slice(AccountId::try_from(multisign)?.as_ref());
+    }
 
     Ok(hex::encode_upper(&buf))
 }
@@ -261,6 +266,8 @@ mod test {
     use alloc::vec;
 
     use super::*;
+    use crate::core::binarycodec::exceptions::XRPLBinaryCodecException;
+    use crate::core::exceptions::XRPLCoreException;
     use crate::utils::testing::test_constants::*;
 
     #[path = "binary_json_tests.rs"]
@@ -899,5 +906,200 @@ mod test {
             encode_for_signing_counterparty(&unsigned).unwrap(),
             encode_for_signing_counterparty(&with_counterparty_signature).unwrap(),
         );
+    }
+
+    const ZERO: &str = "rrrrrrrrrrrrrrrrrrrrrhoLvTp";
+    const ONE: &str = "rrrrrrrrrrrrrrrrrrrrBZbvji";
+    const GENESIS: &str = "rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh";
+    const GENESIS_HEX: &str = "B5F762798A53D543A014CAF8B297CFF8F2F937E8";
+
+    const ID_A: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    const ID_B: &str = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
+
+    fn prefix_hex() -> String {
+        hex::encode_upper(BATCH_PREFIX)
+    }
+
+    #[test]
+    fn exact_layout_no_multisign() {
+        let out = encode_for_signing_batch_v1_1(GENESIS, 3, 0x0001_0000, &[ID_A, ID_B], ONE, None)
+            .unwrap();
+
+        let expected = [
+            prefix_hex().as_str(),
+            GENESIS_HEX,
+            "00000003", // outer sequence, BE
+            "00010000", // flags, BE
+            "00000002", // tx count, BE
+            ID_A,
+            ID_B,
+            "0000000000000000000000000000000000000001", // signer
+        ]
+        .concat();
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn exact_layout_with_multisign() {
+        let out = encode_for_signing_batch_v1_1(ZERO, 1, 0, &[ID_A], ONE, Some(GENESIS)).unwrap();
+
+        let expected = [
+            prefix_hex().as_str(),
+            "0000000000000000000000000000000000000000",
+            "00000001",
+            "00000000",
+            "00000001",
+            ID_A,
+            "0000000000000000000000000000000000000001",
+            GENESIS_HEX, // multisign appended last
+        ]
+        .concat();
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn multisign_adds_exactly_20_bytes() {
+        let without = encode_for_signing_batch_v1_1(ZERO, 1, 0, &[ID_A], ONE, None).unwrap();
+        let with = encode_for_signing_batch_v1_1(ZERO, 1, 0, &[ID_A], ONE, Some(GENESIS)).unwrap();
+        assert_eq!(with.len(), without.len() + 40);
+        assert!(with.starts_with(&without));
+        assert!(with.ends_with(GENESIS_HEX));
+    }
+
+    #[test]
+    fn empty_tx_ids() {
+        let out = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[], ONE, None).unwrap();
+        let expected_len = (BATCH_PREFIX.len() + 20 + 4 + 4 + 4 + 20) * 2;
+        assert_eq!(out.len(), expected_len);
+        // count field is zero
+        let count_off = (BATCH_PREFIX.len() + 20 + 4 + 4) * 2;
+        assert_eq!(&out[count_off..count_off + 8], "00000000");
+    }
+
+    #[test]
+    fn output_length_scales_with_tx_ids() {
+        let base = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[], ONE, None)
+            .unwrap()
+            .len();
+        for n in 1..=8usize {
+            let ids = vec![ID_A; n];
+            let out = encode_for_signing_batch_v1_1(ZERO, 0, 0, &ids, ONE, None).unwrap();
+            assert_eq!(out.len(), base + n * 64);
+        }
+    }
+
+    #[test]
+    fn tx_id_order_is_preserved() {
+        let ab = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[ID_A, ID_B], ONE, None).unwrap();
+        let ba = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[ID_B, ID_A], ONE, None).unwrap();
+        assert_ne!(ab, ba);
+        let off = (BATCH_PREFIX.len() + 20 + 12) * 2;
+        assert_eq!(&ab[off..off + 64], ID_A);
+        assert_eq!(&ba[off..off + 64], ID_B);
+    }
+
+    #[test]
+    fn lowercase_tx_id_accepted_output_uppercase() {
+        let lower = ID_A.replace('A', "a");
+        let out = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[&lower], ONE, None).unwrap();
+        assert_eq!(
+            out,
+            encode_for_signing_batch_v1_1(ZERO, 0, 0, &[ID_A], ONE, None).unwrap()
+        );
+        assert_eq!(out, out.to_uppercase());
+    }
+
+    #[test]
+    fn deterministic() {
+        let a = encode_for_signing_batch_v1_1(GENESIS, 9, 1, &[ID_A, ID_B], ONE, Some(ZERO));
+        let b = encode_for_signing_batch_v1_1(GENESIS, 9, 1, &[ID_A, ID_B], ONE, Some(ZERO));
+        assert_eq!(a.unwrap(), b.unwrap());
+    }
+
+    #[test]
+    fn invalid_outer_account() {
+        assert!(encode_for_signing_batch_v1_1("not-an-address", 0, 0, &[], ONE, None).is_err());
+    }
+
+    #[test]
+    fn invalid_signer_account() {
+        assert!(encode_for_signing_batch_v1_1(ZERO, 0, 0, &[], "bogus", None).is_err());
+    }
+
+    #[test]
+    fn invalid_multisign_account() {
+        assert!(encode_for_signing_batch_v1_1(ZERO, 0, 0, &[], ONE, Some("bogus")).is_err());
+    }
+
+    #[test]
+    fn non_hex_tx_id() {
+        let bad = "Z".repeat(64);
+        let err = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[&bad], ONE, None).unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::InvalidHashLength {
+                expected: 64,
+                found: 64
+            })
+        ));
+    }
+
+    #[test]
+    fn odd_length_tx_id() {
+        let bad = "A".repeat(63);
+        let err = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[&bad], ONE, None).unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::InvalidHashLength {
+                expected: 64,
+                found: 63
+            })
+        ));
+    }
+
+    #[test]
+    fn tx_id_too_short() {
+        let short = "AA".repeat(31);
+        let err = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[&short], ONE, None).unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::InvalidHashLength {
+                expected: 32,
+                found: 31
+            })
+        ));
+    }
+
+    #[test]
+    fn tx_id_too_long() {
+        let long = "AA".repeat(33);
+        let err = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[&long], ONE, None).unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::InvalidHashLength {
+                expected: 32,
+                found: 33
+            })
+        ));
+    }
+
+    #[test]
+    fn empty_tx_id_string() {
+        let err = encode_for_signing_batch_v1_1(ZERO, 0, 0, &[""], ONE, None).unwrap_err();
+        assert!(matches!(
+            err,
+            XRPLCoreException::XRPLBinaryCodecError(XRPLBinaryCodecException::InvalidHashLength {
+                expected: 32,
+                found: 0
+            })
+        ));
+    }
+
+    #[test]
+    fn error_in_later_tx_id_aborts() {
+        let bad = "AA".repeat(31);
+        assert!(encode_for_signing_batch_v1_1(ZERO, 0, 0, &[ID_A, &bad], ONE, None).is_err());
     }
 }

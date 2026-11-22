@@ -263,7 +263,8 @@ fn signer_entry(
 ) -> (String, Value) {
     let ids = json_hashes(inners);
     let refs: Vec<&str> = ids.iter().map(String::as_str).collect();
-    let payload = encode_for_signing_batch_v1_1(outer, outer_seq, flags, &refs, account).unwrap();
+    let payload =
+        encode_for_signing_batch_v1_1(outer, outer_seq, flags, &refs, account, None).unwrap();
     let signature = keypairs::sign(&hex::decode(payload).unwrap(), &key.private_key).unwrap();
     (
         account.to_string(),

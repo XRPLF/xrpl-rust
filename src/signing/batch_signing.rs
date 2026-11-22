@@ -93,7 +93,7 @@ pub fn sign_multi_batch<'a>(
         ))?;
     }
 
-    let signature = sign_batch_payload(wallet, batch, signing_account)?;
+    let signature = sign_batch_payload(wallet, batch, signing_account, multisign_address)?;
     let batch_signer =
         construct_batch_signer(signing_account, wallet, signature, multisign_address)?;
 
@@ -109,8 +109,9 @@ fn sign_batch_payload(
     wallet: &Wallet,
     batch: &Batch<'_>,
     batch_account: &str,
+    multisign_address: Option<&str>,
 ) -> XRPLHelperResult<String> {
-    let payload = hex::decode(batch_signing_data(batch, batch_account)?)?;
+    let payload = hex::decode(batch_signing_data(batch, batch_account, multisign_address)?)?;
 
     Ok(sign(&payload, &wallet.private_key)?)
 }
@@ -118,7 +119,11 @@ fn sign_batch_payload(
 /// Hex payload a BatchSigner signs. `batch_account` is the `BatchSigner.Account`;
 /// `multisigner_account` is the individual signer for multi-signed entries.
 /// Requires the outer `Sequence`/`TicketSequence` and flags to be final.
-pub fn batch_signing_data(batch: &Batch<'_>, batch_account: &str) -> XRPLModelResult<String> {
+pub fn batch_signing_data(
+    batch: &Batch<'_>,
+    batch_account: &str,
+    multisign_address: Option<&str>,
+) -> XRPLModelResult<String> {
     let ids = batch
         .raw_transactions
         .iter()
@@ -133,6 +138,7 @@ pub fn batch_signing_data(batch: &Batch<'_>, batch_account: &str) -> XRPLModelRe
         batch.mode_flags(),
         &id_refs,
         batch_account,
+        multisign_address,
     )
     .map_err(XRPLTransactionException::XRPLCoreError)?)
 }

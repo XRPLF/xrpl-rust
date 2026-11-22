@@ -1,8 +1,6 @@
 pub mod exceptions;
 mod submit_and_wait;
 
-use alloc::format;
-
 use bigdecimal::{BigDecimal, RoundingMode};
 pub use submit_and_wait::*;
 
@@ -39,7 +37,7 @@ use crate::{
 use alloc::string::String;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use alloc::{borrow::Cow, collections::btree_map::BTreeMap};
+use alloc::{borrow::Cow, collections::btree_map::BTreeMap, format};
 use core::convert::TryInto;
 use core::fmt::Debug;
 use exceptions::XRPLTransactionHelperException;
@@ -144,10 +142,13 @@ where
 
     // Next sequence to hand out, per account.
     let mut next_sequence: BTreeMap<String, u32> = BTreeMap::new();
-    next_sequence.insert(
-        outer_account.to_string(),
-        checked_next(outer_sequence, "sequence")?,
-    );
+    let outer_next = if outer_sequence == 0 {
+        // A ticketed outer Batch does not consume the account Sequence.
+        get_next_valid_seq_number(outer_account.as_str().into(), client, None).await?
+    } else {
+        checked_next(outer_sequence, "sequence")?
+    };
+    next_sequence.insert(outer_account.to_string(), outer_next);
 
     let mut filled = Vec::with_capacity(raw_txs.len());
 
