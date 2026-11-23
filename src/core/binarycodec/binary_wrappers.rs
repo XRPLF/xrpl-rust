@@ -498,7 +498,16 @@ impl Parser for BinaryParser {
     }
 
     fn read(&mut self, n: usize) -> XRPLCoreResult<Vec<u8>> {
-        let first_n_bytes = self.0[..n].to_owned();
+        // Bounds-check before slicing, so a short field returns
+        // `UnexpectedParserSkipOverflow` instead of an out-of-range slice.
+        let first_n_bytes = self
+            .0
+            .get(..n)
+            .ok_or(XRPLBinaryCodecException::UnexpectedParserSkipOverflow {
+                max: self.0.len(),
+                found: n,
+            })?
+            .to_owned();
 
         self.skip_bytes(n)?;
         Ok(first_n_bytes)
