@@ -100,7 +100,7 @@ jobs:
         include:
           - { os: ubuntu-latest, label: linux-x86_64 }
           - { os: ubuntu-24.04-arm, label: linux-aarch64 }
-          - { os: macos-14, label: macos-arm64 }
+          - { os: macos-15, label: macos-arm64 }
           - { os: macos-15-intel, label: macos-x86_64 }
           - { os: windows-2022, label: windows-amd64 }
     steps:
