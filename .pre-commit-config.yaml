@@ -1,23 +1,31 @@
-# Pre-commit hooks for xrpl-rust.
+# pre-commit is a tool to perform a predefined set of tasks manually and/or
+# automatically before git commits are made.
 #
-# Install once per clone (requires https://pre-commit.com):
+# Config reference: https://pre-commit.com/#pre-commit-configyaml---top-level
 #
-#     pre-commit install
+# Common tasks
 #
-# Hooks mirror the checks that gate CI in `.github/workflows/build_and_lint.yml`
-# so the same failures are caught locally before pushing:
+# - Run on all files:   pre-commit run --all-files
+# - Register git hooks: pre-commit install --hook-type pre-commit
 #
-#   - cargo fmt --all -- --check
-#   - cargo clippy --all-features -- -D warnings
-#
-# The Rust hooks are `local` (system) rather than pulled from a third-party
-# repo so they use each contributor's own project toolchain — matching what
-# CI does with `dtolnay/rust-toolchain@stable`.
+# The Rust hooks mirror the checks in `.github/workflows/build_and_lint.yml`.
+# `.github/workflows/pre-commit.yml` runs all hooks in CI.
+
+# Generated, vendored, and captured files:
+# - binary codec fixtures and definitions copied from xrpl.js / rippled
+# - generated mpt-crypto-sys bindings and vendored C headers
+exclude: |
+  (?x)^(
+    src/core/binarycodec/test_data/.*|
+    src/core/binarycodec/definitions/definitions\.json|
+    internal/mpt-crypto-sys/src/bindings\.rs|
+    internal/mpt-crypto-sys/vendor/.*
+  )$
 
 repos:
   # Baseline file-hygiene hooks.
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -29,7 +37,8 @@ repos:
       - id: mixed-line-ending
         args: ["--fix=lf"]
 
-  # Rust hooks — run against the project's own toolchain, not a pinned one.
+  # Rust hooks use the contributor's own toolchain (`language: system`), as
+  # CI does with `dtolnay/rust-toolchain@stable`.
   - repo: local
     hooks:
       - id: cargo-fmt
@@ -46,3 +55,21 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+
+  # Lock files generated behind a private mirror point at that mirror, which
+  # CI and other contributors cannot reach. Rewrite them to the public
+  # registries.
+  - repo: local
+    hooks:
+      - id: fix-npm-registry-urls
+        name: Replace non-public registry URLs in package-lock.json
+        entry: >-
+          perl -pi -e 's#"resolved": "https?://(?!registry\.npmjs\.org/)[^"]*?/((?:\@[^/"]+/)?[^/"\@]+/-/[^/"]+\.tgz)"#"resolved": "https://registry.npmjs.org/$1"#'
+        language: system
+        files: (^|/)package-lock\.json$
+      - id: fix-pypi-index-urls
+        name: Remove non-public index URLs from pip requirements
+        entry: >-
+          perl -ni -e 'print unless /^--(index-url|extra-index-url|trusted-host)\s+(?!https:\/\/pypi\.org\/)/'
+        language: system
+        files: ^\.github/requirements/.*\.txt$
