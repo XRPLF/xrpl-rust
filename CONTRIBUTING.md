@@ -54,6 +54,8 @@ To run them across the whole repository ad-hoc:
 pre-commit run --all-files
 ```
 
+CI runs the same hooks in `.github/workflows/pre-commit.yml`.
+
 ### Run the Formatter
 
 To run the linter:
