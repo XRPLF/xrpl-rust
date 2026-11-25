@@ -14,6 +14,7 @@ use crate::common::{
 };
 use xrpl::models::transactions::escrow_cancel::EscrowCancel;
 use xrpl::models::transactions::escrow_create::EscrowCreate;
+use xrpl::models::XRPAmount;
 
 #[tokio::test]
 async fn test_escrow_cancel_base() {
@@ -35,7 +36,7 @@ async fn test_escrow_cancel_base() {
             None,                                       // signers
             None,                                       // source_tag
             None,                                       // ticket_sequence
-            "10000".into(),                             // amount: 10 000 drops
+            XRPAmount::from("10000"),                   // amount: 10 000 drops
             destination.classic_address.clone().into(), // destination
             Some(cancel_after),                         // cancel_after
             None,                                       // condition

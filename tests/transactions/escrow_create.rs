@@ -9,6 +9,7 @@ use crate::common::{
     generate_funded_wallet, get_ledger_close_time, test_transaction, with_blockchain_lock,
 };
 use xrpl::models::transactions::escrow_create::EscrowCreate;
+use xrpl::models::XRPAmount;
 
 #[tokio::test]
 async fn test_escrow_create_base() {
@@ -29,7 +30,7 @@ async fn test_escrow_create_base() {
             None,                                       // signers
             None,                                       // source_tag
             None,                                       // ticket_sequence
-            "10000".into(),                             // amount: 10 000 drops
+            XRPAmount::from("10000"),                   // amount: 10 000 drops
             destination.classic_address.clone().into(), // destination
             None,                                       // cancel_after
             None,                                       // condition
