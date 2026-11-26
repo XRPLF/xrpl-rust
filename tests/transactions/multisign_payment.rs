@@ -61,14 +61,8 @@ async fn test_multisign_payment() {
         sign(&mut payment_signed_by_b, &signer_b, true).expect("signer B sign");
 
         // multisign() merges the signer-signed copies into the master transaction.
-        // Box::leak the Vec because multisign's signature ties the borrow's lifetime
-        // to T's 'a parameter, which the async block infers as 'static when the
-        // Payment was built from string literals (e.g. XRPAmount::from("20000000")).
-        // Without 'static here the borrow checker rejects the call. The leak is
-        // intentional and bounded by the test runtime.
-        let signer_signed_copies: &'static Vec<_> =
-            Box::leak(Box::new(vec![payment_signed_by_a, payment_signed_by_b]));
-        xrpl::transaction::multisign(&mut payment, signer_signed_copies)
+        let signer_signed_copies = vec![payment_signed_by_a, payment_signed_by_b];
+        xrpl::transaction::multisign(&mut payment, &signer_signed_copies)
             .expect("multisign combine");
 
         assert!(
