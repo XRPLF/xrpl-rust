@@ -77,9 +77,12 @@ where
                 Some(sender) => sender,
                 None => return Err(XRPLWebSocketException::MissingRequestSender.into()),
             };
+            // On failure `send` hands back the message that could not be
+            // delivered; discard it so the raw response body is not surfaced
+            // into error-reporting channels.
             sender
                 .send(message)
-                .map_err(XRPLWebSocketException::MessageChannelError)?;
+                .map_err(|_| XRPLWebSocketException::MessageChannelError)?;
         } else {
             self.messages.send(message).await;
         }
@@ -104,5 +107,38 @@ where
             Ok(None) => Ok(None),
             Err(error) => Err(XRPLWebSocketException::Canceled(error).into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asynch::clients::SingleExecutorMutex;
+    use embassy_futures::block_on;
+
+    #[test]
+    fn handle_message_routes_response_to_waiting_request() {
+        let mut base = WebsocketBase::<SingleExecutorMutex>::new();
+        block_on(async {
+            base.setup_request_future("1".to_string()).await;
+            base.handle_message(r#"{"id":"1","result":{}}"#.to_string())
+                .await
+                .unwrap();
+            let received = base.try_recv_request("1".to_string()).await.unwrap();
+            assert_eq!(received, Some(r#"{"id":"1","result":{}}"#.to_string()));
+        });
+    }
+
+    #[test]
+    fn unmatched_message_is_buffered_for_pop() {
+        let mut base = WebsocketBase::<SingleExecutorMutex>::new();
+        block_on(async {
+            // No request is registered, so the message falls through to the
+            // general message channel rather than a request receiver.
+            base.handle_message(r#"{"result":{}}"#.to_string())
+                .await
+                .unwrap();
+            assert_eq!(base.pop_message().await, r#"{"result":{}}"#.to_string());
+        });
     }
 }
