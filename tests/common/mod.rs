@@ -213,8 +213,13 @@ where
     F: FnOnce() -> Fut,
     Fut: std::future::Future<Output = T>,
 {
+    let name = std::thread::current().name().unwrap_or("?").to_string();
+    eprintln!("[{name}] waiting for the blockchain lock");
     let _guard = TEST_MUTEX.lock().await;
-    f().await
+    eprintln!("[{name}] holds the blockchain lock");
+    tokio::time::timeout(std::time::Duration::from_secs(180), f())
+        .await
+        .unwrap_or_else(|_| panic!("[{name}] exceeded 180s while holding the blockchain lock"))
 }
 
 /// Look up the OfferSequence for the first escrow owned by `account`.
