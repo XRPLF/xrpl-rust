@@ -200,9 +200,16 @@ fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[
         ));
     }
 
-    // Parse the value - can be decimal string or hex string (0x prefix)
-    let amount: u64 = if value.starts_with("0x") || value.starts_with("0X") {
-        u64::from_str_radix(&value[2..], 16).map_err(|_| {
+    // Reject uppercase 0X prefix explicitly (must use lowercase 0x)
+    if value.starts_with("0X") {
+        return Err(XRPLCoreException::XRPLUtilsError(
+            "hex prefix must be lowercase '0x', not '0X'".to_string(),
+        ));
+    }
+    // Parse the value: decimal string, or lowercase hex string with "0x" prefix.
+    // Uppercase "0X" prefix is explicitly rejected to match xrpl.js behaviour.
+    let amount: u64 = if let Some(hex_digits) = value.strip_prefix("0x") {
+        u64::from_str_radix(hex_digits, 16).map_err(|_| {
             XRPLCoreException::XRPLUtilsError("Value has bad hex character".to_string())
         })?
     } else if value == "-0" {
@@ -250,28 +257,32 @@ fn _serialize_mpt_amount(value: &str, mpt_issuance_id: &str) -> XRPLCoreResult<[
 
 impl Amount {
     /// Deserialize native asset amount.
-    fn _deserialize_native_amount(&self) -> String {
+    fn _deserialize_native_amount(&self) -> XRPLCoreResult<String> {
+        if self.as_ref().len() < 8 {
+            return Err(XRPLCoreException::XRPLUtilsError(
+                "native amount buffer too short".to_string(),
+            ));
+        }
         let mut sized: [u8; 8] = Default::default();
-
         sized.copy_from_slice(&self.as_ref()[..8]);
-        (u64::from_be_bytes(sized) & 0x3FFFFFFFFFFFFFFF).to_string()
+        Ok((u64::from_be_bytes(sized) & 0x3FFFFFFFFFFFFFFF).to_string())
     }
 
     /// Returns True if this amount is a native XRP amount.
     pub fn is_native(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
+        !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 == 0
     }
 
     /// Returns True if this amount is an MPT amount.
     pub fn is_mpt(&self) -> bool {
-        self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
+        !self.0.is_empty() && self.0[0] & 0x80 == 0 && self.0[0] & 0x20 != 0
     }
 
-    /// Returns true if bit 6 of the first byte is set (positive amount).
-    /// Applies to XRP, IOU, and MPT amounts — the positive flag is always
-    /// encoded in byte[0] bit 6 (0x40) of the serialized amount.
+    /// Returns true if the positive-sign bit (0x40) in byte 0 is set.
+    /// Returns false on an empty buffer. Callers that need to distinguish
+    /// "not positive" from "empty" should check `!self.0.is_empty()` first.
     pub fn is_positive(&self) -> bool {
-        self.0[0] & 0x40 > 0
+        !self.0.is_empty() && self.0[0] & 0x40 > 0
     }
 }
 
@@ -378,19 +389,30 @@ impl Serialize for Amount {
         S: Serializer,
     {
         if self.is_native() {
-            serializer.serialize_str(&self._deserialize_native_amount())
+            serializer.serialize_str(
+                &self
+                    ._deserialize_native_amount()
+                    .map_err(S::Error::custom)?,
+            )
         } else if self.is_mpt() {
             // MPT: 1 byte leading + 8 bytes amount + 24 bytes mpt_issuance_id
             let bytes = self.as_ref();
+            if bytes.len() < 33 {
+                return Err(S::Error::custom("MPT amount buffer too short"));
+            }
             let leading = bytes[0];
             let is_positive = leading & 0x40 != 0;
-            let sign = if is_positive { "" } else { "-" };
+            if !is_positive {
+                return Err(S::Error::custom(
+                    "MPT amount positive-sign bit (0x40) is not set",
+                ));
+            }
             let mut amount_bytes = [0u8; 8];
             amount_bytes.copy_from_slice(&bytes[1..9]);
             let amount_val = u64::from_be_bytes(amount_bytes);
             let mpt_id = hex::encode_upper(&bytes[9..33]);
 
-            let value_str = alloc::format!("{}{}", sign, amount_val);
+            let value_str = alloc::format!("{}", amount_val);
             let mut builder = serializer.serialize_map(Some(2))?;
             builder.serialize_entry("value", &value_str)?;
             builder.serialize_entry("mpt_issuance_id", &mpt_id)?;
@@ -446,32 +468,44 @@ impl TryFrom<serde_json::Value> for Amount {
             let obj = value
                 .as_object()
                 .ok_or(XRPLTypeException::InvalidNoneValue)?;
-            if obj.len() == 2 && obj.contains_key("mpt_issuance_id") && obj.contains_key("value") {
-                // MPT amount: exactly the keys {"mpt_issuance_id", "value"} — matches
-                // xrpl.js isAmountObjectMPT which requires sorted keys === ["mpt_issuance_id","value"].
-                let mpt_id = obj["mpt_issuance_id"]
-                    .as_str()
+            if obj.contains_key("mpt_issuance_id") {
+                // MPT discriminator: must be exactly {"mpt_issuance_id", "value"} —
+                // matches xrpl.js isAmountObjectMPT (sorted keys === ["mpt_issuance_id","value"]).
+                // Reject objects with "currency"/"issuer" or any extra keys to stay
+                // consistent with the strict shape enforced in src/models/amount/mod.rs.
+                if obj.contains_key("currency") || obj.contains_key("issuer") {
+                    return Err(XRPLCoreException::SerdeJsonError(
+                        XRPLSerdeJsonError::UnexpectedValueType {
+                            expected: r#"MPT amount must not contain "currency" or "issuer" keys"#
+                                .into(),
+                            found: value,
+                        },
+                    ));
+                }
+                if obj.len() != 2 || !obj.contains_key("value") {
+                    return Err(XRPLCoreException::SerdeJsonError(
+                        XRPLSerdeJsonError::UnexpectedValueType {
+                            expected: r#"MPT amount must have exactly {"mpt_issuance_id","value"}"#
+                                .into(),
+                            found: value,
+                        },
+                    ));
+                }
+                let mpt_id = obj
+                    .get("mpt_issuance_id")
+                    .and_then(|v| v.as_str())
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
-                let val = obj["value"]
-                    .as_str()
+                let val = obj
+                    .get("value")
+                    .and_then(|v| v.as_str())
                     .ok_or(XRPLTypeException::InvalidNoneValue)?;
                 let serialized = _serialize_mpt_amount(val, mpt_id)?;
                 Ok(Amount::new(Some(&serialized))?)
-            } else if obj.contains_key("currency")
-                && obj.contains_key("issuer")
-                && obj.contains_key("value")
-            {
-                // ICA: must have {"currency", "issuer", "value"}; extra keys (e.g.
-                // "counterparty") are allowed and ignored per the XRPL amount spec.
-                Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
             } else {
-                Err(XRPLCoreException::SerdeJsonError(
-                    XRPLSerdeJsonError::UnexpectedValueType {
-                        expected: r#"{"mpt_issuance_id","value"} or {"currency","issuer","value"}"#
-                            .into(),
-                        found: value,
-                    },
-                ))
+                // ICA path: requires {"currency", "issuer", "value"}; extra keys (e.g.
+                // "counterparty") are allowed and ignored per the XRPL amount spec.
+                // try_from propagates its own validation errors.
+                Ok(Self::try_from(IssuedCurrency::try_from(value)?)?)
             }
         } else {
             Err(XRPLCoreException::SerdeJsonError(
@@ -608,5 +642,69 @@ mod test {
                 assert!(amount.is_err());
             }
         }
+    }
+
+    #[test]
+    fn test_mpt_negative_sign_bit_rejected_on_serialize() {
+        // Leading byte 0x20: MPT flag (0x20) set, positive flag (0x40) clear.
+        // Decoder must reject wire data with cleared positive bit.
+        let mut buf = [0u8; 33];
+        buf[0] = 0x20;
+        let amount = Amount::new(Some(&buf)).unwrap();
+        assert!(
+            serde_json::to_string(&amount).is_err(),
+            "MPT amount with cleared positive bit must not serialize"
+        );
+    }
+
+    #[test]
+    fn test_mpt_short_buffer_serialize_error() {
+        // 5-byte buffer with leading byte 0x60 (MPT + positive flags set).
+        // Decoder must reject buffers shorter than 33 bytes.
+        let buf = [0x60u8, 0, 0, 0, 0];
+        let amount = Amount::new(Some(&buf)).unwrap();
+        assert!(
+            serde_json::to_string(&amount).is_err(),
+            "MPT amount with buffer shorter than 33 bytes must not serialize"
+        );
+    }
+
+    #[test]
+    fn test_amount_bool_methods_empty_buffer() {
+        let amount = Amount::new(Some(&[])).unwrap();
+        assert!(
+            !amount.is_native(),
+            "is_native() must return false for empty buffer"
+        );
+        assert!(
+            !amount.is_mpt(),
+            "is_mpt() must return false for empty buffer"
+        );
+        assert!(
+            !amount.is_positive(),
+            "is_positive() must return false for empty buffer"
+        );
+    }
+
+    #[test]
+    fn test_mpt_reject_uppercase_hex_prefix() {
+        // Uppercase 0X prefix must be rejected to match xrpl.js behaviour.
+        let result = Amount::try_from(serde_json::json!({
+            "value": "0X1F",
+            "mpt_issuance_id": "000000000000000000000000000000000000000000000000"
+        }));
+        assert!(result.is_err(), "uppercase 0X prefix should be rejected");
+    }
+
+    #[test]
+    fn test_native_short_buffer_serialize_error() {
+        // A buffer with native flag (bit 7 and 5 both clear) but fewer than 8 bytes
+        // must return Err from _deserialize_native_amount, not panic.
+        let buf = [0x00u8, 0x01, 0x02]; // 3 bytes, is_native() = true
+        let amount = Amount::new(Some(&buf)).unwrap();
+        assert!(
+            serde_json::to_string(&amount).is_err(),
+            "native amount with buffer < 8 bytes must not serialize"
+        );
     }
 }
