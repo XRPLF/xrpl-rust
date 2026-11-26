@@ -86,6 +86,8 @@ pub enum XRPRangeException {
 pub enum XRPLNFTIdException {
     #[error("Invalid NFT ID length (expected: {expected} found: {found})")]
     InvalidNFTIdLength { expected: usize, found: usize },
+    #[error("Invalid NFT ID encoding (expected ASCII hex)")]
+    InvalidNFTIdEncoding,
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]
