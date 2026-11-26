@@ -30,6 +30,30 @@ use super::exceptions::XRPLClientResult;
 pub struct WebSocketOpen;
 pub struct WebSocketClosed;
 
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for super::WebSocketOpen {}
+    impl Sealed for super::WebSocketClosed {}
+}
+
+/// Type-state marker describing whether a [`websocket`](self) client is open.
+///
+/// Implemented only for [`WebSocketOpen`] and [`WebSocketClosed`], this lets
+/// `is_open()` resolve from the type state at compile time instead of relying
+/// on the unstable [`core::any::type_name`] string representation.
+pub trait ConnectionStatus: sealed::Sealed {
+    /// Whether this state represents an open connection.
+    const IS_OPEN: bool;
+}
+
+impl ConnectionStatus for WebSocketOpen {
+    const IS_OPEN: bool = true;
+}
+
+impl ConnectionStatus for WebSocketClosed {
+    const IS_OPEN: bool = false;
+}
+
 #[allow(async_fn_in_trait)]
 pub trait XRPLAsyncWebsocketIO {
     async fn xrpl_send(&mut self, message: XRPLRequest<'_>) -> XRPLClientResult<()>;
@@ -98,5 +122,21 @@ where
             Some(Err(error)) => Err(error),
             None => Ok(None),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ConnectionStatus, WebSocketClosed, WebSocketOpen};
+
+    /// Mirrors how `is_open()` reads the constant through the type state.
+    fn is_open<S: ConnectionStatus>() -> bool {
+        S::IS_OPEN
+    }
+
+    #[test]
+    fn connection_status_is_open_resolves_from_type_state() {
+        assert!(is_open::<WebSocketOpen>());
+        assert!(!is_open::<WebSocketClosed>());
     }
 }
