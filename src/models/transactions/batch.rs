@@ -71,6 +71,17 @@ impl RawTransaction {
         Self::from_json(serde_json::to_value(transaction)?)
     }
 
+    pub fn from_transactions<'a, T, F>(transaction: &[&T]) -> XRPLModelResult<Vec<Self>>
+    where
+        T: Transaction<'a, F>,
+        F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    {
+        transaction
+            .iter()
+            .map(|v| Self::from_json(serde_json::to_value(v)?))
+            .collect::<XRPLModelResult<Vec<Self>>>()
+    }
+
     pub fn from_json(mut json: Value) -> XRPLModelResult<Self> {
         let Some(object) = json.as_object_mut() else {
             return Err(invalid("raw_transactions", "a JSON object", "non-object"));
@@ -429,6 +440,30 @@ impl<'a> Batch<'a> {
             raw_transactions,
             batch_signers,
         }
+    }
+
+    pub fn with_transaction<'b, T, F>(mut self, transactions: &T) -> XRPLModelResult<Self>
+    where
+        T: Transaction<'b, F>,
+        F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    {
+        let raw = RawTransaction::from_transaction(transactions)?;
+
+        self.raw_transactions.push(raw);
+
+        Ok(self)
+    }
+
+    pub fn with_transactions<'b, T, F>(mut self, transactions: &[&T]) -> XRPLModelResult<Self>
+    where
+        T: Transaction<'b, F>,
+        F: IntoEnumIterator + Serialize + Debug + PartialEq,
+    {
+        let raws = RawTransaction::from_transactions(transactions)?;
+
+        self.raw_transactions.extend(raws);
+
+        Ok(self)
     }
 
     /// Replace the batch mode.
