@@ -1,89 +1,80 @@
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, vec::Vec};
 use core::convert::TryFrom;
 
 use serde::{Deserialize, Serialize};
 
-use super::{metadata::TransactionMetadata, tx::TxVersionMap};
+use super::tx::TxVersionMap;
+use crate::models::transactions::metadata::TransactionMetadata;
 use crate::models::{XRPLModelException, XRPLModelResult};
 
-/// Result type for NFTokenMint transaction
+/// Result type for NFTokenMint transaction.
+/// Access the minted token ID via `meta.nftoken_id`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NFTokenMintResult<'a> {
-    /// The NFTokenID of the minted token
-    pub nftoken_id: Cow<'a, str>,
-    /// The complete transaction metadata
+    /// The complete transaction metadata (includes `nftoken_id`)
     #[serde(flatten)]
     pub meta: TransactionMetadata<'a>,
 }
 
-/// Result type for NFTokenCreateOffer transaction
+/// Result type for NFTokenCreateOffer transaction.
+/// Access the created offer ID via `meta.offer_id`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NFTokenCreateOfferResult<'a> {
-    /// The OfferID of the created offer
-    pub offer_id: Cow<'a, str>,
-    /// The complete transaction metadata
+    /// The complete transaction metadata (includes `offer_id`)
     #[serde(flatten)]
     pub meta: TransactionMetadata<'a>,
 }
 
-/// Result type for NFTokenCancelOffer transaction
+/// Result type for NFTokenCancelOffer transaction.
+/// Access the cancelled token IDs via `meta.nftoken_ids`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NFTokenCancelOfferResult<'a> {
-    /// The NFTokenIDs of all tokens affected by the cancellation
-    pub nftoken_ids: Cow<'a, [Cow<'a, str>]>,
-    /// The complete transaction metadata
+    /// The complete transaction metadata (includes `nftoken_ids`)
     #[serde(flatten)]
     pub meta: TransactionMetadata<'a>,
 }
 
-/// Result type for NFTokenAcceptOffer transaction
+/// Result type for NFTokenAcceptOffer transaction.
+/// Access the accepted token ID via `meta.nftoken_id`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NFTokenAcceptOfferResult<'a> {
-    /// The NFTokenID of the accepted token
-    pub nftoken_id: Cow<'a, str>,
-    /// The complete transaction metadata
+    /// The complete transaction metadata (includes `nftoken_id`)
     #[serde(flatten)]
     pub meta: TransactionMetadata<'a>,
 }
 
-/// Macro to implement TryFrom<TxVersionMap> for NFToken result types
+/// Macro to implement TryFrom<TxVersionMap> for NFToken result types.
+/// Validates that the expected metadata field is present, then wraps the
+/// full metadata in the result struct so callers access it via `result.meta`.
 macro_rules! impl_try_from_tx_version_map {
-    ($result_type:ident, $field_name:ident, $field_type:ty) => {
+    ($result_type:ident, $field_name:ident) => {
         impl<'a> TryFrom<TxVersionMap<'a>> for $result_type<'a> {
             type Error = XRPLModelException;
 
             fn try_from(tx: TxVersionMap<'a>) -> XRPLModelResult<Self> {
-                // Extract metadata based on the version
                 let meta = match &tx {
                     TxVersionMap::Default(tx) => tx.meta.clone(),
                     TxVersionMap::V1(tx) => tx.meta.clone(),
                 };
 
                 if let Some(meta) = meta {
-                    if let Some(field_value) = meta.$field_name.clone() {
-                        return Ok($result_type {
-                            $field_name: field_value,
-                            meta,
-                        });
+                    if meta.$field_name.is_some() {
+                        return Ok($result_type { meta });
                     }
                 }
 
-                return Err(XRPLModelException::MissingField(
+                Err(XRPLModelException::MissingField(
                     stringify!($field_name).into(),
-                ));
+                ))
             }
         }
     };
 }
 
-impl_try_from_tx_version_map!(NFTokenMintResult, nftoken_id, Cow<'a, str>);
-impl_try_from_tx_version_map!(NFTokenCreateOfferResult, offer_id, Cow<'a, str>);
-impl_try_from_tx_version_map!(
-    NFTokenCancelOfferResult,
-    nftoken_ids,
-    Cow<'a, [Cow<'a, str>]>
-);
-impl_try_from_tx_version_map!(NFTokenAcceptOfferResult, nftoken_id, Cow<'a, str>);
+impl_try_from_tx_version_map!(NFTokenMintResult, nftoken_id);
+impl_try_from_tx_version_map!(NFTokenCreateOfferResult, offer_id);
+impl_try_from_tx_version_map!(NFTokenCancelOfferResult, nftoken_ids);
+impl_try_from_tx_version_map!(NFTokenAcceptOfferResult, nftoken_id);
 
 #[cfg(test)]
 mod tests {
@@ -151,7 +142,7 @@ mod tests {
         let meta = meta_with(Some("0008000044CDDA"), None, None);
         let tx = make_tx_default(Some(meta));
         let result: NFTokenMintResult = tx.try_into().unwrap();
-        assert_eq!(result.nftoken_id, "0008000044CDDA");
+        assert_eq!(result.meta.nftoken_id.as_deref(), Some("0008000044CDDA"));
     }
 
     #[test]
@@ -159,7 +150,7 @@ mod tests {
         let meta = meta_with(Some("0008000044CDDA"), None, None);
         let tx = make_tx_v1(Some(meta));
         let result: NFTokenMintResult = tx.try_into().unwrap();
-        assert_eq!(result.nftoken_id, "0008000044CDDA");
+        assert_eq!(result.meta.nftoken_id.as_deref(), Some("0008000044CDDA"));
     }
 
     #[test]
@@ -182,7 +173,7 @@ mod tests {
         let meta = meta_with(None, Some("AABBCCDD"), None);
         let tx = make_tx_default(Some(meta));
         let result: NFTokenCreateOfferResult = tx.try_into().unwrap();
-        assert_eq!(result.offer_id, "AABBCCDD");
+        assert_eq!(result.meta.offer_id.as_deref(), Some("AABBCCDD"));
     }
 
     #[test]
@@ -190,7 +181,10 @@ mod tests {
         let meta = meta_with(None, None, Some(&["ID1", "ID2"]));
         let tx = make_tx_default(Some(meta));
         let result: NFTokenCancelOfferResult = tx.try_into().unwrap();
-        assert_eq!(result.nftoken_ids.as_ref(), &["ID1", "ID2"]);
+        assert_eq!(
+            result.meta.nftoken_ids.as_ref().unwrap().as_slice(),
+            &["ID1", "ID2"][..]
+        );
     }
 
     #[test]
@@ -198,16 +192,14 @@ mod tests {
         let meta = meta_with(Some("0008000044CDDA"), None, None);
         let tx = make_tx_default(Some(meta));
         let result: NFTokenAcceptOfferResult = tx.try_into().unwrap();
-        assert_eq!(result.nftoken_id, "0008000044CDDA");
+        assert_eq!(result.meta.nftoken_id.as_deref(), Some("0008000044CDDA"));
     }
 
     #[test]
     fn test_mint_result_serialize() {
-        // Round-trip would fail because `nftoken_id` collides with the
-        // flattened meta's `nftoken_id`. Just check serialization works.
+        // nftoken_id is carried in meta; no key collision with flatten.
         let result = NFTokenMintResult {
-            nftoken_id: "00080000".into(),
-            meta: meta_with(None, None, None),
+            meta: meta_with(Some("00080000"), None, None),
         };
         let serialized = serde_json::to_string(&result).unwrap();
         assert!(serialized.contains("\"nftoken_id\":\"00080000\""));
