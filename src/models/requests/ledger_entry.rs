@@ -56,16 +56,19 @@ impl Model for DepositPreauth<'_> {
                                 .credential_type
                                 .eq_ignore_ascii_case(&credential.credential_type)
                     }) {
-                        return Err(XRPLModelException::InvalidValue {
-                            field: "authorized_credentials".into(),
-                            expected: "unique issuer and credential_type pairs".into(),
-                            found: credential.credential_type.to_string(),
+                        return Err(XRPLModelException::ValueEqualsValue {
+                            field1: "authorized_credentials".into(),
+                            field2: "authorized_credentials (duplicate entry)".into(),
                         });
                     }
                 }
                 Ok(())
             }
-            _ => Err(XRPLModelException::ExpectedOneOf(&[
+            (Some(_), Some(_)) => Err(XRPLModelException::InvalidFieldCombination {
+                field: "authorized",
+                other_fields: &["authorized_credentials"],
+            }),
+            (None, None) => Err(XRPLModelException::ExpectedOneOf(&[
                 "authorized",
                 "authorized_credentials",
             ])),
@@ -793,7 +796,13 @@ mod test_ledger_entry_errors {
             ..Default::default()
         };
 
-        assert!(req.validate().is_err());
+        assert_eq!(
+            req.validate().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "authorized_credentials".into(),
+                field2: "authorized_credentials (duplicate entry)".into(),
+            }
+        );
     }
 
     #[test]
@@ -817,7 +826,13 @@ mod test_ledger_entry_errors {
             ..Default::default()
         };
 
-        assert!(req.validate().is_err());
+        assert_eq!(
+            req.validate().unwrap_err(),
+            XRPLModelException::ValueEqualsValue {
+                field1: "authorized_credentials".into(),
+                field2: "authorized_credentials (duplicate entry)".into(),
+            }
+        );
     }
 
     #[test]
@@ -834,7 +849,30 @@ mod test_ledger_entry_errors {
             ..Default::default()
         };
 
-        assert!(req.validate().is_err());
+        assert_eq!(
+            req.validate().unwrap_err(),
+            XRPLModelException::InvalidFieldCombination {
+                field: "authorized",
+                other_fields: &["authorized_credentials"],
+            }
+        );
+    }
+
+    #[test]
+    fn test_deposit_preauth_rejects_neither_authorized_nor_credentials() {
+        let req = LedgerEntry {
+            deposit_preauth: Some(DepositPreauth {
+                owner: "rOwner".into(),
+                authorized: None,
+                authorized_credentials: None,
+            }),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            req.validate().unwrap_err(),
+            XRPLModelException::ExpectedOneOf(&["authorized", "authorized_credentials"])
+        );
     }
 
     #[test]
