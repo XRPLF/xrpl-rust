@@ -22,10 +22,6 @@ pub trait XRPLClient {
             {
                 common_fields.id = Some(self.get_random_id());
             }
-            #[cfg(not(feature = "std"))]
-            unimplemented!(
-                "Random ID generation is not supported in no_std. Please provide an ID."
-            );
         }
     }
 
@@ -37,5 +33,43 @@ pub trait XRPLClient {
         let random_id = rand::random::<u32>().to_string();
 
         alloc::borrow::Cow::Owned(random_id)
+    }
+}
+
+#[cfg(all(test, not(feature = "std")))]
+mod tests {
+    use super::XRPLClient;
+    use crate::{
+        asynch::clients::exceptions::XRPLClientResult,
+        models::{
+            requests::{random::Random, Request, XRPLRequest},
+            results::XRPLResponse,
+        },
+    };
+    use url::Url;
+
+    struct TestClient;
+
+    impl XRPLClient for TestClient {
+        async fn request_impl<'a: 'b, 'b>(
+            &self,
+            _request: XRPLRequest<'a>,
+        ) -> XRPLClientResult<XRPLResponse<'b>> {
+            unreachable!("not used in this test")
+        }
+
+        fn get_host(&self) -> Url {
+            Url::parse("ws://localhost:6006").expect("valid URL")
+        }
+    }
+
+    #[test]
+    fn set_request_id_no_std_does_not_panic_or_generate_id() {
+        let client = TestClient;
+        let mut request: XRPLRequest<'_> = Random::new(None).into();
+
+        client.set_request_id(&mut request);
+
+        assert!(request.get_common_fields().id.is_none());
     }
 }
